@@ -1,0 +1,173 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useScenes } from "@/hooks/useScenes";
+import type { Scene } from "@/lib/types";
+
+const commaListToArray = (value: string) =>
+  value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const sceneFormSchema = z.object({
+  title: z.string().min(1, "标题不能为空"),
+  chapterInfo: z.string().min(1, "章节信息不能为空"),
+  summary: z.string().min(1, "摘要不能为空"),
+  tags: z.string(),
+  locationId: z.string().min(1, "地点 ID 不能为空"),
+  characterIds: z.string(),
+});
+
+export type SceneFormValues = z.infer<typeof sceneFormSchema>;
+
+function sceneToFormValues(scene: Scene): SceneFormValues {
+  return {
+    title: scene.title,
+    chapterInfo: scene.chapterInfo,
+    summary: scene.summary,
+    tags: scene.tags.join(", "),
+    locationId: scene.locationId,
+    characterIds: scene.characterIds.join(", "),
+  };
+}
+
+function formValuesToNewSceneInput(
+  values: SceneFormValues
+): Omit<Scene, "tsid"> {
+  return {
+    title: values.title.trim(),
+    chapterInfo: values.chapterInfo.trim(),
+    summary: values.summary.trim(),
+    tags: commaListToArray(values.tags),
+    locationId: values.locationId.trim(),
+    characterIds: commaListToArray(values.characterIds),
+  };
+}
+
+function formValuesToScene(values: SceneFormValues, tsid: string): Scene {
+  return { tsid, ...formValuesToNewSceneInput(values) };
+}
+
+type SceneFormProps =
+  | { mode: "create"; defaultValues?: undefined }
+  | { mode: "edit"; defaultValues: Scene };
+
+export function SceneForm(props: SceneFormProps) {
+  const router = useRouter();
+  const { create, update } = useScenes();
+
+  const defaultValues: SceneFormValues =
+    props.mode === "edit"
+      ? sceneToFormValues(props.defaultValues)
+      : {
+          title: "",
+          chapterInfo: "",
+          summary: "",
+          tags: "",
+          locationId: "",
+          characterIds: "",
+        };
+
+  const form = useForm<SceneFormValues>({
+    resolver: zodResolver(sceneFormSchema),
+    defaultValues,
+  });
+
+  const onSubmit = form.handleSubmit((values) => {
+    if (props.mode === "create") {
+      create(formValuesToNewSceneInput(values));
+    } else {
+      update(formValuesToScene(values, props.defaultValues.tsid));
+    }
+    router.push("/scenes");
+  });
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="title">标题</Label>
+        <Input id="title" {...form.register("title")} aria-invalid={!!form.formState.errors.title} />
+        {form.formState.errors.title && (
+          <p className="text-destructive text-sm">
+            {form.formState.errors.title.message}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="chapterInfo">章节信息</Label>
+        <Input
+          id="chapterInfo"
+          {...form.register("chapterInfo")}
+          aria-invalid={!!form.formState.errors.chapterInfo}
+        />
+        {form.formState.errors.chapterInfo && (
+          <p className="text-destructive text-sm">
+            {form.formState.errors.chapterInfo.message}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="summary">摘要</Label>
+        <Textarea
+          id="summary"
+          {...form.register("summary")}
+          aria-invalid={!!form.formState.errors.summary}
+        />
+        {form.formState.errors.summary && (
+          <p className="text-destructive text-sm">
+            {form.formState.errors.summary.message}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="tags">标签（逗号分隔）</Label>
+        <Input id="tags" {...form.register("tags")} placeholder="例如：序幕, 异鬼" />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="locationId">地点 ID</Label>
+        <Input
+          id="locationId"
+          {...form.register("locationId")}
+          aria-invalid={!!form.formState.errors.locationId}
+        />
+        {form.formState.errors.locationId && (
+          <p className="text-destructive text-sm">
+            {form.formState.errors.locationId.message}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="characterIds">角色 ID（逗号分隔）</Label>
+        <Input
+          id="characterIds"
+          {...form.register("characterIds")}
+          placeholder="例如：char_arya, char_jon"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="submit">
+          {props.mode === "create" ? "创建" : "保存"}
+        </Button>
+        <Button type="button" variant="outline" asChild>
+          <Link href="/scenes">取消</Link>
+        </Button>
+      </div>
+    </form>
+  );
+}
