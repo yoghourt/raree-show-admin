@@ -22,29 +22,75 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useScenes } from "@/hooks/useScenes";
+import type { Scene } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export function SceneTable() {
-  const { getAll, deleteById } = useScenes();
-  const scenes = getAll();
+export type SceneTableProps = {
+  scenes: Scene[];
+  loading: boolean;
+  error: string | null;
+  onDelete: (id: string) => Promise<void>;
+};
 
+function TableSkeleton() {
+  return (
+    <div className="space-y-3 p-4" aria-busy="true" aria-label="加载中">
+      <div className="bg-muted h-4 w-1/3 animate-pulse rounded-md" />
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div
+          key={i}
+          className="bg-muted/70 h-10 w-full animate-pulse rounded-md"
+        />
+      ))}
+      <p className="text-muted-foreground pt-2 text-center text-sm">加载中…</p>
+    </div>
+  );
+}
+
+export function SceneTable({
+  scenes,
+  loading,
+  error,
+  onDelete,
+}: SceneTableProps) {
   const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(
     null
   );
+  const [deleteSubmitting, setDeleteSubmitting] = React.useState(false);
 
-  const confirmDelete = () => {
-    if (deleteTargetId) {
-      deleteById(deleteTargetId);
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+    setDeleteSubmitting(true);
+    try {
+      await onDelete(deleteTargetId);
+      setDeleteTargetId(null);
+    } catch {
+      /* 错误由父级 error 展示 */
+    } finally {
+      setDeleteSubmitting(false);
     }
-    setDeleteTargetId(null);
   };
 
   return (
     <>
+      {error ? (
+        <div
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          role="alert"
+        >
+          {error}
+        </div>
+      ) : null}
+
       <Card className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-sm ring-0">
         <CardContent className="p-0">
-          {scenes.length === 0 ? (
+          {loading ? (
+            <TableSkeleton />
+          ) : error ? (
+            <div className="text-muted-foreground p-8 text-center text-sm">
+              无法加载列表，请查看上方错误信息。
+            </div>
+          ) : scenes.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
               <div className="flex size-14 items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50">
                 <Inbox
@@ -57,7 +103,7 @@ export function SceneTable() {
                 暂无场景
               </p>
               <p className="mt-1 max-w-sm text-sm text-zinc-500">
-                点击右上角「新增场景」创建第一条记录，或刷新页面恢复示例数据。
+                点击右上角「新增场景」创建第一条记录。
               </p>
             </div>
           ) : (
@@ -164,19 +210,25 @@ export function SceneTable() {
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              确定要删除该场景吗？此操作为本地 Mock，刷新页面后数据会恢复为初始示例。
+              确定要删除该场景吗？此操作将从数据库中永久移除该记录。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">
             <Button
               type="button"
               variant="outline"
+              disabled={deleteSubmitting}
               onClick={() => setDeleteTargetId(null)}
             >
               取消
             </Button>
-            <Button type="button" variant="destructive" onClick={confirmDelete}>
-              删除
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteSubmitting}
+              onClick={() => void confirmDelete()}
+            >
+              {deleteSubmitting ? "删除中…" : "删除"}
             </Button>
           </DialogFooter>
         </DialogContent>

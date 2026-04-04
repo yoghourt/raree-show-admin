@@ -2,63 +2,99 @@
 
 import * as React from "react";
 
-import { MOCK_SCENES } from "@/lib/mock-data";
+import {
+  createScene as createSceneApi,
+  deleteScene as deleteSceneApi,
+  getScenes,
+  updateScene as updateSceneApi,
+} from "@/lib/scenes";
 import type { Scene } from "@/lib/types";
 
-export type ScenesContextValue = {
-  getAll: () => Scene[];
-  getById: (id: string) => Scene | undefined;
-  create: (scene: Omit<Scene, "tsid"> & { tsid?: string }) => Scene;
-  update: (scene: Scene) => void;
-  deleteById: (id: string) => void;
-};
-
-const ScenesContext = React.createContext<ScenesContextValue | null>(null);
-
-export function ScenesProvider({ children }: { children: React.ReactNode }) {
-  const [scenes, setScenes] = React.useState<Scene[]>(() => [...MOCK_SCENES]);
-
-  const getAll = React.useCallback(() => scenes, [scenes]);
-
-  const getById = React.useCallback(
-    (id: string) => scenes.find((s) => s.tsid === id),
-    [scenes]
-  );
-
-  const create = React.useCallback(
-    (input: Omit<Scene, "tsid"> & { tsid?: string }) => {
-      const { tsid: optionalTsid, ...rest } = input;
-      const tsid =
-        optionalTsid?.trim() || `scene_${Date.now()}`;
-      const scene: Scene = { ...rest, tsid };
-      setScenes((prev) => [...prev, scene]);
-      return scene;
-    },
-    []
-  );
-
-  const update = React.useCallback((scene: Scene) => {
-    setScenes((prev) =>
-      prev.map((s) => (s.tsid === scene.tsid ? scene : s))
-    );
-  }, []);
-
-  const deleteById = React.useCallback((id: string) => {
-    setScenes((prev) => prev.filter((s) => s.tsid !== id));
-  }, []);
-
-  const value = React.useMemo<ScenesContextValue>(
-    () => ({ getAll, getById, create, update, deleteById }),
-    [getAll, getById, create, update, deleteById]
-  );
-
-  return React.createElement(ScenesContext.Provider, { value }, children);
+function toErrorMessage(e: unknown): string {
+  if (e instanceof Error) {
+    return e.message;
+  }
+  return String(e);
 }
 
-export function useScenes(): ScenesContextValue {
-  const ctx = React.useContext(ScenesContext);
-  if (!ctx) {
-    throw new Error("useScenes must be used within ScenesProvider");
-  }
-  return ctx;
+export function useScenes() {
+  const [scenes, setScenes] = React.useState<Scene[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const refresh = React.useCallback(async () => {
+    setError(null);
+    try {
+      const list = await getScenes();
+      setScenes(list);
+    } catch (e) {
+      setError(toErrorMessage(e));
+      throw e;
+    }
+  }, []);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await refresh();
+    } catch {
+      /* error 已写入 state */
+    } finally {
+      setLoading(false);
+    }
+  }, [refresh]);
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  const createScene = React.useCallback(
+    async (data: Omit<Scene, "tsid"> & { tsid?: string }) => {
+      try {
+        await createSceneApi(data);
+        await refresh();
+      } catch (e) {
+        setError(toErrorMessage(e));
+        throw e;
+      }
+    },
+    [refresh]
+  );
+
+  const updateScene = React.useCallback(
+    async (id: string, data: Omit<Scene, "tsid">) => {
+      try {
+        await updateSceneApi(id, data);
+        await refresh();
+      } catch (e) {
+        setError(toErrorMessage(e));
+        throw e;
+      }
+    },
+    [refresh]
+  );
+
+  const deleteScene = React.useCallback(
+    async (id: string) => {
+      try {
+        await deleteSceneApi(id);
+        await refresh();
+      } catch (e) {
+        setError(toErrorMessage(e));
+        throw e;
+      }
+    },
+    [refresh]
+  );
+
+  return {
+    scenes,
+    loading,
+    error,
+    createScene,
+    updateScene,
+    deleteScene,
+    refresh,
+  };
 }

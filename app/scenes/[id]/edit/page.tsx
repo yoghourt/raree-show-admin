@@ -2,10 +2,19 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import * as React from "react";
 
 import { SceneForm } from "@/components/scenes/SceneForm";
 import { Button } from "@/components/ui/button";
-import { useScenes } from "@/hooks/useScenes";
+import { getScene } from "@/lib/scenes";
+import type { Scene } from "@/lib/types";
+
+function toErrorMessage(e: unknown): string {
+  if (e instanceof Error) {
+    return e.message;
+  }
+  return String(e);
+}
 
 export default function EditScenePage() {
   const params = useParams();
@@ -13,8 +22,72 @@ export default function EditScenePage() {
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const decodedId = id ? decodeURIComponent(id) : "";
 
-  const { getById } = useScenes();
-  const scene = decodedId ? getById(decodedId) : undefined;
+  const [scene, setScene] = React.useState<Scene | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!decodedId) {
+      setScene(null);
+      setLoading(false);
+      setLoadError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+
+    (async () => {
+      try {
+        const s = await getScene(decodedId);
+        if (cancelled) return;
+        setScene(s);
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(toErrorMessage(e));
+          setScene(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [decodedId]);
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
+        <Button variant="ghost" size="sm" className="-ml-2" asChild>
+          <Link href="/scenes">← 返回列表</Link>
+        </Button>
+        <div className="text-muted-foreground text-sm" aria-busy="true">
+          加载中…
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
+        <Button variant="ghost" size="sm" className="-ml-2" asChild>
+          <Link href="/scenes">← 返回列表</Link>
+        </Button>
+        <div
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          role="alert"
+        >
+          {loadError}
+        </div>
+      </div>
+    );
+  }
 
   if (!scene) {
     return (
@@ -22,7 +95,9 @@ export default function EditScenePage() {
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
           <Link href="/scenes">← 返回列表</Link>
         </Button>
-        <p className="text-muted-foreground">未找到该场景（tsid：{decodedId || "—"}）。</p>
+        <p className="text-muted-foreground">
+          未找到该场景（tsid：{decodedId || "—"}）。
+        </p>
       </div>
     );
   }
