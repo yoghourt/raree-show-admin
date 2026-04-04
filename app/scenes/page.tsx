@@ -1,10 +1,15 @@
+"use client";
+
 import { ChevronRight, Plus as PlusIcon } from "lucide-react";
 import Link from "next/link";
 
 import { SceneTable } from "@/components/scenes/SceneTable";
 import { Button } from "@/components/ui/button";
+import { useScenes } from "@/hooks/useScenes";
 
 export default function ScenesPage() {
+  const { scenes, loading, error, deleteScene } = useScenes();
+
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
       <nav
@@ -38,7 +43,12 @@ export default function ScenesPage() {
         </Button>
       </header>
 
-      <SceneTable />
+      <SceneTable
+        scenes={scenes}
+        loading={loading}
+        error={error}
+        onDelete={deleteScene}
+      />
     </div>
   );
 }

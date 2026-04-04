@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import * as React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useScenes } from "@/hooks/useScenes";
+import { createScene, updateScene } from "@/lib/scenes";
 import type { Scene } from "@/lib/types";
 
 const commaListToArray = (value: string) =>
@@ -54,8 +55,11 @@ function formValuesToNewSceneInput(
   };
 }
 
-function formValuesToScene(values: SceneFormValues, tsid: string): Scene {
-  return { tsid, ...formValuesToNewSceneInput(values) };
+function toSubmitError(e: unknown): string {
+  if (e instanceof Error) {
+    return e.message;
+  }
+  return String(e);
 }
 
 type SceneFormProps =
@@ -64,7 +68,7 @@ type SceneFormProps =
 
 export function SceneForm(props: SceneFormProps) {
   const router = useRouter();
-  const { create, update } = useScenes();
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   const defaultValues: SceneFormValues =
     props.mode === "edit"
@@ -83,17 +87,34 @@ export function SceneForm(props: SceneFormProps) {
     defaultValues,
   });
 
-  const onSubmit = form.handleSubmit((values) => {
-    if (props.mode === "create") {
-      create(formValuesToNewSceneInput(values));
-    } else {
-      update(formValuesToScene(values, props.defaultValues.tsid));
+  const onSubmit = form.handleSubmit(async (values) => {
+    setSubmitError(null);
+    try {
+      if (props.mode === "create") {
+        await createScene(formValuesToNewSceneInput(values));
+      } else {
+        await updateScene(
+          props.defaultValues.tsid,
+          formValuesToNewSceneInput(values)
+        );
+      }
+      router.push("/scenes");
+    } catch (e) {
+      setSubmitError(toSubmitError(e));
     }
-    router.push("/scenes");
   });
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
+      {submitError ? (
+        <div
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          role="alert"
+        >
+          {submitError}
+        </div>
+      ) : null}
+
       <div className="space-y-2">
         <Label htmlFor="title">标题</Label>
         <Input id="title" {...form.register("title")} aria-invalid={!!form.formState.errors.title} />
@@ -161,8 +182,12 @@ export function SceneForm(props: SceneFormProps) {
       </div>
 
       <div className="flex gap-2">
-        <Button type="submit">
-          {props.mode === "create" ? "创建" : "保存"}
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting
+            ? "提交中…"
+            : props.mode === "create"
+              ? "创建"
+              : "保存"}
         </Button>
         <Button type="button" variant="outline" asChild>
           <Link href="/scenes">取消</Link>
