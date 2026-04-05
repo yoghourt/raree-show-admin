@@ -12,15 +12,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createWork, updateWork } from "@/lib/works";
+import * as charactersApi from "@/lib/characters";
+import type { Character } from "@/lib/types";
 
-const workFormSchema = z.object({
-  title: z.string().min(1, "标题不能为空"),
+const characterFormSchema = z.object({
+  name: z.string().min(1, "姓名不能为空"),
+  house: z.string(),
   description: z.string(),
-  coverImage: z.string().min(1, "封面链接不能为空"),
+  portraitUrl: z.string().min(1, "肖像链接不能为空"),
 });
 
-export type WorkFormValues = z.infer<typeof workFormSchema>;
+export type CharacterFormValues = z.infer<typeof characterFormSchema>;
+
+function characterToFormValues(c: Character): CharacterFormValues {
+  return {
+    name: c.name,
+    house: c.house,
+    description: c.description,
+    portraitUrl: c.portraitUrl,
+  };
+}
+
+function toPayload(
+  values: CharacterFormValues
+): Omit<Character, "id" | "tsid" | "workId" | "createdAt"> {
+  return {
+    name: values.name.trim(),
+    house: values.house.trim(),
+    description: values.description.trim(),
+    portraitUrl: values.portraitUrl.trim(),
+  };
+}
 
 function toSubmitError(e: unknown): string {
   if (e instanceof Error) {
@@ -29,26 +51,28 @@ function toSubmitError(e: unknown): string {
   return String(e);
 }
 
-type WorkFormProps =
-  | { mode: "create" }
-  | {
-      mode: "edit";
-      workId: string;
-      defaultValues: WorkFormValues;
-    };
+type CharacterFormProps =
+  | { workId: string; mode: "create" }
+  | { workId: string; mode: "edit"; defaultValues: Character };
 
-export function WorkForm(props: WorkFormProps) {
+export function CharacterForm(props: CharacterFormProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [imageUploading, setImageUploading] = React.useState(false);
+  const listHref = `/works/${encodeURIComponent(props.workId)}/characters`;
 
-  const defaultValues: WorkFormValues =
+  const defaultValues: CharacterFormValues =
     props.mode === "edit"
-      ? props.defaultValues
-      : { title: "", description: "", coverImage: "" };
+      ? characterToFormValues(props.defaultValues)
+      : {
+          name: "",
+          house: "",
+          description: "",
+          portraitUrl: "",
+        };
 
-  const form = useForm<WorkFormValues>({
-    resolver: zodResolver(workFormSchema),
+  const form = useForm<CharacterFormValues>({
+    resolver: zodResolver(characterFormSchema),
     defaultValues,
   });
 
@@ -56,19 +80,15 @@ export function WorkForm(props: WorkFormProps) {
     setSubmitError(null);
     try {
       if (props.mode === "create") {
-        await createWork({
-          title: values.title.trim(),
-          description: values.description.trim(),
-          coverImage: values.coverImage.trim(),
-        });
+        await charactersApi.create(props.workId, toPayload(values));
       } else {
-        await updateWork(props.workId, {
-          title: values.title.trim(),
-          description: values.description.trim(),
-          coverImage: values.coverImage.trim(),
-        });
+        await charactersApi.update(
+          props.workId,
+          props.defaultValues.tsid,
+          toPayload(values)
+        );
       }
-      router.push("/works");
+      router.push(listHref);
     } catch (e) {
       setSubmitError(toSubmitError(e));
     }
@@ -86,43 +106,44 @@ export function WorkForm(props: WorkFormProps) {
       ) : null}
 
       <div className="space-y-2">
-        <Label htmlFor="work-title">标题</Label>
+        <Label htmlFor="char-name">姓名</Label>
         <Input
-          id="work-title"
-          {...form.register("title")}
-          aria-invalid={!!form.formState.errors.title}
+          id="char-name"
+          {...form.register("name")}
+          aria-invalid={!!form.formState.errors.name}
         />
-        {form.formState.errors.title && (
+        {form.formState.errors.name && (
           <p className="text-destructive text-sm">
-            {form.formState.errors.title.message}
+            {form.formState.errors.name.message}
           </p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="work-description">描述</Label>
-        <Textarea
-          id="work-description"
-          {...form.register("description")}
-          aria-invalid={!!form.formState.errors.description}
-        />
+        <Label htmlFor="char-house">家族</Label>
+        <Input id="char-house" {...form.register("house")} />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="char-description">描述</Label>
+        <Textarea id="char-description" {...form.register("description")} />
       </div>
 
       <Controller
-        name="coverImage"
+        name="portraitUrl"
         control={form.control}
         render={({ field }) => (
           <div className="space-y-2">
             <ImageUploader
-              id="work-cover"
-              label="封面图片"
+              id="char-portrait"
+              label="肖像图片"
               value={field.value}
               onChange={field.onChange}
               onUploadingChange={setImageUploading}
             />
-            {form.formState.errors.coverImage && (
+            {form.formState.errors.portraitUrl && (
               <p className="text-destructive text-sm">
-                {form.formState.errors.coverImage.message}
+                {form.formState.errors.portraitUrl.message}
               </p>
             )}
           </div>
@@ -141,7 +162,7 @@ export function WorkForm(props: WorkFormProps) {
               : "保存"}
         </Button>
         <Button type="button" variant="outline" asChild>
-          <Link href="/works">取消</Link>
+          <Link href={listHref}>取消</Link>
         </Button>
       </div>
     </form>

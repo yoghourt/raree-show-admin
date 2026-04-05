@@ -22,14 +22,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Work } from "@/lib/types";
+import type { Location } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export type WorkTableProps = {
-  works: Work[];
+export type LocationTableProps = {
+  workId: string;
+  locations: Location[];
   loading: boolean;
   error: string | null;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (tsid: string) => Promise<void>;
 };
 
 function TableSkeleton() {
@@ -47,16 +48,19 @@ function TableSkeleton() {
   );
 }
 
-export function WorkTable({
-  works,
+export function LocationTable({
+  workId,
+  locations,
   loading,
   error,
   onDelete,
-}: WorkTableProps) {
+}: LocationTableProps) {
   const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(
     null
   );
   const [deleteSubmitting, setDeleteSubmitting] = React.useState(false);
+
+  const base = `/works/${encodeURIComponent(workId)}/locations`;
 
   const confirmDelete = async () => {
     if (!deleteTargetId) return;
@@ -65,7 +69,7 @@ export function WorkTable({
       await onDelete(deleteTargetId);
       setDeleteTargetId(null);
     } catch {
-      /* 错误由父级 error 展示 */
+      /* 错误由父级展示 */
     } finally {
       setDeleteSubmitting(false);
     }
@@ -90,7 +94,7 @@ export function WorkTable({
             <div className="text-muted-foreground p-8 text-center text-sm">
               无法加载列表，请查看上方错误信息。
             </div>
-          ) : works.length === 0 ? (
+          ) : locations.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
               <div className="flex size-14 items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50">
                 <Inbox
@@ -100,24 +104,24 @@ export function WorkTable({
                 />
               </div>
               <p className="mt-5 text-sm font-medium text-zinc-800">
-                暂无作品
+                暂无地点
               </p>
               <p className="mt-1 max-w-sm text-sm text-zinc-500">
-                点击右上角「新增作品」创建第一条记录。
+                点击右上角「新增地点」创建第一条记录。
               </p>
             </div>
           ) : (
             <Table className="min-w-max">
               <TableHeader>
                 <TableRow className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50">
-                  <TableHead className="h-10 w-20 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                    封面
+                  <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
+                    TSID
                   </TableHead>
                   <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                    标题
+                    名称
                   </TableHead>
                   <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 sm:table-cell">
-                    TSID
+                    地区
                   </TableHead>
                   <TableHead className="hidden h-10 max-w-[280px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
                     描述
@@ -128,66 +132,35 @@ export function WorkTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {works.map((work) => (
+                {locations.map((loc) => (
                   <TableRow
-                    key={work.id}
+                    key={loc.tsid}
                     className="border-zinc-100 transition-colors hover:bg-zinc-50/90"
                   >
-                    <TableCell className="py-2">
-                      {/* 封面为任意外链 URL，不使用 next/image 远程域名配置 */}
-                      {work.coverImage ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={work.coverImage}
-                          alt=""
-                          className="h-10 w-14 rounded-md border border-border object-cover"
-                        />
-                      ) : (
-                        <div className="h-10 w-14 rounded-md border border-border bg-muted" />
-                      )}
-                    </TableCell>
-                    <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
-                      {work.title}
-                    </TableCell>
-                    <TableCell className="hidden py-3 sm:table-cell">
+                    <TableCell className="whitespace-nowrap py-3">
                       <span
                         className={cn(
                           "inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-700"
                         )}
-                        title={work.tsid}
+                        title={loc.tsid}
                       >
-                        {work.tsid}
+                        {loc.tsid}
                       </span>
                     </TableCell>
-                    <TableCell className="hidden max-w-[280px] py-3 text-sm text-zinc-600 lg:table-cell">
-                      <span className="line-clamp-2">{work.description}</span>
+                    <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
+                      {loc.name}
                     </TableCell>
-                    <TableCell className="py-3 text-right">
-                      <div className="flex flex-wrap justify-end gap-1">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/scenes`}
-                          >
-                            场景
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/characters`}
-                          >
-                            角色
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/locations`}
-                          >
-                            地点
-                          </Link>
-                        </Button>
+                    <TableCell className="hidden py-3 whitespace-nowrap text-zinc-600 sm:table-cell">
+                      {loc.region || "—"}
+                    </TableCell>
+                    <TableCell className="hidden max-w-[280px] py-3 text-sm text-zinc-600 lg:table-cell">
+                      <span className="line-clamp-2">{loc.description}</span>
+                    </TableCell>
+                    <TableCell className="py-3 text-right whitespace-nowrap">
+                      <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="sm" asChild>
                           <Link
-                            href={`/works/${encodeURIComponent(work.id)}/edit`}
+                            href={`${base}/${encodeURIComponent(loc.tsid)}/edit`}
                           >
                             <Pencil className="size-3.5" aria-hidden />
                             编辑
@@ -197,7 +170,7 @@ export function WorkTable({
                           variant="destructive"
                           size="sm"
                           type="button"
-                          onClick={() => setDeleteTargetId(work.id)}
+                          onClick={() => setDeleteTargetId(loc.tsid)}
                         >
                           <Trash2 className="size-3.5" aria-hidden />
                           删除
@@ -222,7 +195,7 @@ export function WorkTable({
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              确定要删除该作品吗？请先处理或迁移其下的场景、角色、地点数据，或在数据库外键上启用级联删除。
+              确定要删除该地点吗？此操作将从数据库中永久移除该记录。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">

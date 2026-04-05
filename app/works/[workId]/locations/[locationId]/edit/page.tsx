@@ -5,13 +5,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as React from "react";
 
-import { SceneForm } from "@/components/scenes/SceneForm";
+import { LocationForm } from "@/components/locations/LocationForm";
 import { Button } from "@/components/ui/button";
-import * as charactersApi from "@/lib/characters";
-import * as locationsApi from "@/lib/locations";
-import { getScene } from "@/lib/scenes";
+import { getLocation } from "@/lib/locations";
 import { getWork } from "@/lib/works";
-import type { Character, Location, Scene, Work } from "@/lib/types";
+import type { Location, Work } from "@/lib/types";
 
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) {
@@ -20,58 +18,52 @@ function toErrorMessage(e: unknown): string {
   return String(e);
 }
 
-export default function EditScenePage() {
+export default function EditLocationPage() {
   const params = useParams();
   const rawWork = params.workId;
   const workId = Array.isArray(rawWork) ? rawWork[0] : rawWork ?? "";
-  const rawScene = params.sceneId;
-  const sceneIdParam = Array.isArray(rawScene) ? rawScene[0] : rawScene ?? "";
-  const sceneTsid = sceneIdParam ? decodeURIComponent(sceneIdParam) : "";
+  const rawLoc = params.locationId;
+  const locParam = Array.isArray(rawLoc) ? rawLoc[0] : rawLoc ?? "";
+  const locationTsid = locParam ? decodeURIComponent(locParam) : "";
 
   const [work, setWork] = React.useState<Work | null>(null);
-  const [scene, setScene] = React.useState<Scene | null>(null);
-  const [characters, setCharacters] = React.useState<Character[]>([]);
-  const [locations, setLocations] = React.useState<Location[]>([]);
-  const [pageLoading, setPageLoading] = React.useState(true);
+  const [workLoading, setWorkLoading] = React.useState(true);
+  const [location, setLocation] = React.useState<Location | null>(null);
+  const [locationLoading, setLocationLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!workId || !sceneTsid) {
+    if (!workId || !locationTsid) {
       setWork(null);
-      setScene(null);
-      setCharacters([]);
-      setLocations([]);
-      setPageLoading(false);
+      setLocation(null);
+      setWorkLoading(false);
+      setLocationLoading(false);
       return;
     }
     let cancelled = false;
-    setPageLoading(true);
+    setWorkLoading(true);
+    setLocationLoading(true);
     setLoadError(null);
 
     (async () => {
       try {
-        const [w, s, ch, loc] = await Promise.all([
+        const [w, loc] = await Promise.all([
           getWork(workId),
-          getScene(workId, sceneTsid),
-          charactersApi.getAll(workId),
-          locationsApi.getAll(workId),
+          getLocation(workId, locationTsid),
         ]);
         if (cancelled) return;
         setWork(w);
-        setScene(s);
-        setCharacters(ch);
-        setLocations(loc);
+        setLocation(loc);
       } catch (e) {
         if (!cancelled) {
           setLoadError(toErrorMessage(e));
           setWork(null);
-          setScene(null);
-          setCharacters([]);
-          setLocations([]);
+          setLocation(null);
         }
       } finally {
         if (!cancelled) {
-          setPageLoading(false);
+          setWorkLoading(false);
+          setLocationLoading(false);
         }
       }
     })();
@@ -79,16 +71,18 @@ export default function EditScenePage() {
     return () => {
       cancelled = true;
     };
-  }, [workId, sceneTsid]);
+  }, [workId, locationTsid]);
 
-  const scenesHref = `/works/${encodeURIComponent(workId)}/scenes`;
-  const workTitle = work?.title ?? "未知作品";
+  const listHref = `/works/${encodeURIComponent(workId)}/locations`;
+  const workTitle =
+    workLoading ? "加载中…" : work?.title ?? "未知作品";
+  const pageLoading = workLoading || locationLoading;
 
   if (pageLoading) {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={scenesHref}>← 返回场景列表</Link>
+          <Link href={listHref}>← 返回地点列表</Link>
         </Button>
         <p className="text-muted-foreground text-sm" aria-busy="true">
           加载中…
@@ -101,7 +95,7 @@ export default function EditScenePage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={scenesHref}>← 返回场景列表</Link>
+          <Link href={listHref}>← 返回地点列表</Link>
         </Button>
         <div
           className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
@@ -113,14 +107,14 @@ export default function EditScenePage() {
     );
   }
 
-  if (!scene) {
+  if (!location) {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={scenesHref}>← 返回场景列表</Link>
+          <Link href={listHref}>← 返回地点列表</Link>
         </Button>
         <p className="text-muted-foreground">
-          未找到该场景（tsid：{sceneTsid || "—"}）。
+          未找到该地点（tsid：{locationTsid || "—"}）。
         </p>
       </div>
     );
@@ -141,35 +135,33 @@ export default function EditScenePage() {
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
         <Link
-          href={scenesHref}
+          href={listHref}
           className="max-w-[140px] truncate transition-colors hover:text-zinc-800"
         >
           {workTitle}
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <Link href={scenesHref} className="transition-colors hover:text-zinc-800">
-          场景
+        <Link href={listHref} className="transition-colors hover:text-zinc-800">
+          地点
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">编辑场景</span>
+        <span className="font-medium text-zinc-800">编辑地点</span>
       </nav>
 
       <Button variant="ghost" size="sm" className="-ml-2" asChild>
-        <Link href={scenesHref}>← 返回场景列表</Link>
+        <Link href={listHref}>← 返回地点列表</Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">编辑场景</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">编辑地点</h1>
         <p className="text-muted-foreground mt-1 font-mono text-sm">
-          {scene.tsid}
+          {location.tsid}
         </p>
       </div>
-      <SceneForm
-        key={scene.tsid}
+      <LocationForm
+        key={location.tsid}
         workId={workId}
         mode="edit"
-        defaultValues={scene}
-        characters={characters}
-        locations={locations}
+        defaultValues={location}
       />
     </div>
   );

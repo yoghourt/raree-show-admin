@@ -17,3 +17,24 @@ export type Scene = {
   locationId: string;
   characterIds: string[];
 };
+
+export type Character = {
+  id: string;
+  tsid: string;
+  name: string;
+  house: string;
+  description: string;
+  portraitUrl: string;
+  workId: string;
+  createdAt: string;
+};
+
+export type Location = {
+  id: string;
+  tsid: string;
+  name: string;
+  region: string;
+  description: string;
+  workId: string;
+  createdAt: string;
+};
