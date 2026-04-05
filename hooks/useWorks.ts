@@ -3,12 +3,12 @@
 import * as React from "react";
 
 import {
-  createScene as createSceneApi,
-  deleteScene as deleteSceneApi,
-  getScenes,
-  updateScene as updateSceneApi,
-} from "@/lib/scenes";
-import type { Scene } from "@/lib/types";
+  createWork as createWorkApi,
+  deleteWork as deleteWorkApi,
+  getWorks,
+  updateWork as updateWorkApi,
+} from "@/lib/works";
+import type { Work } from "@/lib/types";
 
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) {
@@ -17,28 +17,23 @@ function toErrorMessage(e: unknown): string {
   return String(e);
 }
 
-export function useScenes(workId: string) {
-  const [scenes, setScenes] = React.useState<Scene[]>([]);
+export function useWorks() {
+  const [works, setWorks] = React.useState<Work[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     setError(null);
     try {
-      const list = await getScenes(workId);
-      setScenes(list);
+      const list = await getWorks();
+      setWorks(list);
     } catch (e) {
       setError(toErrorMessage(e));
       throw e;
     }
-  }, [workId]);
+  }, []);
 
   const load = React.useCallback(async () => {
-    if (!workId) {
-      setLoading(false);
-      setScenes([]);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
@@ -48,58 +43,65 @@ export function useScenes(workId: string) {
     } finally {
       setLoading(false);
     }
-  }, [workId, refresh]);
+  }, [refresh]);
 
   React.useEffect(() => {
     void load();
   }, [load]);
 
-  const createScene = React.useCallback(
-    async (data: Omit<Scene, "tsid" | "workId"> & { tsid?: string }) => {
+  const createWork = React.useCallback(
+    async (
+      data: Pick<Work, "title" | "description" | "coverImage"> & {
+        tsid?: string;
+      }
+    ) => {
       try {
-        await createSceneApi(workId, data);
+        await createWorkApi(data);
         await refresh();
       } catch (e) {
         setError(toErrorMessage(e));
         throw e;
       }
     },
-    [workId, refresh]
+    [refresh]
   );
 
-  const updateScene = React.useCallback(
-    async (tsid: string, data: Omit<Scene, "tsid" | "workId">) => {
+  const updateWork = React.useCallback(
+    async (
+      id: string,
+      data: Partial<Pick<Work, "title" | "description" | "coverImage" | "tsid">>
+    ) => {
       try {
-        await updateSceneApi(workId, tsid, data);
+        await updateWorkApi(id, data);
         await refresh();
       } catch (e) {
         setError(toErrorMessage(e));
         throw e;
       }
     },
-    [workId, refresh]
+    [refresh]
   );
 
-  const deleteScene = React.useCallback(
-    async (tsid: string) => {
+  const deleteWork = React.useCallback(
+    async (id: string) => {
       try {
-        await deleteSceneApi(workId, tsid);
+        await deleteWorkApi(id);
         await refresh();
       } catch (e) {
         setError(toErrorMessage(e));
         throw e;
       }
     },
-    [workId, refresh]
+    [refresh]
   );
 
   return {
-    scenes,
+    works,
     loading,
     error,
-    createScene,
-    updateScene,
-    deleteScene,
+    createWork,
+    updateWork,
+    deleteWork,
     refresh,
   };
 }

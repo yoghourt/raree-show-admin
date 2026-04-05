@@ -2,7 +2,7 @@
 
 ## 基本信息
 - 目标：国际远程前端工作
-- 计划：60天冲刺，当前第2天，阶段一（第1-20天）
+- 计划：60天冲刺，当前第3天，阶段一（第1-20天）
 - 沟通语言：中文
 
 ---
@@ -45,6 +45,8 @@
   - 深色侧边栏 layout（AppSidebar）
   - Scenes 列表、新增、编辑、删除
   - TSID 完整显示（无截断）
+  
+- PR #2：`feat/supabase-migration` — 迁移 Supabase，替换 mock 数据层
 
 ### 关键文件
 - `components/scenes/SceneTable.tsx` — 场景表格
@@ -53,12 +55,11 @@
 - `hooks/useScenes.ts` — CRUD 状态管理
 
 ### 下一步
-- PR #2：`feat/supabase-migration` — 迁移 Supabase，替换 mock 数据层
 
 ---
 
 ## 工作流约定
-- 分支规范：`feat/xxx` → `dev` → `main`
+- 分支规范：`feat/xxx` → `main`
 - Commit：有真实产出才提交，附规范英文描述
 - 每日最小闭环：一个工程行为 + 一次英文技术输出
 - 对话中断恢复：把此文件内容贴给 Claude 即可
