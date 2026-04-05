@@ -5,12 +5,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as React from "react";
 
-import { SceneForm } from "@/components/scenes/SceneForm";
+import { CharacterForm } from "@/components/characters/CharacterForm";
 import { Button } from "@/components/ui/button";
-import * as charactersApi from "@/lib/characters";
-import * as locationsApi from "@/lib/locations";
 import { getWork } from "@/lib/works";
-import type { Character, Location, Work } from "@/lib/types";
+import type { Work } from "@/lib/types";
 
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) {
@@ -19,7 +17,7 @@ function toErrorMessage(e: unknown): string {
   return String(e);
 }
 
-export default function NewScenePage() {
+export default function NewCharacterPage() {
   const params = useParams();
   const raw = params.workId;
   const workId = Array.isArray(raw) ? raw[0] : raw ?? "";
@@ -27,11 +25,6 @@ export default function NewScenePage() {
   const [work, setWork] = React.useState<Work | null>(null);
   const [workLoading, setWorkLoading] = React.useState(true);
   const [workError, setWorkError] = React.useState<string | null>(null);
-
-  const [characters, setCharacters] = React.useState<Character[]>([]);
-  const [locations, setLocations] = React.useState<Location[]>([]);
-  const [refsLoading, setRefsLoading] = React.useState(true);
-  const [refsError, setRefsError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!workId) {
@@ -64,46 +57,9 @@ export default function NewScenePage() {
     };
   }, [workId]);
 
-  React.useEffect(() => {
-    if (!workId) {
-      setRefsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setRefsLoading(true);
-    setRefsError(null);
-    (async () => {
-      try {
-        const [ch, loc] = await Promise.all([
-          charactersApi.getAll(workId),
-          locationsApi.getAll(workId),
-        ]);
-        if (!cancelled) {
-          setCharacters(ch);
-          setLocations(loc);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setRefsError(toErrorMessage(e));
-          setCharacters([]);
-          setLocations([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setRefsLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [workId]);
-
-  const scenesHref = `/works/${encodeURIComponent(workId)}/scenes`;
+  const listHref = `/works/${encodeURIComponent(workId)}/characters`;
   const workTitle =
     workLoading ? "加载中…" : work?.title ?? "未知作品";
-
-  const formReady = workId && !refsLoading && !refsError;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
@@ -113,15 +69,6 @@ export default function NewScenePage() {
           role="alert"
         >
           {workError}
-        </div>
-      ) : null}
-
-      {refsError ? (
-        <div
-          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-          role="alert"
-        >
-          {refsError}
         </div>
       ) : null}
 
@@ -138,43 +85,33 @@ export default function NewScenePage() {
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
         <Link
-          href={scenesHref}
+          href={listHref}
           className="max-w-[160px] truncate transition-colors hover:text-zinc-800"
         >
           {workTitle}
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <Link href={scenesHref} className="transition-colors hover:text-zinc-800">
-          场景
+        <Link href={listHref} className="transition-colors hover:text-zinc-800">
+          角色
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">新增场景</span>
+        <span className="font-medium text-zinc-800">新增角色</span>
       </nav>
 
       <Button variant="ghost" size="sm" className="-ml-2" asChild>
-        <Link href={scenesHref}>← 返回场景列表</Link>
+        <Link href={listHref}>← 返回角色列表</Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">新增场景</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">新增角色</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          地点、角色从当前作品已维护的数据中选择；若无数据可手动填写 TSID。
+          填写姓名、家族、描述与肖像图片链接。
         </p>
       </div>
-      {refsLoading ? (
-        <p className="text-muted-foreground text-sm" aria-busy="true">
-          加载地点与角色列表…
-        </p>
-      ) : null}
-      {formReady ? (
-        <SceneForm
-          workId={workId}
-          mode="create"
-          characters={characters}
-          locations={locations}
-        />
-      ) : !workId ? (
+      {workId ? (
+        <CharacterForm workId={workId} mode="create" />
+      ) : (
         <p className="text-muted-foreground text-sm">无效的作品 ID。</p>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -4,15 +4,24 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createScene, updateScene } from "@/lib/scenes";
-import type { Scene } from "@/lib/types";
+import type { Character, Location, Scene } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const commaListToArray = (value: string) =>
   value
@@ -25,8 +34,9 @@ const sceneFormSchema = z.object({
   chapterInfo: z.string().min(1, "章节信息不能为空"),
   summary: z.string().min(1, "摘要不能为空"),
   tags: z.string(),
-  locationId: z.string().min(1, "地点 ID 不能为空"),
-  characterIds: z.string(),
+  locationId: z.string().min(1, "请选择或填写地点"),
+  characterIdsTsids: z.array(z.string()),
+  characterIdsFallback: z.string(),
 });
 
 export type SceneFormValues = z.infer<typeof sceneFormSchema>;
@@ -38,20 +48,26 @@ function sceneToFormValues(scene: Scene): SceneFormValues {
     summary: scene.summary,
     tags: scene.tags.join(", "),
     locationId: scene.locationId,
-    characterIds: scene.characterIds.join(", "),
+    characterIdsTsids: [...scene.characterIds],
+    characterIdsFallback: "",
   };
 }
 
 function formValuesToPayload(
-  values: SceneFormValues
+  values: SceneFormValues,
+  hasCharacterPicker: boolean
 ): Omit<Scene, "tsid" | "workId"> {
+  const characterIds = hasCharacterPicker
+    ? values.characterIdsTsids
+    : commaListToArray(values.characterIdsFallback);
+
   return {
     title: values.title.trim(),
     chapterInfo: values.chapterInfo.trim(),
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
     locationId: values.locationId.trim(),
-    characterIds: commaListToArray(values.characterIds),
+    characterIds,
   };
 }
 
@@ -62,14 +78,24 @@ function toSubmitError(e: unknown): string {
   return String(e);
 }
 
+type SceneFormBase = {
+  workId: string;
+  characters: Character[];
+  locations: Location[];
+};
+
 type SceneFormProps =
-  | { workId: string; mode: "create"; defaultValues?: undefined }
-  | { workId: string; mode: "edit"; defaultValues: Scene };
+  | (SceneFormBase & { mode: "create" })
+  | (SceneFormBase & { mode: "edit"; defaultValues: Scene });
 
 export function SceneForm(props: SceneFormProps) {
+  const { workId, characters, locations } = props;
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
-  const listHref = `/works/${encodeURIComponent(props.workId)}/scenes`;
+  const listHref = `/works/${encodeURIComponent(workId)}/scenes`;
+
+  const hasLocationPicker = locations.length > 0;
+  const hasCharacterPicker = characters.length > 0;
 
   const defaultValues: SceneFormValues =
     props.mode === "edit"
@@ -80,7 +106,8 @@ export function SceneForm(props: SceneFormProps) {
           summary: "",
           tags: "",
           locationId: "",
-          characterIds: "",
+          characterIdsTsids: [],
+          characterIdsFallback: "",
         };
 
   const form = useForm<SceneFormValues>({
@@ -88,17 +115,37 @@ export function SceneForm(props: SceneFormProps) {
     defaultValues,
   });
 
+  const watchedLocationId =
+    useWatch({ control: form.control, name: "locationId" }) ?? "";
+
+  const selectLocationOptions = React.useMemo(() => {
+    if (!hasLocationPicker) {
+      return [];
+    }
+    const list = [...locations];
+    if (
+      watchedLocationId &&
+      !list.some((l) => l.tsid === watchedLocationId)
+    ) {
+      return [
+        {
+          tsid: watchedLocationId,
+          label: `${watchedLocationId}（不在当前地点库）`,
+        },
+        ...list.map((l) => ({ tsid: l.tsid, label: l.name })),
+      ];
+    }
+    return list.map((l) => ({ tsid: l.tsid, label: l.name }));
+  }, [hasLocationPicker, locations, watchedLocationId]);
+
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
     try {
+      const payload = formValuesToPayload(values, hasCharacterPicker);
       if (props.mode === "create") {
-        await createScene(props.workId, formValuesToPayload(values));
+        await createScene(workId, payload);
       } else {
-        await updateScene(
-          props.workId,
-          props.defaultValues.tsid,
-          formValuesToPayload(values)
-        );
+        await updateScene(workId, props.defaultValues.tsid, payload);
       }
       router.push(listHref);
     } catch (e) {
@@ -119,7 +166,11 @@ export function SceneForm(props: SceneFormProps) {
 
       <div className="space-y-2">
         <Label htmlFor="title">标题</Label>
-        <Input id="title" {...form.register("title")} aria-invalid={!!form.formState.errors.title} />
+        <Input
+          id="title"
+          {...form.register("title")}
+          aria-invalid={!!form.formState.errors.title}
+        />
         {form.formState.errors.title && (
           <p className="text-destructive text-sm">
             {form.formState.errors.title.message}
@@ -161,12 +212,46 @@ export function SceneForm(props: SceneFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="locationId">地点 ID</Label>
-        <Input
-          id="locationId"
-          {...form.register("locationId")}
-          aria-invalid={!!form.formState.errors.locationId}
-        />
+        <Label>地点</Label>
+        {hasLocationPicker ? (
+          <Controller
+            name="locationId"
+            control={form.control}
+            render={({ field }) => (
+              <Select
+                value={field.value || undefined}
+                onValueChange={field.onChange}
+              >
+                <SelectTrigger
+                  id="locationId"
+                  className="w-full max-w-md"
+                  aria-invalid={!!form.formState.errors.locationId}
+                >
+                  <SelectValue placeholder="选择地点" />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {selectLocationOptions.map((opt) => (
+                    <SelectItem key={opt.tsid} value={opt.tsid}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        ) : (
+          <>
+            <p className="text-muted-foreground text-xs">
+              当前作品暂无地点数据，请手动填写地点 TSID。
+            </p>
+            <Input
+              id="locationId"
+              {...form.register("locationId")}
+              placeholder="例如：loc_winterfell"
+              aria-invalid={!!form.formState.errors.locationId}
+            />
+          </>
+        )}
         {form.formState.errors.locationId && (
           <p className="text-destructive text-sm">
             {form.formState.errors.locationId.message}
@@ -175,12 +260,86 @@ export function SceneForm(props: SceneFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="characterIds">角色 ID（逗号分隔）</Label>
-        <Input
-          id="characterIds"
-          {...form.register("characterIds")}
-          placeholder="例如：char_arya, char_jon"
-        />
+        <Label>角色</Label>
+        {hasCharacterPicker ? (
+          <Controller
+            name="characterIdsTsids"
+            control={form.control}
+            render={({ field }) => {
+              const orphans = field.value.filter(
+                (id) => !characters.some((c) => c.tsid === id)
+              );
+              return (
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <div className="max-h-48 space-y-2 overflow-y-auto">
+                    {characters.map((c) => (
+                      <label
+                        key={c.tsid}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 rounded-md py-1 pr-2 hover:bg-muted/50"
+                        )}
+                      >
+                        <Checkbox
+                          checked={field.value.includes(c.tsid)}
+                          onCheckedChange={(checked) => {
+                            if (checked === true) {
+                              field.onChange([...field.value, c.tsid]);
+                            } else {
+                              field.onChange(
+                                field.value.filter(
+                                  (id: string) => id !== c.tsid
+                                )
+                              );
+                            }
+                          }}
+                        />
+                        <span className="text-sm">{c.name}</span>
+                        <span className="text-muted-foreground font-mono text-xs">
+                          {c.tsid}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {orphans.length > 0 ? (
+                    <div className="border-t pt-2">
+                      <p className="text-muted-foreground mb-2 text-xs">
+                        以下 TSID 不在当前角色库中，仍将写入场景；可移除。
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {orphans.map((id) => (
+                          <button
+                            key={id}
+                            type="button"
+                            className="bg-muted inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-xs"
+                            onClick={() =>
+                              field.onChange(
+                                field.value.filter((x: string) => x !== id)
+                              )
+                            }
+                          >
+                            {id}
+                            <span className="text-destructive">×</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            }}
+          />
+        ) : (
+          <>
+            <p className="text-muted-foreground text-xs">
+              当前作品暂无角色数据，请用英文逗号分隔填写角色 TSID。
+            </p>
+            <Input
+              id="characterIdsFallback"
+              {...form.register("characterIdsFallback")}
+              placeholder="例如：char_arya, char_jon"
+            />
+          </>
+        )}
       </div>
 
       <div className="flex gap-2">
