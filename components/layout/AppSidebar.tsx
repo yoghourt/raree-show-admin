@@ -1,9 +1,10 @@
 "use client";
 
-import { Library, Sparkles } from "lucide-react";
+import { Library, LogOut, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const mainNav = [
@@ -49,6 +50,19 @@ export function AppSidebar() {
           );
         })}
       </nav>
+
+      <div className="border-t border-zinc-800 p-3">
+        <form action="/auth/signout" method="post">
+          <Button
+            type="submit"
+            variant="ghost"
+            className="h-auto w-full justify-start gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100"
+          >
+            <LogOut className="size-4 shrink-0 opacity-80" aria-hidden />
+            退出登录
+          </Button>
+        </form>
+      </div>
     </aside>
   );
 }
