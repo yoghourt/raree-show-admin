@@ -1,7 +1,11 @@
 import type { Scene } from "@/lib/types";
 
+/** 占位 work id，仅作本地示例/种子参考；线上数据以 Supabase 为准 */
+const PLACEHOLDER_WORK_ID = "00000000-0000-0000-0000-000000000000";
+
 export const MOCK_SCENES: Scene[] = [
   {
+    workId: PLACEHOLDER_WORK_ID,
     tsid: "scene_winterfell_gate",
     title: "临冬城城门",
     chapterInfo: "卷一 · 序章",
@@ -11,6 +15,7 @@ export const MOCK_SCENES: Scene[] = [
     characterIds: ["char_will", "char_waymar"],
   },
   {
+    workId: PLACEHOLDER_WORK_ID,
     tsid: "scene_kingsroad",
     title: "国王大道南下",
     chapterInfo: "卷一 · 艾莉亚 I",
@@ -20,6 +25,7 @@ export const MOCK_SCENES: Scene[] = [
     characterIds: ["char_arya", "char_yoren"],
   },
   {
+    workId: PLACEHOLDER_WORK_ID,
     tsid: "scene_dragonstone_council",
     title: "龙石岛议事",
     chapterInfo: "卷二 · 史坦尼斯",

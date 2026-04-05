@@ -42,9 +42,9 @@ function sceneToFormValues(scene: Scene): SceneFormValues {
   };
 }
 
-function formValuesToNewSceneInput(
+function formValuesToPayload(
   values: SceneFormValues
-): Omit<Scene, "tsid"> {
+): Omit<Scene, "tsid" | "workId"> {
   return {
     title: values.title.trim(),
     chapterInfo: values.chapterInfo.trim(),
@@ -63,12 +63,13 @@ function toSubmitError(e: unknown): string {
 }
 
 type SceneFormProps =
-  | { mode: "create"; defaultValues?: undefined }
-  | { mode: "edit"; defaultValues: Scene };
+  | { workId: string; mode: "create"; defaultValues?: undefined }
+  | { workId: string; mode: "edit"; defaultValues: Scene };
 
 export function SceneForm(props: SceneFormProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const listHref = `/works/${encodeURIComponent(props.workId)}/scenes`;
 
   const defaultValues: SceneFormValues =
     props.mode === "edit"
@@ -91,14 +92,15 @@ export function SceneForm(props: SceneFormProps) {
     setSubmitError(null);
     try {
       if (props.mode === "create") {
-        await createScene(formValuesToNewSceneInput(values));
+        await createScene(props.workId, formValuesToPayload(values));
       } else {
         await updateScene(
+          props.workId,
           props.defaultValues.tsid,
-          formValuesToNewSceneInput(values)
+          formValuesToPayload(values)
         );
       }
-      router.push("/scenes");
+      router.push(listHref);
     } catch (e) {
       setSubmitError(toSubmitError(e));
     }
@@ -190,7 +192,7 @@ export function SceneForm(props: SceneFormProps) {
               : "保存"}
         </Button>
         <Button type="button" variant="outline" asChild>
-          <Link href="/scenes">取消</Link>
+          <Link href={listHref}>取消</Link>
         </Button>
       </div>
     </form>

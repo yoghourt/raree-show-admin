@@ -4,6 +4,7 @@ import type { Scene } from "@/lib/types";
 const TABLE = "scenes";
 
 type SceneRow = {
+  work_id: string;
   tsid: string;
   title: string;
   chapter_info: string;
@@ -15,6 +16,7 @@ type SceneRow = {
 
 function rowToScene(row: SceneRow): Scene {
   return {
+    workId: row.work_id,
     tsid: row.tsid,
     title: row.title,
     chapterInfo: row.chapter_info,
@@ -26,9 +28,11 @@ function rowToScene(row: SceneRow): Scene {
 }
 
 function toInsertRow(
-  data: Omit<Scene, "tsid"> & { tsid: string }
+  workId: string,
+  data: Omit<Scene, "tsid" | "workId"> & { tsid: string }
 ): Record<string, unknown> {
   return {
+    work_id: workId,
     tsid: data.tsid,
     title: data.title,
     chapter_info: data.chapterInfo,
@@ -39,7 +43,7 @@ function toInsertRow(
   };
 }
 
-function toUpdateRow(data: Omit<Scene, "tsid">): Record<string, unknown> {
+function toUpdateRow(data: Omit<Scene, "tsid" | "workId">): Record<string, unknown> {
   return {
     title: data.title,
     chapter_info: data.chapterInfo,
@@ -50,11 +54,12 @@ function toUpdateRow(data: Omit<Scene, "tsid">): Record<string, unknown> {
   };
 }
 
-export async function getScenes(): Promise<Scene[]> {
+export async function getScenes(workId: string): Promise<Scene[]> {
   try {
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
+      .eq("work_id", workId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -70,13 +75,16 @@ export async function getScenes(): Promise<Scene[]> {
   }
 }
 
-/** 按业务 tsid（与路由 [id] 一致）查询单条，供编辑页使用 */
-export async function getScene(id: string): Promise<Scene | null> {
+export async function getScene(
+  workId: string,
+  tsid: string
+): Promise<Scene | null> {
   try {
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
-      .eq("tsid", id)
+      .eq("work_id", workId)
+      .eq("tsid", tsid)
       .maybeSingle();
 
     if (error) {
@@ -97,12 +105,13 @@ export async function getScene(id: string): Promise<Scene | null> {
 }
 
 export async function createScene(
-  data: Omit<Scene, "tsid"> & { tsid?: string }
+  workId: string,
+  data: Omit<Scene, "tsid" | "workId"> & { tsid?: string }
 ): Promise<Scene> {
   try {
     const { tsid: optionalTsid, ...rest } = data;
     const tsid = optionalTsid?.trim() || `scene_${Date.now()}`;
-    const full: Scene = {
+    const full: Omit<Scene, "tsid" | "workId"> & { tsid: string } = {
       tsid,
       title: rest.title,
       chapterInfo: rest.chapterInfo,
@@ -114,7 +123,7 @@ export async function createScene(
 
     const { data: inserted, error } = await supabase
       .from(TABLE)
-      .insert(toInsertRow(full))
+      .insert(toInsertRow(workId, full))
       .select("*")
       .single();
 
@@ -132,14 +141,16 @@ export async function createScene(
 }
 
 export async function updateScene(
-  id: string,
-  data: Omit<Scene, "tsid">
+  workId: string,
+  tsid: string,
+  data: Omit<Scene, "tsid" | "workId">
 ): Promise<void> {
   try {
     const { error } = await supabase
       .from(TABLE)
       .update(toUpdateRow(data))
-      .eq("tsid", id);
+      .eq("work_id", workId)
+      .eq("tsid", tsid);
 
     if (error) {
       throw new Error(error.message);
@@ -152,9 +163,13 @@ export async function updateScene(
   }
 }
 
-export async function deleteScene(id: string): Promise<void> {
+export async function deleteScene(workId: string, tsid: string): Promise<void> {
   try {
-    const { error } = await supabase.from(TABLE).delete().eq("tsid", id);
+    const { error } = await supabase
+      .from(TABLE)
+      .delete()
+      .eq("work_id", workId)
+      .eq("tsid", tsid);
 
     if (error) {
       throw new Error(error.message);

@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Sparkles } from "lucide-react";
+import { Library, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,11 +8,10 @@ import { cn } from "@/lib/utils";
 
 const mainNav = [
   {
-    href: "/scenes",
-    label: "场景管理",
-    icon: LayoutDashboard,
-    match: (path: string) =>
-      path === "/scenes" || path.startsWith("/scenes/"),
+    href: "/works",
+    label: "作品管理",
+    icon: Library,
+    match: (path: string) => path === "/works" || path.startsWith("/works/"),
   },
 ] as const;
 

@@ -22,15 +22,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Scene } from "@/lib/types";
+import type { Work } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export type SceneTableProps = {
-  workId: string;
-  scenes: Scene[];
+export type WorkTableProps = {
+  works: Work[];
   loading: boolean;
   error: string | null;
-  onDelete: (tsid: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 };
 
 function TableSkeleton() {
@@ -48,19 +47,16 @@ function TableSkeleton() {
   );
 }
 
-export function SceneTable({
-  workId,
-  scenes,
+export function WorkTable({
+  works,
   loading,
   error,
   onDelete,
-}: SceneTableProps) {
+}: WorkTableProps) {
   const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(
     null
   );
   const [deleteSubmitting, setDeleteSubmitting] = React.useState(false);
-
-  const scenesBase = `/works/${encodeURIComponent(workId)}/scenes`;
 
   const confirmDelete = async () => {
     if (!deleteTargetId) return;
@@ -94,7 +90,7 @@ export function SceneTable({
             <div className="text-muted-foreground p-8 text-center text-sm">
               无法加载列表，请查看上方错误信息。
             </div>
-          ) : scenes.length === 0 ? (
+          ) : works.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
               <div className="flex size-14 items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50">
                 <Inbox
@@ -104,30 +100,27 @@ export function SceneTable({
                 />
               </div>
               <p className="mt-5 text-sm font-medium text-zinc-800">
-                暂无场景
+                暂无作品
               </p>
               <p className="mt-1 max-w-sm text-sm text-zinc-500">
-                点击右上角「新增场景」创建第一条记录。
+                点击右上角「新增作品」创建第一条记录。
               </p>
             </div>
           ) : (
             <Table className="min-w-max">
               <TableHeader>
                 <TableRow className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50">
-                  <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                    TSID
+                  <TableHead className="h-10 w-20 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
+                    封面
                   </TableHead>
                   <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
                     标题
                   </TableHead>
-                  <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 md:table-cell">
-                    章节
-                  </TableHead>
-                  <TableHead className="hidden h-10 max-w-[240px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
-                    摘要
-                  </TableHead>
                   <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 sm:table-cell">
-                    标签
+                    TSID
+                  </TableHead>
+                  <TableHead className="hidden h-10 max-w-[280px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
+                    描述
                   </TableHead>
                   <TableHead className="h-10 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
                     操作
@@ -135,51 +128,52 @@ export function SceneTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scenes.map((scene) => (
+                {works.map((work) => (
                   <TableRow
-                    key={scene.tsid}
+                    key={work.id}
                     className="border-zinc-100 transition-colors hover:bg-zinc-50/90"
                   >
-                    <TableCell className="whitespace-nowrap py-3">
+                    <TableCell className="py-2">
+                      {/* 封面为任意外链 URL，不使用 next/image 远程域名配置 */}
+                      {work.coverImage ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={work.coverImage}
+                          alt=""
+                          className="h-10 w-14 rounded-md border border-border object-cover"
+                        />
+                      ) : (
+                        <div className="h-10 w-14 rounded-md border border-border bg-muted" />
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
+                      {work.title}
+                    </TableCell>
+                    <TableCell className="hidden py-3 sm:table-cell">
                       <span
                         className={cn(
                           "inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-700"
                         )}
-                        title={scene.tsid}
+                        title={work.tsid}
                       >
-                        {scene.tsid}
+                        {work.tsid}
                       </span>
                     </TableCell>
-                    <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
-                      {scene.title}
-                    </TableCell>
-                    <TableCell className="hidden py-3 whitespace-nowrap text-zinc-600 md:table-cell">
-                      {scene.chapterInfo}
-                    </TableCell>
-                    <TableCell className="hidden max-w-[240px] py-3 whitespace-normal text-sm text-zinc-600 lg:table-cell">
-                      {scene.summary}
-                    </TableCell>
-                    <TableCell className="hidden py-3 sm:table-cell">
-                      <div className="flex max-w-[220px] flex-wrap gap-1">
-                        {scene.tags.length === 0 ? (
-                          <span className="text-xs text-zinc-400">—</span>
-                        ) : (
-                          scene.tags.map((tag) => (
-                            <span
-                              key={`${scene.tsid}-${tag}`}
-                              className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[11px] font-medium text-zinc-600"
-                            >
-                              {tag}
-                            </span>
-                          ))
-                        )}
-                      </div>
+                    <TableCell className="hidden max-w-[280px] py-3 text-sm text-zinc-600 lg:table-cell">
+                      <span className="line-clamp-2">{work.description}</span>
                     </TableCell>
                     <TableCell className="py-3 text-right whitespace-nowrap">
                       <div className="flex justify-end gap-1">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link
+                            href={`/works/${encodeURIComponent(work.id)}/scenes`}
+                          >
+                            进入内容
+                          </Link>
+                        </Button>
                         <Button variant="ghost" size="sm" asChild>
                           <Link
-                            href={`${scenesBase}/${encodeURIComponent(scene.tsid)}/edit`}
+                            href={`/works/${encodeURIComponent(work.id)}/edit`}
                           >
                             <Pencil className="size-3.5" aria-hidden />
                             编辑
@@ -189,7 +183,7 @@ export function SceneTable({
                           variant="destructive"
                           size="sm"
                           type="button"
-                          onClick={() => setDeleteTargetId(scene.tsid)}
+                          onClick={() => setDeleteTargetId(work.id)}
                         >
                           <Trash2 className="size-3.5" aria-hidden />
                           删除
@@ -214,7 +208,7 @@ export function SceneTable({
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              确定要删除该场景吗？此操作将从数据库中永久移除该记录。
+              确定要删除该作品吗？若数据库未配置级联删除，请先处理其下的场景数据。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">
