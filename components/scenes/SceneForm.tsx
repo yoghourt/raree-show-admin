@@ -4,7 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import {
+  Controller,
+  type Resolver,
+  useForm,
+  useWatch,
+} from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -31,7 +36,21 @@ const commaListToArray = (value: string) =>
 
 const sceneFormSchema = z.object({
   title: z.string().min(1, "标题不能为空"),
-  chapterInfo: z.string().min(1, "章节信息不能为空"),
+  chapter_number: z.preprocess(
+    (v) => {
+      if (typeof v === "number" && !Number.isNaN(v)) return v;
+      if (typeof v === "string" && v.trim() !== "") return Number(v);
+      return undefined;
+    },
+    z.number().int().min(1, "章节序号至少为 1")
+  ),
+  chapter_title: z
+    .string()
+    .transform((s) => {
+      const t = s.trim();
+      return t === "" ? null : t;
+    })
+    .nullable(),
   summary: z.string().min(1, "摘要不能为空"),
   tags: z.string(),
   locationId: z.string().min(1, "请选择或填写地点"),
@@ -39,12 +58,22 @@ const sceneFormSchema = z.object({
   characterIdsFallback: z.string(),
 });
 
-export type SceneFormValues = z.infer<typeof sceneFormSchema>;
+export type SceneFormValues = {
+  title: string;
+  chapter_number: number;
+  chapter_title: string | null;
+  summary: string;
+  tags: string;
+  locationId: string;
+  characterIdsTsids: string[];
+  characterIdsFallback: string;
+};
 
 function sceneToFormValues(scene: Scene): SceneFormValues {
   return {
     title: scene.title,
-    chapterInfo: scene.chapterInfo,
+    chapter_number: scene.chapter_number,
+    chapter_title: scene.chapter_title ?? "",
     summary: scene.summary,
     tags: scene.tags.join(", "),
     locationId: scene.locationId,
@@ -63,7 +92,8 @@ function formValuesToPayload(
 
   return {
     title: values.title.trim(),
-    chapterInfo: values.chapterInfo.trim(),
+    chapter_number: values.chapter_number,
+    chapter_title: values.chapter_title,
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
     locationId: values.locationId.trim(),
@@ -102,7 +132,8 @@ export function SceneForm(props: SceneFormProps) {
       ? sceneToFormValues(props.defaultValues)
       : {
           title: "",
-          chapterInfo: "",
+          chapter_number: 1,
+          chapter_title: "",
           summary: "",
           tags: "",
           locationId: "",
@@ -111,7 +142,7 @@ export function SceneForm(props: SceneFormProps) {
         };
 
   const form = useForm<SceneFormValues>({
-    resolver: zodResolver(sceneFormSchema),
+    resolver: zodResolver(sceneFormSchema) as Resolver<SceneFormValues>,
     defaultValues,
   });
 
@@ -178,18 +209,32 @@ export function SceneForm(props: SceneFormProps) {
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="chapterInfo">章节信息</Label>
-        <Input
-          id="chapterInfo"
-          {...form.register("chapterInfo")}
-          aria-invalid={!!form.formState.errors.chapterInfo}
-        />
-        {form.formState.errors.chapterInfo && (
-          <p className="text-destructive text-sm">
-            {form.formState.errors.chapterInfo.message}
-          </p>
-        )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="chapter_number">章节序号</Label>
+          <Input
+            id="chapter_number"
+            type="number"
+            min={1}
+            step={1}
+            {...form.register("chapter_number", { valueAsNumber: true })}
+            aria-invalid={!!form.formState.errors.chapter_number}
+          />
+          {form.formState.errors.chapter_number && (
+            <p className="text-destructive text-sm">
+              {form.formState.errors.chapter_number.message}
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="chapter_title">章节标题</Label>
+          <Input
+            id="chapter_title"
+            placeholder="可选，如：凛冬将至"
+            {...form.register("chapter_title")}
+            aria-invalid={!!form.formState.errors.chapter_title}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
