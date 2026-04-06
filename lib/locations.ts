@@ -11,6 +11,8 @@ type LocationRow = {
   region: string;
   description: string;
   created_at: string;
+  map_focus_x: number | null;
+  map_focus_y: number | null;
 };
 
 function rowToLocation(row: LocationRow): Location {
@@ -22,6 +24,8 @@ function rowToLocation(row: LocationRow): Location {
     region: row.region,
     description: row.description,
     createdAt: row.created_at,
+    map_focus_x: row.map_focus_x ?? null,
+    map_focus_y: row.map_focus_y ?? null,
   };
 }
 
@@ -37,6 +41,8 @@ function toInsertRow(
     name: data.name,
     region: data.region,
     description: data.description,
+    map_focus_x: data.map_focus_x ?? null,
+    map_focus_y: data.map_focus_y ?? null,
   };
 }
 
@@ -47,6 +53,8 @@ function toUpdateRow(
     name: data.name,
     region: data.region,
     description: data.description,
+    map_focus_x: data.map_focus_x ?? null,
+    map_focus_y: data.map_focus_y ?? null,
   };
 }
 

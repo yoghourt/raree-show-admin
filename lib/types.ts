@@ -37,4 +37,6 @@ export type Location = {
   description: string;
   workId: string;
   createdAt: string;
+  map_focus_x?: number | null;
+  map_focus_y?: number | null;
 };
