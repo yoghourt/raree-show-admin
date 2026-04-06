@@ -4,19 +4,22 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MapPicker } from "@/components/locations/MapPicker";
 import * as locationsApi from "@/lib/locations";
 import type { Location } from "@/lib/types";
 
 const locationFormSchema = z.object({
   name: z.string().min(1, "名称不能为空"),
   region: z.string(),
+  map_focus_x: z.number().min(0).max(1).nullable().optional(),
+  map_focus_y: z.number().min(0).max(1).nullable().optional(),
   description: z.string(),
 });
 
@@ -26,6 +29,8 @@ function locationToFormValues(loc: Location): LocationFormValues {
   return {
     name: loc.name,
     region: loc.region,
+    map_focus_x: loc.map_focus_x ?? null,
+    map_focus_y: loc.map_focus_y ?? null,
     description: loc.description,
   };
 }
@@ -36,6 +41,8 @@ function toPayload(
   return {
     name: values.name.trim(),
     region: values.region.trim(),
+    map_focus_x: values.map_focus_x ?? null,
+    map_focus_y: values.map_focus_y ?? null,
     description: values.description.trim(),
   };
 }
@@ -59,12 +66,21 @@ export function LocationForm(props: LocationFormProps) {
   const defaultValues: LocationFormValues =
     props.mode === "edit"
       ? locationToFormValues(props.defaultValues)
-      : { name: "", region: "", description: "" };
+      : {
+          name: "",
+          region: "",
+          map_focus_x: null,
+          map_focus_y: null,
+          description: "",
+        };
 
   const form = useForm<LocationFormValues>({
     resolver: zodResolver(locationFormSchema),
     defaultValues,
   });
+
+  const mapFocusX = useWatch({ control: form.control, name: "map_focus_x" });
+  const mapFocusY = useWatch({ control: form.control, name: "map_focus_y" });
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
@@ -112,6 +128,17 @@ export function LocationForm(props: LocationFormProps) {
       <div className="space-y-2">
         <Label htmlFor="loc-region">地区</Label>
         <Input id="loc-region" {...form.register("region")} />
+      </div>
+
+      <div className="space-y-2">
+        <Label>地图坐标</Label>
+        <MapPicker
+          value={{ x: mapFocusX ?? null, y: mapFocusY ?? null }}
+          onChange={({ x, y }) => {
+            form.setValue("map_focus_x", x, { shouldDirty: true });
+            form.setValue("map_focus_y", y, { shouldDirty: true });
+          }}
+        />
       </div>
 
       <div className="space-y-2">
