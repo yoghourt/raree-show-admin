@@ -7,7 +7,9 @@ type SceneRow = {
   work_id: string;
   tsid: string;
   title: string;
-  chapter_info: string;
+  chapter_number: number;
+  chapter_title: string | null;
+  order_index: number;
   summary: string;
   tags: string[] | null;
   location_id: string;
@@ -19,7 +21,8 @@ function rowToScene(row: SceneRow): Scene {
     workId: row.work_id,
     tsid: row.tsid,
     title: row.title,
-    chapterInfo: row.chapter_info,
+    chapter_number: row.chapter_number,
+    chapter_title: row.chapter_title ?? null,
     summary: row.summary,
     tags: row.tags ?? [],
     locationId: row.location_id,
@@ -35,7 +38,9 @@ function toInsertRow(
     work_id: workId,
     tsid: data.tsid,
     title: data.title,
-    chapter_info: data.chapterInfo,
+    chapter_number: data.chapter_number,
+    chapter_title: data.chapter_title ?? null,
+    order_index: 0,
     summary: data.summary,
     tags: data.tags,
     location_id: data.locationId,
@@ -46,7 +51,8 @@ function toInsertRow(
 function toUpdateRow(data: Omit<Scene, "tsid" | "workId">): Record<string, unknown> {
   return {
     title: data.title,
-    chapter_info: data.chapterInfo,
+    chapter_number: data.chapter_number,
+    chapter_title: data.chapter_title ?? null,
     summary: data.summary,
     tags: data.tags,
     location_id: data.locationId,
@@ -60,7 +66,8 @@ export async function getScenes(workId: string): Promise<Scene[]> {
       .from(TABLE)
       .select("*")
       .eq("work_id", workId)
-      .order("created_at", { ascending: false });
+      .order("chapter_number", { ascending: true })
+      .order("order_index", { ascending: true });
 
     if (error) {
       throw new Error(error.message);
@@ -114,7 +121,8 @@ export async function createScene(
     const full: Omit<Scene, "tsid" | "workId"> & { tsid: string } = {
       tsid,
       title: rest.title,
-      chapterInfo: rest.chapterInfo,
+      chapter_number: rest.chapter_number,
+      chapter_title: rest.chapter_title ?? null,
       summary: rest.summary,
       tags: rest.tags,
       locationId: rest.locationId,

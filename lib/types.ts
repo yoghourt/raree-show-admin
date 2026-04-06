@@ -11,7 +11,8 @@ export type Scene = {
   workId: string;
   tsid: string;
   title: string;
-  chapterInfo: string;
+  chapter_number: number;
+  chapter_title: string | null;
   summary: string;
   tags: string[];
   locationId: string;
