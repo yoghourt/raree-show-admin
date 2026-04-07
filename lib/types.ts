@@ -15,6 +15,7 @@ export type Scene = {
   chapter_title: string | null;
   summary: string;
   tags: string[];
+  story_images: string[];
   locationId: string;
   characterIds: string[];
 };

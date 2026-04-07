@@ -12,6 +12,7 @@ type SceneRow = {
   order_index: number;
   summary: string;
   tags: string[] | null;
+  story_images: string[] | null;
   location_id: string;
   character_ids: string[] | null;
 };
@@ -25,6 +26,7 @@ function rowToScene(row: SceneRow): Scene {
     chapter_title: row.chapter_title ?? null,
     summary: row.summary,
     tags: row.tags ?? [],
+    story_images: row.story_images ?? [],
     locationId: row.location_id,
     characterIds: row.character_ids ?? [],
   };
@@ -43,6 +45,7 @@ function toInsertRow(
     order_index: 0,
     summary: data.summary,
     tags: data.tags,
+    story_images: data.story_images,
     location_id: data.locationId,
     character_ids: data.characterIds,
   };
@@ -55,6 +58,7 @@ function toUpdateRow(data: Omit<Scene, "tsid" | "workId">): Record<string, unkno
     chapter_title: data.chapter_title ?? null,
     summary: data.summary,
     tags: data.tags,
+    story_images: data.story_images,
     location_id: data.locationId,
     character_ids: data.characterIds,
   };
@@ -125,6 +129,7 @@ export async function createScene(
       chapter_title: rest.chapter_title ?? null,
       summary: rest.summary,
       tags: rest.tags,
+      story_images: rest.story_images ?? [],
       locationId: rest.locationId,
       characterIds: rest.characterIds,
     };

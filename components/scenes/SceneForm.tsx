@@ -12,6 +12,7 @@ import {
 } from "react-hook-form";
 import { z } from "zod";
 
+import { MultiImageUploader } from "@/components/scenes/MultiImageUploader";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ const sceneFormSchema = z.object({
     .nullable(),
   summary: z.string().min(1, "摘要不能为空"),
   tags: z.string(),
+  story_images: z.array(z.string()).default([]),
   locationId: z.string().min(1, "请选择或填写地点"),
   characterIdsTsids: z.array(z.string()),
   characterIdsFallback: z.string(),
@@ -64,6 +66,7 @@ export type SceneFormValues = {
   chapter_title: string | null;
   summary: string;
   tags: string;
+  story_images: string[];
   locationId: string;
   characterIdsTsids: string[];
   characterIdsFallback: string;
@@ -76,6 +79,7 @@ function sceneToFormValues(scene: Scene): SceneFormValues {
     chapter_title: scene.chapter_title ?? "",
     summary: scene.summary,
     tags: scene.tags.join(", "),
+    story_images: scene.story_images ?? [],
     locationId: scene.locationId,
     characterIdsTsids: [...scene.characterIds],
     characterIdsFallback: "",
@@ -96,6 +100,7 @@ function formValuesToPayload(
     chapter_title: values.chapter_title,
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
+    story_images: values.story_images,
     locationId: values.locationId.trim(),
     characterIds,
   };
@@ -122,6 +127,7 @@ export function SceneForm(props: SceneFormProps) {
   const { workId, characters, locations } = props;
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [uploadingImages, setUploadingImages] = React.useState(false);
   const listHref = `/works/${encodeURIComponent(workId)}/scenes`;
 
   const hasLocationPicker = locations.length > 0;
@@ -136,6 +142,7 @@ export function SceneForm(props: SceneFormProps) {
           chapter_title: "",
           summary: "",
           tags: "",
+          story_images: [],
           locationId: "",
           characterIdsTsids: [],
           characterIdsFallback: "",
@@ -254,6 +261,24 @@ export function SceneForm(props: SceneFormProps) {
       <div className="space-y-2">
         <Label htmlFor="tags">标签（逗号分隔）</Label>
         <Input id="tags" {...form.register("tags")} placeholder="例如：序幕, 异鬼" />
+      </div>
+
+      <div className="space-y-2">
+        <Label>故事图片序列</Label>
+        <p className="text-muted-foreground text-xs">
+          按顺序上传场景图片，将用于拉洋片式展示
+        </p>
+        <Controller
+          name="story_images"
+          control={form.control}
+          render={({ field }) => (
+            <MultiImageUploader
+              value={field.value}
+              onChange={field.onChange}
+              onUploadingChange={setUploadingImages}
+            />
+          )}
+        />
       </div>
 
       <div className="space-y-2">
@@ -388,7 +413,10 @@ export function SceneForm(props: SceneFormProps) {
       </div>
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={form.formState.isSubmitting}>
+        <Button
+          type="submit"
+          disabled={form.formState.isSubmitting || uploadingImages}
+        >
           {form.formState.isSubmitting
             ? "提交中…"
             : props.mode === "create"
