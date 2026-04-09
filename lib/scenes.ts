@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Scene } from "@/lib/types";
+import type { Scene, StoryImage } from "@/lib/types";
 
 const TABLE = "scenes";
 
@@ -13,9 +13,30 @@ type SceneRow = {
   summary: string;
   tags: string[] | null;
   story_images: string[] | null;
+  story_images_v2: unknown | null;
   location_id: string;
   character_ids: string[] | null;
 };
+
+function parseStoryImagesV2(raw: unknown): StoryImage[] | null {
+  if (raw == null) return null;
+  if (!Array.isArray(raw)) return null;
+  const out: StoryImage[] = [];
+  for (const item of raw) {
+    if (
+      item &&
+      typeof item === "object" &&
+      "url" in item &&
+      typeof (item as { url: unknown }).url === "string"
+    ) {
+      const rec = item as { url: string; caption?: unknown };
+      const caption =
+        typeof rec.caption === "string" ? rec.caption : "";
+      out.push({ url: rec.url, caption });
+    }
+  }
+  return out;
+}
 
 function rowToScene(row: SceneRow): Scene {
   return {
@@ -27,6 +48,7 @@ function rowToScene(row: SceneRow): Scene {
     summary: row.summary,
     tags: row.tags ?? [],
     story_images: row.story_images ?? [],
+    story_images_v2: parseStoryImagesV2(row.story_images_v2),
     locationId: row.location_id,
     characterIds: row.character_ids ?? [],
   };
@@ -46,6 +68,7 @@ function toInsertRow(
     summary: data.summary,
     tags: data.tags,
     story_images: data.story_images,
+    story_images_v2: data.story_images_v2 ?? [],
     location_id: data.locationId,
     character_ids: data.characterIds,
   };
@@ -59,6 +82,7 @@ function toUpdateRow(data: Omit<Scene, "tsid" | "workId">): Record<string, unkno
     summary: data.summary,
     tags: data.tags,
     story_images: data.story_images,
+    story_images_v2: data.story_images_v2 ?? [],
     location_id: data.locationId,
     character_ids: data.characterIds,
   };
@@ -130,13 +154,17 @@ export async function createScene(
       summary: rest.summary,
       tags: rest.tags,
       story_images: rest.story_images ?? [],
+      story_images_v2: rest.story_images_v2 ?? [],
       locationId: rest.locationId,
       characterIds: rest.characterIds,
     };
 
+    const insertRow = toInsertRow(workId, full);
+    console.log("[scenes] createScene Supabase insert payload", insertRow);
+
     const { data: inserted, error } = await supabase
       .from(TABLE)
-      .insert(toInsertRow(workId, full))
+      .insert(insertRow)
       .select("*")
       .single();
 
@@ -159,9 +187,12 @@ export async function updateScene(
   data: Omit<Scene, "tsid" | "workId">
 ): Promise<void> {
   try {
+    const updateRow = toUpdateRow(data);
+    console.log("[scenes] updateScene Supabase update payload", updateRow);
+
     const { error } = await supabase
       .from(TABLE)
-      .update(toUpdateRow(data))
+      .update(updateRow)
       .eq("work_id", workId)
       .eq("tsid", tsid);
 

@@ -7,6 +7,11 @@ export type Work = {
   createdAt: string;
 };
 
+export type StoryImage = {
+  url: string;
+  caption: string;
+};
+
 export type Scene = {
   workId: string;
   tsid: string;
@@ -15,7 +20,10 @@ export type Scene = {
   chapter_title: string | null;
   summary: string;
   tags: string[];
+  /** Legacy text[]；写入时必须与 `story_images_v2.map(x => x.url)` 一致 */
   story_images: string[];
+  /** 新版 jsonb；表单与双写的单一数据源 */
+  story_images_v2: StoryImage[] | null;
   locationId: string;
   characterIds: string[];
 };
