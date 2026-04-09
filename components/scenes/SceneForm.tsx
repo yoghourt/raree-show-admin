@@ -80,11 +80,7 @@ export type SceneFormValues = {
 };
 
 function sceneToFormValues(scene: Scene): SceneFormValues {
-  const v2 = scene.story_images_v2;
-  const story_images_v2 =
-    v2 != null
-      ? v2
-      : (scene.story_images ?? []).map((url) => ({ url, caption: "" }));
+  const story_images_v2 = scene.story_images_v2 ?? [];
 
   return {
     title: scene.title,
@@ -107,17 +103,13 @@ function formValuesToPayload(
     ? values.characterIdsTsids
     : commaListToArray(values.characterIdsFallback);
 
-  const storyImagesV2 = values.story_images_v2;
-  const storyImages = storyImagesV2.map((i) => i.url);
-
   return {
     title: values.title.trim(),
     chapter_number: values.chapter_number,
     chapter_title: values.chapter_title,
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
-    story_images: storyImages,
-    story_images_v2: storyImagesV2,
+    story_images_v2: values.story_images_v2,
     locationId: values.locationId.trim(),
     characterIds,
   };
@@ -201,14 +193,7 @@ export function SceneForm(props: SceneFormProps) {
         values.story_images_v2
       );
       const payload = formValuesToPayload(values, hasCharacterPicker);
-      console.log("[SceneForm] Supabase scene payload (dual-write)", payload);
-      console.log("[SceneForm] invariant check", {
-        story_images: payload.story_images,
-        projectedFromV2: payload.story_images_v2?.map((x) => x.url),
-        match:
-          JSON.stringify(payload.story_images) ===
-          JSON.stringify(payload.story_images_v2?.map((x) => x.url)),
-      });
+      console.log("[SceneForm] Supabase scene payload (story_images_v2 only)", payload);
       if (props.mode === "create") {
         await createScene(workId, payload);
       } else {
