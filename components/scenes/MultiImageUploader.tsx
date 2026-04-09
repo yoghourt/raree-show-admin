@@ -10,11 +10,13 @@ import {
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import type { StoryImage } from "@/lib/types";
 
 type MultiImageUploaderProps = {
-  value: string[];
-  onChange: (urls: string[]) => void;
+  value: StoryImage[];
+  onChange: (next: StoryImage[]) => void;
   onUploadingChange?: (uploading: boolean) => void;
 };
 
@@ -45,41 +47,60 @@ export function MultiImageUploader({
     onChange(value.filter((_, i) => i !== index));
   };
 
+  const updateCaption = (index: number, caption: string) => {
+    const next = [...value];
+    next[index] = { ...next[index], caption };
+    onChange(next);
+  };
+
   return (
     <div className="space-y-3">
-      {value.map((url, index) => (
-        <div key={`${url}-${index}`} className="flex items-center gap-2">
-          <div className="rounded border bg-muted/30 p-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="" className="max-h-20 object-contain" />
+      {value.map((item, index) => (
+        <div key={`${item.url}-${index}`} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="rounded border bg-muted/30 p-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.url}
+                alt=""
+                className="max-h-20 object-contain"
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={index === 0}
+              onClick={() => moveUp(index)}
+            >
+              <ArrowUp className="size-4" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={index === value.length - 1}
+              onClick={() => moveDown(index)}
+            >
+              <ArrowDown className="size-4" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              onClick={() => remove(index)}
+            >
+              <X className="size-4" aria-hidden />
+            </Button>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={index === 0}
-            onClick={() => moveUp(index)}
-          >
-            <ArrowUp className="size-4" aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={index === value.length - 1}
-            onClick={() => moveDown(index)}
-          >
-            <ArrowDown className="size-4" aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            onClick={() => remove(index)}
-          >
-            <X className="size-4" aria-hidden />
-          </Button>
+          <Textarea
+            rows={2}
+            placeholder="Caption for this image (optional)"
+            value={item.caption}
+            onChange={(e) => updateCaption(index, e.target.value)}
+            className="max-w-md"
+          />
         </div>
       ))}
 
@@ -103,7 +124,11 @@ export function MultiImageUploader({
                 r.status === "fulfilled"
             )
             .map((r) => r.value);
-          onChange([...value, ...newUrls]);
+          const newItems: StoryImage[] = newUrls.map((url) => ({
+            url,
+            caption: "",
+          }));
+          onChange([...value, ...newItems]);
           setAddingCount(0);
           onUploadingChange?.(false);
           if (addInputRef.current) {

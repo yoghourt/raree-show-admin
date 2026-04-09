@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createScene, updateScene } from "@/lib/scenes";
-import type { Character, Location, Scene } from "@/lib/types";
+import type { Character, Location, Scene, StoryImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const commaListToArray = (value: string) =>
@@ -54,7 +54,14 @@ const sceneFormSchema = z.object({
     .nullable(),
   summary: z.string().min(1, "摘要不能为空"),
   tags: z.string(),
-  story_images: z.array(z.string()).default([]),
+  story_images_v2: z
+    .array(
+      z.object({
+        url: z.string().min(1),
+        caption: z.string(),
+      })
+    )
+    .default([]),
   locationId: z.string().min(1, "请选择或填写地点"),
   characterIdsTsids: z.array(z.string()),
   characterIdsFallback: z.string(),
@@ -66,20 +73,26 @@ export type SceneFormValues = {
   chapter_title: string | null;
   summary: string;
   tags: string;
-  story_images: string[];
+  story_images_v2: StoryImage[];
   locationId: string;
   characterIdsTsids: string[];
   characterIdsFallback: string;
 };
 
 function sceneToFormValues(scene: Scene): SceneFormValues {
+  const v2 = scene.story_images_v2;
+  const story_images_v2 =
+    v2 != null
+      ? v2
+      : (scene.story_images ?? []).map((url) => ({ url, caption: "" }));
+
   return {
     title: scene.title,
     chapter_number: scene.chapter_number,
     chapter_title: scene.chapter_title ?? "",
     summary: scene.summary,
     tags: scene.tags.join(", "),
-    story_images: scene.story_images ?? [],
+    story_images_v2,
     locationId: scene.locationId,
     characterIdsTsids: [...scene.characterIds],
     characterIdsFallback: "",
@@ -94,13 +107,17 @@ function formValuesToPayload(
     ? values.characterIdsTsids
     : commaListToArray(values.characterIdsFallback);
 
+  const storyImagesV2 = values.story_images_v2;
+  const storyImages = storyImagesV2.map((i) => i.url);
+
   return {
     title: values.title.trim(),
     chapter_number: values.chapter_number,
     chapter_title: values.chapter_title,
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
-    story_images: values.story_images,
+    story_images: storyImages,
+    story_images_v2: storyImagesV2,
     locationId: values.locationId.trim(),
     characterIds,
   };
@@ -142,7 +159,7 @@ export function SceneForm(props: SceneFormProps) {
           chapter_title: "",
           summary: "",
           tags: "",
-          story_images: [],
+          story_images_v2: [],
           locationId: "",
           characterIdsTsids: [],
           characterIdsFallback: "",
@@ -179,7 +196,19 @@ export function SceneForm(props: SceneFormProps) {
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
     try {
+      console.log(
+        "[SceneForm] submit story_images_v2 (uploader state)",
+        values.story_images_v2
+      );
       const payload = formValuesToPayload(values, hasCharacterPicker);
+      console.log("[SceneForm] Supabase scene payload (dual-write)", payload);
+      console.log("[SceneForm] invariant check", {
+        story_images: payload.story_images,
+        projectedFromV2: payload.story_images_v2?.map((x) => x.url),
+        match:
+          JSON.stringify(payload.story_images) ===
+          JSON.stringify(payload.story_images_v2?.map((x) => x.url)),
+      });
       if (props.mode === "create") {
         await createScene(workId, payload);
       } else {
@@ -269,7 +298,7 @@ export function SceneForm(props: SceneFormProps) {
           按顺序上传场景图片，将用于拉洋片式展示
         </p>
         <Controller
-          name="story_images"
+          name="story_images_v2"
           control={form.control}
           render={({ field }) => (
             <MultiImageUploader
