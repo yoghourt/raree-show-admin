@@ -273,9 +273,10 @@ export function SceneForm(props: SceneFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label>故事图片序列</Label>
+        <Label>Story Sequence</Label>
         <p className="text-muted-foreground text-xs">
-          按顺序上传场景图片，将用于拉洋片式展示
+          Each segment is one frame of the scene. Caption first, then add the
+          image.
         </p>
         <Controller
           name="story_images_v2"
