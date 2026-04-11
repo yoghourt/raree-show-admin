@@ -52,7 +52,7 @@ const sceneFormSchema = z.object({
       return t === "" ? null : t;
     })
     .nullable(),
-  summary: z.string().min(1, "摘要不能为空"),
+  summary: z.string().optional().default(""),
   tags: z.string(),
   story_images_v2: z
     .array(
@@ -259,7 +259,7 @@ export function SceneForm(props: SceneFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="summary">摘要</Label>
+        <Label htmlFor="summary">摘要 (可选)</Label>
         <Textarea
           id="summary"
           {...form.register("summary")}
@@ -273,14 +273,10 @@ export function SceneForm(props: SceneFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="tags">标签（逗号分隔）</Label>
-        <Input id="tags" {...form.register("tags")} placeholder="例如：序幕, 异鬼" />
-      </div>
-
-      <div className="space-y-2">
-        <Label>故事图片序列</Label>
+        <Label>Story Sequence</Label>
         <p className="text-muted-foreground text-xs">
-          按顺序上传场景图片，将用于拉洋片式展示
+          Each segment is one frame of the scene. Caption first, then add the
+          image.
         </p>
         <Controller
           name="story_images_v2"
