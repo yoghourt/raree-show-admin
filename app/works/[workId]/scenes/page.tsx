@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import * as React from "react";
 
 import { SceneTable } from "@/components/scenes/SceneTable";
+import { RagBackfillPanel } from "@/components/works/RagBackfillPanel";
 import { Button } from "@/components/ui/button";
 import { useScenes } from "@/hooks/useScenes";
 import { getWork } from "@/lib/works";
@@ -111,6 +112,8 @@ export default function WorkScenesPage() {
           </Link>
         </Button>
       </header>
+
+      <RagBackfillPanel workId={workId} />
 
       <SceneTable
         workId={workId}
