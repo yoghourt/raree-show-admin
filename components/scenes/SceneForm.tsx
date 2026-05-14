@@ -12,22 +12,16 @@ import {
 } from "react-hook-form";
 import { z } from "zod";
 
+import { EntityMultiFuzzyPicker } from "@/components/entity/EntityMultiFuzzyPicker";
+import { FuzzyEntityCombobox } from "@/components/entity/FuzzyEntityCombobox";
+import type { EntityOption } from "@/components/entity/types";
 import { MultiImageUploader } from "@/components/scenes/MultiImageUploader";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createScene, updateScene } from "@/lib/scenes";
 import type { Character, Location, Scene, StoryImage } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 const commaListToArray = (value: string) =>
   value
@@ -126,6 +120,8 @@ type SceneFormBase = {
   workId: string;
   characters: Character[];
   locations: Location[];
+  /** True while characters/locations are being fetched (comboboxes show Loading...) */
+  entitiesLoading?: boolean;
 };
 
 type SceneFormProps =
@@ -133,14 +129,14 @@ type SceneFormProps =
   | (SceneFormBase & { mode: "edit"; defaultValues: Scene });
 
 export function SceneForm(props: SceneFormProps) {
-  const { workId, characters, locations } = props;
+  const { workId, characters, locations, entitiesLoading = false } = props;
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = React.useState(false);
   const listHref = `/works/${encodeURIComponent(workId)}/scenes`;
 
-  const hasLocationPicker = locations.length > 0;
-  const hasCharacterPicker = characters.length > 0;
+  const hasLocationPicker = locations.length > 0 || entitiesLoading;
+  const hasCharacterPicker = characters.length > 0 || entitiesLoading;
 
   const defaultValues: SceneFormValues =
     props.mode === "edit"
@@ -165,35 +161,41 @@ export function SceneForm(props: SceneFormProps) {
   const watchedLocationId =
     useWatch({ control: form.control, name: "locationId" }) ?? "";
 
-  const selectLocationOptions = React.useMemo(() => {
-    if (!hasLocationPicker) {
-      return [];
-    }
+  const locationEntityOptions = React.useMemo((): EntityOption[] => {
     const list = [...locations];
+    const base = list.map((l) => ({
+      id: l.tsid,
+      label: l.name,
+      aliases: [l.tsid],
+    }));
     if (
       watchedLocationId &&
       !list.some((l) => l.tsid === watchedLocationId)
     ) {
       return [
         {
-          tsid: watchedLocationId,
+          id: watchedLocationId,
           label: `${watchedLocationId}（不在当前地点库）`,
+          aliases: [watchedLocationId],
         },
-        ...list.map((l) => ({ tsid: l.tsid, label: l.name })),
+        ...base,
       ];
     }
-    return list.map((l) => ({ tsid: l.tsid, label: l.name }));
-  }, [hasLocationPicker, locations, watchedLocationId]);
+    return base;
+  }, [locations, watchedLocationId]);
+
+  const characterEntityOptions = React.useMemo((): EntityOption[] => {
+    return characters.map((c) => ({
+      id: c.tsid,
+      label: c.name,
+      aliases: [c.tsid],
+    }));
+  }, [characters]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
     try {
-      console.log(
-        "[SceneForm] submit story_images_v2 (uploader state)",
-        values.story_images_v2
-      );
       const payload = formValuesToPayload(values, hasCharacterPicker);
-      console.log("[SceneForm] Supabase scene payload (story_images_v2 only)", payload);
       if (props.mode === "create") {
         await createScene(workId, payload);
       } else {
@@ -298,25 +300,14 @@ export function SceneForm(props: SceneFormProps) {
             name="locationId"
             control={form.control}
             render={({ field }) => (
-              <Select
+              <FuzzyEntityCombobox
                 value={field.value || undefined}
-                onValueChange={field.onChange}
-              >
-                <SelectTrigger
-                  id="locationId"
-                  className="w-full max-w-md"
-                  aria-invalid={!!form.formState.errors.locationId}
-                >
-                  <SelectValue placeholder="选择地点" />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  {selectLocationOptions.map((opt) => (
-                    <SelectItem key={opt.tsid} value={opt.tsid}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={locationEntityOptions}
+                placeholder="选择地点"
+                loading={entitiesLoading}
+                disabled={form.formState.isSubmitting}
+                onSelect={(opt) => field.onChange(opt.id)}
+              />
             )}
           />
         ) : (
@@ -350,38 +341,17 @@ export function SceneForm(props: SceneFormProps) {
                 (id) => !characters.some((c) => c.tsid === id)
               );
               return (
-                <div className="space-y-3 rounded-lg border border-border p-3">
-                  <div className="max-h-48 space-y-2 overflow-y-auto">
-                    {characters.map((c) => (
-                      <label
-                        key={c.tsid}
-                        className={cn(
-                          "flex cursor-pointer items-center gap-2 rounded-md py-1 pr-2 hover:bg-muted/50"
-                        )}
-                      >
-                        <Checkbox
-                          checked={field.value.includes(c.tsid)}
-                          onCheckedChange={(checked) => {
-                            if (checked === true) {
-                              field.onChange([...field.value, c.tsid]);
-                            } else {
-                              field.onChange(
-                                field.value.filter(
-                                  (id: string) => id !== c.tsid
-                                )
-                              );
-                            }
-                          }}
-                        />
-                        <span className="text-sm">{c.name}</span>
-                        <span className="text-muted-foreground font-mono text-xs">
-                          {c.tsid}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                <div className="space-y-3">
+                  <EntityMultiFuzzyPicker
+                    options={characterEntityOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="搜索角色…"
+                    loading={entitiesLoading}
+                    disabled={form.formState.isSubmitting}
+                  />
                   {orphans.length > 0 ? (
-                    <div className="border-t pt-2">
+                    <div className="rounded-lg border border-border p-3 pt-2">
                       <p className="text-muted-foreground mb-2 text-xs">
                         以下 TSID 不在当前角色库中，仍将写入场景；可移除。
                       </p>
