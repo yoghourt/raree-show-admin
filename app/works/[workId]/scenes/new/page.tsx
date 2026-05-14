@@ -103,7 +103,7 @@ export default function NewScenePage() {
   const workTitle =
     workLoading ? "加载中…" : work?.title ?? "未知作品";
 
-  const formReady = workId && !refsLoading && !refsError;
+  const formReady = workId && !refsError;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
@@ -160,17 +160,13 @@ export default function NewScenePage() {
           地点、角色从当前作品已维护的数据中选择；若无数据可手动填写 TSID。
         </p>
       </div>
-      {refsLoading ? (
-        <p className="text-muted-foreground text-sm" aria-busy="true">
-          加载地点与角色列表…
-        </p>
-      ) : null}
       {formReady ? (
         <SceneForm
           workId={workId}
           mode="create"
           characters={characters}
           locations={locations}
+          entitiesLoading={refsLoading}
         />
       ) : !workId ? (
         <p className="text-muted-foreground text-sm">无效的作品 ID。</p>

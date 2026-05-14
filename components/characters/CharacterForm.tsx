@@ -4,9 +4,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { Controller, useForm } from "react-hook-form";
+import { startTransition, useActionState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import {
+  generateCharacterAvatar,
+  type GenerateCharacterAvatarState,
+} from "@/app/actions/generateCharacterAvatar";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +66,11 @@ export function CharacterForm(props: CharacterFormProps) {
   const [imageUploading, setImageUploading] = React.useState(false);
   const listHref = `/works/${encodeURIComponent(props.workId)}/characters`;
 
+  const [avatarGenState, avatarGenAction, avatarGenPending] = useActionState<
+    GenerateCharacterAvatarState | null,
+    FormData
+  >(generateCharacterAvatar, null);
+
   const defaultValues: CharacterFormValues =
     props.mode === "edit"
       ? characterToFormValues(props.defaultValues)
@@ -75,6 +85,19 @@ export function CharacterForm(props: CharacterFormProps) {
     resolver: zodResolver(characterFormSchema),
     defaultValues,
   });
+
+  const watchedName = useWatch({ control: form.control, name: "name" }) ?? "";
+  const watchedDescription =
+    useWatch({ control: form.control, name: "description" }) ?? "";
+
+  React.useEffect(() => {
+    if (avatarGenState?.ok) {
+      form.setValue("portraitUrl", avatarGenState.url, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [avatarGenState, form]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
@@ -141,6 +164,33 @@ export function CharacterForm(props: CharacterFormProps) {
               onChange={field.onChange}
               onUploadingChange={setImageUploading}
             />
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={avatarGenPending}
+                className="min-w-[9.5rem]"
+                onClick={() => {
+                  const fd = new FormData();
+                  fd.append("name", watchedName);
+                  fd.append("description", watchedDescription);
+                  if (props.mode === "edit") {
+                    fd.append("characterTsid", props.defaultValues.tsid);
+                  }
+                  startTransition(() => {
+                    avatarGenAction(fd);
+                  });
+                }}
+              >
+                {avatarGenPending ? "Generating..." : "AI Generate"}
+              </Button>
+              {avatarGenState && !avatarGenState.ok ? (
+                <p className="text-destructive max-w-md text-sm">
+                  {avatarGenState.message}
+                </p>
+              ) : null}
+            </div>
             {form.formState.errors.portraitUrl && (
               <p className="text-destructive text-sm">
                 {form.formState.errors.portraitUrl.message}
@@ -153,7 +203,9 @@ export function CharacterForm(props: CharacterFormProps) {
       <div className="flex gap-2">
         <Button
           type="submit"
-          disabled={form.formState.isSubmitting || imageUploading}
+          disabled={
+            form.formState.isSubmitting || imageUploading || avatarGenPending
+          }
         >
           {form.formState.isSubmitting
             ? "提交中…"
