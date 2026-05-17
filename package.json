@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "bootstrap": "node scripts/governance/bootstrap.mjs",
+    "check:governance": "node scripts/governance/check-governance.mjs",
+    "predev": "npm run bootstrap",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
