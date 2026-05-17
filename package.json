@@ -5,6 +5,7 @@
   "scripts": {
     "bootstrap": "node scripts/governance/bootstrap.mjs",
     "check:governance": "node scripts/governance/check-governance.mjs",
+    "sync:governance": "node scripts/governance/sync-governance.mjs",
     "predev": "npm run bootstrap",
     "dev": "next dev",
     "build": "next build",

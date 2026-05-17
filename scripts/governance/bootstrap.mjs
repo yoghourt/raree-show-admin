@@ -23,4 +23,13 @@ const check = spawnSync("node", ["scripts/governance/check-governance.mjs"], {
   stdio: "inherit",
 });
 
-process.exit(check.status ?? 1);
+if (check.status !== 0) {
+  process.exit(check.status ?? 1);
+}
+
+const sync = spawnSync("node", ["scripts/governance/sync-governance.mjs"], {
+  cwd: repoRoot,
+  stdio: "inherit",
+});
+
+process.exit(sync.status ?? 1);
