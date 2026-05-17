@@ -42,3 +42,6 @@ next-env.d.ts
 
 .cursorrules
 .cursor
+
+# governance (root submodule working tree only; do not use bare `governance/` — it ignores scripts/governance/)
+/governance/

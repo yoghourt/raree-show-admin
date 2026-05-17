@@ -1,0 +1,4 @@
+[submodule "governance"]
+	path = governance
+	url = https://github.com/yoghourt/raree-governance.git
+	branch = main
