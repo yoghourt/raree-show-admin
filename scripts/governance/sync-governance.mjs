@@ -6,17 +6,10 @@ import { access, copyFile, mkdir } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { adapterMappings } from "./adapter-mappings.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const governanceRoot = path.join(repoRoot, "governance");
-
-/** @type {{ source: string; dest: string }[]} */
-const syncMappings = [
-  {
-    source: "templates/PR_TEMPLATE.md",
-    dest: ".github/pull_request_template.md",
-  },
-];
 
 try {
   await access(governanceRoot, constants.F_OK);
@@ -29,7 +22,7 @@ try {
 
 let failed = false;
 
-for (const { source, dest } of syncMappings) {
+for (const { source, dest } of adapterMappings) {
   const sourcePath = path.join(governanceRoot, source);
   const destPath = path.join(repoRoot, dest);
 

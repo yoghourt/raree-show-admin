@@ -48,3 +48,5 @@ if (failed) {
 }
 
 console.log("check:governance: governance entrypoints accessible.");
+
+await import("./verify-adapter-integrity.mjs");
