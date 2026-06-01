@@ -1,12 +1,4 @@
-# Pull Request
-
-Authority: `specs/CHANGE_TELEMETRY_SPEC.md`
-
-Use constraint-oriented narration. Prefer verbs such as formalize, enforce, validate, isolate, constrain, normalize, harden, freeze, and supersede.
-
----
-
-## What
+# What
 
 <!-- Operational changes: files, boundaries, and behavioral deltas. -->
 
