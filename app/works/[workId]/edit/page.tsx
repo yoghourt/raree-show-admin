@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as React from "react";
 
-import { BootstrapPanel } from "@/components/works/BootstrapPanel";
 import { WorkForm } from "@/components/works/WorkForm";
 import { Button } from "@/components/ui/button";
 import { getWork } from "@/lib/works";
@@ -99,7 +98,7 @@ export default function EditWorkPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 px-6 py-8">
+    <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
       <nav
         className="flex flex-wrap items-center gap-1 text-sm text-zinc-500"
         aria-label="面包屑"
@@ -115,29 +114,25 @@ export default function EditWorkPage() {
         <span className="font-medium text-zinc-800">编辑作品</span>
       </nav>
 
-      <div className="max-w-2xl space-y-6">
-        <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href="/works">← 返回列表</Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">编辑作品</h1>
-          <p className="text-muted-foreground mt-1 font-mono text-sm">
-            {work.tsid}
-          </p>
-        </div>
-        <WorkForm
-          key={work.id}
-          mode="edit"
-          workId={work.id}
-          defaultValues={{
-            title: work.title,
-            description: work.description,
-            coverImage: work.coverImage,
-          }}
-        />
+      <Button variant="ghost" size="sm" className="-ml-2" asChild>
+        <Link href="/works">← 返回列表</Link>
+      </Button>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">编辑作品</h1>
+        <p className="text-muted-foreground mt-1 font-mono text-sm">
+          {work.tsid}
+        </p>
       </div>
-
-      <BootstrapPanel workId={work.id} />
+      <WorkForm
+        key={work.id}
+        mode="edit"
+        workId={work.id}
+        defaultValues={{
+          title: work.title,
+          description: work.description,
+          coverImage: work.coverImage,
+        }}
+      />
     </div>
   );
 }

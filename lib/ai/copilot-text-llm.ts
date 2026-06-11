@@ -11,7 +11,7 @@
  * Avatar / image generation still uses Gemini separately (GEMINI_IMAGE_MODEL).
  */
 
-import { extractContent } from "@/lib/ai/bootstrap-parser";
+import { extractContent } from "@/lib/ai/llm-response-utils";
 
 export type CopilotTextProvider = "openrouter" | "gemini";
 

@@ -3,7 +3,7 @@
  * Free-tier models often return broken JSON — extract best-effort or throw.
  */
 
-import { extractJson } from "@/lib/ai/bootstrap-parser";
+import { extractJson } from "@/lib/ai/llm-response-utils";
 
 function looksLikeJsonGarbage(text: string): boolean {
   const t = text.trim();
