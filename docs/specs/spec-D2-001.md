@@ -471,6 +471,48 @@ These mechanisms do not exist in current Runtime Truth.
 
 ---
 
+## Provider Architecture
+
+### Provider Selection
+
+Per ADR-001 §4, Bootstrap text generation SHALL use:
+
+```text
+Bootstrap Text Generation
+    ↓
+OpenRouter Free Model Tier
+```
+
+Rationale (from ADR-001):
+
+```text
+Avoid coupling bootstrap completion
+to Gemini quota availability.
+```
+
+Alternative B (Gemini Bootstrap) has been explicitly rejected in ADR-001 due to quota exhaustion risk.
+
+---
+
+### Provider Separation
+
+The following runtime systems are explicitly separated from Bootstrap:
+
+```text
+Bootstrap Text Generation
+≠ Character Portrait Generation
+
+Bootstrap Text Generation
+≠ Scene Image Generation
+
+Bootstrap Text Generation
+≠ RAG Embedding
+```
+
+Existing Gemini-based systems remain unchanged.
+
+---
+
 ## UI Contract
 
 ### Placement
@@ -478,15 +520,13 @@ These mechanisms do not exist in current Runtime Truth.
 Page:
 
 ```text
-/works/{workId}/scenes
+/works/{workId}/edit
 ```
 
 Location:
 
 ```text
-Below RagBackfillPanel
-or
-Same-level Card
+Below WorkForm
 ```
 
 ---
@@ -670,6 +710,43 @@ Invisible in Evaluation Runtime
 until image URLs are populated.
 
 This behavior is intentional and preserved.
+
+---
+
+## Cross-Repository Obligations
+
+Per ADR-001 §7, the introduction of `signatureQuote` requires changes outside of this repository.
+
+### Admin Repository
+
+Governed by this specification.
+
+Changes required:
+
+```text
+Character type
+Character row mapping
+Insert mapping
+Update mapping
+Character form
+Database schema
+```
+
+### Web Repository
+
+This specification does not govern Web Repository implementation.
+
+Changes required per ADR-001 §7:
+
+```text
+Character type
+Data mapping
+Character presentation layer
+```
+
+Web Repository implementation MUST be tracked and completed separately.
+
+Cross-repository implementation is required before `signatureQuote` is considered fully deployed.
 
 ---
 
