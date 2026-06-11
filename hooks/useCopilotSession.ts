@@ -277,7 +277,7 @@ export function useCopilotSession(
       const column = DUP_CHECK_COLUMN[entityType];
       const idColumn = DUP_ENTITY_ID_COLUMN[entityType];
 
-      const query = supabase
+      let builder = supabase
         .from(table)
         .select(idColumn)
         .eq("work_id", workId)
@@ -285,10 +285,10 @@ export function useCopilotSession(
 
       // In edit mode, exclude the entity itself from the conflict check
       if (entityId !== "new") {
-        query.neq(idColumn, entityId);
+        builder = builder.neq(idColumn, entityId);
       }
 
-      const { data } = await (query as ReturnType<typeof supabase.from>).maybeSingle();
+      const { data } = await builder.limit(1).maybeSingle();
 
       const isDuplicate = data !== null;
 
