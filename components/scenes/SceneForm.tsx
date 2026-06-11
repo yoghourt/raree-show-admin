@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { useEffect } from "react";
 import {
   Controller,
   type Resolver,
@@ -15,13 +16,38 @@ import { z } from "zod";
 import { EntityMultiFuzzyPicker } from "@/components/entity/EntityMultiFuzzyPicker";
 import { FuzzyEntityCombobox } from "@/components/entity/FuzzyEntityCombobox";
 import type { EntityOption } from "@/components/entity/types";
+import { CopilotIcon } from "@/components/copilot/CopilotIcon";
+import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
 import { MultiImageUploader } from "@/components/scenes/MultiImageUploader";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useCopilotSession } from "@/hooks/useCopilotSession";
+import { getClassification } from "@/lib/ai/field-registry";
 import { createScene, updateScene } from "@/lib/scenes";
+import type { SuggestionItem } from "@/lib/ai/copilot-types";
 import type { Character, Location, Scene, StoryImage } from "@/lib/types";
+
+// ---------------------------------------------------------------------------
+// Scene Copilot field labels
+// ---------------------------------------------------------------------------
+
+const FIELD_LABELS: Record<string, string> = {
+  chapter_number: "章节序号",
+  title:          "标题",
+  summary:        "摘要",
+};
+
+// ---------------------------------------------------------------------------
+// Form schema
+// ---------------------------------------------------------------------------
 
 const commaListToArray = (value: string) =>
   value
@@ -56,7 +82,7 @@ const sceneFormSchema = z.object({
       })
     )
     .default([]),
-  locationId: z.string().min(1, "请选择或填写地点"),
+  locationId: z.string(),
   characterIdsTsids: z.array(z.string()),
   characterIdsFallback: z.string(),
 });
@@ -83,7 +109,7 @@ function sceneToFormValues(scene: Scene): SceneFormValues {
     summary: scene.summary,
     tags: scene.tags.join(", "),
     story_images_v2,
-    locationId: scene.locationId,
+    locationId: scene.locationId ?? "",
     characterIdsTsids: [...scene.characterIds],
     characterIdsFallback: "",
   };
@@ -104,7 +130,7 @@ function formValuesToPayload(
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
     story_images_v2: values.story_images_v2,
-    locationId: values.locationId.trim(),
+    locationId: values.locationId.trim() || null,
     characterIds,
   };
 }
@@ -120,7 +146,6 @@ type SceneFormBase = {
   workId: string;
   characters: Character[];
   locations: Location[];
-  /** True while characters/locations are being fetched (comboboxes show Loading...) */
   entitiesLoading?: boolean;
 };
 
@@ -158,6 +183,8 @@ export function SceneForm(props: SceneFormProps) {
     defaultValues,
   });
 
+  const watchedChapterTitle =
+    useWatch({ control: form.control, name: "chapter_title" }) ?? "";
   const watchedLocationId =
     useWatch({ control: form.control, name: "locationId" }) ?? "";
 
@@ -192,6 +219,34 @@ export function SceneForm(props: SceneFormProps) {
     }));
   }, [characters]);
 
+  // ── Copilot session (scope field = chapter_title, §4.1) ───────────────────
+
+  const entityId = props.mode === "edit" ? props.defaultValues.tsid : "new";
+
+  const copilot = useCopilotSession({
+    entityType: "scene",
+    workId,
+    entityId,
+  });
+
+  // Trigger duplicate check on chapter_title change (AC-24, §4.2)
+  const chapterTitleStr = typeof watchedChapterTitle === "string"
+    ? watchedChapterTitle
+    : (watchedChapterTitle ?? "");
+
+  useEffect(() => {
+    copilot.onScopeFieldChange(chapterTitleStr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapterTitleStr]);
+
+  // Teardown on unmount (RT-INV-07)
+  useEffect(() => {
+    return () => copilot.teardown();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Form submission ────────────────────────────────────────────────────────
+
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
     try {
@@ -207,6 +262,82 @@ export function SceneForm(props: SceneFormProps) {
     }
   });
 
+  // ── Copilot helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Build form value map for empty-field enumeration.
+   * chapter_number is treated as empty only if it equals the default (1) AND
+   * the field has not been touched — to avoid always suggesting it.
+   * All other fields use standard empty check.
+   */
+  const getFormValuesForCopilot = (): Record<string, unknown> => {
+    const v = form.getValues();
+    return {
+      title:          v.title,
+      chapter_number: v.chapter_number,
+      summary:        v.summary,
+      // reference and asset fields — excluded by registry (v1)
+      locationId:     v.locationId,
+      characterIds:   v.characterIdsTsids,
+      story_images_v2: v.story_images_v2,
+      tags:           v.tags,
+    };
+  };
+
+  const handleAccept = (field: string, value: string) => {
+    // chapter_number requires numeric conversion
+    if (field === "chapter_number") {
+      const num = parseInt(value, 10);
+      if (!Number.isNaN(num)) {
+        const currentVal = form.getValues("chapter_number");
+        // RT-INV-09: don't overwrite non-default (operator-set) chapter numbers
+        if (currentVal === 1 || currentVal === undefined) {
+          form.setValue("chapter_number", num, { shouldDirty: true });
+          copilot.accept(
+            field,
+            value,
+            "",   // treat as empty to allow the accept
+            () => {} // setValue already called above
+          );
+        }
+      }
+      return;
+    }
+
+    copilot.accept(
+      field,
+      value,
+      form.getValues(field as keyof SceneFormValues),
+      (f, v) => form.setValue(f as keyof SceneFormValues, v as never, { shouldDirty: true })
+    );
+  };
+
+  const handleAcceptAll = () => {
+    const currentSuggestions = copilot.suggestions;
+    currentSuggestions.forEach((s) => {
+      handleAccept(s.field, s.value);
+    });
+    // Clear suggestions after accepting all
+  };
+
+  const handleBatchRetry = () => {
+    copilot.batchRetry(chapterTitleStr);
+  };
+
+  const handleRegen = (field: string) => {
+    const currentValue = String(form.getValues(field as keyof SceneFormValues) ?? "");
+    copilot.narrativeRegen(field, currentValue, chapterTitleStr);
+  };
+
+  const handleAcceptRegen = (field: string) => {
+    copilot.acceptRegen(
+      field,
+      (f, v) => form.setValue(f as keyof SceneFormValues, v as never, { shouldDirty: true })
+    );
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <form onSubmit={onSubmit} className="space-y-6">
       {submitError ? (
@@ -218,6 +349,7 @@ export function SceneForm(props: SceneFormProps) {
         </div>
       ) : null}
 
+      {/* ── Title (narrative) ── */}
       <div className="space-y-2">
         <Label htmlFor="title">标题</Label>
         <Input
@@ -230,8 +362,17 @@ export function SceneForm(props: SceneFormProps) {
             {form.formState.errors.title.message}
           </p>
         )}
+        <SceneNarrativeRegen
+          field="title"
+          currentValue={form.watch("title")}
+          pendingItem={copilot.pendingRegen["title"]}
+          onRegen={() => handleRegen("title")}
+          onAcceptRegen={() => handleAcceptRegen("title")}
+          onDismissRegen={() => copilot.dismissRegen("title")}
+        />
       </div>
 
+      {/* ── Chapter Number + Chapter Title ── */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="chapter_number">章节序号</Label>
@@ -249,8 +390,19 @@ export function SceneForm(props: SceneFormProps) {
             </p>
           )}
         </div>
+
+        {/* ── Chapter Title (Scope Field) — with CopilotIcon ── */}
         <div className="space-y-2">
-          <Label htmlFor="chapter_title">章节标题</Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="chapter_title">章节标题</Label>
+            {copilot.dupConflict && (
+              <span className="text-xs text-destructive">该章节标题已存在</span>
+            )}
+            <CopilotIcon
+              state={copilot.isSuggesting ? "loading" : copilot.iconState}
+              onClick={() => copilot.triggerSuggest(getFormValuesForCopilot())}
+            />
+          </div>
           <Input
             id="chapter_title"
             placeholder="可选，如：凛冬将至"
@@ -260,6 +412,7 @@ export function SceneForm(props: SceneFormProps) {
         </div>
       </div>
 
+      {/* ── Summary (narrative) ── */}
       <div className="space-y-2">
         <Label htmlFor="summary">摘要 (可选)</Label>
         <Textarea
@@ -272,8 +425,17 @@ export function SceneForm(props: SceneFormProps) {
             {form.formState.errors.summary.message}
           </p>
         )}
+        <SceneNarrativeRegen
+          field="summary"
+          currentValue={form.watch("summary") ?? ""}
+          pendingItem={copilot.pendingRegen["summary"]}
+          onRegen={() => handleRegen("summary")}
+          onAcceptRegen={() => handleAcceptRegen("summary")}
+          onDismissRegen={() => copilot.dismissRegen("summary")}
+        />
       </div>
 
+      {/* ── Story Sequence (asset — excluded from Copilot, FC-03) ── */}
       <div className="space-y-2">
         <Label>Story Sequence</Label>
         <p className="text-muted-foreground text-xs">
@@ -293,8 +455,9 @@ export function SceneForm(props: SceneFormProps) {
         />
       </div>
 
+      {/* ── Location (reference — excluded in v1, OQ-03) ── */}
       <div className="space-y-2">
-        <Label>地点</Label>
+        <Label>地点（可选）</Label>
         {hasLocationPicker ? (
           <Controller
             name="locationId"
@@ -330,6 +493,7 @@ export function SceneForm(props: SceneFormProps) {
         )}
       </div>
 
+      {/* ── Characters (reference — excluded in v1, OQ-03) ── */}
       <div className="space-y-2">
         <Label>角色</Label>
         {hasCharacterPicker ? (
@@ -392,6 +556,39 @@ export function SceneForm(props: SceneFormProps) {
         )}
       </div>
 
+      {/* ── Suggestion Panel (right-side drawer) ── */}
+      <Sheet open={copilot.panelOpen} onOpenChange={(open) => { if (!open) copilot.closePanel(); }}>
+        <SheetContent side="right" className="w-[420px] sm:max-w-[420px] overflow-y-auto flex flex-col gap-0">
+          <SheetHeader className="pb-4 border-b">
+            <div className="flex items-center gap-2">
+              <SheetTitle>Copilot 建议</SheetTitle>
+              {copilot.suggestions.length > 0 && (
+                <span className="rounded-full bg-violet-100 dark:bg-violet-900 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-300 font-medium">
+                  {copilot.suggestions.length} 条
+                </span>
+              )}
+            </div>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto pt-4">
+            <SuggestionPanel
+              suggestions={copilot.suggestions}
+              retryQueue={copilot.retryQueue}
+              isRetrying={copilot.isRetrying}
+              suggestErrors={copilot.suggestErrors}
+              fieldLabels={FIELD_LABELS}
+              showHeader={false}
+              onAccept={handleAccept}
+              onSkip={copilot.skip}
+              onAddToRetryQueue={copilot.addToRetryQueue}
+              onAcceptAll={handleAcceptAll}
+              onBatchRetry={handleBatchRetry}
+              onClose={copilot.closePanel}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Form actions ── */}
       <div className="flex gap-2">
         <Button
           type="submit"
@@ -408,5 +605,83 @@ export function SceneForm(props: SceneFormProps) {
         </Button>
       </div>
     </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SceneNarrativeRegen — Narrative Regenerate button for scenes (§9.5)
+// ---------------------------------------------------------------------------
+
+interface SceneNarrativeRegenProps {
+  field: string;
+  currentValue: string;
+  pendingItem: SuggestionItem | undefined;
+  onRegen: () => void;
+  onAcceptRegen: () => void;
+  onDismissRegen: () => void;
+}
+
+function SceneNarrativeRegen({
+  field,
+  currentValue,
+  pendingItem,
+  onRegen,
+  onAcceptRegen,
+  onDismissRegen,
+}: SceneNarrativeRegenProps) {
+  // AC-26: derived from registry — no field name literals in condition
+  const classification = getClassification("scene", field);
+  if (classification !== "narrative") return null;
+  if (!currentValue?.trim()) return null;
+
+  if (pendingItem) {
+    return (
+      <div className="rounded-md border border-violet-200 bg-violet-50/60 dark:border-violet-800 dark:bg-violet-950/20 p-2.5 space-y-1.5">
+        <p className="text-xs text-muted-foreground font-medium">再生成建议：</p>
+        <p className="text-sm whitespace-pre-wrap">{pendingItem.value}</p>
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" className="h-7 text-xs" onClick={onAcceptRegen}>
+            接受并覆写
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={onDismissRegen}>
+            忽略
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
+      onClick={onRegen}
+    >
+      <RegenIcon />
+      再生成
+    </Button>
+  );
+}
+
+function RegenIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="mr-1 h-3 w-3"
+      aria-hidden="true"
+    >
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M8 16H3v5" />
+    </svg>
   );
 }

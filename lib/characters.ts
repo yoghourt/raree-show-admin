@@ -10,6 +10,7 @@ type CharacterRow = {
   name: string;
   house: string;
   description: string;
+  signature_quote: string | null;
   portrait_url: string;
   created_at: string;
 };
@@ -22,6 +23,7 @@ function rowToCharacter(row: CharacterRow): Character {
     name: row.name,
     house: row.house,
     description: row.description,
+    signatureQuote: row.signature_quote ?? null,
     portraitUrl: row.portrait_url,
     createdAt: row.created_at,
   };
@@ -39,6 +41,7 @@ function toInsertRow(
     name: data.name,
     house: data.house,
     description: data.description,
+    signature_quote: data.signatureQuote ?? null,
     portrait_url: data.portraitUrl,
   };
 }
@@ -50,6 +53,7 @@ function toUpdateRow(
     name: data.name,
     house: data.house,
     description: data.description,
+    signature_quote: data.signatureQuote ?? null,
     portrait_url: data.portraitUrl,
   };
 }

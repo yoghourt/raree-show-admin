@@ -3,6 +3,17 @@ import type { Scene, StoryImage } from "@/lib/types";
 
 const TABLE = "scenes";
 
+/** scenes.location_id is NOT NULL in DB; empty string means "not yet assigned". */
+function locationIdToDb(locationId: string | null): string {
+  const trimmed = locationId?.trim();
+  return trimmed ? trimmed : "";
+}
+
+function locationIdFromDb(raw: string | null | undefined): string | null {
+  const trimmed = raw?.trim();
+  return trimmed ? trimmed : null;
+}
+
 type SceneRow = {
   work_id: string;
   tsid: string;
@@ -47,7 +58,7 @@ function rowToScene(row: SceneRow): Scene {
     summary: row.summary,
     tags: row.tags ?? [],
     story_images_v2: parseStoryImagesV2(row.story_images_v2),
-    locationId: row.location_id,
+    locationId: locationIdFromDb(row.location_id),
     characterIds: row.character_ids ?? [],
   };
 }
@@ -66,7 +77,7 @@ function toInsertRow(
     summary: data.summary,
     tags: data.tags,
     story_images_v2: data.story_images_v2 ?? [],
-    location_id: data.locationId,
+    location_id: locationIdToDb(data.locationId),
     character_ids: data.characterIds,
   };
 }
@@ -79,7 +90,7 @@ function toUpdateRow(data: Omit<Scene, "tsid" | "workId">): Record<string, unkno
     summary: data.summary,
     tags: data.tags,
     story_images_v2: data.story_images_v2 ?? [],
-    location_id: data.locationId,
+    location_id: locationIdToDb(data.locationId),
     character_ids: data.characterIds,
   };
 }

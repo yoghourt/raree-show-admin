@@ -22,7 +22,7 @@ export type Scene = {
   tags: string[];
   /** 场景配图序列（jsonb，唯一数据源） */
   story_images_v2: StoryImage[] | null;
-  locationId: string;
+  locationId: string | null;
   characterIds: string[];
 };
 
@@ -32,6 +32,7 @@ export type Character = {
   name: string;
   house: string;
   description: string;
+  signatureQuote: string | null;
   portraitUrl: string;
   workId: string;
   createdAt: string;

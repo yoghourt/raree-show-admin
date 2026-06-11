@@ -1,9 +1,12 @@
 # ADR-001 — Assisted Work Bootstrap Pipeline
 
-**Status:** Accepted
+**Status:** Superseded
+**Superseded by:** ADR-004 — Source of Canonical Truth
+**Archive Classification:** Experimental Prototype
 **Type:** Architecture ADR
 **Version:** 1.1
 **Last Updated:** 2026-06-01
+**Archived:** 2026-06-06
 **Owner:** Architect
 
 ---
