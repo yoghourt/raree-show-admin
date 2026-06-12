@@ -16,7 +16,7 @@
  *
  * NOTE: Full browser E2E tests (icon click → panel → form value update)
  * require Playwright or Cypress and should be added when that framework
- * is added to the project. See docs/adr/EAR-IMP-D2-002-001.md §3.3.
+ * is added to the project. See docs/specs/spec-d2-002-enrichment-copilot.md §9.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

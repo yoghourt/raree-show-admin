@@ -1,17 +1,8 @@
 /**
- * SPEC-D2-002 — Enrichment Copilot Suggest Service
+ * SPEC-D2-002 + SPEC-D2-003 — Enrichment Copilot Suggest Service
  *
- * Implements the Fact (SC-01) and Narrative (SC-02) suggestion pipelines.
- *
- * Source Connector v1 is a stub (§4.4 Architect Decision 2026-06-11).
- * All `fact`-routed fields fall through SC-03 Original Work fallback and
- * are returned as classification: "narrative", confidence: "yellow".
- *
- * AC-16 / SD-02: Generation prompts MUST NOT contain any instruction to
- * produce or infer the Scope Field value.
- *
- * AC-12: classification: "fact" with sources: [] is NEVER returned.
- * AC-20: SC-03 fallback NEVER produces confidence: "green".
+ * Fact-route: Connector First (Option B) → EvidenceBundle → normalize → SuggestionItem
+ * SC-03 when no source profile or no evidence.
  */
 
 import type {
@@ -21,16 +12,22 @@ import type {
   FieldRequest,
   EntityType,
 } from "@/lib/ai/copilot-types";
+import type { WorkSourceContext } from "@/lib/ai/evidence-types";
+import { queryEvidenceBundle } from "@/lib/ai/connector-orchestrator";
 import { callCopilotTextLlm } from "@/lib/ai/copilot-text-llm";
 import {
   parseBatchCopilotValues,
   parseCopilotFieldValue,
 } from "@/lib/ai/parse-copilot-value";
-import { querySourceConnector } from "@/lib/ai/source-connector-stub";
+import {
+  bundleToConfidence,
+  normalizeEvidence,
+} from "@/lib/ai/normalize-evidence";
 import { getFieldMetadata, getFieldLabel } from "@/lib/ai/field-registry";
 
-/** Gap between sequential fallback calls only (batch mode uses a single call). */
-const LLM_CALL_GAP_MS = Number(process.env.COPILOT_LLM_CALL_GAP_MS ?? process.env.GEMINI_CALL_GAP_MS ?? 400);
+const LLM_CALL_GAP_MS = Number(
+  process.env.COPILOT_LLM_CALL_GAP_MS ?? process.env.GEMINI_CALL_GAP_MS ?? 400
+);
 
 function entityTypeLabel(entityType: EntityType): string {
   return entityType === "character"
@@ -44,16 +41,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ---------------------------------------------------------------------------
-// Internal — single field generation via configured text LLM
-// ---------------------------------------------------------------------------
-
-/**
- * Builds the generation prompt for a field suggestion.
- *
- * AC-16 compliance: the prompt deliberately does NOT instruct the model to
- * produce the entity's canonical scope field value.
- */
 function buildFieldPrompt(params: {
   entityType: EntityType;
   scopeFieldValue: string;
@@ -113,9 +100,6 @@ ${retryContext}
 仅输出 JSON，不要有其他内容。`;
 }
 
-/**
- * Batch prompt — one LLM call for all empty fields (faster, avoids 3rd-call drops).
- */
 function buildBatchFieldPrompt(params: {
   entityType: EntityType;
   scopeFieldValue: string;
@@ -154,73 +138,6 @@ ${fieldLines}
 - 不要包含解释文字或 markdown
 
 仅输出 JSON 对象，不要有其他内容。`;
-}
-
-function fieldValuesToItems(
-  fields: FieldRequest[],
-  values: Record<string, string>
-): SuggestionItem[] {
-  const items: SuggestionItem[] = [];
-  for (const fr of fields) {
-    const value = (values[fr.field] ?? "").trim();
-    if (!value) continue;
-    items.push({
-      field: fr.field,
-      value,
-      confidence: "yellow",
-      classification: "narrative",
-      sources: [],
-    });
-  }
-  return items;
-}
-
-async function generateBatchSuggestions(
-  req: SuggestRequest
-): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
-  const started = Date.now();
-  const fields = req.emptyFields;
-
-  // SC-01 stub: fact fields have no connector match in v1 — batch uses narrative generation
-  for (const fr of fields) {
-    if (fr.copilot_route === "fact") {
-      querySourceConnector({
-        entityType: req.entityType,
-        scopeFieldValue: req.scopeField,
-        field: fr.field,
-        workId: req.workId,
-      });
-    }
-  }
-
-  const prompt = buildBatchFieldPrompt({
-    entityType: req.entityType,
-    scopeFieldValue: req.scopeField,
-    workTitle: req.workTitle,
-    fields,
-  });
-
-  const raw = await callCopilotTextLlm(prompt);
-  const values = parseBatchCopilotValues(
-    raw,
-    fields.map((f) => f.field)
-  );
-  const items = fieldValuesToItems(fields, values);
-
-  console.info("[suggest-service] batch suggest done", {
-    entityType: req.entityType,
-    fieldCount: fields.length,
-    itemCount: items.length,
-    durationMs: Date.now() - started,
-  });
-
-  const errors = collectEmptyFieldErrors(
-    fields.map((f) => f.field),
-    values,
-    false
-  );
-
-  return { items, errors };
 }
 
 function buildBatchRetryPrompt(params: {
@@ -290,171 +207,6 @@ function collectEmptyFieldErrors(
   return errors;
 }
 
-async function generateBatchRetrySuggestions(
-  retryFields: RetryFieldRequest[],
-  context: {
-    entityType: EntityType;
-    scopeFieldValue: string;
-    workId: string;
-    workTitle?: string | null;
-  }
-): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
-  const started = Date.now();
-  const { entityType, scopeFieldValue, workId, workTitle } = context;
-
-  for (const rfr of retryFields) {
-    querySourceConnector({
-      entityType,
-      scopeFieldValue,
-      field: rfr.field,
-      workId,
-    });
-  }
-
-  const prompt = buildBatchRetryPrompt({
-    entityType,
-    scopeFieldValue,
-    workTitle,
-    retryFields,
-  });
-
-  const raw = await callCopilotTextLlm(prompt);
-  const fieldKeys = retryFields.map((r) => r.field);
-  const values = parseBatchCopilotValues(raw, fieldKeys);
-
-  const pseudoFields: FieldRequest[] = retryFields.map((r) => ({
-    field: r.field,
-    copilot_route: "narrative",
-  }));
-  const items = fieldValuesToItems(pseudoFields, values);
-  const errors = collectEmptyFieldErrors(fieldKeys, values, true);
-
-  console.info("[suggest-service] batch retry done", {
-    entityType,
-    fieldCount: retryFields.length,
-    itemCount: items.length,
-    errorCount: errors.length,
-    durationMs: Date.now() - started,
-  });
-
-  return { items, errors };
-}
-
-async function generateSequentialSuggestions(
-  req: SuggestRequest
-): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
-  const started = Date.now();
-  const acceptedFacts: Record<string, string> = {};
-  const items: SuggestionItem[] = [];
-  const errors: Array<{ field: string; code: string; message: string }> = [];
-
-  for (let i = 0; i < req.emptyFields.length; i++) {
-    const fr = req.emptyFields[i];
-    if (i > 0 && LLM_CALL_GAP_MS > 0) {
-      await sleep(LLM_CALL_GAP_MS);
-    }
-
-    try {
-      let item: SuggestionItem;
-      if (fr.copilot_route === "fact") {
-        item = await processFact({
-          entityType: req.entityType,
-          scopeFieldValue: req.scopeField,
-          field: fr.field,
-          workId: req.workId,
-          workTitle: req.workTitle,
-          acceptedFacts,
-        });
-      } else {
-        item = await processNarrative({
-          entityType: req.entityType,
-          scopeFieldValue: req.scopeField,
-          field: fr.field,
-          workTitle: req.workTitle,
-          acceptedFacts,
-        });
-      }
-
-      if (!item.value.trim()) continue;
-      items.push(item);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error("[suggest-service] field suggestion failed", { field: fr.field, error: msg });
-      errors.push({ field: fr.field, code: "PROVIDER_ERROR", message: msg });
-    }
-  }
-
-  console.info("[suggest-service] sequential suggest done", {
-    entityType: req.entityType,
-    fieldCount: req.emptyFields.length,
-    itemCount: items.length,
-    errorCount: errors.length,
-    durationMs: Date.now() - started,
-  });
-
-  return { items, errors };
-}
-
-// ---------------------------------------------------------------------------
-// SC-01 Fact pipeline with SC-03 fallback
-// ---------------------------------------------------------------------------
-
-async function processFact(params: {
-  entityType: EntityType;
-  scopeFieldValue: string;
-  field: string;
-  workId: string;
-  workTitle?: string | null;
-  acceptedFacts: Record<string, string>;
-  previousSuggestion?: string;
-  feedback?: string | null;
-}): Promise<SuggestionItem> {
-  const {
-    entityType,
-    scopeFieldValue,
-    field,
-    workId,
-    workTitle,
-    acceptedFacts,
-    previousSuggestion,
-    feedback,
-  } = params;
-
-  // SC-01: Query Source Connector first (SC-04 Source First Principle)
-  const connectorResult = querySourceConnector({
-    entityType,
-    scopeFieldValue,
-    field,
-    workId,
-  });
-
-  if (connectorResult.matched && connectorResult.tier === 1) {
-    // Tier-1: green confidence (§8.3) — not reachable with stub, included for future connector
-    throw new Error("Tier-1 source path not reachable in v1 stub");
-  }
-
-  if (connectorResult.matched && connectorResult.tier === 2) {
-    // Tier-2: yellow confidence — not reachable with stub, included for future connector
-    throw new Error("Tier-2 source path not reachable in v1 stub");
-  }
-
-  // SC-03 Original Work fallback: matched=false → demote to narrative/yellow (§4.4 step 4, AC-12, AC-20)
-  // Returning classification: "fact" with sources: [] is forbidden here.
-  return processNarrative({
-    entityType,
-    scopeFieldValue,
-    field,
-    workTitle,
-    acceptedFacts,
-    previousSuggestion,
-    feedback,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// SC-02 Narrative pipeline
-// ---------------------------------------------------------------------------
-
 async function processNarrative(params: {
   entityType: EntityType;
   scopeFieldValue: string;
@@ -490,101 +242,278 @@ async function processNarrative(params: {
   return {
     field,
     value,
-    confidence: "yellow",          // AC-20: SC-03 / narrative always yellow
-    classification: "narrative",   // AC-12: no "fact" without SourceRef
+    confidence: "yellow",
+    classification: "narrative",
     sources: [],
   };
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+async function processFact(params: {
+  entityType: EntityType;
+  scopeFieldValue: string;
+  field: string;
+  workId: string;
+  workTitle?: string | null;
+  sourceContext: WorkSourceContext | null | undefined;
+  acceptedFacts: Record<string, string>;
+  previousSuggestion?: string;
+  feedback?: string | null;
+}): Promise<SuggestionItem> {
+  const {
+    entityType,
+    scopeFieldValue,
+    field,
+    workId,
+    workTitle,
+    sourceContext,
+    acceptedFacts,
+    previousSuggestion,
+    feedback,
+  } = params;
 
-/**
- * Generates suggestions for all requested fields.
- *
- * Routing is derived exclusively from the FieldRequest.copilot_route
- * pre-resolved by the client from Appendix A metadata (MD-01, AC-26).
- *
- * Returns individual results including errors for partial failures (§13.2).
- */
-export async function generateSuggestions(
-  req: SuggestRequest
-): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
-  if (req.emptyFields.length === 0) {
-    return { items: [], errors: [] };
+  if (!sourceContext) {
+    return processNarrative({
+      entityType,
+      scopeFieldValue,
+      field,
+      workTitle,
+      acceptedFacts,
+      previousSuggestion,
+      feedback,
+    });
   }
 
-  // Batch: 1 LLM call for all fields (~3× faster than sequential per-field calls).
-  if (req.emptyFields.length >= 2) {
+  const bundle = await queryEvidenceBundle({
+    workId,
+    entityType,
+    scopeFieldValue,
+    field,
+    sourceContext,
+  });
+
+  if (process.env.SOURCE_CONNECTOR_DEBUG === "1" && bundle.diagnostics.length > 0) {
+    console.info("[suggest-service] connector diagnostics", {
+      field,
+      scopeFieldValue,
+      tier: bundle.tier,
+      matched: bundle.matched,
+      diagnostics: bundle.diagnostics,
+      connectors: bundle.evidenceItems.map((i) => i.connectorId),
+    });
+  }
+
+  if (!bundle.matched || bundle.evidenceItems.length === 0) {
+    return processNarrative({
+      entityType,
+      scopeFieldValue,
+      field,
+      workTitle,
+      acceptedFacts,
+      previousSuggestion,
+      feedback,
+    });
+  }
+
+  const { value, sources } = await normalizeEvidence(bundle, entityType, field);
+  if (!value.trim()) {
+    return processNarrative({
+      entityType,
+      scopeFieldValue,
+      field,
+      workTitle,
+      acceptedFacts,
+      previousSuggestion,
+      feedback,
+    });
+  }
+
+  return {
+    field,
+    value,
+    confidence: bundleToConfidence(bundle),
+    classification: "fact",
+    sources,
+  };
+}
+
+async function generateOptionBSuggestions(
+  req: SuggestRequest
+): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
+  const started = Date.now();
+  const factFields = req.emptyFields.filter((f) => f.copilot_route === "fact");
+  const narrativeFields = req.emptyFields.filter(
+    (f) => f.copilot_route === "narrative"
+  );
+
+  const items: SuggestionItem[] = [];
+  const errors: Array<{ field: string; code: string; message: string }> = [];
+  const acceptedFacts: Record<string, string> = {};
+
+  for (let i = 0; i < factFields.length; i++) {
+    const fr = factFields[i];
+    if (i > 0 && LLM_CALL_GAP_MS > 0) await sleep(LLM_CALL_GAP_MS);
+
     try {
-      return await generateBatchSuggestions(req);
+      const item = await processFact({
+        entityType: req.entityType,
+        scopeFieldValue: req.scopeField,
+        field: fr.field,
+        workId: req.workId,
+        workTitle: req.workTitle,
+        sourceContext: req.sourceContext,
+        acceptedFacts,
+      });
+      if (!item.value.trim()) continue;
+      items.push(item);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn("[suggest-service] batch suggest failed, sequential fallback", msg);
+      errors.push({ field: fr.field, code: "PROVIDER_ERROR", message: msg });
     }
   }
 
-  return generateSequentialSuggestions(req);
+  if (narrativeFields.length > 0) {
+    if (LLM_CALL_GAP_MS > 0) await sleep(LLM_CALL_GAP_MS);
+
+    try {
+      const prompt = buildBatchFieldPrompt({
+        entityType: req.entityType,
+        scopeFieldValue: req.scopeField,
+        workTitle: req.workTitle,
+        fields: narrativeFields,
+      });
+      const raw = await callCopilotTextLlm(prompt);
+      const values = parseBatchCopilotValues(
+        raw,
+        narrativeFields.map((f) => f.field)
+      );
+
+      for (const fr of narrativeFields) {
+        const value = (values[fr.field] ?? "").trim();
+        if (!value) continue;
+        items.push({
+          field: fr.field,
+          value,
+          confidence: "yellow",
+          classification: "narrative",
+          sources: [],
+        });
+      }
+
+      errors.push(
+        ...collectEmptyFieldErrors(
+          narrativeFields.map((f) => f.field),
+          values,
+          false
+        )
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      for (const fr of narrativeFields) {
+        errors.push({ field: fr.field, code: "PROVIDER_ERROR", message: msg });
+      }
+    }
+  }
+
+  console.info("[suggest-service] option B batch done", {
+    entityType: req.entityType,
+    factCount: factFields.length,
+    narrativeCount: narrativeFields.length,
+    itemCount: items.length,
+    durationMs: Date.now() - started,
+  });
+
+  return { items, errors };
 }
 
-/**
- * Generates retry suggestions for all queued fields in a single batch call.
- *
- * RT-INV-11: This function processes ALL retryFields in one invocation — one
- * HTTP request at the endpoint level. It MUST NOT be called per-field.
- *
- * Server incorporates previousSuggestion and feedback per field (§7.4).
- */
-async function generateSequentialRetrySuggestions(
+async function generateSequentialSuggestions(
+  req: SuggestRequest
+): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
+  const started = Date.now();
+  const acceptedFacts: Record<string, string> = {};
+  const items: SuggestionItem[] = [];
+  const errors: Array<{ field: string; code: string; message: string }> = [];
+
+  for (let i = 0; i < req.emptyFields.length; i++) {
+    const fr = req.emptyFields[i];
+    if (i > 0 && LLM_CALL_GAP_MS > 0) await sleep(LLM_CALL_GAP_MS);
+
+    try {
+      const item =
+        fr.copilot_route === "fact"
+          ? await processFact({
+              entityType: req.entityType,
+              scopeFieldValue: req.scopeField,
+              field: fr.field,
+              workId: req.workId,
+              workTitle: req.workTitle,
+              sourceContext: req.sourceContext,
+              acceptedFacts,
+            })
+          : await processNarrative({
+              entityType: req.entityType,
+              scopeFieldValue: req.scopeField,
+              field: fr.field,
+              workTitle: req.workTitle,
+              acceptedFacts,
+            });
+
+      if (!item.value.trim()) continue;
+      items.push(item);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errors.push({ field: fr.field, code: "PROVIDER_ERROR", message: msg });
+    }
+  }
+
+  console.info("[suggest-service] sequential suggest done", {
+    entityType: req.entityType,
+    fieldCount: req.emptyFields.length,
+    itemCount: items.length,
+    durationMs: Date.now() - started,
+  });
+
+  return { items, errors };
+}
+
+async function generateOptionBRetry(
   retryFields: RetryFieldRequest[],
   context: {
     entityType: EntityType;
     scopeFieldValue: string;
     workId: string;
     workTitle?: string | null;
+    sourceContext?: WorkSourceContext | null;
   }
 ): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
-  const started = Date.now();
-  const acceptedFacts: Record<string, string> = {};
-  const { entityType, scopeFieldValue, workId, workTitle } = context;
-
   const items: SuggestionItem[] = [];
   const errors: Array<{ field: string; code: string; message: string }> = [];
+  const acceptedFacts: Record<string, string> = {};
 
-  for (let i = 0; i < retryFields.length; i++) {
-    const rfr = retryFields[i];
-    if (i > 0 && LLM_CALL_GAP_MS > 0) {
-      await sleep(LLM_CALL_GAP_MS);
-    }
+  const factRetries: RetryFieldRequest[] = [];
+  const narrativeRetries: RetryFieldRequest[] = [];
 
-    const meta = getFieldMetadata(entityType, rfr.field);
-    const route = meta?.copilot_route ?? "narrative";
+  for (const rfr of retryFields) {
+    const route = getFieldMetadata(context.entityType, rfr.field)?.copilot_route;
+    if (route === "fact") factRetries.push(rfr);
+    else narrativeRetries.push(rfr);
+  }
+
+  for (let i = 0; i < factRetries.length; i++) {
+    const rfr = factRetries[i];
+    if (i > 0 && LLM_CALL_GAP_MS > 0) await sleep(LLM_CALL_GAP_MS);
 
     try {
-      let item: SuggestionItem;
-      if (route === "fact") {
-        item = await processFact({
-          entityType,
-          scopeFieldValue,
-          field: rfr.field,
-          workId,
-          workTitle,
-          acceptedFacts,
-          previousSuggestion: rfr.previousSuggestion,
-          feedback: rfr.feedback,
-        });
-      } else {
-        item = await processNarrative({
-          entityType,
-          scopeFieldValue,
-          field: rfr.field,
-          workTitle,
-          acceptedFacts,
-          previousSuggestion: rfr.previousSuggestion,
-          feedback: rfr.feedback,
-        });
-      }
+      const item = await processFact({
+        entityType: context.entityType,
+        scopeFieldValue: context.scopeFieldValue,
+        field: rfr.field,
+        workId: context.workId,
+        workTitle: context.workTitle,
+        sourceContext: context.sourceContext,
+        acceptedFacts,
+        previousSuggestion: rfr.previousSuggestion,
+        feedback: rfr.feedback,
+      });
 
       if (!item.value.trim()) {
         errors.push({
@@ -594,24 +523,70 @@ async function generateSequentialRetrySuggestions(
         });
         continue;
       }
-
       items.push(item);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error("[suggest-service] retry field failed", { field: rfr.field, error: msg });
       errors.push({ field: rfr.field, code: "PROVIDER_ERROR", message: msg });
     }
   }
 
-  console.info("[suggest-service] sequential retry done", {
-    entityType,
-    fieldCount: retryFields.length,
-    itemCount: items.length,
-    errorCount: errors.length,
-    durationMs: Date.now() - started,
-  });
+  if (narrativeRetries.length > 0) {
+    try {
+      const prompt = buildBatchRetryPrompt({
+        entityType: context.entityType,
+        scopeFieldValue: context.scopeFieldValue,
+        workTitle: context.workTitle,
+        retryFields: narrativeRetries,
+      });
+      const raw = await callCopilotTextLlm(prompt);
+      const values = parseBatchCopilotValues(
+        raw,
+        narrativeRetries.map((r) => r.field)
+      );
+
+      for (const rfr of narrativeRetries) {
+        const value = (values[rfr.field] ?? "").trim();
+        if (!value) {
+          errors.push({
+            field: rfr.field,
+            code: "EMPTY_RESULT",
+            message: "模型未返回有效建议，请补充反馈后重试",
+          });
+          continue;
+        }
+        items.push({
+          field: rfr.field,
+          value,
+          confidence: "yellow",
+          classification: "narrative",
+          sources: [],
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      for (const rfr of narrativeRetries) {
+        errors.push({ field: rfr.field, code: "PROVIDER_ERROR", message: msg });
+      }
+    }
+  }
 
   return { items, errors };
+}
+
+export async function generateSuggestions(
+  req: SuggestRequest
+): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
+  if (req.emptyFields.length === 0) {
+    return { items: [], errors: [] };
+  }
+
+  const hasFact = req.emptyFields.some((f) => f.copilot_route === "fact");
+
+  if (req.emptyFields.length >= 2 || hasFact) {
+    return generateOptionBSuggestions(req);
+  }
+
+  return generateSequentialSuggestions(req);
 }
 
 export async function generateRetrySuggestions(
@@ -621,18 +596,12 @@ export async function generateRetrySuggestions(
     scopeFieldValue: string;
     workId: string;
     workTitle?: string | null;
+    sourceContext?: WorkSourceContext | null;
   }
 ): Promise<{ items: SuggestionItem[]; errors: Array<{ field: string; code: string; message: string }> }> {
   if (retryFields.length === 0) {
     return { items: [], errors: [] };
   }
 
-  try {
-    return await generateBatchRetrySuggestions(retryFields, context);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn("[suggest-service] batch retry failed, sequential fallback", msg);
-  }
-
-  return generateSequentialRetrySuggestions(retryFields, context);
+  return generateOptionBRetry(retryFields, context);
 }

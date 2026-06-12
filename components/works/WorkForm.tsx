@@ -18,9 +18,17 @@ const workFormSchema = z.object({
   title: z.string().min(1, "标题不能为空"),
   description: z.string(),
   coverImage: z.string().min(1, "封面链接不能为空"),
+  sourceProfileId: z.string(),
 });
 
 export type WorkFormValues = z.infer<typeof workFormSchema>;
+
+type SourceProfileOption = {
+  profileId: string;
+  displayName: string;
+  kind: string;
+  workPattern: string;
+};
 
 function toSubmitError(e: unknown): string {
   if (e instanceof Error) {
@@ -41,31 +49,74 @@ export function WorkForm(props: WorkFormProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [imageUploading, setImageUploading] = React.useState(false);
+  const [profiles, setProfiles] = React.useState<SourceProfileOption[]>([]);
+  const [profilesLoading, setProfilesLoading] = React.useState(true);
+  const [profilesError, setProfilesError] = React.useState<string | null>(null);
 
   const defaultValues: WorkFormValues =
     props.mode === "edit"
       ? props.defaultValues
-      : { title: "", description: "", coverImage: "" };
+      : { title: "", description: "", coverImage: "", sourceProfileId: "" };
 
   const form = useForm<WorkFormValues>({
     resolver: zodResolver(workFormSchema),
     defaultValues,
   });
 
+  const savedSourceProfileId =
+    props.mode === "edit" ? props.defaultValues.sourceProfileId : "";
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setProfilesLoading(true);
+      try {
+        const res = await fetch("/api/admin/source-profiles");
+        if (!res.ok) {
+          throw new Error(`加载来源配置失败 (${res.status})`);
+        }
+        const data = (await res.json()) as { profiles?: SourceProfileOption[] };
+        if (!cancelled) {
+          setProfiles(data.profiles ?? []);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setProfilesError(toSubmitError(e));
+        }
+      } finally {
+        if (!cancelled) {
+          setProfilesLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Re-sync select after options load (native <select> ignores value without matching <option>)
+  React.useEffect(() => {
+    if (profilesLoading || profilesError) return;
+    form.setValue("sourceProfileId", savedSourceProfileId, { shouldDirty: false });
+  }, [profilesLoading, profilesError, profiles, savedSourceProfileId, form]);
+
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
+    const sourceProfileId = values.sourceProfileId.trim() || null;
     try {
       if (props.mode === "create") {
         await createWork({
           title: values.title.trim(),
           description: values.description.trim(),
           coverImage: values.coverImage.trim(),
+          sourceProfileId,
         });
       } else {
         await updateWork(props.workId, {
           title: values.title.trim(),
           description: values.description.trim(),
           coverImage: values.coverImage.trim(),
+          sourceProfileId,
         });
       }
       router.push("/works");
@@ -97,6 +148,39 @@ export function WorkForm(props: WorkFormProps) {
             {form.formState.errors.title.message}
           </p>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="work-source-profile">来源配置（Source Profile）</Label>
+        <Controller
+          name="sourceProfileId"
+          control={form.control}
+          render={({ field }) => (
+            <select
+              id="work-source-profile"
+              className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              value={profilesLoading ? "" : field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              disabled={profilesLoading}
+            >
+              <option value="">
+                {profilesLoading ? "加载来源配置…" : "无（原创 / SC-03 路径）"}
+              </option>
+              {profiles.map((p) => (
+                <option key={p.profileId} value={p.profileId}>
+                  {p.displayName} ({p.workPattern})
+                </option>
+              ))}
+            </select>
+          )}
+        />
+        <p className="text-muted-foreground text-xs">
+          绑定公共作品来源以启用外源证据；原创作品请留空。
+        </p>
+        {profilesError ? (
+          <p className="text-destructive text-sm">{profilesError}</p>
+        ) : null}
       </div>
 
       <div className="space-y-2">

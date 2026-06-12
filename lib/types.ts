@@ -4,6 +4,7 @@ export type Work = {
   title: string;
   description: string;
   coverImage: string;
+  sourceProfileId: string | null;
   createdAt: string;
 };
 

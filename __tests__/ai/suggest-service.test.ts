@@ -1,30 +1,52 @@
 /**
  * Unit tests — lib/ai/suggest-service.ts
  *
- * Verifies:
- *   - AC-12: classification: "fact" with sources: [] is never returned
- *   - AC-20: SC-03 fallback always yields confidence: "yellow"
- *   - SC-03: when stub returns matched=false, output is classification: "narrative"
- *   - Partial failure handling (§13.2)
- *
- * The Gemini API call is mocked to isolate pure service logic.
+ * Verifies SC-03, Option B batch topology, and Tier-1 fact path with mock connectors.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { WorkSourceContext } from "@/lib/ai/evidence-types";
 
-// Mock global fetch before importing the service
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-// Set env var for tests
 process.env.COPILOT_TEXT_PROVIDER = "gemini";
 process.env.GEMINI_API_KEY = "test-key";
 process.env.COPILOT_LLM_CALL_GAP_MS = "0";
+process.env.SOURCE_CONNECTOR_MODE = "mock";
 
-// Dynamic import to pick up the mock
 const { generateSuggestions, generateRetrySuggestions } = await import(
   "@/lib/ai/suggest-service"
 );
+
+const asoiafContext: WorkSourceContext = {
+  sourceProfileId: "asoiaf-profile",
+  profile: {
+    profileId: "asoiaf-profile",
+    kind: "public_franchise",
+    displayName: "ASOIAF",
+    workPattern: "asoiaf",
+    tier2Enabled: true,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+  tier1Bindings: [
+    {
+      bindingId: "asoiaf-awoiaf-house",
+      profileId: "asoiaf-profile",
+      tier: 1,
+      connectorId: "awoiaf",
+      officialSourceId: "awoiaf",
+      sourceLabel: "A Wiki of Ice and Fire",
+      baseUrl: "https://awoiaf.westeros.org",
+      applicableFields: ["house"],
+      effectiveFrom: "2026-01-01",
+      status: "approved",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+  ],
+};
 
 function makeFakeGeminiResponse(value: string) {
   return {
@@ -69,7 +91,7 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
     vi.restoreAllMocks();
   });
 
-  it("SC-03: stub matched=false → returns classification: narrative (AC-12)", async () => {
+  it("SC-03: no sourceContext → classification narrative, empty sources", async () => {
     mockFetch.mockResolvedValue(makeFakeGeminiResponse("House Stark"));
 
     const { items } = await generateSuggestions({
@@ -81,28 +103,30 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
     });
 
     expect(items).toHaveLength(1);
-    // AC-12: fact pipeline miss → classification must be "narrative", not "fact"
     expect(items[0].classification).toBe("narrative");
-    // AC-12: classification: "fact" with sources: [] is forbidden — we return "narrative"
     expect(items[0].sources).toEqual([]);
-  });
-
-  it("SC-03 / AC-20: fallback confidence is always yellow", async () => {
-    mockFetch.mockResolvedValue(makeFakeGeminiResponse("The North"));
-
-    const { items } = await generateSuggestions({
-      workId: "work-1",
-      entityType: "location",
-      entityId: "new",
-      scopeField: "Winterfell",
-      emptyFields: [{ field: "region", copilot_route: "fact" }],
-    });
-
-    // AC-20: SC-03 must NOT produce confidence: "green"
     expect(items[0].confidence).toBe("yellow");
   });
 
-  it("narrative route fields: classification narrative, confidence yellow", async () => {
+  it("Tier-1: sourceContext + house → fact/green with sources (mock AWOIAF)", async () => {
+    const { items } = await generateSuggestions({
+      workId: "work-1",
+      entityType: "character",
+      entityId: "new",
+      scopeField: "Arya Stark",
+      sourceContext: asoiafContext,
+      emptyFields: [{ field: "house", copilot_route: "fact" }],
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(items).toHaveLength(1);
+    expect(items[0].classification).toBe("fact");
+    expect(items[0].confidence).toBe("green");
+    expect(items[0].sources.length).toBeGreaterThan(0);
+    expect(items[0].sources[0].tier).toBe(1);
+  });
+
+  it("narrative route: classification narrative, confidence yellow", async () => {
     mockFetch.mockResolvedValue(
       makeFakeGeminiResponse("A fierce and skilled assassin of the North.")
     );
@@ -119,10 +143,9 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
     expect(items[0].confidence).toBe("yellow");
   });
 
-  it("batch mode: multiple fields in one LLM call", async () => {
+  it("Option B batch: fact connector-first, then narrative batch LLM", async () => {
     mockFetch.mockResolvedValue(
       makeFakeBatchResponse({
-        house: "",
         description: "物理学家，ETO 创始人",
         signatureQuote: "这是人类的落日……",
       })
@@ -134,6 +157,7 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
       entityId: "new",
       scopeField: "叶文洁",
       workTitle: "三体",
+      sourceContext: asoiafContext,
       emptyFields: [
         { field: "house", copilot_route: "fact" },
         { field: "description", copilot_route: "narrative" },
@@ -143,23 +167,21 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(errors).toHaveLength(0);
-    expect(items).toHaveLength(2);
-    expect(items.map((i) => i.field)).toEqual(
-      expect.arrayContaining(["description", "signatureQuote"])
-    );
+    expect(items).toHaveLength(3);
+    const house = items.find((i) => i.field === "house");
+    expect(house?.classification).toBe("fact");
+    expect(house?.confidence).toBe("green");
   });
 
-  it("partial failure: batch fails then sequential returns item + error (§13.2)", async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error("Batch failed"))
-      .mockResolvedValueOnce(makeFakeGeminiResponse("Stark"))
-      .mockRejectedValueOnce(new Error("Provider error"));
+  it("partial failure: narrative batch fails, fact field still succeeds", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Batch failed"));
 
     const { items, errors } = await generateSuggestions({
       workId: "work-1",
       entityType: "character",
       entityId: "new",
       scopeField: "Arya Stark",
+      sourceContext: asoiafContext,
       emptyFields: [
         { field: "house", copilot_route: "fact" },
         { field: "description", copilot_route: "narrative" },
@@ -172,41 +194,16 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
     expect(errors[0].field).toBe("description");
     expect(errors[0].code).toBe("PROVIDER_ERROR");
   });
-
-  it("all fields succeed: errors is empty", async () => {
-    mockFetch.mockResolvedValue(
-      makeFakeBatchResponse({
-        house: "Stark",
-        description: "Some value",
-      })
-    );
-
-    const { items, errors } = await generateSuggestions({
-      workId: "work-1",
-      entityType: "character",
-      entityId: "new",
-      scopeField: "Test",
-      emptyFields: [
-        { field: "house", copilot_route: "fact" },
-        { field: "description", copilot_route: "narrative" },
-      ],
-    });
-
-    expect(errors).toHaveLength(0);
-    expect(items).toHaveLength(2);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-  });
 });
 
-describe("generateRetrySuggestions — RT-INV-11 batch invariants", () => {
+describe("generateRetrySuggestions — Option B retry", () => {
   beforeEach(() => {
     mockFetch.mockReset();
   });
 
-  it("processes all retry fields in a single LLM call (RT-INV-11)", async () => {
+  it("fact retry uses connector path; narrative retries batch LLM", async () => {
     mockFetch.mockResolvedValue(
       makeFakeBatchResponse({
-        house: "Stark",
         description: "Regenerated bio",
       })
     );
@@ -220,18 +217,19 @@ describe("generateRetrySuggestions — RT-INV-11 batch invariants", () => {
         entityType: "character",
         scopeFieldValue: "Arya Stark",
         workId: "work-1",
+        sourceContext: asoiafContext,
       }
     );
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(items).toHaveLength(2);
-    expect(items.map((i) => i.field)).toEqual(
-      expect.arrayContaining(["house", "description"])
-    );
+    const house = items.find((i) => i.field === "house");
+    expect(house?.classification).toBe("fact");
+    expect(house?.confidence).toBe("green");
   });
 
-  it("retry result: confidence yellow, classification narrative (SC-03 stub path)", async () => {
-    mockFetch.mockResolvedValue(makeFakeBatchResponse({ house: "Updated Stark" }));
+  it("retry without sourceContext: SC-03 narrative path", async () => {
+    mockFetch.mockResolvedValue(makeFakeGeminiResponse("Updated Stark"));
 
     const { items } = await generateRetrySuggestions(
       [{ field: "house", previousSuggestion: "Baratheon", feedback: "Wrong family" }],

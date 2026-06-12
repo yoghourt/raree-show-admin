@@ -9,6 +9,7 @@ type WorkRow = {
   title: string;
   description: string;
   cover_image: string;
+  source_profile_id: string | null;
   created_at: string;
 };
 
@@ -19,6 +20,7 @@ function rowToWork(row: WorkRow): Work {
     title: row.title,
     description: row.description,
     coverImage: row.cover_image,
+    sourceProfileId: row.source_profile_id ?? null,
     createdAt: row.created_at,
   };
 }
@@ -69,16 +71,22 @@ export async function getWork(id: string): Promise<Work | null> {
 }
 
 export async function createWork(
-  data: Pick<Work, "title" | "description" | "coverImage"> & { tsid?: string }
+  data: Pick<Work, "title" | "description" | "coverImage"> & {
+    tsid?: string;
+    sourceProfileId?: string | null;
+  }
 ): Promise<Work> {
   try {
     const tsid = data.tsid?.trim() || `work_${Date.now()}`;
-    const row = {
+    const row: Record<string, unknown> = {
       tsid,
       title: data.title,
       description: data.description,
       cover_image: data.coverImage,
     };
+    if (data.sourceProfileId !== undefined) {
+      row.source_profile_id = data.sourceProfileId || null;
+    }
 
     const { data: inserted, error } = await supabase
       .from(TABLE)
@@ -101,7 +109,9 @@ export async function createWork(
 
 export async function updateWork(
   id: string,
-  data: Partial<Pick<Work, "title" | "description" | "coverImage" | "tsid">>
+  data: Partial<
+    Pick<Work, "title" | "description" | "coverImage" | "tsid" | "sourceProfileId">
+  >
 ): Promise<void> {
   try {
     const row: Record<string, unknown> = {};
@@ -109,6 +119,9 @@ export async function updateWork(
     if (data.description !== undefined) row.description = data.description;
     if (data.coverImage !== undefined) row.cover_image = data.coverImage;
     if (data.tsid !== undefined) row.tsid = data.tsid;
+    if (data.sourceProfileId !== undefined) {
+      row.source_profile_id = data.sourceProfileId || null;
+    }
 
     const { error } = await supabase.from(TABLE).update(row).eq("id", id);
 

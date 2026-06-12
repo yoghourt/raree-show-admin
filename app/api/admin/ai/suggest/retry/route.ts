@@ -22,6 +22,7 @@ import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { generateRetrySuggestions } from "@/lib/ai/suggest-service";
+import { loadWorkSourceContext } from "@/lib/ai/source-registry";
 import type { EntityType } from "@/lib/ai/copilot-types";
 
 // ---------------------------------------------------------------------------
@@ -97,12 +98,19 @@ export async function POST(request: Request) {
     .maybeSingle();
   const workTitle = (workRow as { title?: string } | null)?.title ?? null;
 
-  // Generate retry suggestions — all fields in a single invocation (RT-INV-11)
+  let sourceContext = null;
+  try {
+    sourceContext = await loadWorkSourceContext(workId);
+  } catch (e) {
+    console.error("[suggest/retry] loadWorkSourceContext failed", e);
+  }
+
   const { items, errors } = await generateRetrySuggestions(retryFields, {
     entityType: entityType as EntityType,
     scopeFieldValue: scopeField,
     workId,
     workTitle,
+    sourceContext,
   });
 
   if (errors.length === 0) {

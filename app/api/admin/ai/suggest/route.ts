@@ -23,6 +23,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { generateSuggestions } from "@/lib/ai/suggest-service";
 import { getScopeFields, getAssetFields } from "@/lib/ai/field-registry";
+import { loadWorkSourceContext } from "@/lib/ai/source-registry";
 import type { EntityType, SuggestRequest } from "@/lib/ai/copilot-types";
 
 // ---------------------------------------------------------------------------
@@ -163,13 +164,20 @@ export async function POST(request: Request) {
     .maybeSingle();
   const workTitle = (workRow as { title?: string } | null)?.title ?? null;
 
-  // Generate suggestions (§4.4 / §4.5)
+  let sourceContext = null;
+  try {
+    sourceContext = await loadWorkSourceContext(workId);
+  } catch (e) {
+    console.error("[suggest] loadWorkSourceContext failed", e);
+  }
+
   const req: SuggestRequest = {
     workId,
     entityType,
     entityId,
     scopeField,
     workTitle,
+    sourceContext,
     emptyFields,
   };
 
