@@ -5,6 +5,10 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    env: {
+      SOURCE_CONNECTOR_MODE: "mock",
+      COPILOT_LLM_CALL_GAP_MS: "0",
+    },
     include: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
     environmentOptions: {
       jsdom: {},

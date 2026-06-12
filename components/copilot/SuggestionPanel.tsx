@@ -109,10 +109,10 @@ function SuggestionRow({
         {item.value}
       </p>
 
-      {/* Provenance — v1 stub has no Source Connector matches */}
+      {/* Provenance — SC-03 / narrative path has no external sources */}
       {item.sources.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          来源：AI 生成（v1 未匹配 verified 外部资料，请人工核实）
+          来源：AI 生成（未匹配 verified 外部资料，请人工核实）
         </p>
       )}
 

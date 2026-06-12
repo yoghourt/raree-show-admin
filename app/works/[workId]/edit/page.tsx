@@ -131,6 +131,7 @@ export default function EditWorkPage() {
           title: work.title,
           description: work.description,
           coverImage: work.coverImage,
+          sourceProfileId: work.sourceProfileId ?? "",
         }}
       />
     </div>

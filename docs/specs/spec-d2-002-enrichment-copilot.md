@@ -5,10 +5,10 @@
 | Field        | Value                                                    |
 | ------------ | -------------------------------------------------------- |
 | Title        | Enrichment Copilot                                       |
-| Status       | Draft                                                    |
+| Status       | Approved                                                 |
 | Version      | v0.1                                                     |
 | Owner        | Architect                                                |
-| Last Updated | 2026-06-08                                               |
+| Last Updated | 2026-06-12                                               |
 | Derived From | ADR-004 v1.10 (docs/adr/004-source-of-canonical-truth.md) |
 
 ---
@@ -213,13 +213,13 @@ On icon click:
 
 ### 4.4 Phase 4 — Fact Pipeline Execution (SC-01, SC-04)
 
-> **Source Connector v1 — Stub (Architect Decision, 2026-06-11):**
-> In Runtime Truth v1, the Source Connector is implemented as a stub that always returns
-> `{ matched: false, tier: 3, results: [] }`. All canonical fields therefore fall through to
-> SC-03 Original Work fallback and are returned as `classification: "narrative"`, `confidence: "yellow"`.
-> This validates the full Human Acceptance Gate, Metadata Routing, and Copilot Workflow without a live
-> knowledge source. Real Source Connector implementations (Open Library, Wikipedia, etc.) are deferred
-> to the Source Connector Spec.
+> **Source Connector v1 (SPEC-D2-003 Phase 1):**
+> Fact-route fields consult the connector orchestrator (`works.source_profile_id` →
+> SourceProfile → Tier-1 bindings + global Tier-2 Wikipedia). Evidence is normalized in
+> `normalize-evidence`; Tier-1 yields `fact`/`green`, Tier-2 yields `fact`/`yellow`.
+> Works without `source_profile_id` fall through to SC-03 (`classification: "narrative"`,
+> `confidence: "yellow"`, `sources: []`). See **SPEC-D2-003**
+> (`docs/specs/spec-d2-003-source-connector-v1.md`).
 
 For each field classified as `canonical` (default route: Fact Suggestion):
 
@@ -338,7 +338,7 @@ interface FieldMetadata {
 }
 ```
 
-**Minimal Source Connector interface** (full specification deferred to Source Connector Spec):
+**Minimal Source Connector interface** (extended by SPEC-D2-003 §4):
 
 ```typescript
 interface SourceConnectorInput {
@@ -355,7 +355,7 @@ interface SourceConnectorOutput {
 }
 ```
 
-SPEC-D2-002 mandates these interface shapes. Implementation details (which APIs to call, auth, caching, rate limiting) belong to the Source Connector Spec.
+SPEC-D2-002 mandates these interface shapes. Evidence architecture, tier rules, and registry governance belong to SPEC-D2-003. Connector API implementation (auth, caching, rate limiting) remains out of scope until Implementation Authorization under SPEC-D2-003.
 
 ### 5.7 Extensibility Invariants (AC-26/27)
 
@@ -993,7 +993,7 @@ The following are explicitly outside the authority of SPEC-D2-002. No code writt
 - **Runtime Reading Redesign**: Reading flow routing, Scene navigation, or `chapter_number`/`chapter_title` access pattern changes.
 - **URL Restructuring**: No changes to the `/works/[workId]/...` path structure.
 - **Reference Suggestion v1 Implementation**: RS-04 defers Reference Suggestion to a future spec. Reference fields route as `excluded` in v1.
-- **Real Source Connector Implementation**: Open Library, Wikipedia, Fandom, AWOIAF, and any other external knowledge API integration, auth, rate limiting, caching, and source ranking. The v1 Source Connector is a stub (see §4.4); real implementations belong to the Source Connector Spec.
+- **Real Source Connector Implementation**: Open Library, Wikipedia, Fandom, AWOIAF, and any other external knowledge API integration. Architecture and tier rules: SPEC-D2-003. Current runtime: stub (see §4.4). Implementation requires separate authorization under SPEC-D2-003.
 - **Catalog or Work-level Accept All**: Any bulk acceptance mechanism beyond the current entity session (Decision 8).
 - **Bootstrap Components (ADR-001)**: `BootstrapPanel`, `clearExisting`, batch persist route — explicitly rejected by ADR-004 Decision 7.
 - **LLM Provider Selection**: Model choice for Fact or Narrative pipelines is an implementation-layer decision.
@@ -1044,7 +1044,7 @@ The following are explicitly outside the authority of SPEC-D2-002. No code writt
 | **Governance: Template** | `governance/templates/SPEC_TEMPLATE.md` |
 | **Planning Package** | `.cursor/plans/spec-004_规划包_893efe2e.plan.md` |
 | **Schema Field Registry** | Appendix A of this document |
-| **Future: Source Connector Spec** | TBD — will implement `SourceConnectorInput/Output` interface (§5.6) |
+| **Source Connector Spec** | `docs/specs/spec-d2-003-source-connector-v1.md` — SPEC-D2-003 (Approved); governs tier/confidence over §8 where specified |
 | **Confidence visualization** | Governed by §8.4 of this document (no separate UI Spec required) |
 | **Future: ADR-005** | Topology normalization (not a dependency of this spec) |
 | **Future: ADR-006** | Discovery Copilot architecture (not in scope) |

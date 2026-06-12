@@ -42,6 +42,9 @@ export interface SourceConnectorInput {
   workId: string;
 }
 
+/** Resolved server-side from works.source_profile_id (SPEC-D2-003). */
+export type { WorkSourceContext } from "@/lib/ai/evidence-types";
+
 export interface SourceConnectorOutput {
   tier: 1 | 2 | 3;
   results: SourceRef[];
@@ -64,6 +67,8 @@ export interface SuggestRequest {
   scopeField: string;
   /** Work title for prompt context (e.g. "三体"). Optional but improves relevance. */
   workTitle?: string | null;
+  /** Loaded from works.source_profile_id — null triggers SC-03 for fact fields. */
+  sourceContext?: import("@/lib/ai/evidence-types").WorkSourceContext | null;
   emptyFields: FieldRequest[];
 }
 
