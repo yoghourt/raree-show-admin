@@ -2,13 +2,21 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.10
-**Last Updated:** 2026-06-08
+**Version:** 1.11
+**Last Updated:** 2026-06-28
 **Owner:** Architect
 **Supersedes:** ADR-001 (Assisted Work Bootstrap Pipeline — archived as Experimental Prototype)
 **Amendment:** Clarification only — A1 (Runtime Truth Topology), A2 (chapter_title qualifier),
-A3 (Known Constraint §15), Follow-up restructure (ADR-005 + ADR-006).
+A3 (Known Constraint §15), Follow-up restructure (ADR-005 + ADR-006),
+A4 (ADR-005 Accepted — Narrative Information Model; Follow-up Roadmap and §15 updated).
 No Decisions, Acceptance Criteria, or routing logic changed.
+
+**A4 Historical Note:** Prior Follow-up Roadmap text described ADR-005 as
+investigation-phase "Content Topology Normalization." ADR-005 is now **Accepted**
+as the **Narrative Information Model** (editorial domain). **Correction rationale:**
+investigation is complete; editorial Story semantics are frozen. **Runtime
+reconciliation:** Runtime Truth v1 topology is unchanged; editorial model is
+orthogonal until a future Rollout ADR.
 
 ---
 
@@ -46,8 +54,8 @@ It defines:
 * The Discovery boundary deferring all entity-discovery capabilities to
   ADR-006 — Discovery Copilot Architecture.
 * The Known Constraint §15 bounding ADR-004 to Runtime Truth v1 topology;
-  content-topology normalization is governed by ADR-005 — Content Topology
-  Normalization.
+  the Editorial Domain Narrative Information Model is governed by ADR-005 —
+  Narrative Information Model (Accepted v1.1); cross-domain mapping remains deferred.
 
 ### Runtime Truth v1 Topology
 
@@ -71,8 +79,9 @@ Definitions (descriptive; no future topology implied):
   organisational fields on Scene. They are not a separate navigation layer in
   Runtime Truth v1.
 
-This section describes the current runtime state only. Future content-topology
-normalization is outside ADR-004 scope (see Known Constraint §15).
+This section describes the current runtime state only. The Editorial Domain
+Narrative Information Model is governed by ADR-005 v1.1 (see Known Constraint §15).
+Cross-domain mapping of Story units remains outside ADR-004 scope.
 
 ---
 
@@ -2010,22 +2019,27 @@ topology described in the Runtime Truth v1 Topology section of **What** above.
 The following are explicitly outside ADR-004 scope:
 
 ```text
-Content-topology normalization (e.g., Chapter → Story → Scene)
+Editorial Narrative Information Model (Story definition and boundaries)
+Runtime mapping of editorial Story units to runtime representation
 Migration strategy for existing runtime schemas
 Redesign of the reading flow or routing layer
 Discovery Copilot runtime implementation
 ```
 
-Future topology changes require a dedicated ADR (ADR-005 — Content Topology
-Normalization) to determine whether normalization is permitted before
-Runtime Truth v1 Freeze. ADR-005 is investigation-phase only; it does not
-implement changes.
+The editorial Narrative Information Model is governed by **ADR-005 — Narrative
+Information Model** (Status: Accepted; v1.1). ADR-005 publishes the **Canonical
+Definition** and **Glossary** of Story, governs the **Editorial Domain**
+(independent of the **Runtime Domain**), and defines boundary principles and
+information-emergence **dependency order**. It does not modify Runtime Truth v1.
+
+Mapping Editorial Domain Story units into Runtime Domain representation is
+**deferred** to a future Rollout ADR. Until that Rollout ADR is Accepted and
+implemented, the Runtime Truth v1 topology in **What** above remains authoritative.
 
 Discovery architecture requires a dedicated ADR (ADR-006 — Discovery Copilot
-Architecture). ADR-006 depends on the outcome of ADR-005.
-
-No constraint in this ADR shall be read as endorsing or prohibiting future
-topology normalization. That determination belongs to ADR-005.
+Architecture). ADR-006 depends on the **Editorial Domain** entity topology frozen
+by ADR-005. ADR-005 is Accepted; the ADR-006 gate is satisfied at the editorial
+layer. Cross-domain mapping remains a separate deferred concern.
 
 ---
 
@@ -2036,68 +2050,59 @@ The ADR dependency chain is:
 ```text
 ADR-004 — Metadata-Driven Copilot (this ADR)
     ↓
-ADR-005 — Content Topology Normalization
+ADR-005 — Narrative Information Model (Accepted)
     ↓
 ADR-006 — Discovery Copilot Architecture
+    ↓
+[Future Rollout ADR — Editorial Domain Story ↔ Runtime Domain mapping]
 ```
 
-Topology normalization (ADR-005) must be decided before Discovery architecture
-(ADR-006) is specified, because Discovery architecture depends on the stable
-entity topology it will operate against.
+Discovery architecture (ADR-006) depends on the **Editorial Domain** topology
+ frozen by ADR-005. ADR-005 is **Accepted** (v1.1); the editorial-layer gate for
+ ADR-006 is satisfied. Cross-domain mapping of Story units into Runtime Truth v1
+ remains **deferred** to a future Rollout ADR and is not a prerequisite for ADR-006
+ specification at the Discovery layer.
 
 ---
 
-### ADR-005 — Content Topology Normalization
+### ADR-005 — Narrative Information Model (Accepted)
 
-**Problem:**
+**Status:** Accepted (v1.1) — see [`docs/adr/005-narrative-information-model.md`](005-narrative-information-model.md)
 
-A topology mismatch exists between the current Runtime Truth and the desired
-authoring model:
+**Summary:** Canonical Story definition and shared Glossary; **Editorial Domain**
+ / **Runtime Domain** separation; Story boundary principles (ONE Rule); information
+ emergence **dependency order** (not strict workflow); runtime mapping deferred.
 
-```text
-Current Runtime Truth (Work → Scene → Story Images)
-
-  Work
-   └─ Scene              (routable reading unit)
-        └─ Story Images  (ordered visual frames; JSONB)
-
-Potential Authoring Model (Chapter → Story → Scene)
-
-  Chapter
-   └─ Story
-        └─ Scene         (individual visual frame)
-```
-
-**ADR-005 SHALL determine:**
-
-Whether topology normalization is permitted before Runtime Truth v1 Freeze.
-
-**ADR-005 Phase 1 scope:**
+**Frozen by ADR-005:**
 
 ```text
-Investigation   — audit current topology across Admin and Web consumers
-Audit           — impact on DB tables, types, routes, API contracts, queries
-Impact analysis — ADR-001, ADR-002, W-01, Progress model, Oracle, URL compat
-Decision        — normalize before v1 Freeze, or defer
+Canonical Definition of Story (system-wide reference)
+Glossary (Story, Story Arc, Chapter, Mental Model Transition, Narrative Closure,
+  Knowledge Artifact, Editorial Domain, Runtime Domain, ONE Rule)
+Story ≠ Chapter; Story Arc ≠ Story
+Story boundaries by Narrative Closure and the ONE Rule
+Narrative precedes Knowledge (Information Emergence dependency order)
+Multi-pass Editorial Domain philosophy
+Editorial Domain independent of Runtime Domain (NIM-INV-01…05)
 ```
 
-**ADR-005 SHALL NOT:**
+**Deferred by ADR-005 (not in ADR-005 scope):**
 
 ```text
-Migrate data
-Redesign runtime reading flow
-Modify runtime schemas
-Implement any changes
+Editorial Domain Story ↔ Runtime Domain Scene mapping
+Relationship delta persistence
+Story Arc visibility in the Runtime Domain
+Knowledge Graph integration
+Schema, API, UI, migration, AI implementation
 ```
 
-ADR-005 Phase 1 is investigation and decision only.
+ADR-005 does not modify Runtime Truth v1 (Runtime Domain). ADR-004 remains
+ authoritative for Copilot routing and Human Acceptance regardless of ADR-005.
 
-**Constraints inherited from ADR-004:**
+**Constraints inherited from ADR-004 (unchanged):**
 
 ADR-005 MUST maintain the Human Acceptance Gate (Decision 2).
 ADR-005 MUST NOT weaken the Human Owns Canonical Truth principle (Decision 1).
-ADR-004 remains the authority for Copilot routing and suggestion behavior
-regardless of ADR-005 outcome.
 
 ---
 
@@ -2121,10 +2126,12 @@ model. Discovery involves proposing which entities should exist. The ADR-004
 Copilot model assists with enriching an entity the operator has already decided
 to create. This is the boundary drawn by RT-INV-04 (Entity Discovery Prohibited).
 
-**ADR-006 depends on ADR-005.**
+**ADR-006 depends on ADR-005 (editorial topology).**
 
-Discovery architecture specification requires a stable entity topology.
-ADR-006 SHALL NOT be opened until ADR-005 has issued its decision.
+ADR-005 is Accepted. ADR-006 **may proceed** at the architectural specification
+ layer. ADR-006 operates against the **Editorial Domain Story model** (Canonical
+ Definition and Glossary in ADR-005). Cross-domain mapping remains deferred to a
+ future Rollout ADR.
 
 **ADR-006 MUST preserve:**
 
@@ -2132,6 +2139,7 @@ ADR-006 SHALL NOT be opened until ADR-005 has issued its decision.
 Human Acceptance Gate            (ADR-004 Decision 2)
 Human Owns Canonical Truth       (ADR-004 Decision 1)
 RT-INV-04 Discovery Boundary
+NIM-INV-05                       (ADR-005 — human acceptance final for Stories)
 ```
 
 ```text
@@ -2148,8 +2156,9 @@ Discovery Workflow (intent; ADR-006 will formalise):
   Candidate Acceptance → Entity Creation → CRUD → Runtime Truth
 ```
 
-Any implementation that introduces Discovery capabilities under ADR-004 or
-ADR-005 framing is non-conformant and requires ADR-006 governance first.
+Any implementation that introduces Discovery capabilities under ADR-004 framing
+ alone is non-conformant and requires ADR-006 governance first. Discovery MUST
+ NOT bypass ADR-005 editorial boundary principles when proposing Story candidates.
 
 ---
 
@@ -2168,6 +2177,7 @@ EAR-D2-001 → EAR-D2-009b  ADR-001 prototype evidence chain (retained)
 ### Governance
 
 ```text
+Constitution.md                     Reader principles; capability roadmap
 governance/FOUNDATION.md            Runtime Supremacy Law
 governance/ADR_RULES.md             ADR lifecycle law
 governance/specs/AUTHORITY_BOUNDARY_AND_PRECEDENCE_SPEC.md
@@ -2178,4 +2188,5 @@ governance/specs/AUTHORITY_BOUNDARY_AND_PRECEDENCE_SPEC.md
 ```text
 ADR-001     Assisted Work Bootstrap Pipeline (Superseded — Experimental Prototype)
 ADR-D2-001  Canonical Metadata Authority (Tier 1 / Tier 2 / Tier 3 architecture)
+ADR-005     Narrative Information Model (Accepted v1.1 — Canonical Definition, Glossary, Editorial Domain)
 ```
