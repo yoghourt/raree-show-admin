@@ -2,10 +2,11 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.1
-**Last Updated:** 2026-06-28
+**Version:** 1.2
+**Last Updated:** 2026-06-29
 **Owner:** Architect
-**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Copilot authority)
+**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Copilot authority); ADR-006 (Discovery Copilot Architecture — Accepted; Authority Emergence and Human Review outcome paths)
+**Amendment:** Clarification only — A1 (Relationship to ADR-006; Approved Story unit vs Production Entity). No Decisions changed.
 
 ---
 
@@ -376,9 +377,25 @@ ADR-004 remains authoritative for:
 * Human-Owned Canonical Truth (Decision 1)
 * Human Acceptance Gate (Decision 2)
 * Copilot routing, field classification, and suggestion pipelines
-* RT-INV-04 Discovery boundary (Discovery deferred to ADR-006)
+* RT-INV-04 Enrichment boundary (Discovery architecturally owned by ADR-006 Accepted)
 
 This ADR MUST NOT weaken any ADR-004 decision or invariant.
+
+---
+
+## Relationship to ADR-006
+
+ADR-006 (Accepted) governs Discovery and the **Authority Emergence Model**.
+ This ADR governs **Story semantics** and **Information Emergence** in the
+ Editorial Domain.
+
+When **Story Discovery** produces Story Candidates, Human Review acceptance
+ yields an **Approved Story unit** — an editorial artifact governed by this ADR
+ (NIM-INV-05, Canonical Definition). An Approved Story unit is **not** a
+ Production **Entity** as defined in ADR-006. Catalog objects (Character,
+ Location) follow the Catalog Entity path in ADR-006 after Human Review.
+
+This ADR MUST NOT weaken ADR-006 Discovery boundaries or ADR-004 Human Acceptance.
 
 ---
 
@@ -500,5 +517,5 @@ docs/adr/004-source-of-canonical-truth.md   Human Acceptance Gate; Copilot autho
 
 ```text
 ADR-004 — Source of Canonical Truth (parent)
-ADR-006 — Discovery Copilot Architecture (downstream; Discovery only)
+ADR-006 — Discovery Copilot Architecture (Accepted v1.1 — Authority Emergence; Story vs Entity paths)
 ```

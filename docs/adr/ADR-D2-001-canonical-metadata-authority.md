@@ -2,9 +2,17 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.0
-**Last Updated:** 2026-06-04
+**Version:** 1.1
+**Last Updated:** 2026-06-29
 **Owner:** Architect
+**Related ADR:** ADR-004 (Source of Canonical Truth — operative Human Acceptance and Enrichment Copilot); ADR-006 (Discovery Copilot Architecture — source extraction vs Discovery)
+**Amendment:** Clarification only — A1 (ADR-001 supersession; operative authority ADR-004 Enrichment Copilot; Bootstrap prototype historical). No Decision changed.
+
+**A1 Historical Note:** ADR-001 is **Superseded** by ADR-004. Operative enrichment
+ and Human Acceptance semantics are governed by ADR-004. References to "LLM Bootstrap"
+ as authority or immediate-persist catalog generation are **historical** (Option A
+ assessment and pre-ADR-004 context). Tier 3 draft assistance and Enrichment outputs
+ align with ADR-004 Copilot workflow, not ADR-001 Bootstrap architecture.
 
 ---
 
@@ -28,7 +36,9 @@ Image caption generation
 Scene image generation
 ```
 
-Those remain within the LLM Bootstrap scope defined by ADR-001.
+Those remain within the **Enrichment Copilot** scope defined by **ADR-004**
+ (descriptions, quotes, scene summaries, image captions). ADR-001 Bootstrap is
+ **Superseded** — historical only.
 
 ---
 
@@ -371,11 +381,11 @@ Runtime Truth v1 — Canonical Metadata Authority Architecture
 │                                                                  │
 │  Admin manually enters Characters, Locations, Chapter Catalog    │
 │  via existing admin CRUD screens.                                │
-│  LLM Bootstrap MAY assist as non-authoritative draft input.      │
+│  Enrichment Copilot (ADR-004) MAY assist as non-authoritative draft input.      │
 └──────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────┐
-│  LLM Bootstrap — Enrichment Layer ONLY (NOT Runtime Truth)       │
+│  Enrichment Copilot (ADR-004) — Enrichment only (NOT Runtime Truth)       │
 │                                                                  │
 │  Uses: Canonical entity list from Tier 1/2/3 as input           │
 │  Output: Descriptions, Quotes, Scene Summaries, Image Captions   │
@@ -408,8 +418,8 @@ Option B has two hard limitations:
    disqualified as an authority source.
 
 2. **Chapter Catalog coverage is ~60–75%**, meaning 25–40% of works on the
-   platform would have no canonical chapter data and would fall back to LLM
-   Bootstrap — which is exactly the failure case this ADR exists to prevent.
+   platform would have no canonical chapter data and would fall back to non-Tier-1
+   draft assistance — which is exactly the failure case this ADR exists to prevent.
 
 Option B is retained as a Tier 2 supplementary source for Chapter Catalog
 where indexed editions are available, reducing user friction for covered works.
@@ -433,14 +443,14 @@ The primary cost is user friction (file upload) and engineering complexity
 ### What this ADR mandates
 
 1. Chapter Catalog MUST be derived from Tier 1 (EPUB spine/NCX) or Tier 2
-   (bibliographic API) before LLM Bootstrap may use it as context.
+   (bibliographic API) before Enrichment Copilot may use it as context.
 
-2. Characters and Locations obtained via LLM Bootstrap MUST be flagged as
+2. Characters and Locations obtained via non-Tier-1 draft assistance MUST be flagged as
    `source: "llm_draft"` and require human confirmation before being treated
    as Runtime Truth until Tier 1 NER pipeline is implemented.
 
-3. The existing `BootstrapProvider` interface remains valid for enrichment
-   (descriptions, quotes, scene summaries). It MUST NOT be used as the
+3. The Enrichment suggest pipeline (ADR-004 / SPEC-D2-002) remains valid for narrative
+   field enrichment (descriptions, quotes, scene summaries). It MUST NOT be used as the
    source of canonical entity names or chapter titles.
 
 4. Source files MUST NOT be persisted server-side. EPUB/TXT/PDF processing
@@ -454,8 +464,8 @@ The primary cost is user friction (file upload) and engineering complexity
 This ADR does not mandate a specific implementation timeline for the
 Tier 1 NER pipeline. Until the pipeline is implemented:
 
-- LLM Bootstrap (`source: "llm_draft"`) remains the operative mechanism.
-- Human review via existing admin CRUD screens is the quality gate.
+- Tier 3 manual entry with optional draft assistance remains the operative mechanism.
+- Human confirmation per ADR-004 Decision 2 is the quality gate.
 - The system operates in a pre-Runtime-Truth state.
 
 This ADR establishes the architectural direction. The transition from
@@ -477,12 +487,12 @@ pre-Runtime-Truth to Runtime Truth v1 occurs when the Tier 1 pipeline ships.
 - User friction increases. Users must supply source files for Tier 1 accuracy.
 - Engineering complexity increases. EPUB parser + NER pipeline is non-trivial.
 - Not all users will have or be able to supply source files.
-  These users remain on the LLM Bootstrap + manual review path indefinitely.
+  These users remain on Tier 3 manual entry with optional draft assistance indefinitely.
 
 ### Neutral
 
-- LLM Bootstrap retains its role. It is repositioned from Authority Source to
-  Enrichment Layer, which is a better-fit use of LLM capabilities.
+- Enrichment Copilot (ADR-004) retains the enrichment role previously described as
+  LLM Bootstrap Enrichment Layer — a better-fit use of LLM capabilities for narrative fields.
 - Open Library / Google Books integration adds moderate engineering work
   for partial Chapter Catalog coverage improvement.
 
@@ -494,12 +504,17 @@ pre-Runtime-Truth to Runtime Truth v1 occurs when the Tier 1 pipeline ships.
 EAR-D2-013  Scene-level recall evaluation
 EAR-D2-014  Bootstrap prompt constraint analysis
 EAR-D2-015  LLM knowledge ceiling audit
-ADR-001     Assisted Work Bootstrap Pipeline (Bootstrap remains valid for enrichment)
+ADR-001     Assisted Work Bootstrap Pipeline (Superseded — historical)
+ADR-004     Source of Canonical Truth (operative Human Acceptance and Enrichment)
+ADR-006     Discovery Copilot Architecture (Discovery vs Tier extraction)
 ```
 
 ---
 
 ## Supersedes / Modifies
+
+ADR-001 is **Superseded** by ADR-004. The following amendment block is retained
+ for audit continuity only.
 
 This ADR modifies the scope of ADR-001:
 
@@ -509,5 +524,5 @@ This ADR modifies the scope of ADR-001:
 > ADR-D2-001 amendment:
 > External source material (EPUB/TXT/PDF) MAY be introduced for
 > Canonical Metadata extraction ONLY.
-> The Bootstrap pipeline itself continues to use only Work metadata as input.
-> Source material extraction is a separate pipeline operating before Bootstrap.
+> Source material extraction is a separate pipeline. Operative enrichment and
+> Human Acceptance are governed by ADR-004, not ADR-001 Bootstrap architecture.
