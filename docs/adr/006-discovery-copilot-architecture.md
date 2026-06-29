@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.1
+**Version:** 1.2
 **Last Updated:** 2026-06-29
 **Owner:** Architect
-**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Enrichment Copilot authority); ADR-005 (Narrative Information Model — Editorial Domain and Information Emergence); ADR-D2-001 (Canonical Metadata Authority — Tier 1 / Tier 2 / Tier 3)
-**Amendment:** Clarification only — A1 (Human Review outcome paths: Catalog Entity vs Story unit; ADR-D2-001 relationship). No Decisions, Acceptance Criteria, or routing logic changed.
+**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Enrichment Copilot authority); ADR-005 (Narrative Information Model — Editorial Domain and Information Emergence); ADR-007 (Editorial → Runtime Rollout Architecture — Architecture Closure); ADR-D2-001 (Canonical Metadata Authority — Tier 1 / Tier 2 / Tier 3)
+**Amendment:** Clarification only — A1 (Human Review outcome paths: Catalog Entity vs Story unit; ADR-D2-001 relationship), A2 (Relationship to ADR-007; cross-domain mapping and Story runtime representation deferral closed). No Decisions, Acceptance Criteria, or routing logic changed.
 
 ---
 
@@ -63,10 +63,8 @@ This ADR explicitly does **not** govern:
 
 * Runtime schema, database design, API contracts, or UI
 * Candidate persistence model or storage format
-* Editorial Domain Story ↔ Runtime Domain Scene mapping
 * Enrichment Copilot routing, field classification, or suggestion pipelines
   (ADR-004 / SPEC-D2-002 remain authoritative)
-* Migration strategy or rollout sequencing
 * AI orchestration implementation details
 
 ---
@@ -286,12 +284,12 @@ Knowledge Extraction …   ← per ADR-005 Information Emergence Model
 An **Approved Story unit** is an editorial narrative unit satisfying ADR-005
  Canonical Definition and NIM-INV-05. It is **not** an **Entity** as defined in
  this ADR's Glossary. Story units do not cross the Production Domain boundary as
- catalog Entities until a future Rollout ADR defines any Runtime mapping.
+ catalog Entities until governed projection per ADR-007 (Accepted).
 
 **Scene Candidate Generation** proposes editorial candidates related to scene-level
- content. Cross-domain mapping to Runtime Scene records remains **deferred**; Human
- Review outcomes for scene-level Candidates MUST NOT be assumed to be Runtime Scene
- records without Rollout ADR governance.
+ content. Cross-domain mapping to Runtime Scene records is governed by **ADR-007**;
+ Human Review outcomes for scene-level Candidates MUST NOT be assumed to be Runtime Scene
+ records without human-accepted governed projection per ADR-007.
 
 ### Relationship to Information Emergence
 
@@ -482,8 +480,7 @@ Work
 
 Scene Candidate Generation (a Discovery capability class) proposes editorial
  candidates derived from narrative understanding. It does not equate editorial
- Story units with Runtime Scene records. Cross-domain mapping remains **deferred**
- to a future Rollout ADR.
+ Story units with Runtime Scene records. Cross-domain mapping is governed by **ADR-007**.
 
 Until that Rollout ADR is Accepted and implemented, Runtime Domain supremacy
  applies unchanged (`governance/FOUNDATION.md` §1).
@@ -696,7 +693,23 @@ ADR-D2-001 does not supersede ADR-006. ADR-006 does not supersede ADR-D2-001.
 
 ---
 
+
+## Relationship to ADR-007
+
+ADR-007 (Accepted) governs **Editorial → Runtime Rollout** and **Architecture
+ Closure**. This ADR governs **Discovery** and **Authority Emergence**.
+
+Cross-domain mapping and Story runtime representation (architecture intent) deferrals
+ from this ADR are **closed** by ADR-007. Approved Story units and editorial
+ scene-level artifacts reach Runtime only through **governed projection** — not
+ Entity promotion or silent persist.
+
+This ADR MUST NOT weaken ADR-007 rollout boundaries.
+
+---
+
 ## Relationship to D2 Enrichment
+
 
 Current D2 implementation is **Enrichment only**.
 
@@ -728,8 +741,8 @@ Current Runtime Truth v1 topology in the **Runtime Domain** is unchanged by this
 
 This ADR governs the **Discovery and Production boundary model** in the Editorial
  and Production layers. Runtime Truth v1 governs the **Runtime Domain** enforced
- reading topology. The two coexist until a future Rollout ADR defines mapping
- between Editorial Domain artifacts and Runtime Domain representation.
+ reading topology. Editorial↔Runtime association is governed by **ADR-007**;
+ governed projection implementation is deferred to downstream SPEC.
 
 When Editorial Domain and Runtime Domain descriptions diverge, **Runtime Domain
  enforcement prevails** for production behavior; **ADR-005 and ADR-006 prevail**
@@ -749,7 +762,6 @@ The following are **architectural extension points** for downstream governance.
 * Scene Candidate Generation SPEC
 * Candidate Review UX SPEC
 * Candidate staging or persistence SPEC (explicitly deferred — see Deferred Decisions)
-* Editorial Domain Story ↔ Runtime Domain Scene Rollout ADR
 * Knowledge Graph extraction (deferred by ADR-005)
 
 All downstream implementation MUST follow **ADR → SPEC → Implementation**
@@ -769,10 +781,8 @@ The following are explicitly deferred. They MUST NOT be inferred from this ADR.
 | Candidate review UI | Future UI Spec |
 | Batch or Work-level Discovery workflow | Future SPEC |
 | AI orchestration details | Implementation layer |
-| Editorial Domain Story ↔ Runtime Domain Scene mapping | Future Rollout ADR |
-| Database schema for Candidates or Discovery sessions | Future SPEC or migration ADR |
-| Story runtime representation | Future Rollout ADR or SPEC |
-| Knowledge Graph integration | Future Architecture or Rollout ADR |
+| Database schema for Candidates or Discovery sessions | SPEC |
+| Knowledge Graph integration | post-v1 capability (Constitution roadmap) |
 
 ---
 
@@ -789,7 +799,6 @@ This ADR explicitly excludes:
 * Bootstrap revival (ADR-001 remains superseded)
 * Runtime Domain reading flow redesign
 * Copilot UI visualization for Discovery
-* Runtime Scene mapping and Story runtime representation
 
 ---
 
@@ -865,6 +874,8 @@ docs/adr/001-assisted-work-bootstrap-pipeline.md
   — Historical; Bootstrap rejection context (Superseded by ADR-004)
 docs/adr/ADR-D2-001-canonical-metadata-authority.md
   — Tier authority model; external metadata evidence architecture
+docs/adr/007-rollout-architecture.md
+  — Rollout governance; governed projection; Architecture Closure
 ```
 
 ### Governance
@@ -884,6 +895,7 @@ ADR-004 — Source of Canonical Truth (parent; Enrichment authority)
 ADR-005 — Narrative Information Model (parent; Editorial Domain)
 ADR-001 — Assisted Work Bootstrap Pipeline (Historical; Superseded)
 ADR-D2-001 — Canonical Metadata Authority (Tier 1 / Tier 2 / Tier 3)
+ADR-007 — Editorial → Runtime Rollout Architecture (Architecture Closure)
 ```
 
 ### Specs (implementation anchors; not ADR scope)

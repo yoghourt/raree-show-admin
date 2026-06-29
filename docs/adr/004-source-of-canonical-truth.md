@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.13
+**Version:** 1.14
 **Last Updated:** 2026-06-29
 **Owner:** Architect
 **Supersedes:** ADR-001 (Assisted Work Bootstrap Pipeline — archived as Experimental Prototype)
@@ -11,7 +11,9 @@ A3 (Known Constraint §15), Follow-up restructure (ADR-005 + ADR-006),
 A4 (ADR-005 Accepted — Narrative Information Model; Follow-up Roadmap and §15 updated),
 A5 (ADR-006 Accepted — Discovery Copilot Architecture; §15, Follow-up §ADR-006,
 RT-INV-04 Enrichment scope clarified),
-A6 (ADR-D2-001 vs ADR-006 — source extraction vs Discovery proposal; complementary paths).
+A6 (ADR-D2-001 vs ADR-006 — source extraction vs Discovery proposal; complementary paths),
+A7 (ADR-007 Accepted — Editorial → Runtime Rollout Architecture; Architecture Freeze;
+Follow-up chain terminates; cross-domain mapping deferral closed).
 No Decisions, Acceptance Criteria, or routing logic changed.
 
 **A4 Historical Note:** Prior Follow-up Roadmap text described ADR-005 as
@@ -19,11 +21,11 @@ investigation-phase "Content Topology Normalization." ADR-005 is now **Accepted*
 as the **Narrative Information Model** (editorial domain). **Correction rationale:**
 investigation is complete; editorial Story semantics are frozen. **Runtime
 reconciliation:** Runtime Truth v1 topology is unchanged; editorial model is
-orthogonal until a future Rollout ADR.
+orthogonal until ADR-007 governed projection is implemented under SPEC.
 
 **A5 Historical Note:** Prior §15 and Follow-up §ADR-006 text described ADR-006 as
 a future dedicated ADR. ADR-006 is now **Accepted** as the **Discovery Copilot
-Architecture** (v1.0). **Correction rationale:** Discovery deferral is closed at
+Architecture**. **Correction rationale:** Discovery deferral is closed at
 the architecture layer. **Runtime reconciliation:** RT-INV-04 remains binding on
 the ADR-004 Enrichment Copilot architecture; Discovery capabilities are
 architecturally owned by ADR-006 and authorized for implementation only via
@@ -70,11 +72,11 @@ It defines:
   Excluded, Fact Suggestion, Narrative Suggestion, Reference Suggestion — as
   a runtime concept independent of field classification.
 * The Discovery boundary: entity-discovery capabilities are architecturally owned
-  by ADR-006 — Discovery Copilot Architecture (Accepted v1.0); RT-INV-04 continues
+  by ADR-006 — Discovery Copilot Architecture (Accepted); RT-INV-04 continues
   to prohibit Discovery under the ADR-004 Enrichment Copilot architecture.
 * The Known Constraint §15 bounding ADR-004 to Runtime Truth v1 topology;
   the Editorial Domain Narrative Information Model is governed by ADR-005 —
-  Narrative Information Model (Accepted v1.1); cross-domain mapping remains deferred.
+  Narrative Information Model (Accepted); cross-domain mapping governed by ADR-007.
 
 ### Runtime Truth v1 Topology
 
@@ -99,7 +101,7 @@ Definitions (descriptive; no future topology implied):
   Runtime Truth v1.
 
 This section describes the current runtime state only. The Editorial Domain
-Narrative Information Model is governed by ADR-005 v1.1 (see Known Constraint §15).
+Narrative Information Model is governed by ADR-005 (see Known Constraint §15). Cross-domain mapping is governed by ADR-007.
 Cross-domain mapping of Story units remains outside ADR-004 scope.
 
 ---
@@ -1390,7 +1392,7 @@ RT-INV-13   Suggestion generation is triggered by the Copilot icon click.
 Enrichment Copilot architecture** only. It prohibits entity discovery within
 Enrichment suggestion sessions. **Discovery** — proposing which entities should
 exist — is architecturally owned by **ADR-006 — Discovery Copilot Architecture**
-(Accepted v1.0). Discovery implementation MUST follow ADR-006 governance and
+(Accepted). Discovery implementation MUST follow ADR-006 governance and
 downstream SPECs; RT-INV-04 is **not** superseded for Enrichment sessions.
 AC-31 remains in force until Discovery capabilities are implemented under
 ADR-006 governance.
@@ -2062,23 +2064,24 @@ Discovery Copilot runtime implementation (SPEC and code under ADR-006 governance
 ```
 
 The editorial Narrative Information Model is governed by **ADR-005 — Narrative
-Information Model** (Status: Accepted; v1.1). ADR-005 publishes the **Canonical
+Information Model** (Status: Accepted). ADR-005 publishes the **Canonical
 Definition** and **Glossary** of Story, governs the **Editorial Domain**
 (independent of the **Runtime Domain**), and defines boundary principles and
 information-emergence **dependency order**. It does not modify Runtime Truth v1.
 
-Mapping Editorial Domain Story units into Runtime Domain representation is
-**deferred** to a future Rollout ADR. Until that Rollout ADR is Accepted and
-implemented, the Runtime Truth v1 topology in **What** above remains authoritative.
+Cross-domain mapping is governed by **ADR-007 — Editorial → Runtime Rollout
+Architecture** (Status: Accepted). ADR-007 defines governed projection from
+ Editorial Story units to Runtime Scene association without redesigning Runtime
+ Truth v1. Until governed projection is implemented under downstream SPEC
+ governance, the Runtime Truth v1 topology in **What** above remains authoritative
+ for production behavior.
 
 Discovery architecture is governed by **ADR-006 — Discovery Copilot Architecture**
-(Status: Accepted; v1.0). ADR-006 depends on the **Editorial Domain** topology
-frozen by ADR-005. Both ADR-005 and ADR-006 are Accepted; the editorial-layer
-gate for Discovery is satisfied. Discovery runtime implementation remains outside
-ADR-004 scope and MUST follow ADR-006 downstream SPECs. **RT-INV-04** continues
-to prohibit entity discovery under the ADR-004 Enrichment Copilot architecture;
-Discovery capabilities authorized only via the ADR-006 governance chain. Cross-domain
-mapping remains a separate deferred concern.
+(Status: Accepted). ADR-006 depends on the **Editorial Domain** topology frozen
+ by ADR-005. Discovery runtime implementation remains outside ADR-004 scope and
+ MUST follow ADR-006 downstream SPECs. **RT-INV-04** continues to prohibit entity
+ discovery under the ADR-004 Enrichment Copilot architecture; Discovery capabilities
+ are authorized only via the ADR-006 governance chain.
 
 ---
 
@@ -2093,28 +2096,31 @@ ADR-005 — Narrative Information Model (Accepted)
     ↓
 ADR-006 — Discovery Copilot Architecture (Accepted)
     ↓
-[Future Rollout ADR — Editorial Domain Story ↔ Runtime Domain mapping]
+ADR-007 — Editorial → Runtime Rollout Architecture (Accepted)
     ↓
-[Future Discovery SPECs — implementation under ADR-006 governance]
+──────────────────────
+Architecture Freeze — SPEC design authorized
+──────────────────────
+    ↓
+Downstream SPECs (Enrichment, Discovery, governed projection, …)
 ```
 
-Discovery architecture (ADR-006) depends on the **Editorial Domain** topology
- frozen by ADR-005. ADR-005 is **Accepted** (v1.1); ADR-006 is **Accepted**
- (v1.0). The editorial-layer gate for Discovery is satisfied at the architecture
- layer. Cross-domain mapping of Story units into Runtime Truth v1 remains
- **deferred** to a future Rollout ADR. Discovery runtime implementation proceeds
- via ADR-006 downstream SPECs; RT-INV-04 and AC-31 remain in force for the
- ADR-004 Enrichment Copilot until Discovery is implemented under ADR-006 governance.
+The Architecture and Rollout decision chain for Runtime Truth v1 **terminates** at
+ ADR-007. ADR-005 and ADR-006 are **Accepted**; cross-domain mapping deferral is
+ **closed** at the architecture layer by ADR-007. Downstream work MUST follow
+ **ADR → SPEC → Implementation** (`governance/ADR_RULES.md` §13). RT-INV-04 and
+ AC-31 remain in force for the ADR-004 Enrichment Copilot until Discovery is
+ implemented under ADR-006 downstream SPECs.
 
 ---
 
 ### ADR-005 — Narrative Information Model (Accepted)
 
-**Status:** Accepted (v1.1) — see [`docs/adr/005-narrative-information-model.md`](005-narrative-information-model.md)
+**Status:** Accepted — see [`docs/adr/005-narrative-information-model.md`](005-narrative-information-model.md)
 
 **Summary:** Canonical Story definition and shared Glossary; **Editorial Domain**
  / **Runtime Domain** separation; Story boundary principles (ONE Rule); information
- emergence **dependency order** (not strict workflow); runtime mapping deferred.
+ emergence **dependency order** (not strict workflow); cross-domain mapping governed by ADR-007.
 
 **Frozen by ADR-005:**
 
@@ -2132,12 +2138,13 @@ Editorial Domain independent of Runtime Domain (NIM-INV-01…05)
 **Deferred by ADR-005 (not in ADR-005 scope):**
 
 ```text
-Editorial Domain Story ↔ Runtime Domain Scene mapping
 Relationship delta persistence
 Story Arc visibility in the Runtime Domain
 Knowledge Graph integration
 Schema, API, UI, migration, AI implementation
 ```
+
+Cross-domain mapping is governed by **ADR-007** (Accepted).
 
 ADR-005 does not modify Runtime Truth v1 (Runtime Domain). ADR-004 remains
  authoritative for Copilot routing and Human Acceptance regardless of ADR-005.
@@ -2151,7 +2158,7 @@ ADR-005 MUST NOT weaken the Human Owns Canonical Truth principle (Decision 1).
 
 ### ADR-006 — Discovery Copilot Architecture (Accepted)
 
-**Status:** Accepted (v1.0) — see [`docs/adr/006-discovery-copilot-architecture.md`](006-discovery-copilot-architecture.md)
+**Status:** Accepted — see [`docs/adr/006-discovery-copilot-architecture.md`](006-discovery-copilot-architecture.md)
 
 ADR-006 inherits and formalises the Discovery intent originally referenced by ADR-004.
 The architecture-layer deferral is **closed**. Discovery runtime implementation
@@ -2177,9 +2184,9 @@ Discovery is authorized only via the ADR-006 governance chain and downstream SPE
 
 **ADR-006 depends on ADR-005 (editorial topology) and ADR-004 (Human Acceptance).**
 
-ADR-005 is Accepted (v1.1). ADR-006 is Accepted (v1.0). ADR-006 operates against
+ADR-005 is Accepted. ADR-006 is Accepted. ADR-006 operates against
  the **Editorial Domain Story model** (Canonical Definition and Glossary in
- ADR-005). Cross-domain mapping remains deferred to a future Rollout ADR.
+ ADR-005). Cross-domain mapping is governed by **ADR-007** (Accepted).
 
 **Frozen by ADR-006:**
 
@@ -2229,6 +2236,39 @@ Any implementation that introduces Discovery capabilities under ADR-004 Enrichme
 
 ---
 
+### ADR-007 — Editorial → Runtime Rollout Architecture (Accepted)
+
+**Status:** Accepted — see [`docs/adr/007-rollout-architecture.md`](007-rollout-architecture.md)
+
+ADR-007 closes the cross-domain mapping deferral from ADR-004, ADR-005, and
+ ADR-006. The Runtime Truth v1 Architecture and Rollout layer **terminates** at
+ ADR-007. **SPEC design is authorized** per `governance/ADR_RULES.md` §13.
+
+**Frozen by ADR-007:**
+
+```text
+Rollout governance (Editorial → Production → Runtime domain transition)
+Story ↔ Scene orthogonal association (N:M; no identity merge)
+Story runtime representation — projection-only (not a routable Runtime entity)
+Dual-domain coexistence model and rollout phases (architectural intent)
+Authority reconciliation when Editorial and Runtime diverge (split precedence)
+Governed projection requires Human Acceptance (ADR-004 Decision 2)
+Rollout Architectural Invariants (ROL-INV-01 through ROL-INV-07)
+Architecture Closure — no additional Architecture ADR required before SPEC design
+```
+
+**ADR-007 MUST preserve:**
+
+```text
+Human Acceptance Gate            (ADR-004 Decision 2)
+Human Owns Canonical Truth       (ADR-004 Decision 1)
+Runtime Truth v1 topology        (ADR-004)
+Story semantics and NIM-INV-*    (ADR-005)
+Discovery and DISC-INV-*         (ADR-006)
+```
+
+---
+
 ## Refs
 
 ### Evidence Chain
@@ -2255,6 +2295,7 @@ governance/specs/AUTHORITY_BOUNDARY_AND_PRECEDENCE_SPEC.md
 ```text
 ADR-001     Assisted Work Bootstrap Pipeline (Superseded — Experimental Prototype)
 ADR-D2-001  Canonical Metadata Authority (Tier 1 / Tier 2 / Tier 3 architecture)
-ADR-005     Narrative Information Model (Accepted v1.1 — Canonical Definition, Glossary, Editorial Domain)
-ADR-006     Discovery Copilot Architecture (Accepted v1.0 — Authority Emergence, Discovery boundary)
+ADR-005     Narrative Information Model (Accepted — Editorial Domain and Story semantics)
+ADR-006     Discovery Copilot Architecture (Accepted — Authority Emergence and Discovery)
+ADR-007     Editorial → Runtime Rollout Architecture (Accepted — Architecture Freeze)
 ```
