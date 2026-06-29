@@ -2,10 +2,11 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.1
-**Last Updated:** 2026-06-28
+**Version:** 1.3
+**Last Updated:** 2026-06-29
 **Owner:** Architect
-**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Copilot authority)
+**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Copilot authority); ADR-006 (Discovery Copilot Architecture — Authority Emergence and Human Review outcome paths); ADR-007 (Editorial → Runtime Rollout Architecture — Architecture Closure)
+**Amendment:** Clarification only — A1 (Relationship to ADR-006; Approved Story unit vs Production Entity), A2 (Relationship to ADR-007; cross-domain mapping deferral closed). No Decisions changed.
 
 ---
 
@@ -68,8 +69,8 @@ When Characters, Locations, Relationships, or graph structures are treated as
 
 This ADR resolves these problems within the **Editorial Domain** without altering
  current Runtime Domain enforcement. Runtime Truth v1 remains authoritative until
- a future Rollout ADR maps Editorial Domain Story units into Runtime Domain
- representation (`FOUNDATION.md` §1 — Runtime Supremacy Law).
+ ADR-007 governs governed projection from Editorial Story units to Runtime Scene
+ association (`FOUNDATION.md` §1 — Runtime Supremacy Law).
 
 This ADR supports the Constitution capability roadmap stage **Story Structure**
  (Appendix A): the reader can naturally explain the main storyline from beginning
@@ -296,9 +297,9 @@ Work
 
 This ADR does not modify, endorse, or implement any mapping between domains.
 
-Mapping Editorial Domain Story units into Runtime Domain representation is
- **deferred** to a future Rollout ADR. Until that Rollout ADR is Accepted and
- implemented, Runtime Domain supremacy applies unchanged (`FOUNDATION.md` §1).
+Cross-domain mapping is governed by **ADR-007** (Accepted). Governed projection
+ implementation is deferred to downstream SPEC. Until implemented, Runtime Domain
+ supremacy applies unchanged (`FOUNDATION.md` §1).
 
 ---
 
@@ -376,19 +377,51 @@ ADR-004 remains authoritative for:
 * Human-Owned Canonical Truth (Decision 1)
 * Human Acceptance Gate (Decision 2)
 * Copilot routing, field classification, and suggestion pipelines
-* RT-INV-04 Discovery boundary (Discovery deferred to ADR-006)
+* RT-INV-04 Enrichment boundary (Discovery architecturally owned by ADR-006 Accepted)
 
 This ADR MUST NOT weaken any ADR-004 decision or invariant.
 
 ---
 
+## Relationship to ADR-006
+
+ADR-006 (Accepted) governs Discovery and the **Authority Emergence Model**.
+ This ADR governs **Story semantics** and **Information Emergence** in the
+ Editorial Domain.
+
+When **Story Discovery** produces Story Candidates, Human Review acceptance
+ yields an **Approved Story unit** — an editorial artifact governed by this ADR
+ (NIM-INV-05, Canonical Definition). An Approved Story unit is **not** a
+ Production **Entity** as defined in ADR-006. Catalog objects (Character,
+ Location) follow the Catalog Entity path in ADR-006 after Human Review.
+
+This ADR MUST NOT weaken ADR-006 Discovery boundaries or ADR-004 Human Acceptance.
+
+---
+
+
+## Relationship to ADR-007
+
+ADR-007 (Accepted) governs **Editorial → Runtime Rollout** and **Architecture
+ Closure** for Runtime Truth v1. This ADR governs **Story semantics** and
+ **Information Emergence** in the Editorial Domain.
+
+Cross-domain mapping deferral from this ADR is **closed** by ADR-007. Approved
+ Story units reach Runtime only through **governed projection** onto Scene records
+ (projection-only; Story is not a routable Runtime entity).
+
+This ADR MUST NOT weaken ADR-007 rollout boundaries or ADR-004 Human Acceptance.
+
+---
+
 ## Relationship to Runtime Truth v1
+
 
 Current Runtime Truth v1 topology in the **Runtime Domain** is unchanged by this ADR.
 
 This ADR governs the **Editorial Domain** cognitive model. Runtime Truth v1 governs
- the **Runtime Domain** enforced reading topology. The two domains coexist until a
- future Rollout ADR defines mapping between them.
+ the **Runtime Domain** enforced reading topology. The two domains coexist; Editorial↔Runtime association is governed by **ADR-007**;
+ projection implementation is deferred to downstream SPEC.
 
 When Editorial Domain and Runtime Domain descriptions diverge, **Runtime Domain
  enforcement prevails** for production behavior; **this ADR prevails** for Editorial
@@ -402,16 +435,15 @@ The following are explicitly deferred. They MUST NOT be inferred from this ADR.
 
 | Deferred item | Expected governance home |
 | ------------- | ------------------------ |
-| Editorial Domain Story ↔ Runtime Domain Scene mapping | Future Rollout ADR |
-| Relationship delta persistence model | Future Rollout ADR or SPEC |
-| Story Arc visibility in the Runtime Domain | Future Rollout ADR or SPEC |
-| Knowledge Graph integration | Future Architecture or Rollout ADR |
+| Relationship delta persistence model | SPEC (post-v1 capability) |
+| Story Arc visibility in the Runtime Domain | SPEC or post-v1 capability |
+| Knowledge Graph integration | post-v1 capability (Constitution roadmap) |
 
 Implementation of any deferred item MUST follow **ADR → SPEC → Implementation**
  (`ADR_RULES.md` §13, `SPEC_RULES.md` §4).
 
 ADR-006 (Discovery Copilot Architecture) governs **Discovery** capabilities only.
- It does not substitute for cross-domain mapping decisions above.
+ Cross-domain mapping is governed by **ADR-007** (Accepted).
 
 ---
 
@@ -500,5 +532,6 @@ docs/adr/004-source-of-canonical-truth.md   Human Acceptance Gate; Copilot autho
 
 ```text
 ADR-004 — Source of Canonical Truth (parent)
-ADR-006 — Discovery Copilot Architecture (downstream; Discovery only)
+ADR-006 — Discovery Copilot Architecture (Accepted — Authority Emergence; Story vs Entity paths)
+ADR-007 — Editorial → Runtime Rollout Architecture (Accepted — Architecture Closure)
 ```
