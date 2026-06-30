@@ -2,8 +2,6 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
-  // Unit tests do not import CSS; skip PostCSS/Tailwind native bindings (oxide).
-  css: false,
   test: {
     environment: "node",
     globals: true,
