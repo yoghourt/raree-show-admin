@@ -64,7 +64,7 @@ ADR-001 (Bootstrap Pipeline) is superseded by ADR-004. The Bootstrap batch-persi
 - Reference Suggestion v1 implementation (RS-04, deferred; v1 route = Excluded)
 - Catalog-level or Work-level Accept All (Decision 8)
 - Source Connector implementation details (Open Library, Google Books, auth, rate limiting)
-- Schema field registry migration — Appendix A is authoritative for Runtime Truth v1; future Schema Spec may assume ownership in a later version
+- Schema field registry — governed by SPEC-CORE-001 (`docs/specs/spec-core-001-entity-schema-registry.md` §4.3); Appendix A of this document is superseded
 - Content topology normalization (→ ADR-005)
 - Any Bootstrap / ADR-001 components (`BootstrapPanel`, `clearExisting`, batch persist route)
 - LLM provider selection
@@ -285,7 +285,7 @@ When the operator navigates away from the current entity form (entity switch, br
 | Layer | Owner | Responsibility |
 | ----- | ----- | -------------- |
 | **Architecture** (ADR-004) | ADR | Defines valid classification types and valid route types |
-| **Schema Registry** (Appendix A) | SPEC-D2-002 | Registers per-field `classification` and `copilot_route` for each entity type (Runtime Truth v1) |
+| **Schema Registry** | SPEC-CORE-001 §4.3 | Registers per-field `classification` and `copilot_route` for each entity type (Runtime Truth v1) |
 | **Copilot Runtime** (implementation) | SPEC-D2-002 | Reads metadata at runtime; MUST NOT hardcode field names (AC-26, MD-01) |
 
 Adding a new field to an entity type MUST require zero changes to Copilot runtime code (AC-27, MD-02). Adding a new entity type MUST require zero changes to Copilot routing logic (MD-03).
@@ -310,7 +310,7 @@ Classification and `copilot_route` are stored independently in schema metadata (
 | `narrative` | `narrative` (SC-02) |
 | `asset` | `excluded` (FC-03, non-overridable) |
 
-Schema Spec may assign a non-default route to a field where justified, except: Asset fields MUST always be `excluded` regardless of any other metadata value (FC-03, AC-29).
+SPEC-CORE-001 may assign a non-default route to a field where justified, except: Asset fields MUST always be `excluded` regardless of any other metadata value (FC-03, AC-29).
 
 ### 5.4 Route Definitions
 
@@ -327,7 +327,7 @@ Before building the suggest request, the client MUST filter the field list to in
 
 ### 5.6 Schema Metadata Contract (MD-04)
 
-SPEC-D2-002 defines the field registration shape required for Copilot routing. The per-field registry for Runtime Truth v1 is **Appendix A** of this document — it is the authoritative source for `classification` and `copilot_route` assignments. A future Schema Spec may assume ownership of the registry; until then, Appendix A governs.
+SPEC-D2-002 defines the minimum field registration shape required for Copilot routing (see interface below). The per-field registry for Runtime Truth v1 is governed by **SPEC-CORE-001 §4.3** (`docs/specs/spec-core-001-entity-schema-registry.md`). On registry conflicts, SPEC-CORE-001 governs classification and route assignments.
 
 **Minimum required fields per schema entry:**
 
@@ -997,7 +997,7 @@ The following are explicitly outside the authority of SPEC-D2-002. No code writt
 - **Catalog or Work-level Accept All**: Any bulk acceptance mechanism beyond the current entity session (Decision 8).
 - **Bootstrap Components (ADR-001)**: `BootstrapPanel`, `clearExisting`, batch persist route — explicitly rejected by ADR-004 Decision 7.
 - **LLM Provider Selection**: Model choice for Fact or Narrative pipelines is an implementation-layer decision.
-- **Schema Field Registry (future migration)**: Appendix A is the authoritative registry for Runtime Truth v1. A future Schema Spec MAY assume ownership; until that document exists and explicitly supersedes Appendix A, Appendix A governs.
+- **Schema Field Registry**: Governed by SPEC-CORE-001 §4.3. Appendix A of this document is retained for audit diff only.
 - **Portrait and Image Generation**: `portraitUrl`, `story_images_v2`, and any other Asset fields are permanently excluded from Copilot (FC-03).
 - **Entity Discovery / Candidate Review**: Workflows that propose which entities should exist — governed by ADR-006.
 - **Confidence UI Visualization**: Specific visual form (colors, icons, label styles) for green/yellow confidence indicators. SPEC-D2-002 specifies the API contract only; visual form is owned by the UI Spec.
@@ -1043,7 +1043,7 @@ The following are explicitly outside the authority of SPEC-D2-002. No code writt
 | **Governance: ADR rules** | `governance/ADR_RULES.md` |
 | **Governance: Template** | `governance/templates/SPEC_TEMPLATE.md` |
 | **Planning Package** | `.cursor/plans/spec-004_规划包_893efe2e.plan.md` |
-| **Schema Field Registry** | Appendix A of this document |
+| **Schema Field Registry** | `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 §4.3 |
 | **Source Connector Spec** | `docs/specs/spec-d2-003-source-connector-v1.md` — SPEC-D2-003 (Approved); governs tier/confidence over §8 where specified |
 | **Confidence visualization** | Governed by §8.4 of this document (no separate UI Spec required) |
 | **Future: ADR-005** | Topology normalization (not a dependency of this spec) |
@@ -1051,9 +1051,18 @@ The following are explicitly outside the authority of SPEC-D2-002. No code writt
 
 ---
 
-## Appendix A — Schema Field Registry
+## Appendix A — Schema Field Registry (Superseded)
 
-This appendix is the authoritative per-field classification and Copilot route registry for Runtime Truth v1. It fulfills the Schema Metadata Contract defined in §5.6.
+> **Superseded by:** [`docs/specs/spec-core-001-entity-schema-registry.md`](spec-core-001-entity-schema-registry.md) §4.3 (SPEC-CORE-001, Approved).
+>
+> This appendix is retained for audit continuity only. The authoritative per-field `classification` and `copilot_route` registry for Runtime Truth v1 is **SPEC-CORE-001 §4.3**.
+>
+> Governance corrections applied in SPEC-CORE-001 relative to this appendix:
+>
+> - `tags`: classification corrected from invalid `excluded` to `scope`
+> - `locationId`, `characterIds`: classification corrected from invalid `reference` to `canonical` with `copilot_route: reference`
+
+The tables below are **historical** (pre-SPEC-CORE-001). Do not use for implementation after SPEC-CORE-001 is Approved.
 
 Column definitions:
 
@@ -1102,6 +1111,8 @@ System fields (`id`, `tsid`, `workId`, `createdAt`) are excluded from all Copilo
 
 System fields (`tsid`, `workId`, `order_index`) are excluded from all Copilot operations.
 
-### A.4 Extensibility Note
+### A.4 Extensibility Note (Historical)
+
+> Superseded: new fields MUST be registered in SPEC-CORE-001 §4.3 before the Copilot runtime can route them.
 
 New fields added to any entity type MUST be registered in this appendix with `classification` and `copilot_route` before the Copilot runtime can route them. No change to Copilot routing code is required — the runtime reads from this registry (MD-02, AC-26/27).

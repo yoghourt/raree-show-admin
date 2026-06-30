@@ -1,11 +1,12 @@
 /**
  * Unit tests — lib/ai/field-registry.ts
  *
- * Verifies:
+ * Verifies SPEC-CORE-001 §4.3 / §4.5 (CORE-AC-IMP-01/02):
  *   - AC-26: field routing derived purely from registry metadata
  *   - AC-27: adding a field to registry requires no routing code change
  *   - AC-29: asset fields always excluded (FC-03)
  *   - AC-15: scope fields absent from suggestable results
+ *   - CORE-RC-04: reference route effective excluded in v1
  *   - RT-INV-08: empty-field filter gate
  */
 
@@ -15,6 +16,7 @@ import {
   getSuggestableFields,
   getEffectiveRoute,
   getClassification,
+  getFieldMetadata,
   getScopeFields,
   getAssetFields,
 } from "@/lib/ai/field-registry";
@@ -23,7 +25,7 @@ import {
 // FIELD_REGISTRY shape assertions
 // ---------------------------------------------------------------------------
 
-describe("FIELD_REGISTRY — Appendix A completeness", () => {
+describe("FIELD_REGISTRY — SPEC-CORE-001 §4.3 completeness", () => {
   it("registers all three entity types", () => {
     expect(Object.keys(FIELD_REGISTRY)).toEqual(
       expect.arrayContaining(["character", "location", "scene"])
@@ -54,7 +56,12 @@ describe("FIELD_REGISTRY — Appendix A completeness", () => {
     expect(sceneReg["chapter_number"].classification).toBe("canonical");
     expect(sceneReg["title"].classification).toBe("narrative");
     expect(sceneReg["summary"].classification).toBe("narrative");
+    expect(sceneReg["tags"].classification).toBe("scope");
     expect(sceneReg["story_images_v2"].classification).toBe("asset");
+    expect(sceneReg["locationId"].classification).toBe("canonical");
+    expect(sceneReg["characterIds"].classification).toBe("canonical");
+    expect(sceneReg["locationId"].copilot_route).toBe("reference");
+    expect(sceneReg["characterIds"].copilot_route).toBe("reference");
   });
 });
 
@@ -96,6 +103,15 @@ describe("getEffectiveRoute — FC-03 asset permanent exclusion", () => {
     expect(getEffectiveRoute("character", "tsid")).toBe("excluded");
     expect(getEffectiveRoute("character", "workId")).toBe("excluded");
     expect(getEffectiveRoute("character", "createdAt")).toBe("excluded");
+  });
+});
+
+describe("getEffectiveRoute — CORE-RC-04 reference v1 exclusion", () => {
+  it("stores reference route in metadata but returns effective excluded", () => {
+    expect(getFieldMetadata("scene", "locationId")?.copilot_route).toBe("reference");
+    expect(getFieldMetadata("scene", "characterIds")?.copilot_route).toBe("reference");
+    expect(getEffectiveRoute("scene", "locationId")).toBe("excluded");
+    expect(getEffectiveRoute("scene", "characterIds")).toBe("excluded");
   });
 });
 
@@ -166,6 +182,30 @@ describe("getSuggestableFields — empty-field filter gate", () => {
     const result = getSuggestableFields("character", formValues);
     expect(result).toHaveLength(0);
   });
+
+  it("excludes scene reference fields and tags even when empty", () => {
+    const formValues = {
+      chapter_title: "The Red Wedding",
+      chapter_number: 47,
+      title: "",
+      summary: "",
+      tags: "",
+      locationId: "",
+      characterIds: [],
+      story_images_v2: [],
+    };
+
+    const result = getSuggestableFields("scene", formValues);
+    const fields = result.map((fr) => fr.field);
+
+    expect(fields).toContain("title");
+    expect(fields).toContain("summary");
+    expect(fields).not.toContain("chapter_title");
+    expect(fields).not.toContain("tags");
+    expect(fields).not.toContain("locationId");
+    expect(fields).not.toContain("characterIds");
+    expect(fields).not.toContain("story_images_v2");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -191,8 +231,10 @@ describe("getScopeFields / getAssetFields", () => {
     expect(getScopeFields("location")).toContain("name");
   });
 
-  it("scene scope field is chapter_title", () => {
-    expect(getScopeFields("scene")).toContain("chapter_title");
+  it("scene scope fields are chapter_title and tags", () => {
+    const scope = getScopeFields("scene");
+    expect(scope).toContain("chapter_title");
+    expect(scope).toContain("tags");
   });
 });
 
