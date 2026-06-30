@@ -1,14 +1,15 @@
 /**
- * SPEC-D2-002 Appendix A — Schema Field Registry (Runtime Authority)
+ * SPEC-CORE-001 §4.3 — Entity Schema Field Registry (runtime mirror)
  *
- * This module is the sole authoritative source for field classification and
- * Copilot routing in Runtime Truth v1.
+ * Mirrors docs/specs/spec-core-001-entity-schema-registry.md §4.3.
+ * Consumed by SPEC-D2-002 Enrichment Copilot routing.
  *
- * INVARIANTS (MD-01, AC-26/27):
+ * INVARIANTS (MD-01, AC-26/27, CORE-RC-01):
  *   - Copilot routing logic MUST NOT hardcode field names as string literals.
  *   - All routing decisions are derived exclusively from this registry at runtime.
  *   - Adding a new field requires only a new entry here — zero routing code changes.
  *   - Asset fields MUST always be excluded regardless of any other metadata (FC-03).
+ *   - Reference route fields are effective excluded for v1 suggest paths (CORE-RC-04).
  */
 
 import type {
@@ -20,7 +21,7 @@ import type {
 } from "@/lib/ai/copilot-types";
 
 // ---------------------------------------------------------------------------
-// A.1 Character — `characters` table
+// §4.3.2 Character — `characters` table
 // ---------------------------------------------------------------------------
 
 const CHARACTER_REGISTRY: Record<string, FieldMetadata> = {
@@ -32,7 +33,7 @@ const CHARACTER_REGISTRY: Record<string, FieldMetadata> = {
 };
 
 // ---------------------------------------------------------------------------
-// A.2 Location — `locations` table
+// §4.3.3 Location — `locations` table
 // ---------------------------------------------------------------------------
 
 const LOCATION_REGISTRY: Record<string, FieldMetadata> = {
@@ -44,7 +45,7 @@ const LOCATION_REGISTRY: Record<string, FieldMetadata> = {
 };
 
 // ---------------------------------------------------------------------------
-// A.3 Scene — `scenes` table
+// §4.3.4 Scene — `scenes` table
 // ---------------------------------------------------------------------------
 
 const SCENE_REGISTRY: Record<string, FieldMetadata> = {
@@ -54,8 +55,8 @@ const SCENE_REGISTRY: Record<string, FieldMetadata> = {
   summary:        { classification: "narrative",  copilot_route: "narrative" },
   tags:           { classification: "scope",      copilot_route: "excluded"  },
   story_images_v2:{ classification: "asset",      copilot_route: "excluded"  },
-  locationId:     { classification: "canonical",  copilot_route: "excluded"  }, // reference — excluded v1
-  characterIds:   { classification: "canonical",  copilot_route: "excluded"  }, // reference — excluded v1
+  locationId:     { classification: "canonical",  copilot_route: "reference" },
+  characterIds:   { classification: "canonical",  copilot_route: "reference" },
 };
 
 // ---------------------------------------------------------------------------
@@ -108,9 +109,10 @@ export function getFieldMetadata(
 }
 
 /**
- * Returns the effective Copilot route for a field.
- * Asset fields are always excluded regardless of other metadata (FC-03, AC-29).
+ * Returns the effective Copilot route for a field (SPEC-CORE-001 §4.5).
  * Unregistered fields are excluded.
+ * Asset fields are always excluded (FC-03, AC-29).
+ * Reference route fields are effective excluded for v1 suggest paths (CORE-RC-04).
  */
 export function getEffectiveRoute(
   entityType: EntityType,
@@ -118,8 +120,8 @@ export function getEffectiveRoute(
 ): CopilotRoute {
   const meta = getFieldMetadata(entityType, field);
   if (!meta) return "excluded";
-  // FC-03: asset permanently excluded regardless of copilot_route value
   if (meta.classification === "asset") return "excluded";
+  if (meta.copilot_route === "reference") return "excluded";
   return meta.copilot_route;
 }
 

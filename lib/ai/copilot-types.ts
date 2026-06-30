@@ -16,7 +16,7 @@ export type Confidence = "green" | "yellow";
 export type SuggestionClassification = "fact" | "narrative";
 
 // ---------------------------------------------------------------------------
-// Schema metadata (§5.6, Appendix A)
+// Schema metadata (SPEC-CORE-001 §4.1, consumed by SPEC-D2-002)
 // ---------------------------------------------------------------------------
 
 export interface FieldMetadata {
