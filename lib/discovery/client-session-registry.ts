@@ -69,6 +69,16 @@ function removeRecord(key: string): void {
   memoryStore.delete(key);
 }
 
+export function getStoredClientSessionId(
+  workId: string,
+  operatorId: string
+): string | null {
+  if (!workId || !operatorId) {
+    return null;
+  }
+  return readRecord(storageKey(workId, operatorId))?.sessionId ?? null;
+}
+
 export function getDiscoverySessionStorageKey(
   workId: string,
   operatorId: string

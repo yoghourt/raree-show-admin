@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   claimClientSession,
   getDiscoverySessionStorageKey,
+  getStoredClientSessionId,
   hasClientSessionConflict,
   releaseClientSession,
 } from "@/lib/discovery/client-session-registry";
@@ -36,6 +37,10 @@ import type {
   NarrativeGateFlags,
   NarrativeInputBundle,
 } from "@/lib/discovery/types";
+import type {
+  DiscoveryCandidate,
+  ProposeTypeError,
+} from "@/lib/discovery/propose-types";
 
 export interface UseDiscoverySessionConfig {
   workId: string;
@@ -48,6 +53,12 @@ export interface LockNarrativeError {
   failures?: NarrativeGateResult["failures"];
 }
 
+export interface ProposeError {
+  code: string;
+  message: string;
+  errors?: ProposeTypeError[];
+}
+
 export interface UseDiscoverySessionReturn {
   session: DiscoverySession;
   gateResult: NarrativeGateResult;
@@ -57,11 +68,15 @@ export interface UseDiscoverySessionReturn {
   isLocking: boolean;
   lockError: LockNarrativeError | null;
   canPropose: boolean;
+  isProposing: boolean;
+  proposeError: ProposeError | null;
+  candidates: DiscoveryCandidate[];
   minProseRequired: number;
   updateNarrative: (narrative: NarrativeInputBundle) => void;
   setInputMode: (mode: NarrativeInputBundle["inputMode"]) => void;
   lockNarrative: () => Promise<boolean>;
   unlockNarrative: () => Promise<void>;
+  startPropose: () => Promise<boolean>;
   teardown: () => void;
 }
 
@@ -85,6 +100,9 @@ export function useDiscoverySession(
   const [sessionConflict, setSessionConflict] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [lockError, setLockError] = useState<LockNarrativeError | null>(null);
+  const [isProposing, setIsProposing] = useState(false);
+  const [proposeError, setProposeError] = useState<ProposeError | null>(null);
+  const [candidates, setCandidates] = useState<DiscoveryCandidate[]>([]);
 
   const gateResult = useMemo(
     () =>
@@ -100,16 +118,25 @@ export function useDiscoverySession(
       ? APPROVED_SUMMARY_MIN_PROSE
       : EXCERPT_BUNDLE_MIN_PROSE;
 
+  const sessionPairRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!operatorId) {
       return;
     }
-    sessionIdRef.current = createSessionId();
+    const pair = `${workId}:${operatorId}`;
+    if (sessionPairRef.current !== pair) {
+      sessionPairRef.current = pair;
+      const storedSessionId = getStoredClientSessionId(workId, operatorId);
+      sessionIdRef.current = storedSessionId ?? createSessionId();
+    }
     setSession(
       createDiscoverySession(workId, operatorId, sessionIdRef.current)
     );
     setGateFlags({});
     setLockError(null);
+    setProposeError(null);
+    setCandidates([]);
     setSessionConflict(false);
   }, [workId, operatorId]);
 
@@ -149,7 +176,6 @@ export function useDiscoverySession(
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("pagehide", releaseOnPageHide);
-      releaseClientSession(workId, operatorId, sessionIdRef.current);
     };
   }, [workId, operatorId]);
 
@@ -159,6 +185,8 @@ export function useDiscoverySession(
     setSession(createDiscoverySession(workId, operatorId, sessionIdRef.current));
     setGateFlags({});
     setLockError(null);
+    setProposeError(null);
+    setCandidates([]);
     setSessionConflict(false);
     claimClientSession(workId, operatorId, sessionIdRef.current);
   }, [workId, operatorId]);
@@ -214,8 +242,8 @@ export function useDiscoverySession(
     setIsLocking(true);
     setLockError(null);
 
-    try {
-      const res = await fetch("/api/admin/discovery/session/lock", {
+    const requestLock = async (): Promise<Response> =>
+      fetch("/api/admin/discovery/session/lock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -227,11 +255,29 @@ export function useDiscoverySession(
         }),
       });
 
-      const body = (await res.json().catch(() => ({}))) as {
+    try {
+      let res = await requestLock();
+
+      let body = (await res.json().catch(() => ({}))) as {
         error?: LockNarrativeError;
         lockedAt?: string;
         narrative?: NarrativeInputBundle;
       };
+
+      if (
+        !res.ok &&
+        res.status === 409 &&
+        body.error?.code === "SESSION_ALREADY_ACTIVE" &&
+        !sessionConflict
+      ) {
+        await fetch("/api/admin/discovery/session/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workId }),
+        });
+        res = await requestLock();
+        body = (await res.json().catch(() => ({}))) as typeof body;
+      }
 
       if (!res.ok) {
         setLockError(
@@ -243,6 +289,7 @@ export function useDiscoverySession(
         return false;
       }
 
+      claimClientSession(workId, operatorId, session.sessionId);
       setGateFlags({});
       setSession((prev) => ({
         ...prev,
@@ -260,10 +307,13 @@ export function useDiscoverySession(
     } finally {
       setIsLocking(false);
     }
-  }, [session, sessionConflict, workId, gateFlags]);
+  }, [session, sessionConflict, workId, operatorId, gateFlags]);
 
   const unlockNarrative = useCallback(async () => {
-    if (session.state !== "narrative_locked") {
+    if (
+      session.state !== "narrative_locked" &&
+      session.state !== "review_pending"
+    ) {
       return;
     }
 
@@ -286,7 +336,89 @@ export function useDiscoverySession(
       lockedAt: null,
     }));
     setLockError(null);
+    setProposeError(null);
+    setCandidates([]);
   }, [session.sessionId, session.state, workId]);
+
+  const startPropose = useCallback(async (): Promise<boolean> => {
+    if (!canStartPropose(session) || sessionConflict || isProposing) {
+      return false;
+    }
+    if (!session.lockedAt) {
+      setProposeError({
+        code: "NARRATIVE_NOT_LOCKED",
+        message: "Narrative must be locked before propose",
+      });
+      return false;
+    }
+
+    setIsProposing(true);
+    setProposeError(null);
+    setSession((prev) => ({ ...prev, state: "proposing" }));
+
+    try {
+      const res = await fetch("/api/admin/discovery/propose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workId,
+          sessionId: session.sessionId,
+          narrative: session.narrative,
+          lockedAt: session.lockedAt,
+        }),
+      });
+
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: ProposeError & { errors?: ProposeTypeError[] };
+        candidates?: DiscoveryCandidate[];
+        errors?: ProposeTypeError[];
+      };
+
+      if (!res.ok) {
+        setProposeError(
+          body.error ?? {
+            code: "PROPOSE_FAILED",
+            message: `Propose failed (HTTP ${res.status})`,
+          }
+        );
+        setSession((prev) => ({
+          ...prev,
+          state: prev.state === "proposing" ? "narrative_locked" : prev.state,
+        }));
+        return false;
+      }
+
+      setCandidates(body.candidates ?? []);
+      setSession((prev) => ({ ...prev, state: "review_pending" }));
+      if (body.errors?.length) {
+        setProposeError({
+          code: "PARTIAL_PROPOSE_FAILURE",
+          message: `部分类型生成失败（${body.errors.map((e) => e.candidateType).join("、")}），其余 Candidate 已展示`,
+          errors: body.errors,
+        });
+      } else {
+        setProposeError(null);
+      }
+      return true;
+    } catch {
+      setProposeError({
+        code: "NETWORK_ERROR",
+        message: "Failed to reach Discovery propose endpoint",
+      });
+      setSession((prev) => ({
+        ...prev,
+        state: prev.state === "proposing" ? "narrative_locked" : prev.state,
+      }));
+      return false;
+    } finally {
+      setIsProposing(false);
+    }
+  }, [
+    session,
+    sessionConflict,
+    isProposing,
+    workId,
+  ]);
 
   return {
     session,
@@ -296,12 +428,16 @@ export function useDiscoverySession(
     sessionConflict,
     isLocking,
     lockError,
-    canPropose: canStartPropose(session),
+    canPropose: canStartPropose(session) && !isProposing,
+    isProposing,
+    proposeError,
+    candidates,
     minProseRequired,
     updateNarrative,
     setInputMode,
     lockNarrative,
     unlockNarrative,
+    startPropose,
     teardown,
   };
 }

@@ -18,6 +18,7 @@ import {
   claimServerLock,
   releaseServerLock,
   resetServerLockRegistry,
+  setServerLock,
 } from "@/lib/discovery/server-session-registry";
 import {
   canStartPropose,
@@ -26,6 +27,24 @@ import {
   switchNarrativeInputMode,
 } from "@/lib/discovery/session-factory";
 import { computeTotalProse } from "@/lib/discovery/narrative-gate";
+import { EXCERPT_BUNDLE_MIN_PROSE } from "@/lib/discovery/constants";
+import type { NarrativeInputBundle } from "@/lib/discovery/types";
+
+function makeProse(length: number): string {
+  const unit = "Narrative prose sentence. ";
+  let out = "";
+  while (out.length < length) {
+    out += unit;
+  }
+  return out.slice(0, length);
+}
+
+const sampleNarrative: NarrativeInputBundle = {
+  excerpts: [{ text: makeProse(EXCERPT_BUNDLE_MIN_PROSE), orderIndex: 0 }],
+  operatorSummary: null,
+  inputMode: "excerpt_bundle",
+  summaryAttested: false,
+};
 
 describe("D3-RC-10 — one active session per (workId, operatorId)", () => {
   beforeEach(() => {
@@ -59,18 +78,37 @@ describe("D3-RC-10 — one active session per (workId, operatorId)", () => {
   });
 
   it("server lock registry enforces SESSION_ALREADY_ACTIVE", () => {
-    expect(claimServerLock("work-1", "op-1", "sess-a")).toEqual({ ok: true });
-    expect(claimServerLock("work-1", "op-1", "sess-b")).toEqual({
+    const lockedAt = new Date().toISOString();
+    expect(
+      setServerLock("work-1", "op-1", "sess-a", lockedAt, sampleNarrative)
+    ).toEqual({ ok: true });
+    expect(
+      setServerLock("work-1", "op-1", "sess-b", lockedAt, sampleNarrative)
+    ).toEqual({
       ok: false,
       code: "SESSION_ALREADY_ACTIVE",
     });
     releaseServerLock("work-1", "op-1", "sess-a");
-    expect(claimServerLock("work-1", "op-1", "sess-b")).toEqual({ ok: true });
+    expect(
+      setServerLock("work-1", "op-1", "sess-b", lockedAt, sampleNarrative)
+    ).toEqual({ ok: true });
+  });
+
+  it("claimServerLock backward compat accepts snapshot", () => {
+    expect(
+      claimServerLock(
+        "work-1",
+        "op-1",
+        "sess-a",
+        "2026-01-01T00:00:00.000Z",
+        sampleNarrative
+      )
+    ).toEqual({ ok: true });
   });
 });
 
 describe("Discovery session state helpers", () => {
-  it("draft is editable; narrative_locked enables propose handoff", () => {
+  it("draft is editable; narrative_locked and review_pending enable propose", () => {
     const session = createDiscoverySession("work-1", "op-1", "sess-a");
     expect(isNarrativeEditable(session)).toBe(true);
     expect(canStartPropose(session)).toBe(false);
@@ -78,6 +116,9 @@ describe("Discovery session state helpers", () => {
     const locked = { ...session, state: "narrative_locked" as const };
     expect(isNarrativeEditable(locked)).toBe(false);
     expect(canStartPropose(locked)).toBe(true);
+
+    const review = { ...session, state: "review_pending" as const };
+    expect(canStartPropose(review)).toBe(true);
   });
 
   it("session is work-scoped with operatorId", () => {
@@ -115,6 +156,7 @@ describe("D3-RC-02 — separate from Enrichment Copilot", () => {
     const source = readFileSync(hookPath, "utf8");
     expect(source).not.toMatch(/from\s+["']@\/hooks\/useCopilotSession["']/);
     expect(source).not.toContain("/api/admin/ai/suggest");
+    expect(source).toContain("/api/admin/discovery/propose");
   });
 
   it("Discovery lock route does not import suggest-service", () => {

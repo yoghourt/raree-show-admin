@@ -5,7 +5,7 @@
 | Field        | Value                                                                 |
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Discovery Platform — Session & Narrative Input                        |
-| Status       | Approved                                                              |
+| Status       | Implemented                                                           |
 | Version      | v1.0                                                                  |
 | Owner        | Architect                                                             |
 | Last Updated | 2026-06-30                                                            |
@@ -289,13 +289,13 @@ Partial gate failures MUST NOT transition state to `narrative_locked`.
 - [x] D3-AC-07: §2 Out of Scope excludes D3-002 Review and D3-003 Proposals without overlap
 - [x] D3-AC-08: Min length N resolved (512 / 768) in §4.5
 
-### 8.2 Implementation criteria (verified after Approved — execute directly from this SPEC)
+### 8.2 Implementation criteria (verified — Implemented)
 
-- [ ] D3-AC-IMP-01: Discovery session hook/route separate from `useCopilotSession`
-- [ ] D3-AC-IMP-02: Unit tests cover NG-05, NG-06, and min-length rules
-- [ ] D3-AC-IMP-03: No persist of Candidates or Entities at platform layer
-- [ ] D3-AC-IMP-04: UI implements §4.4 lock gate, hints, and examples block
-- [ ] D3-AC-IMP-05: Server re-validates Narrative Gate on lock (not client-only)
+- [x] D3-AC-IMP-01: Discovery session hook/route separate from `useCopilotSession`
+- [x] D3-AC-IMP-02: Unit tests cover NG-05, NG-06, and min-length rules
+- [x] D3-AC-IMP-03: No persist of Candidates or Entities at platform layer
+- [x] D3-AC-IMP-04: UI implements §4.4 lock gate, hints, and examples block
+- [x] D3-AC-IMP-05: Server re-validates Narrative Gate on lock (not client-only)
 
 **Implementation authority:** SPEC Approved → implement §8.2 → run §10 → mark SPEC **Implemented**. No separate Implementation plan required.
 
@@ -330,7 +330,7 @@ Manual checks:
 - §2.1 boundary matrix consistent with §9 Non-Goals
 - No normative dependency on Enrichment `/api/admin/ai/suggest`
 
-### 10.2 Implementation validation (after Approved)
+### 10.2 Implementation validation (Implemented)
 
 ```bash
 npm run test -- __tests__/discovery/
@@ -369,7 +369,7 @@ Expected implementation anchors (read-only planning reference):
 ### Related SPECs
 
 - `docs/specs/spec-d3-002-*.md` — SPEC-D3-002 (Review / Re-propose; pending draft)
-- `docs/specs/spec-d3-003-*.md` — SPEC-D3-003 (Proposals; pending draft)
+- `docs/specs/spec-d3-003-discovery-proposals.md` — SPEC-D3-003 (Proposals; Approved)
 - `docs/specs/spec-d2-002-enrichment-copilot.md` — SPEC-D2-002 (Enrichment boundary)
 - `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 (Enrichment registry)
 
@@ -382,7 +382,15 @@ ADR-005 > SPEC-D3-001 (narrative semantics)
 
 Enrichment and Discovery MUST remain separate authority paths (DISC-INV-06, DISC-INV-07).
 
-### Read-only implementation anchors (not modified by this SPEC document)
+### Read-only implementation anchors (this SPEC — Implemented)
+
+- `hooks/useDiscoverySession.ts` — Discovery session hook
+- `lib/discovery/narrative-gate.ts` — Narrative Gate (NG-01–NG-07)
+- `app/api/admin/discovery/session/lock/route.ts` — server gate re-validation
+- `components/discovery/DiscoveryComposer.tsx` — §4.4 UI contract
+- `__tests__/discovery/` — §10.2 validation
+
+### Read-only anti-pattern anchors (not modified by this SPEC)
 
 - `hooks/useCopilotSession.ts` — Enrichment session; anti-pattern for Discovery extension
 - `docs/specs/spec-d2-002-enrichment-copilot.md` §2, §15.5 — Discovery prohibition

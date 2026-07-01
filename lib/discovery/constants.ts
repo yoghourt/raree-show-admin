@@ -16,3 +16,6 @@ export const NARRATIVE_GATE_RULE_IDS = [
 ] as const;
 
 export type NarrativeGateRuleId = (typeof NARRATIVE_GATE_RULE_IDS)[number];
+
+/** SPEC-D3-003 OQ-D3-003-05 — max Candidates per type per propose response */
+export const MAX_CANDIDATES_PER_TYPE = 10;
