@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { validateNarrativeGate } from "@/lib/discovery/narrative-gate";
-import { claimServerLock } from "@/lib/discovery/server-session-registry";
+import { setServerLock } from "@/lib/discovery/server-session-registry";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const excerptSchema = z.object({
@@ -122,7 +122,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const lockClaim = claimServerLock(workId, user.id, sessionId);
+  const lockedAt = new Date().toISOString();
+  const lockClaim = setServerLock(
+    workId,
+    user.id,
+    sessionId,
+    lockedAt,
+    narrative
+  );
   if (!lockClaim.ok) {
     return NextResponse.json(
       {
@@ -138,7 +145,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     state: "narrative_locked" as const,
     sessionId,
-    lockedAt: new Date().toISOString(),
+    lockedAt,
     narrative,
   });
 }

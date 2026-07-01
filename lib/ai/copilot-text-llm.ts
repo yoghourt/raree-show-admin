@@ -15,6 +15,11 @@ import { extractContent } from "@/lib/ai/llm-response-utils";
 
 export type CopilotTextProvider = "openrouter" | "gemini";
 
+export interface CopilotTextLlmOptions {
+  /** Gemini only: request json_object response format. Default true (Enrichment). */
+  geminiJsonObject?: boolean;
+}
+
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
 
@@ -115,13 +120,17 @@ async function callOpenRouter(prompt: string): Promise<string> {
   return content;
 }
 
-async function callGemini(prompt: string): Promise<string> {
+async function callGemini(
+  prompt: string,
+  options?: CopilotTextLlmOptions
+): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
   const model = process.env.GEMINI_SUGGEST_MODEL?.trim() || GEMINI_DEFAULT_MODEL;
+  const useJsonObject = options?.geminiJsonObject !== false;
 
   const res = await fetch(GEMINI_API_URL, {
     method: "POST",
@@ -132,7 +141,7 @@ async function callGemini(prompt: string): Promise<string> {
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
+      ...(useJsonObject ? { response_format: { type: "json_object" } } : {}),
     }),
   });
 
@@ -167,7 +176,10 @@ async function callGemini(prompt: string): Promise<string> {
 let loggedProvider: CopilotTextProvider | null = null;
 
 /** Invoke the configured Copilot text model with a single user prompt. */
-export async function callCopilotTextLlm(prompt: string): Promise<string> {
+export async function callCopilotTextLlm(
+  prompt: string,
+  options?: CopilotTextLlmOptions
+): Promise<string> {
   const provider = resolveCopilotTextProvider();
 
   if (loggedProvider !== provider) {
@@ -179,5 +191,7 @@ export async function callCopilotTextLlm(prompt: string): Promise<string> {
     console.info("[copilot-llm] provider=%s model=%s", provider, model);
   }
 
-  return provider === "openrouter" ? callOpenRouter(prompt) : callGemini(prompt);
+  return provider === "openrouter"
+    ? callOpenRouter(prompt)
+    : callGemini(prompt, options);
 }

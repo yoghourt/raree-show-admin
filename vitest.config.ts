@@ -8,6 +8,7 @@ export default defineConfig({
     env: {
       SOURCE_CONNECTOR_MODE: "mock",
       COPILOT_LLM_CALL_GAP_MS: "0",
+      DISCOVERY_PROPOSE_MODE: "mock",
     },
     include: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
     environmentOptions: {

@@ -54,5 +54,7 @@ export function isNarrativeEditable(session: DiscoverySession): boolean {
 }
 
 export function canStartPropose(session: DiscoverySession): boolean {
-  return session.state === "narrative_locked";
+  return (
+    session.state === "narrative_locked" || session.state === "review_pending"
+  );
 }

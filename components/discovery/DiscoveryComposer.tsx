@@ -57,11 +57,15 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
     isLocking,
     lockError,
     canPropose,
+    isProposing,
+    proposeError,
+    candidates,
     minProseRequired,
     updateNarrative,
     setInputMode,
     lockNarrative,
     unlockNarrative,
+    startPropose,
   } = discovery;
 
   const [lockDialogOpen, setLockDialogOpen] = React.useState(false);
@@ -141,9 +145,9 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {DISCOVERY_EXAMPLES.map((row) => (
+            {DISCOVERY_EXAMPLES.map((row, index) => (
               <div
-                key={`${row.label}-${row.verdict}`}
+                key={`${row.label}-${row.verdict}-${index}`}
                 className="rounded-lg border border-zinc-200 p-3 text-sm"
               >
                 <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -364,6 +368,24 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
               ) : null}
             </div>
           ) : null}
+
+          {proposeError ? (
+            <div
+              className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              role="alert"
+            >
+              {proposeError.code}: {proposeError.message}
+              {proposeError.errors?.length ? (
+                <ul className="mt-2 list-disc pl-5">
+                  {proposeError.errors.map((err) => (
+                    <li key={err.candidateType}>
+                      {err.candidateType}: {err.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </CardContent>
         <CardFooter className="flex flex-wrap gap-2">
           {editable ? (
@@ -387,8 +409,13 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
               解锁叙事
             </Button>
           )}
-          <Button type="button" disabled={!canPropose} variant="secondary">
-            开始 Propose（待 SPEC-D3-003）
+          <Button
+            type="button"
+            disabled={!canPropose}
+            variant="secondary"
+            onClick={() => void startPropose()}
+          >
+            {isProposing ? "Propose 生成中…" : "开始 Propose"}
           </Button>
         </CardFooter>
       </Card>
@@ -419,6 +446,49 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {candidates.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Candidate 预览（ephemeral）</CardTitle>
+            <CardDescription>
+              SPEC-D3-003 生成结果 · 完整 Review UX 见 SPEC-D3-002
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(["character", "location", "story", "scene"] as const).map(
+              (type) => {
+                const typed = candidates.filter(
+                  (candidate) => candidate.candidateType === type
+                );
+                if (typed.length === 0) {
+                  return null;
+                }
+                return (
+                  <div key={type} className="space-y-2">
+                    <p className="text-sm font-medium capitalize">{type}</p>
+                    <ul className="space-y-2">
+                      {typed.map((candidate) => (
+                        <li
+                          key={candidate.candidateId}
+                          className="rounded-lg border border-zinc-200 p-3 text-sm"
+                        >
+                          <div className="font-medium">
+                            {candidate.displayName}
+                          </div>
+                          <p className="text-muted-foreground">
+                            {candidate.summary}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              }
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
