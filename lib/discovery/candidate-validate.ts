@@ -269,14 +269,12 @@ export function dedupeCandidates(candidates: DiscoveryCandidate[]): DiscoveryCan
   const deduped: DiscoveryCandidate[] = [];
 
   for (const candidate of candidates) {
-    const fields = candidate.fields as Record<string, unknown>;
-    const key = (
-      (typeof fields.name === "string" ? fields.name : "") ||
-      (typeof fields.title === "string" ? fields.title : "") ||
-      candidate.displayName
-    )
-      .trim()
-      .toLowerCase();
+    const { fields, displayName } = candidate;
+    const label =
+      ("name" in fields && typeof fields.name === "string" ? fields.name : "") ||
+      ("title" in fields && typeof fields.title === "string" ? fields.title : "") ||
+      displayName;
+    const key = label.trim().toLowerCase();
     if (!key || seen.has(key)) {
       continue;
     }
