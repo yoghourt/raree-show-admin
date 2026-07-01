@@ -185,6 +185,13 @@ export function WorkTable({
                             地点
                           </Link>
                         </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link
+                            href={`/works/${encodeURIComponent(work.id)}/discovery`}
+                          >
+                            Discovery
+                          </Link>
+                        </Button>
                         <Button variant="ghost" size="sm" asChild>
                           <Link
                             href={`/works/${encodeURIComponent(work.id)}/edit`}
