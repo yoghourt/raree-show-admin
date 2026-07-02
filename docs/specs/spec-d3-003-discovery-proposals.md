@@ -5,7 +5,7 @@
 | Field        | Value                                                                 |
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Discovery Proposals — Candidate Generation                            |
-| Status       | Approved                                                              |
+| Status       | Implemented                                                           |
 | Version      | v1.0                                                                  |
 | Owner        | Architect                                                             |
 | Last Updated | 2026-06-30                                                            |
@@ -74,7 +74,7 @@ On Story semantics conflicts, ADR-005 governs. On Discovery boundary conflicts, 
 | Candidate payload schema | — | Yes | Review display only |
 | Accept / Edit / Discard | — | — | Yes |
 | Re-propose | — | Regen API (generation) | UX + feedback |
-| Persist Candidates / Entities | Prohibited | Prohibited at propose | TBD |
+| Persist Candidates / Entities | Prohibited | Prohibited at propose | Accept handoff only (SPEC-D3-002) |
 
 This matrix MUST remain consistent with SPEC-D3-001 §2.1.
 
@@ -369,15 +369,15 @@ Client-side ephemeral Candidate list MUST be cleared on session teardown (D3-001
 - [x] D3-AC-PRO-06: Partial success and cap semantics defined
 - [x] D3-AC-PRO-07: No normative dependency on Enrichment `/suggest` routes
 
-### 8.2 Implementation criteria (verified after Approved — execute directly from this SPEC)
+### 8.2 Implementation criteria (verified — Implemented)
 
-- [ ] D3-AC-IMP-PRO-01: `POST /api/admin/discovery/propose` separate from `/api/admin/ai/suggest`
-- [ ] D3-AC-IMP-PRO-02: Propose rejects without verified lock (`NARRATIVE_NOT_LOCKED`)
-- [ ] D3-AC-IMP-PRO-03: No DB persist of Candidates at propose or regen
-- [ ] D3-AC-IMP-PRO-04: `useDiscoverySession` wires `proposing` → `review_pending` on success
-- [ ] D3-AC-IMP-PRO-05: Unit tests for payload validation, per-type caps, lock gate
-- [ ] D3-AC-IMP-PRO-06: `DiscoveryComposer` Propose button invokes real propose flow
-- [ ] D3-AC-IMP-PRO-07: Regen route implemented per §4.6 (generation only; no D3-002 UI required)
+- [x] D3-AC-IMP-PRO-01: `POST /api/admin/discovery/propose` separate from `/api/admin/ai/suggest`
+- [x] D3-AC-IMP-PRO-02: Propose rejects without verified lock (`NARRATIVE_NOT_LOCKED`)
+- [x] D3-AC-IMP-PRO-03: No DB persist of Candidates at propose or regen
+- [x] D3-AC-IMP-PRO-04: `useDiscoverySession` wires `proposing` → `review_pending` on success
+- [x] D3-AC-IMP-PRO-05: Unit tests for payload validation, per-type caps, lock gate
+- [x] D3-AC-IMP-PRO-06: `DiscoveryComposer` Propose button invokes real propose flow
+- [x] D3-AC-IMP-PRO-07: Regen route implemented per §4.6 (generation only; no D3-002 UI required)
 
 **Implementation authority:** SPEC Approved → implement §8.2 → run §10 → mark SPEC **Implemented**. No separate Implementation plan required.
 
@@ -415,10 +415,10 @@ Manual checks:
 - No normative dependency on Enrichment `/api/admin/ai/suggest`
 - SPEC body English-only (no mixed CJK in normative text)
 
-### 10.2 Implementation validation (after Approved)
+### 10.2 Implementation validation (Implemented)
 
 ```bash
-npm run test -- __tests__/discovery/propose
+npm run test -- __tests__/discovery/ __tests__/api/discovery-propose-route.test.ts
 ```
 
 | Check | Maps to |
@@ -455,12 +455,12 @@ Expected implementation anchors (read-only planning reference):
 
 - `docs/adr/006-discovery-copilot-architecture.md` — ADR-006 (parent; Decision 2–3, 5–6; DISC-INV-*; capability classes)
 - `docs/adr/005-narrative-information-model.md` — ADR-005 (Story semantics; narrative-first)
-- `docs/adr/007-editorial-runtime-rollout.md` — ADR-007 (Scene Candidate vs Runtime Scene; reference only)
+- `docs/adr/007-rollout-architecture.md` — ADR-007 (Scene Candidate vs Runtime Scene; reference only)
 
 ### Related SPECs
 
 - `docs/specs/spec-d3-001-discovery-platform.md` — SPEC-D3-001 (Implemented; locked narrative + session states)
-- `docs/specs/spec-d3-002-*.md` — SPEC-D3-002 (Review / Re-propose UX; pending draft)
+- `docs/specs/spec-d3-002-discovery-human-review.md` — SPEC-D3-002 (Review / Re-propose; Approved)
 - `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 (field names and classifications)
 - `docs/specs/spec-d2-003-source-connector-v1.md` — SPEC-D2-003 (optional evidence orchestration)
 - `docs/specs/spec-d2-002-enrichment-copilot.md` — SPEC-D2-002 (Enrichment boundary; partial success reference)
