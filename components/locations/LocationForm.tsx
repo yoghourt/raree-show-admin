@@ -80,7 +80,7 @@ function toSubmitError(e: unknown): string {
 }
 
 type LocationFormProps =
-  | { workId: string; mode: "create" }
+  | { workId: string; mode: "create"; initialValues?: Partial<LocationFormValues> }
   | { workId: string; mode: "edit"; defaultValues: Location };
 
 export function LocationForm(props: LocationFormProps) {
@@ -92,17 +92,30 @@ export function LocationForm(props: LocationFormProps) {
     props.mode === "edit"
       ? locationToFormValues(props.defaultValues)
       : {
-          name: "",
-          region: "",
-          map_focus_x: null,
-          map_focus_y: null,
-          description: "",
+          name: props.initialValues?.name ?? "",
+          region: props.initialValues?.region ?? "",
+          map_focus_x: props.initialValues?.map_focus_x ?? null,
+          map_focus_y: props.initialValues?.map_focus_y ?? null,
+          description: props.initialValues?.description ?? "",
         };
 
   const form = useForm<LocationFormValues>({
     resolver: zodResolver(locationFormSchema),
     defaultValues,
   });
+
+  useEffect(() => {
+    if (props.mode !== "create" || !props.initialValues) {
+      return;
+    }
+    form.reset({
+      name: props.initialValues.name ?? "",
+      region: props.initialValues.region ?? "",
+      map_focus_x: props.initialValues.map_focus_x ?? null,
+      map_focus_y: props.initialValues.map_focus_y ?? null,
+      description: props.initialValues.description ?? "",
+    });
+  }, [form, props]);
 
   const watchedName = useWatch({ control: form.control, name: "name" }) ?? "";
   const mapFocusX = useWatch({ control: form.control, name: "map_focus_x" });

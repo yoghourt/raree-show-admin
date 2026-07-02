@@ -264,17 +264,26 @@ export function normalizeRawCandidate(
   };
 }
 
+export function getCandidateLabelKey(candidate: DiscoveryCandidate): string {
+  const { fields, displayName } = candidate;
+  const label =
+    ("name" in fields && typeof fields.name === "string" ? fields.name : "") ||
+    ("title" in fields && typeof fields.title === "string" ? fields.title : "") ||
+    displayName;
+  return label.trim().toLowerCase();
+}
+
+/** Type-scoped key for review-session duplicate checks. */
+export function getCandidateDedupeKey(candidate: DiscoveryCandidate): string {
+  return `${candidate.candidateType}:${getCandidateLabelKey(candidate)}`;
+}
+
 export function dedupeCandidates(candidates: DiscoveryCandidate[]): DiscoveryCandidate[] {
   const seen = new Set<string>();
   const deduped: DiscoveryCandidate[] = [];
 
   for (const candidate of candidates) {
-    const { fields, displayName } = candidate;
-    const label =
-      ("name" in fields && typeof fields.name === "string" ? fields.name : "") ||
-      ("title" in fields && typeof fields.title === "string" ? fields.title : "") ||
-      displayName;
-    const key = label.trim().toLowerCase();
+    const key = getCandidateLabelKey(candidate);
     if (!key || seen.has(key)) {
       continue;
     }

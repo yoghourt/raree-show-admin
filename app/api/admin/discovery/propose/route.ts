@@ -14,7 +14,7 @@ import {
   requireDiscoveryAuth,
 } from "@/lib/discovery/discovery-route-helpers";
 import { proposeDiscoveryBodySchema } from "@/lib/discovery/propose-schemas";
-import { proposeAllCandidateTypes } from "@/lib/discovery/propose-service";
+import { proposeCandidateTypes } from "@/lib/discovery/propose-service";
 import { verifyProposeLock } from "@/lib/discovery/propose-verify";
 
 export async function POST(request: Request) {
@@ -42,7 +42,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { workId, sessionId, narrative, lockedAt } = parsed.data;
+  const { workId, sessionId, narrative, lockedAt, candidateTypes, feedback } =
+    parsed.data;
 
   const workResult = await assertWorkAccessible(auth.supabase, workId);
   if (!workResult.ok) {
@@ -69,13 +70,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const { candidates, errors } = await proposeAllCandidateTypes({
+  const scopedRetry = Boolean(candidateTypes?.length);
+
+  const { candidates, errors } = await proposeCandidateTypes({
     workId,
     workTitle: workResult.title,
     narrative,
+    candidateTypes,
+    feedback,
   });
 
-  if (candidates.length === 0 && errors.length > 0) {
+  if (candidates.length === 0 && errors.length > 0 && !scopedRetry) {
     return NextResponse.json(
       {
         error: {

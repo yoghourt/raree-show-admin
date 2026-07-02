@@ -2,11 +2,13 @@
 
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useSearchParams } from "next/navigation";
 import * as React from "react";
 
-import { CharacterForm } from "@/components/characters/CharacterForm";
+import { CharacterForm, type CharacterFormValues } from "@/components/characters/CharacterForm";
 import { Button } from "@/components/ui/button";
+import { loadDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
+import { characterPrefillToFormValues } from "@/lib/discovery/review-state";
 import { getWork } from "@/lib/works";
 import type { Work } from "@/lib/types";
 
@@ -19,12 +21,31 @@ function toErrorMessage(e: unknown): string {
 
 export default function NewCharacterPage() {
   const params = useParams();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const raw = params.workId;
   const workId = Array.isArray(raw) ? raw[0] : raw ?? "";
+  const discoveryReviewId = searchParams.get("discoveryReviewId");
 
   const [work, setWork] = React.useState<Work | null>(null);
   const [workLoading, setWorkLoading] = React.useState(true);
   const [workError, setWorkError] = React.useState<string | null>(null);
+  const [prefillValues, setPrefillValues] = React.useState<
+    Partial<CharacterFormValues> | undefined
+  >(undefined);
+
+  React.useEffect(() => {
+    if (!discoveryReviewId) {
+      setPrefillValues(undefined);
+      return;
+    }
+    const prefill = loadDiscoveryAcceptPrefill(discoveryReviewId);
+    if (prefill?.candidateType === "character") {
+      setPrefillValues(characterPrefillToFormValues(prefill));
+    } else {
+      setPrefillValues(undefined);
+    }
+  }, [discoveryReviewId, pathname]);
 
   React.useEffect(() => {
     if (!workId) {
@@ -108,7 +129,16 @@ export default function NewCharacterPage() {
         </p>
       </div>
       {workId ? (
-        <CharacterForm workId={workId} mode="create" />
+        <CharacterForm
+          key={
+            discoveryReviewId
+              ? `${discoveryReviewId}:${prefillValues?.name ?? ""}`
+              : "new"
+          }
+          workId={workId}
+          mode="create"
+          initialValues={prefillValues}
+        />
       ) : (
         <p className="text-muted-foreground text-sm">无效的作品 ID。</p>
       )}

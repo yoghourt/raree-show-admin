@@ -39,8 +39,40 @@ import type {
 } from "@/lib/discovery/types";
 import type {
   DiscoveryCandidate,
+  DiscoveryCandidateType,
   ProposeTypeError,
 } from "@/lib/discovery/propose-types";
+import type {
+  AcceptedSceneCandidateStaging,
+  AcceptedStoryUnitStaging,
+  AcceptReviewError,
+  AcceptReviewResult,
+  DiscoveryReviewItem,
+} from "@/lib/discovery/review-types";
+import {
+  createReviewItems,
+  discardReviewItem,
+  findReviewDuplicateCandidate,
+  findReviewItem,
+  getActiveReviewItems,
+  getEffectiveCandidate,
+  getSiblingCandidatesForRegen,
+  hasPendingReviewItems,
+  markReviewAccepted,
+  prepareAcceptReview,
+  replaceReviewCandidate,
+  saveReviewEdit,
+  buildAcceptPrefill,
+  buildStoryStaging,
+  buildSceneStaging,
+  type ReviewEditPayload,
+} from "@/lib/discovery/review-state";
+import { storeDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
+import {
+  clearDiscoveryReviewSnapshot,
+  loadDiscoveryReviewSnapshot,
+  saveDiscoveryReviewSnapshot,
+} from "@/lib/discovery/review-session-storage";
 
 export interface UseDiscoverySessionConfig {
   workId: string;
@@ -59,6 +91,11 @@ export interface ProposeError {
   errors?: ProposeTypeError[];
 }
 
+export interface RegenError {
+  code: string;
+  message: string;
+}
+
 export interface UseDiscoverySessionReturn {
   session: DiscoverySession;
   gateResult: NarrativeGateResult;
@@ -71,13 +108,52 @@ export interface UseDiscoverySessionReturn {
   isProposing: boolean;
   proposeError: ProposeError | null;
   candidates: DiscoveryCandidate[];
+  reviewItems: DiscoveryReviewItem[];
+  activeReviewItems: DiscoveryReviewItem[];
+  acceptedStoryUnits: AcceptedStoryUnitStaging[];
+  acceptedSceneCandidates: AcceptedSceneCandidateStaging[];
+  isRegening: boolean;
+  regenReviewId: string | null;
+  regenError: RegenError | null;
+  retryingType: DiscoveryCandidateType | null;
+  retryTypeError: RegenError | null;
+  acceptError: AcceptReviewError | null;
   minProseRequired: number;
   updateNarrative: (narrative: NarrativeInputBundle) => void;
   setInputMode: (mode: NarrativeInputBundle["inputMode"]) => void;
   lockNarrative: () => Promise<boolean>;
   unlockNarrative: () => Promise<void>;
   startPropose: () => Promise<boolean>;
+  startFullRePropose: () => Promise<boolean>;
+  discardCandidate: (reviewId: string) => void;
+  saveCandidateEdit: (reviewId: string, edit: ReviewEditPayload) => void;
+  regenCandidate: (reviewId: string, feedback?: string | null) => Promise<boolean>;
+  retryProposeType: (
+    candidateType: DiscoveryCandidateType,
+    feedback?: string | null
+  ) => Promise<boolean>;
+  acceptCandidate: (
+    reviewId: string
+  ) => AcceptReviewResult | AcceptReviewError;
   teardown: () => void;
+}
+
+function partialProposeFailureMessage(errors: ProposeTypeError[]): string {
+  return `部分类型生成失败（${errors.map((e) => e.candidateType).join("、")}），其余 Candidate 已展示`;
+}
+
+function mergePartialProposeErrors(
+  previous: ProposeTypeError[] | undefined,
+  candidateType: DiscoveryCandidateType,
+  nextTypeError?: ProposeTypeError
+): ProposeTypeError[] {
+  const withoutRetried = (previous ?? []).filter(
+    (error) => error.candidateType !== candidateType
+  );
+  if (nextTypeError) {
+    return [...withoutRetried, nextTypeError];
+  }
+  return withoutRetried;
 }
 
 function createSessionId(): string {
@@ -103,6 +179,21 @@ export function useDiscoverySession(
   const [isProposing, setIsProposing] = useState(false);
   const [proposeError, setProposeError] = useState<ProposeError | null>(null);
   const [candidates, setCandidates] = useState<DiscoveryCandidate[]>([]);
+  const [reviewItems, setReviewItems] = useState<DiscoveryReviewItem[]>([]);
+  const [acceptedStoryUnits, setAcceptedStoryUnits] = useState<
+    AcceptedStoryUnitStaging[]
+  >([]);
+  const [acceptedSceneCandidates, setAcceptedSceneCandidates] = useState<
+    AcceptedSceneCandidateStaging[]
+  >([]);
+  const [isRegening, setIsRegening] = useState(false);
+  const [regenReviewId, setRegenReviewId] = useState<string | null>(null);
+  const [regenError, setRegenError] = useState<RegenError | null>(null);
+  const [retryingType, setRetryingType] = useState<DiscoveryCandidateType | null>(
+    null
+  );
+  const [retryTypeError, setRetryTypeError] = useState<RegenError | null>(null);
+  const [acceptError, setAcceptError] = useState<AcceptReviewError | null>(null);
 
   const gateResult = useMemo(
     () =>
@@ -130,15 +221,71 @@ export function useDiscoverySession(
       const storedSessionId = getStoredClientSessionId(workId, operatorId);
       sessionIdRef.current = storedSessionId ?? createSessionId();
     }
-    setSession(
-      createDiscoverySession(workId, operatorId, sessionIdRef.current)
+    const snapshot = loadDiscoveryReviewSnapshot(
+      workId,
+      operatorId,
+      sessionIdRef.current
     );
+
+    if (snapshot) {
+      setSession(snapshot.session);
+      setCandidates(snapshot.candidates);
+      setReviewItems(snapshot.reviewItems);
+      setAcceptedStoryUnits(snapshot.acceptedStoryUnits);
+      setAcceptedSceneCandidates(snapshot.acceptedSceneCandidates);
+    } else {
+      setSession(
+        createDiscoverySession(workId, operatorId, sessionIdRef.current)
+      );
+      setCandidates([]);
+      setReviewItems([]);
+      setAcceptedStoryUnits([]);
+      setAcceptedSceneCandidates([]);
+    }
     setGateFlags({});
     setLockError(null);
     setProposeError(null);
-    setCandidates([]);
+    setRegenError(null);
+    setAcceptError(null);
     setSessionConflict(false);
   }, [workId, operatorId]);
+
+  useEffect(() => {
+    if (!workId || !operatorId) {
+      return;
+    }
+
+    const hasReviewProgress =
+      reviewItems.length > 0 ||
+      session.state === "review_pending" ||
+      acceptedStoryUnits.length > 0 ||
+      acceptedSceneCandidates.length > 0;
+
+    if (!hasReviewProgress) {
+      clearDiscoveryReviewSnapshot(workId, operatorId, session.sessionId);
+      return;
+    }
+
+    saveDiscoveryReviewSnapshot({
+      sessionId: session.sessionId,
+      workId,
+      operatorId,
+      session,
+      candidates,
+      reviewItems,
+      acceptedStoryUnits,
+      acceptedSceneCandidates,
+      savedAt: new Date().toISOString(),
+    });
+  }, [
+    workId,
+    operatorId,
+    session,
+    candidates,
+    reviewItems,
+    acceptedStoryUnits,
+    acceptedSceneCandidates,
+  ]);
 
   useEffect(() => {
     if (!workId || !operatorId) {
@@ -180,6 +327,7 @@ export function useDiscoverySession(
   }, [workId, operatorId]);
 
   const teardown = useCallback(() => {
+    clearDiscoveryReviewSnapshot(workId, operatorId, sessionIdRef.current);
     releaseClientSession(workId, operatorId, sessionIdRef.current);
     sessionIdRef.current = createSessionId();
     setSession(createDiscoverySession(workId, operatorId, sessionIdRef.current));
@@ -187,6 +335,11 @@ export function useDiscoverySession(
     setLockError(null);
     setProposeError(null);
     setCandidates([]);
+    setReviewItems([]);
+    setAcceptedStoryUnits([]);
+    setAcceptedSceneCandidates([]);
+    setRegenError(null);
+    setAcceptError(null);
     setSessionConflict(false);
     claimClientSession(workId, operatorId, sessionIdRef.current);
   }, [workId, operatorId]);
@@ -330,6 +483,8 @@ export function useDiscoverySession(
       // Client unlock still proceeds — server registry is best-effort in v1
     }
 
+    clearDiscoveryReviewSnapshot(workId, operatorId, session.sessionId);
+
     setSession((prev) => ({
       ...prev,
       state: "draft",
@@ -338,7 +493,12 @@ export function useDiscoverySession(
     setLockError(null);
     setProposeError(null);
     setCandidates([]);
-  }, [session.sessionId, session.state, workId]);
+    setReviewItems([]);
+    setAcceptedStoryUnits([]);
+    setAcceptedSceneCandidates([]);
+    setRegenError(null);
+    setAcceptError(null);
+  }, [session.sessionId, session.state, workId, operatorId]);
 
   const startPropose = useCallback(async (): Promise<boolean> => {
     if (!canStartPropose(session) || sessionConflict || isProposing) {
@@ -389,11 +549,12 @@ export function useDiscoverySession(
       }
 
       setCandidates(body.candidates ?? []);
+      setReviewItems(createReviewItems(body.candidates ?? []));
       setSession((prev) => ({ ...prev, state: "review_pending" }));
       if (body.errors?.length) {
         setProposeError({
           code: "PARTIAL_PROPOSE_FAILURE",
-          message: `部分类型生成失败（${body.errors.map((e) => e.candidateType).join("、")}），其余 Candidate 已展示`,
+          message: partialProposeFailureMessage(body.errors),
           errors: body.errors,
         });
       } else {
@@ -420,6 +581,290 @@ export function useDiscoverySession(
     workId,
   ]);
 
+  const startFullRePropose = useCallback(async (): Promise<boolean> => {
+    return startPropose();
+  }, [startPropose]);
+
+  const discardCandidate = useCallback((reviewId: string) => {
+    setAcceptError(null);
+    setReviewItems((prev) => discardReviewItem(prev, reviewId));
+  }, []);
+
+  const saveCandidateEdit = useCallback(
+    (reviewId: string, edit: ReviewEditPayload) => {
+      setAcceptError(null);
+      setReviewItems((prev) => {
+        const next = saveReviewEdit(prev, reviewId, edit);
+        const item = findReviewItem(next, reviewId);
+        if (item?.status === "accepted") {
+          const candidateType = item.candidate.candidateType;
+          if (candidateType === "character" || candidateType === "location") {
+            storeDiscoveryAcceptPrefill(
+              buildAcceptPrefill(item, candidateType)
+            );
+          } else if (candidateType === "story") {
+            const staging = buildStoryStaging(item);
+            setAcceptedStoryUnits((units) =>
+              units.map((unit) =>
+                unit.sourceReviewId === reviewId ? staging : unit
+              )
+            );
+          } else if (candidateType === "scene") {
+            const staging = buildSceneStaging(item);
+            setAcceptedSceneCandidates((scenes) =>
+              scenes.map((scene) =>
+                scene.sourceReviewId === reviewId ? staging : scene
+              )
+            );
+          }
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const regenCandidate = useCallback(
+    async (reviewId: string, feedback?: string | null): Promise<boolean> => {
+      const item = findReviewItem(reviewItems, reviewId);
+      if (!item || !session.lockedAt || sessionConflict || isRegening) {
+        return false;
+      }
+
+      setIsRegening(true);
+      setRegenReviewId(reviewId);
+      setRegenError(null);
+
+      try {
+        const siblingCandidates = getSiblingCandidatesForRegen(
+          reviewItems,
+          reviewId
+        );
+        const previousCandidate = getEffectiveCandidate(item);
+
+        const res = await fetch("/api/admin/discovery/propose/regen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workId,
+            sessionId: session.sessionId,
+            narrative: session.narrative,
+            lockedAt: session.lockedAt,
+            candidateType: previousCandidate.candidateType,
+            previousCandidate,
+            siblingCandidates,
+            feedback: feedback ?? null,
+          }),
+        });
+
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: RegenError;
+          candidate?: DiscoveryCandidate;
+        };
+
+        if (!res.ok || !body.candidate) {
+          setRegenError(
+            body.error ?? {
+              code: "REGEN_FAILED",
+              message: `Regen failed (HTTP ${res.status})`,
+            }
+          );
+          return false;
+        }
+
+        const duplicate = findReviewDuplicateCandidate(
+          body.candidate,
+          reviewItems,
+          reviewId
+        );
+        if (duplicate) {
+          setRegenError({
+            code: "REGEN_DUPLICATE",
+            message:
+              "Regenerated candidate duplicates another item in this review session. Add feedback and try again.",
+          });
+          return false;
+        }
+
+        setReviewItems((prev) =>
+          replaceReviewCandidate(prev, reviewId, body.candidate!)
+        );
+        setCandidates((prev) =>
+          prev.map((candidate) =>
+            candidate.candidateId === item.candidate.candidateId
+              ? body.candidate!
+              : candidate
+          )
+        );
+        return true;
+      } catch {
+        setRegenError({
+          code: "NETWORK_ERROR",
+          message: "Failed to reach Discovery regen endpoint",
+        });
+        return false;
+      } finally {
+        setIsRegening(false);
+        setRegenReviewId(null);
+      }
+    },
+    [
+      reviewItems,
+      session,
+      sessionConflict,
+      isRegening,
+      workId,
+    ]
+  );
+
+  const retryProposeType = useCallback(
+    async (
+      candidateType: DiscoveryCandidateType,
+      feedback?: string | null
+    ): Promise<boolean> => {
+      if (
+        session.state !== "review_pending" ||
+        !session.lockedAt ||
+        sessionConflict ||
+        isProposing ||
+        isRegening ||
+        retryingType
+      ) {
+        return false;
+      }
+
+      setRetryingType(candidateType);
+      setRetryTypeError(null);
+
+      try {
+        const res = await fetch("/api/admin/discovery/propose", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workId,
+            sessionId: session.sessionId,
+            narrative: session.narrative,
+            lockedAt: session.lockedAt,
+            candidateTypes: [candidateType],
+            feedback: feedback ?? null,
+          }),
+        });
+
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: ProposeError & { errors?: ProposeTypeError[] };
+          candidates?: DiscoveryCandidate[];
+          errors?: ProposeTypeError[];
+        };
+
+        if (!res.ok) {
+          setRetryTypeError({
+            code: body.error?.code ?? "TYPE_RETRY_FAILED",
+            message:
+              body.error?.message ?? `Type retry failed (HTTP ${res.status})`,
+          });
+          return false;
+        }
+
+        const newCandidates = (body.candidates ?? []).filter(
+          (candidate) => candidate.candidateType === candidateType
+        );
+
+        if (newCandidates.length === 0) {
+          const typeError =
+            body.errors?.find((error) => error.candidateType === candidateType) ??
+            body.errors?.[0];
+          setRetryTypeError({
+            code: typeError?.code ?? "TYPE_RETRY_FAILED",
+            message:
+              typeError?.message ??
+              `${candidateType} propose produced no candidates`,
+          });
+          setProposeError((prev) => {
+            const merged = mergePartialProposeErrors(
+              prev?.errors,
+              candidateType,
+              typeError ?? {
+                candidateType,
+                code: "GENERATION_FAILED",
+                message: `${candidateType} propose produced no candidates`,
+              }
+            );
+            if (merged.length === 0) {
+              return null;
+            }
+            return {
+              code: "PARTIAL_PROPOSE_FAILURE",
+              message: partialProposeFailureMessage(merged),
+              errors: merged,
+            };
+          });
+          return false;
+        }
+
+        const newItems = createReviewItems(newCandidates);
+        setCandidates((prev) => [...prev, ...newCandidates]);
+        setReviewItems((prev) => [...prev, ...newItems]);
+        setProposeError((prev) => {
+          const merged = mergePartialProposeErrors(prev?.errors, candidateType);
+          if (merged.length === 0) {
+            return null;
+          }
+          return {
+            code: "PARTIAL_PROPOSE_FAILURE",
+            message: partialProposeFailureMessage(merged),
+            errors: merged,
+          };
+        });
+        return true;
+      } catch {
+        setRetryTypeError({
+          code: "NETWORK_ERROR",
+          message: "Failed to reach Discovery propose endpoint",
+        });
+        return false;
+      } finally {
+        setRetryingType(null);
+      }
+    },
+    [
+      session,
+      sessionConflict,
+      isProposing,
+      isRegening,
+      retryingType,
+      workId,
+    ]
+  );
+
+  const acceptCandidate = useCallback(
+    (reviewId: string): AcceptReviewResult | AcceptReviewError => {
+      const result = prepareAcceptReview(reviewItems, reviewId);
+      if (!result.ok) {
+        setAcceptError(result);
+        return result;
+      }
+
+      setAcceptError(null);
+      setReviewItems((prev) => markReviewAccepted(prev, reviewId));
+
+      if (result.kind === "entity_prefill") {
+        storeDiscoveryAcceptPrefill(result.prefill);
+      } else if (result.kind === "story_staging") {
+        setAcceptedStoryUnits((prev) => [...prev, result.staging]);
+      } else if (result.kind === "scene_staging") {
+        setAcceptedSceneCandidates((prev) => [...prev, result.staging]);
+      }
+
+      return result;
+    },
+    [reviewItems]
+  );
+
+  const activeReviewItems = useMemo(
+    () => getActiveReviewItems(reviewItems),
+    [reviewItems]
+  );
+
   return {
     session,
     gateResult,
@@ -428,16 +873,33 @@ export function useDiscoverySession(
     sessionConflict,
     isLocking,
     lockError,
-    canPropose: canStartPropose(session) && !isProposing,
+    canPropose:
+      canStartPropose(session) && !isProposing && !isRegening && !retryingType,
     isProposing,
     proposeError,
     candidates,
+    reviewItems,
+    activeReviewItems,
+    acceptedStoryUnits,
+    acceptedSceneCandidates,
+    isRegening,
+    regenReviewId,
+    regenError,
+    retryingType,
+    retryTypeError,
+    acceptError,
     minProseRequired,
     updateNarrative,
     setInputMode,
     lockNarrative,
     unlockNarrative,
     startPropose,
+    startFullRePropose,
+    discardCandidate,
+    saveCandidateEdit,
+    regenCandidate,
+    retryProposeType,
+    acceptCandidate,
     teardown,
   };
 }

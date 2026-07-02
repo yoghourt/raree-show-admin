@@ -70,7 +70,7 @@ On narrative semantics conflicts, ADR-005 governs. On Discovery boundary conflic
 | Candidate payload schema | — | Review display | Yes |
 | Accept / Edit / Discard | — | Yes | — |
 | Re-propose | — | Yes | Triggers regen |
-| Persist Candidates / Entities | Prohibited | TBD | Prohibited at propose |
+| Persist Candidates / Entities | Prohibited | Accept handoff only (SPEC-D3-002) | Prohibited at propose |
 
 ---
 
@@ -248,7 +248,7 @@ interface LockNarrativeRequest {
 [review_pending] → [draft]       trigger: operator starts new discovery pass
 ```
 
-Re-propose semantics (SPEC-D3-002) MUST remain independent from Enrichment retry session (Master §1.E, DISC-INV-07). Whether `review_pending` reuses locked narrative is defined in SPEC-D3-002; D3-001 guarantees locked narrative remains addressable by reference until unlock or teardown.
+Re-propose semantics (SPEC-D3-002) MUST remain independent from Enrichment retry session (DISC-INV-07). `review_pending` reuses locked narrative without unlock per SPEC-D3-002 OQ-D3-002-06 / D3-RC-REV-15; D3-001 guarantees locked narrative remains addressable by reference until unlock or teardown.
 
 ---
 
@@ -368,8 +368,8 @@ Expected implementation anchors (read-only planning reference):
 
 ### Related SPECs
 
-- `docs/specs/spec-d3-002-*.md` — SPEC-D3-002 (Review / Re-propose; pending draft)
-- `docs/specs/spec-d3-003-discovery-proposals.md` — SPEC-D3-003 (Proposals; Approved)
+- `docs/specs/spec-d3-002-discovery-human-review.md` — SPEC-D3-002 (Review / Re-propose; Implemented)
+- `docs/specs/spec-d3-003-discovery-proposals.md` — SPEC-D3-003 (Proposals; Implemented)
 - `docs/specs/spec-d2-002-enrichment-copilot.md` — SPEC-D2-002 (Enrichment boundary)
 - `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 (Enrichment registry)
 

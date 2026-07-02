@@ -7,6 +7,10 @@ import * as React from "react";
 
 import { DiscoveryComposer } from "@/components/discovery/DiscoveryComposer";
 import { useDiscoverySession } from "@/hooks/useDiscoverySession";
+import {
+  DISCOVERY_PAGE_SUBTITLE,
+  DISCOVERY_PAGE_TITLE,
+} from "@/lib/discovery/ui-copy";
 import { getWork } from "@/lib/works";
 import { supabase } from "@/lib/supabase";
 import type { Work } from "@/lib/types";
@@ -128,16 +132,14 @@ export default function WorkDiscoveryPage() {
           {workTitle}
         </span>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">Discovery</span>
+        <span className="font-medium text-zinc-800">{DISCOVERY_PAGE_TITLE}</span>
       </nav>
 
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          Discovery
+          {DISCOVERY_PAGE_TITLE}
         </h1>
-        <p className="text-muted-foreground text-sm">
-          叙事优先的 Discovery 会话（SPEC-D3-001）。锁定叙事后方可进入 Propose（D3-003）。
-        </p>
+        <p className="text-muted-foreground text-sm">{DISCOVERY_PAGE_SUBTITLE}</p>
       </header>
 
       {operatorId ? <DiscoveryComposer discovery={discovery} /> : null}

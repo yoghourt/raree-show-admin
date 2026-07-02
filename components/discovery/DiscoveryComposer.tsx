@@ -39,7 +39,9 @@ import {
   DISCOVERY_FORBIDDEN_INPUTS,
   DISCOVERY_NARRATIVE_HINT,
 } from "@/lib/discovery/normative-copy";
+import { discoveryComposerUi } from "@/lib/discovery/ui-copy";
 import type { UseDiscoverySessionReturn } from "@/hooks/useDiscoverySession";
+import { DiscoveryReviewPanel } from "@/components/discovery/DiscoveryReviewPanel";
 import { Input } from "@/components/ui/input";
 import type { NarrativeExcerpt } from "@/lib/discovery/types";
 
@@ -59,7 +61,6 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
     canPropose,
     isProposing,
     proposeError,
-    candidates,
     minProseRequired,
     updateNarrative,
     setInputMode,
@@ -119,17 +120,19 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
           className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
           role="alert"
         >
-          当前作品已存在另一个 Discovery 会话（D3-RC-10）。请关闭其他标签页后刷新。
+          {discoveryComposerUi.sessionConflict}
         </div>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>叙事输入引导</CardTitle>
+          <CardTitle>{discoveryComposerUi.narrativeGuideTitle}</CardTitle>
           <CardDescription>{DISCOVERY_NARRATIVE_HINT}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm font-medium text-zinc-800">禁止作为唯一输入：</p>
+          <p className="text-sm font-medium text-zinc-800">
+            {discoveryComposerUi.forbiddenInputsTitle}
+          </p>
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             {DISCOVERY_FORBIDDEN_INPUTS.map((item) => (
               <li key={item}>{item}</li>
@@ -140,8 +143,8 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>示例（规范文案）</CardTitle>
-          <CardDescription>SPEC-D3-001 §4.4.1 — Good / Bad examples</CardDescription>
+          <CardTitle>{discoveryComposerUi.examplesTitle}</CardTitle>
+          <CardDescription>{discoveryComposerUi.examplesDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -165,16 +168,19 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>叙事输入</CardTitle>
+          <CardTitle>{discoveryComposerUi.narrativeInputTitle}</CardTitle>
           <CardDescription>
             {session.state === "narrative_locked"
-              ? `已锁定 · ${session.lockedAt ?? ""}`
-              : `草稿 · 至少需要 ${minProseRequired} 字符 · 当前 ${gateResult.totalProse} 字符`}
+              ? discoveryComposerUi.lockedDescription(session.lockedAt ?? "")
+              : discoveryComposerUi.draftDescription(
+                  minProseRequired,
+                  gateResult.totalProse
+                )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="input-mode">输入模式</Label>
+            <Label htmlFor="input-mode">{discoveryComposerUi.inputModeLabel}</Label>
             <Select
               value={narrative.inputMode}
               onValueChange={(value) =>
@@ -187,15 +193,17 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="excerpt_bundle">
-                  跨章摘录 bundle（≥ {EXCERPT_BUNDLE_MIN_PROSE} 字）
+                  {discoveryComposerUi.excerptBundleMode(EXCERPT_BUNDLE_MIN_PROSE)}
                 </SelectItem>
                 <SelectItem value="approved_summary">
-                  经确认的摘要（≥ {APPROVED_SUMMARY_MIN_PROSE} 字）
+                  {discoveryComposerUi.approvedSummaryMode(
+                    APPROVED_SUMMARY_MIN_PROSE
+                  )}
                 </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-xs">
-              切换输入模式会清空当前叙事草稿，字符计数从 0 重新计算。
+              {discoveryComposerUi.inputModeSwitchHint}
             </p>
           </div>
 
@@ -207,7 +215,9 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
                   className="space-y-2 rounded-lg border border-zinc-200 p-4"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <Label>摘录 #{excerpt.orderIndex + 1}</Label>
+                    <Label>
+                      {discoveryComposerUi.excerptLabel(excerpt.orderIndex + 1)}
+                    </Label>
                     <Button
                       type="button"
                       variant="ghost"
@@ -216,11 +226,11 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
                       onClick={() => removeExcerpt(index)}
                     >
                       <Trash2 className="size-3.5" aria-hidden />
-                      删除
+                      {discoveryComposerUi.removeExcerpt}
                     </Button>
                   </div>
                   <Input
-                    placeholder="来源标签（可选），如 Chapter 47 — Catelyn POV"
+                    placeholder={discoveryComposerUi.sourceLabelPlaceholder}
                     value={excerpt.sourceLabel ?? ""}
                     disabled={!editable}
                     onChange={(e) =>
@@ -228,7 +238,7 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
                     }
                   />
                   <Textarea
-                    placeholder='粘贴叙事摘录 prose…（Bad 示例如 "Red Wedding, Robb, Walder Frey, Catelyn" 应粘贴在此处）'
+                    placeholder={discoveryComposerUi.excerptPlaceholder}
                     value={excerpt.text}
                     disabled={!editable}
                     rows={5}
@@ -246,7 +256,7 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
                 onClick={addExcerpt}
               >
                 <Plus className="size-4" aria-hidden />
-                添加摘录
+                {discoveryComposerUi.addExcerpt}
               </Button>
             </div>
           ) : null}
@@ -254,12 +264,12 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
           <div className="space-y-2">
             <Label htmlFor="operator-summary">
               {narrative.inputMode === "approved_summary"
-                ? "经确认摘要（必填）"
-                : "操作者摘要（可选）"}
+                ? discoveryComposerUi.operatorSummaryRequired
+                : discoveryComposerUi.operatorSummaryOptional}
             </Label>
             <Textarea
               id="operator-summary"
-              placeholder="Operator summary prose…"
+              placeholder={discoveryComposerUi.operatorSummaryPlaceholder}
               value={narrative.operatorSummary ?? ""}
               disabled={!editable}
               rows={6}
@@ -272,7 +282,7 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
             />
             {narrative.inputMode === "excerpt_bundle" ? (
               <p className="text-muted-foreground text-xs">
-                excerpt_bundle 模式下摘要不能替代摘录；仅填摘要会触发 NG-07，关键词式摘要还会触发 NG-05。
+                {discoveryComposerUi.excerptBundleSummaryHint}
               </p>
             ) : null}
           </div>
@@ -291,14 +301,16 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
                 }
               />
               <Label htmlFor="summary-attested" className="leading-snug">
-                我确认此摘要准确代表待 Discovery 的叙事内容（summaryAttested）
+                {discoveryComposerUi.summaryAttested}
               </Label>
             </div>
           ) : null}
 
           {editable ? (
             <div className="space-y-3 rounded-lg border border-dashed border-zinc-300 p-4">
-              <p className="text-sm font-medium">导入标记（仅用于 Gate 校验，不会写入锁定 bundle）</p>
+              <p className="text-sm font-medium">
+                {discoveryComposerUi.importFlagsTitle}
+              </p>
               <div className="flex items-start gap-2">
                 <Checkbox
                   id="catalog-only"
@@ -311,7 +323,7 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
                   }
                 />
                 <Label htmlFor="catalog-only" className="leading-snug">
-                  内容仅来自 Chapter Catalog 导出，未添加叙事 prose（NG-06）
+                  {discoveryComposerUi.catalogOnlyFlag}
                 </Label>
               </div>
               <div className="flex items-start gap-2">
@@ -326,7 +338,7 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
                   }
                 />
                 <Label htmlFor="runtime-export-only" className="leading-snug">
-                  内容仅来自 Runtime Scene 列表/元数据导出（NG-06）
+                  {discoveryComposerUi.runtimeExportOnlyFlag}
                 </Label>
               </div>
             </div>
@@ -339,7 +351,7 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
             >
               <div className="mb-2 flex items-center gap-2 font-medium">
                 <AlertCircle className="size-4 shrink-0" aria-hidden />
-                Narrative Gate 未通过
+                {discoveryComposerUi.gateFailedTitle}
               </div>
               <ul className="list-disc space-y-1 pl-5">
                 {gateResult.failures.map((failure) => (
@@ -397,7 +409,7 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
               onClick={() => setLockDialogOpen(true)}
             >
               <Lock className="size-4" aria-hidden />
-              锁定叙事
+              {discoveryComposerUi.lockNarrative}
             </Button>
           ) : (
             <Button
@@ -406,7 +418,7 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
               onClick={() => void unlockNarrative()}
             >
               <Unlock className="size-4" aria-hidden />
-              解锁叙事
+              {discoveryComposerUi.unlockNarrative}
             </Button>
           )}
           <Button
@@ -415,7 +427,9 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
             variant="secondary"
             onClick={() => void startPropose()}
           >
-            {isProposing ? "Propose 生成中…" : "开始 Propose"}
+            {isProposing
+              ? discoveryComposerUi.proposing
+              : discoveryComposerUi.startPropose}
           </Button>
         </CardFooter>
       </Card>
@@ -423,9 +437,9 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
       <Dialog open={lockDialogOpen} onOpenChange={setLockDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认锁定叙事输入？</DialogTitle>
+            <DialogTitle>{discoveryComposerUi.lockConfirmTitle}</DialogTitle>
             <DialogDescription>
-              锁定后叙事 bundle 在 propose / review 完成前不可编辑。此操作需显式确认（§4.4）。
+              {discoveryComposerUi.lockConfirmDescription}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -434,61 +448,20 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
               variant="outline"
               onClick={() => setLockDialogOpen(false)}
             >
-              取消
+              {discoveryComposerUi.cancel}
             </Button>
             <Button
               type="button"
               disabled={isLocking}
               onClick={() => void handleConfirmLock()}
             >
-              确认锁定
+              {discoveryComposerUi.confirmLock}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {candidates.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Candidate 预览（ephemeral）</CardTitle>
-            <CardDescription>
-              SPEC-D3-003 生成结果 · 完整 Review UX 见 SPEC-D3-002
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {(["character", "location", "story", "scene"] as const).map(
-              (type) => {
-                const typed = candidates.filter(
-                  (candidate) => candidate.candidateType === type
-                );
-                if (typed.length === 0) {
-                  return null;
-                }
-                return (
-                  <div key={type} className="space-y-2">
-                    <p className="text-sm font-medium capitalize">{type}</p>
-                    <ul className="space-y-2">
-                      {typed.map((candidate) => (
-                        <li
-                          key={candidate.candidateId}
-                          className="rounded-lg border border-zinc-200 p-3 text-sm"
-                        >
-                          <div className="font-medium">
-                            {candidate.displayName}
-                          </div>
-                          <p className="text-muted-foreground">
-                            {candidate.summary}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              }
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
+      <DiscoveryReviewPanel discovery={discovery} />
     </div>
   );
 }

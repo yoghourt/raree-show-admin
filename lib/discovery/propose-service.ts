@@ -11,6 +11,8 @@ import { MAX_CANDIDATES_PER_TYPE } from "@/lib/discovery/constants";
 import {
   capCandidatesByType,
   dedupeCandidates,
+  getCandidateDedupeKey,
+  getCandidateLabelKey,
   normalizeRawCandidate,
 } from "@/lib/discovery/candidate-validate";
 import { parseCandidateArray } from "@/lib/discovery/propose-parse";
@@ -121,13 +123,29 @@ function buildProposePrompt(params: {
   candidateType: DiscoveryCandidateType;
   feedback?: string | null;
   previousCandidate?: DiscoveryCandidate;
+  excludeCandidates?: DiscoveryCandidate[];
 }): string {
-  const { workTitle, narrative, candidateType, feedback, previousCandidate } =
-    params;
+  const {
+    workTitle,
+    narrative,
+    candidateType,
+    feedback,
+    previousCandidate,
+    excludeCandidates,
+  } = params;
   const hints = REGISTRY_FIELD_HINTS[candidateType].join(", ");
 
   const regenBlock = previousCandidate
     ? `\nPrevious candidate (replace with improved version):\n${JSON.stringify(previousCandidate, null, 2)}\nOperator feedback: ${feedback ?? "(none)"}\n`
+    : "";
+
+  const excludeBlock = excludeCandidates?.length
+    ? `\nOther candidates already in this review session (MUST NOT duplicate name/title):\n${excludeCandidates
+        .map(
+          (candidate) =>
+            `- ${candidate.candidateType}: ${candidate.displayName} (${getCandidateLabelKey(candidate)})`
+        )
+        .join("\n")}\n`
     : "";
 
   return `You are a Discovery Copilot generating editorial Candidates for a narrative work.
@@ -137,8 +155,14 @@ Hard cap (never exceed): ${MAX_CANDIDATES_PER_TYPE} per type
 
 Locked narrative bundle (JSON):
 ${JSON.stringify(narrative, null, 2)}
-${regenBlock}
+${regenBlock}${excludeBlock}
 Generation rules (critical):
+- OUTPUT LANGUAGE (mandatory): Every string in your JSON response MUST be English (Latin script only).
+  This includes displayName, summary, all fields values, evidence sourceLabel/excerpt, chapter_title, title, name, etc.
+  The narrative input MAY be Chinese or another language — you MUST still emit English canonical names
+  (e.g. character "Gared" not "盖雷德", location "Winterfell" not "临冬城").
+  Do NOT return Chinese, Japanese, Korean, or other CJK/non-Latin text in candidate output.
+  Use established English spellings from the work when known; otherwise use standard English transliteration.
 - Include ONLY ${candidateType} entities explicitly supported by the narrative prose above.
 - Do NOT invent background cast, generic extras, or inferred entities not grounded in the text.
 - Do NOT pad the list to reach the cap. Prefer fewer accurate candidates.
@@ -166,6 +190,7 @@ async function generateForType(params: {
   candidateType: DiscoveryCandidateType;
   feedback?: string | null;
   previousCandidate?: DiscoveryCandidate;
+  excludeCandidates?: DiscoveryCandidate[];
 }): Promise<{ candidates: DiscoveryCandidate[]; error?: ProposeTypeError }> {
   const { workId, workTitle, narrative, candidateType } = params;
 
@@ -252,16 +277,25 @@ async function generateForType(params: {
   }
 }
 
-export async function proposeAllCandidateTypes(params: {
+export async function proposeCandidateTypes(params: {
   workId: string;
   workTitle: string;
   narrative: NarrativeInputBundle;
+  candidateTypes?: DiscoveryCandidateType[];
+  feedback?: string | null;
 }): Promise<{ candidates: DiscoveryCandidate[]; errors: ProposeTypeError[] }> {
+  const types = params.candidateTypes ?? [...DISCOVERY_CANDIDATE_TYPES];
   const allCandidates: DiscoveryCandidate[] = [];
   const errors: ProposeTypeError[] = [];
 
-  for (const candidateType of DISCOVERY_CANDIDATE_TYPES) {
-    const result = await generateForType({ ...params, candidateType });
+  for (const candidateType of types) {
+    const result = await generateForType({
+      workId: params.workId,
+      workTitle: params.workTitle,
+      narrative: params.narrative,
+      candidateType,
+      feedback: params.feedback,
+    });
     allCandidates.push(...result.candidates);
     if (result.error) {
       errors.push(result.error);
@@ -274,12 +308,21 @@ export async function proposeAllCandidateTypes(params: {
   };
 }
 
+export async function proposeAllCandidateTypes(params: {
+  workId: string;
+  workTitle: string;
+  narrative: NarrativeInputBundle;
+}): Promise<{ candidates: DiscoveryCandidate[]; errors: ProposeTypeError[] }> {
+  return proposeCandidateTypes(params);
+}
+
 export async function regenCandidate(params: {
   workId: string;
   workTitle: string;
   narrative: NarrativeInputBundle;
   candidateType: DiscoveryCandidateType;
   previousCandidate: DiscoveryCandidate;
+  siblingCandidates?: DiscoveryCandidate[];
   feedback?: string | null;
 }): Promise<{ candidate?: DiscoveryCandidate; error?: ProposeTypeError }> {
   if (params.previousCandidate.candidateType !== params.candidateType) {
@@ -308,10 +351,29 @@ export async function regenCandidate(params: {
     candidateType: params.candidateType,
     feedback: params.feedback,
     previousCandidate: params.previousCandidate,
+    excludeCandidates: params.siblingCandidates,
   });
 
-  const candidate = result.candidates[0];
+  const excludeKeys = new Set(
+    (params.siblingCandidates ?? []).map((candidate) =>
+      getCandidateDedupeKey(candidate)
+    )
+  );
+  const candidate = result.candidates.find(
+    (item) => !excludeKeys.has(getCandidateDedupeKey(item))
+  );
+
   if (!candidate) {
+    if (result.candidates.length > 0) {
+      return {
+        error: {
+          candidateType: params.candidateType,
+          code: "REGEN_DUPLICATE",
+          message:
+            "Regenerated candidate duplicates another item in this review session",
+        },
+      };
+    }
     return {
       error: result.error ?? {
         candidateType: params.candidateType,

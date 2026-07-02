@@ -24,6 +24,8 @@ export const proposeDiscoveryBodySchema = z.object({
   sessionId: z.string().min(1),
   narrative: narrativeInputBundleSchema,
   lockedAt: z.string().min(1),
+  candidateTypes: z.array(z.enum(DISCOVERY_CANDIDATE_TYPES)).min(1).optional(),
+  feedback: z.string().nullable().optional(),
 });
 
 const evidenceRefSchema = z.object({
@@ -82,5 +84,6 @@ export const regenDiscoveryBodySchema = z.object({
   lockedAt: z.string().min(1),
   candidateType: z.enum(DISCOVERY_CANDIDATE_TYPES),
   previousCandidate: discoveryCandidateSchema,
+  siblingCandidates: z.array(discoveryCandidateSchema).optional(),
   feedback: z.string().nullable().optional(),
 });
