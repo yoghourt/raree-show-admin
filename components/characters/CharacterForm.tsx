@@ -86,7 +86,7 @@ function toSubmitError(e: unknown): string {
 }
 
 type CharacterFormProps =
-  | { workId: string; mode: "create" }
+  | { workId: string; mode: "create"; initialValues?: Partial<CharacterFormValues> }
   | { workId: string; mode: "edit"; defaultValues: Character };
 
 export function CharacterForm(props: CharacterFormProps) {
@@ -104,17 +104,30 @@ export function CharacterForm(props: CharacterFormProps) {
     props.mode === "edit"
       ? characterToFormValues(props.defaultValues)
       : {
-          name: "",
-          house: "",
-          description: "",
-          signatureQuote: null,
-          portraitUrl: "",
+          name: props.initialValues?.name ?? "",
+          house: props.initialValues?.house ?? "",
+          description: props.initialValues?.description ?? "",
+          signatureQuote: props.initialValues?.signatureQuote ?? null,
+          portraitUrl: props.initialValues?.portraitUrl ?? "",
         };
 
   const form = useForm<CharacterFormValues>({
     resolver: zodResolver(characterFormSchema),
     defaultValues,
   });
+
+  useEffect(() => {
+    if (props.mode !== "create" || !props.initialValues) {
+      return;
+    }
+    form.reset({
+      name: props.initialValues.name ?? "",
+      house: props.initialValues.house ?? "",
+      description: props.initialValues.description ?? "",
+      signatureQuote: props.initialValues.signatureQuote ?? null,
+      portraitUrl: props.initialValues.portraitUrl ?? "",
+    });
+  }, [form, props]);
 
   const watchedName = useWatch({ control: form.control, name: "name" }) ?? "";
   const watchedDescription =

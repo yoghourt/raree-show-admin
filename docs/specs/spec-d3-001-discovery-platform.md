@@ -368,7 +368,7 @@ Expected implementation anchors (read-only planning reference):
 
 ### Related SPECs
 
-- `docs/specs/spec-d3-002-discovery-human-review.md` — SPEC-D3-002 (Review / Re-propose; Approved)
+- `docs/specs/spec-d3-002-discovery-human-review.md` — SPEC-D3-002 (Review / Re-propose; Implemented)
 - `docs/specs/spec-d3-003-discovery-proposals.md` — SPEC-D3-003 (Proposals; Implemented)
 - `docs/specs/spec-d2-002-enrichment-copilot.md` — SPEC-D2-002 (Enrichment boundary)
 - `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 (Enrichment registry)

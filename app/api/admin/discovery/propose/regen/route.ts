@@ -47,6 +47,7 @@ export async function POST(request: Request) {
     lockedAt,
     candidateType,
     previousCandidate,
+    siblingCandidates,
     feedback,
   } = parsed.data;
 
@@ -81,12 +82,20 @@ export async function POST(request: Request) {
     narrative,
     candidateType,
     previousCandidate,
+    siblingCandidates,
     feedback,
   });
 
   if (result.error?.code === "REGEN_INVALID") {
     return NextResponse.json(
       { error: { code: "REGEN_INVALID", message: result.error.message } },
+      { status: 422 }
+    );
+  }
+
+  if (result.error?.code === "REGEN_DUPLICATE") {
+    return NextResponse.json(
+      { error: { code: "REGEN_DUPLICATE", message: result.error.message } },
       { status: 422 }
     );
   }

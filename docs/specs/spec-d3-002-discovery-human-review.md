@@ -5,7 +5,7 @@
 | Field        | Value                                                                 |
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Discovery Human Review — Accept, Edit, Discard, Re-propose            |
-| Status       | Approved                                                              |
+| Status       | Implemented                                                           |
 | Version      | v1.0                                                                  |
 | Owner        | Architect                                                             |
 | Last Updated | 2026-07-01                                                            |
@@ -415,18 +415,18 @@ Re-propose during Review MUST NOT transition narrative to editable `draft` witho
 - [x] D3-AC-REV-07: DISC-INV-01/02/03/07 reflected in §3 contracts
 - [x] D3-AC-REV-08: Entity create prefill contract defined in §4.4.5 without silent persist
 
-### 8.2 Implementation criteria (verified after Approved — execute directly from this SPEC)
+### 8.2 Implementation criteria (verified — Implemented)
 
-- [ ] D3-AC-IMP-REV-01: Review panel replaces ephemeral Candidate preview in `DiscoveryComposer`
-- [ ] D3-AC-IMP-REV-02: Per-candidate Accept, Edit, Discard wired for all four types
-- [ ] D3-AC-IMP-REV-03: Regen invokes `/api/admin/discovery/propose/regen` with optional feedback
-- [ ] D3-AC-IMP-REV-04: Full re-propose invokes `/api/admin/discovery/propose`; session `review_pending` ↔ `proposing`
-- [ ] D3-AC-IMP-REV-05: Accept (character/location) handoff to entity create prefill routes via `DiscoveryAcceptPrefill` (§4.4.5)
-- [ ] D3-AC-IMP-REV-06: No work-level Accept All; no auto-accept controls
-- [ ] D3-AC-IMP-REV-07: Unit or integration tests for review item state machine and handoff guards
-- [ ] D3-AC-IMP-REV-08: Discard permanently removes item from active review set
-- [ ] D3-AC-IMP-REV-09: Story/scene Accept writes client staging objects only (no Runtime DB write)
-- [ ] D3-AC-IMP-REV-10: Evidence displayed when present on Candidate
+- [x] D3-AC-IMP-REV-01: Review panel replaces ephemeral Candidate preview in `DiscoveryComposer`
+- [x] D3-AC-IMP-REV-02: Per-candidate Accept, Edit, Discard wired for all four types
+- [x] D3-AC-IMP-REV-03: Regen invokes `/api/admin/discovery/propose/regen` with optional feedback
+- [x] D3-AC-IMP-REV-04: Full re-propose invokes `/api/admin/discovery/propose`; session `review_pending` ↔ `proposing`
+- [x] D3-AC-IMP-REV-05: Accept (character/location) handoff to entity create prefill routes via `DiscoveryAcceptPrefill` (§4.4.5)
+- [x] D3-AC-IMP-REV-06: No work-level Accept All; no auto-accept controls
+- [x] D3-AC-IMP-REV-07: Unit or integration tests for review item state machine and handoff guards
+- [x] D3-AC-IMP-REV-08: Discard permanently removes item from active review set
+- [x] D3-AC-IMP-REV-09: Story/scene Accept writes client staging objects only (no Runtime DB write)
+- [x] D3-AC-IMP-REV-10: Evidence displayed when present on Candidate
 
 **Implementation authority:** SPEC Approved → implement §8.2 → run §10 → mark SPEC **Implemented**. No separate Implementation plan required.
 
@@ -465,7 +465,7 @@ Manual checks:
 - No normative dependency on Enrichment `/api/admin/ai/suggest` or retry routes
 - SPEC body English-only (no mixed CJK in normative text)
 
-### 10.2 Implementation validation (after Approved)
+### 10.2 Implementation validation (Implemented)
 
 ```bash
 npm run test -- __tests__/discovery/

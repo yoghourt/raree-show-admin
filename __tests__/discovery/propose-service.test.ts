@@ -19,6 +19,7 @@ import {
   isDiscoveryProposeMockMode,
   proposeAllCandidateTypes,
   regenCandidate,
+  proposeCandidateTypes,
 } from "@/lib/discovery/propose-service";
 import { verifyProposeLock } from "@/lib/discovery/propose-verify";
 import {
@@ -195,6 +196,19 @@ describe("proposeAllCandidateTypes (mock)", () => {
   });
 });
 
+describe("proposeCandidateTypes (mock)", () => {
+  it("generates only requested types", async () => {
+    const result = await proposeCandidateTypes({
+      workId: "work-1",
+      workTitle: "Test Work",
+      narrative: validNarrative,
+      candidateTypes: ["scene"],
+    });
+    expect(result.candidates.every((c) => c.candidateType === "scene")).toBe(true);
+    expect(result.candidates.length).toBeGreaterThan(0);
+  });
+});
+
 describe("regenCandidate (mock)", () => {
   it("returns a replacement candidate", async () => {
     const { candidates } = await proposeAllCandidateTypes({
@@ -215,5 +229,36 @@ describe("regenCandidate (mock)", () => {
     });
     expect(result.candidate).toBeTruthy();
     expect(result.candidate?.candidateType).toBe("character");
+  });
+
+  it("rejects regen that duplicates a sibling candidate", async () => {
+    const sibling = {
+      candidateId: "sibling-1",
+      candidateType: "character" as const,
+      workId: "work-1",
+      displayName: "Eddard Stark",
+      summary: "Existing review item",
+      fields: { name: "Eddard Stark", house: "Stark" },
+    };
+
+    const result = await regenCandidate({
+      workId: "work-1",
+      workTitle: "Test Work",
+      narrative: validNarrative,
+      candidateType: "character",
+      previousCandidate: {
+        candidateId: "prev-1",
+        candidateType: "character",
+        workId: "work-1",
+        displayName: "Fourth Character",
+        summary: "Needs regen",
+        fields: { name: "Fourth Character" },
+      },
+      siblingCandidates: [sibling],
+      feedback: "Try again",
+    });
+
+    expect(result.candidate).toBeUndefined();
+    expect(result.error?.code).toBe("REGEN_DUPLICATE");
   });
 });

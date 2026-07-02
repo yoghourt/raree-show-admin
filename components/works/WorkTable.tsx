@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Work } from "@/lib/types";
+import { DISCOVERY_PAGE_TITLE } from "@/lib/discovery/ui-copy";
 import { cn } from "@/lib/utils";
 
 export type WorkTableProps = {
@@ -189,7 +190,7 @@ export function WorkTable({
                           <Link
                             href={`/works/${encodeURIComponent(work.id)}/discovery`}
                           >
-                            Discovery
+                            {DISCOVERY_PAGE_TITLE}
                           </Link>
                         </Button>
                         <Button variant="ghost" size="sm" asChild>
