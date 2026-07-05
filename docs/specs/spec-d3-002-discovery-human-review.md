@@ -8,7 +8,7 @@
 | Status       | Implemented                                                           |
 | Version      | v1.0                                                                  |
 | Owner        | Architect                                                             |
-| Last Updated | 2026-07-01                                                            |
+| Last Updated | 2026-07-05                                                            |
 | Derived From | ADR-006 (`docs/adr/006-discovery-copilot-architecture.md`)            |
 | Related      | SPEC-D3-001, SPEC-D3-003, ADR-005, ADR-007, SPEC-CORE-001, SPEC-D2-002 |
 
@@ -245,7 +245,7 @@ Same pattern as §4.4.1 with location create route `/works/{workId}/locations/ne
 | 2 | Mark review item `accepted` |
 | 3 | MUST NOT insert catalog Entity rows or claim Entity standing |
 
-Durable Approved Story unit storage schema is **Deferred** beyond v1 client staging (OQ-D3-002-02).
+Durable Approved Story unit storage is owned by **SPEC-ROL-001** (Rollout persist). v1 client staging remains valid until operator imports to Rollout (OQ-D3-002-02 partial closure).
 
 #### 4.4.4 Scene Candidate Accept
 
@@ -487,7 +487,9 @@ Expected implementation anchors (read-only planning reference):
 - `hooks/useDiscoverySession.ts`
 - `app/works/[workId]/characters/new/page.tsx`
 - `app/works/[workId]/locations/new/page.tsx`
-- `__tests__/discovery/review-session.test.ts`
+- `__tests__/discovery/review-state.test.ts`
+- `lib/discovery/accept-prefill.ts`
+- `lib/discovery/review-session-storage.ts`
 
 Manual runtime checks:
 
@@ -518,6 +520,7 @@ Manual runtime checks:
 
 - `docs/specs/spec-d3-001-discovery-platform.md` — SPEC-D3-001 (Implemented; session + lock authority)
 - `docs/specs/spec-d3-003-discovery-proposals.md` — SPEC-D3-003 (Implemented; Candidate schema + regen API)
+- `docs/specs/spec-rol-001-governed-projection.md` — SPEC-ROL-001 (Approved; downstream Runtime projection)
 - `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 (Accept field validation)
 - `docs/specs/spec-d2-002-enrichment-copilot.md` — SPEC-D2-002 (Enrichment boundary; anti-pattern reference)
 
@@ -535,8 +538,9 @@ Review MUST NOT modify Narrative Gate rules, propose contracts, or Candidate pay
 
 ### Read-only implementation anchors (not modified by this SPEC document)
 
-- `components/discovery/DiscoveryComposer.tsx` — ephemeral preview to be replaced
-- `hooks/useDiscoverySession.ts` — candidates and session state
+- `components/discovery/DiscoveryComposer.tsx` — session + review integration
+- `hooks/useDiscoverySession.ts` — candidates, review state, and staging
+- `components/discovery/DiscoveryReviewPanel.tsx` — Review UX (Implemented)
 - `app/api/admin/discovery/propose/regen/route.ts` — regen consumer target
 - `lib/discovery/propose-types.ts` — Candidate types
 - `hooks/useCopilotSession.ts` — Enrichment anti-pattern reference
