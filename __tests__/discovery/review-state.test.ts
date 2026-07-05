@@ -15,6 +15,7 @@ import {
   getSiblingCandidatesForRegen,
   hasPendingReviewItems,
   markReviewAccepted,
+  revokeReviewAccept,
   prepareAcceptReview,
   replaceReviewCandidate,
   saveReviewEdit,
@@ -88,6 +89,19 @@ describe("review item lifecycle", () => {
     const accepted = markReviewAccepted(items, reviewId);
     expect(accepted[0]?.status).toBe("accepted");
     expect(hasPendingReviewItems(accepted)).toBe(false);
+  });
+
+  it("revokeReviewAccept returns story/scene item to pending review", () => {
+    const story = makeCandidate({
+      candidateType: "story",
+      fields: { title: "Arc", summary: "Summary" },
+    });
+    const items = createReviewItems([story]);
+    const reviewId = items[0]!.reviewId;
+    const accepted = markReviewAccepted(items, reviewId);
+    const revoked = revokeReviewAccept(accepted, reviewId);
+    expect(revoked[0]?.status).toBe("pending");
+    expect(hasPendingReviewItems(revoked)).toBe(true);
   });
 
   it("edit after accept keeps accepted status and updates effective name", () => {

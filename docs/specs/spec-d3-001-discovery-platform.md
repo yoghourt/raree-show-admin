@@ -10,7 +10,7 @@
 | Owner        | Architect                                                             |
 | Last Updated | 2026-06-30                                                            |
 | Derived From | ADR-006 (`docs/adr/006-discovery-copilot-architecture.md`)            |
-| Related      | ADR-005, SPEC-D3-002, SPEC-D3-003, SPEC-D2-002, SPEC-CORE-001        |
+| Related      | ADR-005, ADR-007, SPEC-D3-002, SPEC-D3-003, SPEC-ROL-001, SPEC-D2-002, SPEC-CORE-001        |
 
 **ADR-005 note:** Listed under Related for narrative-first semantics only. Narrative input rules in this SPEC MUST align with ADR-005 Decision 6 (Narrative Precedes Knowledge). Story boundary adjudication remains ADR-005 authority.
 

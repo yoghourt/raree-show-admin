@@ -10,7 +10,7 @@
 | Owner        | Architect                                                             |
 | Last Updated | 2026-06-30                                                            |
 | Derived From | ADR-006 (`docs/adr/006-discovery-copilot-architecture.md`)            |
-| Related      | SPEC-D3-001, SPEC-D3-002, ADR-005, SPEC-D2-003, SPEC-CORE-001, SPEC-D2-002 |
+| Related      | SPEC-D3-001, SPEC-D3-002, ADR-005, ADR-007, SPEC-ROL-001, SPEC-D2-003, SPEC-CORE-001, SPEC-D2-002 |
 
 **ADR-005 note:** Listed under Related for Story Candidate semantics and narrative-first alignment. Story boundary adjudication (ONE Rule) remains ADR-005 authority; this SPEC MUST NOT define ONE Rule UI.
 
@@ -461,6 +461,7 @@ Expected implementation anchors (read-only planning reference):
 
 - `docs/specs/spec-d3-001-discovery-platform.md` — SPEC-D3-001 (Implemented; locked narrative + session states)
 - `docs/specs/spec-d3-002-discovery-human-review.md` — SPEC-D3-002 (Review / Re-propose; Implemented)
+- `docs/specs/spec-rol-001-governed-projection.md` — SPEC-ROL-001 (Implemented; downstream Runtime projection)
 - `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 (field names and classifications)
 - `docs/specs/spec-d2-003-source-connector-v1.md` — SPEC-D2-003 (optional evidence orchestration)
 - `docs/specs/spec-d2-002-enrichment-copilot.md` — SPEC-D2-002 (Enrichment boundary; partial success reference)

@@ -43,7 +43,7 @@ const DUP_CHECK_TABLE: Record<EntityType, string> = {
 const DUP_CHECK_COLUMN: Record<EntityType, string> = {
   character: "name",
   location:  "name",
-  scene:     "chapter_title",
+  scene:     "title",
 };
 
 const DUP_ENTITY_ID_COLUMN: Record<EntityType, string> = {

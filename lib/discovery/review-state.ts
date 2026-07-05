@@ -20,6 +20,7 @@ import type {
   ReviewItemStatus,
 } from "@/lib/discovery/review-types";
 import { buildEntityCreateHandoffPath } from "@/lib/discovery/accept-prefill";
+import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
 
 export function createReviewId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -197,6 +198,36 @@ export function markReviewAccepted(
   );
 }
 
+export function revokeReviewAccept(
+  items: DiscoveryReviewItem[],
+  reviewId: string
+): DiscoveryReviewItem[] {
+  return items.map((item) => {
+    if (item.reviewId !== reviewId || item.status !== "accepted") {
+      return item;
+    }
+    const hadEdits =
+      item.editedFields !== undefined ||
+      item.editedDisplayName !== undefined ||
+      item.editedSummary !== undefined;
+    return {
+      ...item,
+      status: hadEdits ? ("edited_pending_accept" as const) : ("pending" as const),
+      reviewedAt: undefined,
+    };
+  });
+}
+
+export function isStoryOrSceneAcceptedInStaging(
+  item: DiscoveryReviewItem
+): boolean {
+  return (
+    item.status === "accepted" &&
+    (item.candidate.candidateType === "story" ||
+      item.candidate.candidateType === "scene")
+  );
+}
+
 export function replaceReviewCandidate(
   items: DiscoveryReviewItem[],
   reviewId: string,
@@ -257,12 +288,10 @@ export function validateSceneAcceptFields(
 ): { ok: true } | { ok: false; fieldErrors: string[] } {
   const scene = fields as SceneCandidateFields;
   const errors: string[] = [];
-  if (
-    scene.chapter_number === undefined ||
-    scene.chapter_number === null ||
-    String(scene.chapter_number).trim() === ""
-  ) {
-    errors.push("chapter_number is required");
+  if (!isValidSceneChapterNumber(scene.chapter_number)) {
+    errors.push(
+      "chapter_number must be a numeric chapter index (integer ≥ 1); use chapter_title for POV labels like \"Bran I\""
+    );
   }
   if (!isNonEmptyString(scene.title)) {
     errors.push("title is required");

@@ -52,9 +52,9 @@ describe("FIELD_REGISTRY — SPEC-CORE-001 §4.3 completeness", () => {
 
   it("scene registry contains required fields with correct classification", () => {
     const sceneReg = FIELD_REGISTRY.scene;
-    expect(sceneReg["chapter_title"].classification).toBe("scope");
+    expect(sceneReg["title"].classification).toBe("scope");
+    expect(sceneReg["chapter_title"].classification).toBe("canonical");
     expect(sceneReg["chapter_number"].classification).toBe("canonical");
-    expect(sceneReg["title"].classification).toBe("narrative");
     expect(sceneReg["summary"].classification).toBe("narrative");
     expect(sceneReg["tags"].classification).toBe("scope");
     expect(sceneReg["story_images_v2"].classification).toBe("asset");
@@ -81,7 +81,7 @@ describe("getEffectiveRoute — FC-03 asset permanent exclusion", () => {
   it("excludes scope fields", () => {
     expect(getEffectiveRoute("character", "name")).toBe("excluded");
     expect(getEffectiveRoute("location", "name")).toBe("excluded");
-    expect(getEffectiveRoute("scene", "chapter_title")).toBe("excluded");
+    expect(getEffectiveRoute("scene", "chapter_title")).toBe("fact");
   });
 
   it("returns fact for canonical fields", () => {
@@ -94,8 +94,8 @@ describe("getEffectiveRoute — FC-03 asset permanent exclusion", () => {
     expect(getEffectiveRoute("character", "description")).toBe("narrative");
     expect(getEffectiveRoute("character", "signatureQuote")).toBe("narrative");
     expect(getEffectiveRoute("location", "description")).toBe("narrative");
-    expect(getEffectiveRoute("scene", "title")).toBe("narrative");
     expect(getEffectiveRoute("scene", "summary")).toBe("narrative");
+    expect(getEffectiveRoute("scene", "title")).toBe("excluded");
   });
 
   it("returns excluded for unregistered fields (system fields)", () => {
@@ -183,11 +183,11 @@ describe("getSuggestableFields — empty-field filter gate", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("excludes scene reference fields and tags even when empty", () => {
+  it("excludes scene reference fields, scope fields, and tags even when empty", () => {
     const formValues = {
+      title: "Courtyard Welcome",
       chapter_title: "The Red Wedding",
       chapter_number: 47,
-      title: "",
       summary: "",
       tags: "",
       locationId: "",
@@ -198,8 +198,8 @@ describe("getSuggestableFields — empty-field filter gate", () => {
     const result = getSuggestableFields("scene", formValues);
     const fields = result.map((fr) => fr.field);
 
-    expect(fields).toContain("title");
     expect(fields).toContain("summary");
+    expect(fields).not.toContain("title");
     expect(fields).not.toContain("chapter_title");
     expect(fields).not.toContain("tags");
     expect(fields).not.toContain("locationId");
@@ -231,10 +231,11 @@ describe("getScopeFields / getAssetFields", () => {
     expect(getScopeFields("location")).toContain("name");
   });
 
-  it("scene scope fields are chapter_title and tags", () => {
+  it("scene scope fields are title and tags", () => {
     const scope = getScopeFields("scene");
-    expect(scope).toContain("chapter_title");
+    expect(scope).toContain("title");
     expect(scope).toContain("tags");
+    expect(scope).not.toContain("chapter_title");
   });
 });
 
@@ -247,20 +248,21 @@ describe("getClassification — Narrative Regenerate eligibility (AC-26)", () =>
     expect(getClassification("character", "description")).toBe("narrative");
     expect(getClassification("character", "signatureQuote")).toBe("narrative");
     expect(getClassification("location", "description")).toBe("narrative");
-    expect(getClassification("scene", "title")).toBe("narrative");
     expect(getClassification("scene", "summary")).toBe("narrative");
+    expect(getClassification("scene", "title")).toBe("scope");
   });
 
   it("returns canonical for canonical fields", () => {
     expect(getClassification("character", "house")).toBe("canonical");
     expect(getClassification("location", "region")).toBe("canonical");
     expect(getClassification("scene", "chapter_number")).toBe("canonical");
+    expect(getClassification("scene", "chapter_title")).toBe("canonical");
   });
 
   it("returns scope for scope fields", () => {
     expect(getClassification("character", "name")).toBe("scope");
     expect(getClassification("location", "name")).toBe("scope");
-    expect(getClassification("scene", "chapter_title")).toBe("scope");
+    expect(getClassification("scene", "title")).toBe("scope");
   });
 
   it("returns asset for asset fields", () => {

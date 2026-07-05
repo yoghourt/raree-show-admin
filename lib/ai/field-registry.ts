@@ -49,9 +49,9 @@ const LOCATION_REGISTRY: Record<string, FieldMetadata> = {
 // ---------------------------------------------------------------------------
 
 const SCENE_REGISTRY: Record<string, FieldMetadata> = {
-  chapter_title:  { classification: "scope",     copilot_route: "excluded"  },
+  title:          { classification: "scope",     copilot_route: "excluded"  },
+  chapter_title:  { classification: "canonical",  copilot_route: "fact"      },
   chapter_number: { classification: "canonical",  copilot_route: "fact"      },
-  title:          { classification: "narrative",  copilot_route: "narrative" },
   summary:        { classification: "narrative",  copilot_route: "narrative" },
   tags:           { classification: "scope",      copilot_route: "excluded"  },
   story_images_v2:{ classification: "asset",      copilot_route: "excluded"  },
@@ -82,8 +82,8 @@ const FIELD_DISPLAY_LABELS: Record<EntityType, Record<string, string>> = {
     description: "描述",
   },
   scene: {
+    chapter_title: "章节标题",
     chapter_number: "章节序号",
-    title: "标题",
     summary: "摘要",
   },
 };

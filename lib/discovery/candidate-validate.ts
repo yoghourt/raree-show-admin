@@ -5,6 +5,7 @@
 import { randomUUID } from "crypto";
 
 import { MAX_CANDIDATES_PER_TYPE } from "@/lib/discovery/constants";
+import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
 import type {
   DiscoveryCandidate,
   DiscoveryCandidateType,
@@ -158,20 +159,28 @@ function validateSceneFields(
   }
   const chapterNumber = fields.chapter_number;
   if (
-    chapterNumber === undefined ||
-    chapterNumber === null ||
-    (typeof chapterNumber === "string" && chapterNumber.trim() === "")
+    !isValidSceneChapterNumber(
+      chapterNumber as string | number | null | undefined
+    )
   ) {
-    return { ok: false, errors: ["Scene fields require chapter_number"] };
+    return {
+      ok: false,
+      errors: [
+        "Scene fields require chapter_number as integer ≥ 1 (not POV title text)",
+      ],
+    };
   }
   if (!isNonEmptyString(fields.title)) {
     return { ok: false, errors: ["Scene fields require non-empty title"] };
   }
+  const parsedChapter = Number(String(chapterNumber).trim());
   return {
     ok: true,
     fields: {
       chapter_number:
-        typeof chapterNumber === "number" ? chapterNumber : String(chapterNumber).trim(),
+        typeof chapterNumber === "number"
+          ? Math.trunc(chapterNumber)
+          : parsedChapter,
       title: fields.title.trim(),
       ...(fields.chapter_title === null || isNonEmptyString(fields.chapter_title)
         ? { chapter_title: fields.chapter_title ?? null }
