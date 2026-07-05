@@ -183,8 +183,8 @@ export function SceneForm(props: SceneFormProps) {
     defaultValues,
   });
 
-  const watchedChapterTitle =
-    useWatch({ control: form.control, name: "chapter_title" }) ?? "";
+  const watchedTitle =
+    useWatch({ control: form.control, name: "title" }) ?? "";
   const watchedLocationId =
     useWatch({ control: form.control, name: "locationId" }) ?? "";
 
@@ -219,7 +219,7 @@ export function SceneForm(props: SceneFormProps) {
     }));
   }, [characters]);
 
-  // ── Copilot session (scope field = chapter_title, §4.1) ───────────────────
+  // ── Copilot session (scope field = title, §4.1) ───────────────────────────
 
   const entityId = props.mode === "edit" ? props.defaultValues.tsid : "new";
 
@@ -229,15 +229,14 @@ export function SceneForm(props: SceneFormProps) {
     entityId,
   });
 
-  // Trigger duplicate check on chapter_title change (AC-24, §4.2)
-  const chapterTitleStr = typeof watchedChapterTitle === "string"
-    ? watchedChapterTitle
-    : (watchedChapterTitle ?? "");
+  // Trigger duplicate check on title change (AC-24, §4.2)
+  const titleStr =
+    typeof watchedTitle === "string" ? watchedTitle : (watchedTitle ?? "");
 
   useEffect(() => {
-    copilot.onScopeFieldChange(chapterTitleStr);
+    copilot.onScopeFieldChange(titleStr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapterTitleStr]);
+  }, [titleStr]);
 
   // Teardown on unmount (RT-INV-07)
   useEffect(() => {
@@ -273,14 +272,14 @@ export function SceneForm(props: SceneFormProps) {
   const getFormValuesForCopilot = (): Record<string, unknown> => {
     const v = form.getValues();
     return {
-      title:          v.title,
       chapter_number: v.chapter_number,
-      summary:        v.summary,
+      chapter_title: v.chapter_title,
+      summary: v.summary,
       // reference and asset fields — excluded by registry (v1)
-      locationId:     v.locationId,
-      characterIds:   v.characterIdsTsids,
+      locationId: v.locationId,
+      characterIds: v.characterIdsTsids,
       story_images_v2: v.story_images_v2,
-      tags:           v.tags,
+      tags: v.tags,
     };
   };
 
@@ -321,12 +320,12 @@ export function SceneForm(props: SceneFormProps) {
   };
 
   const handleBatchRetry = () => {
-    copilot.batchRetry(chapterTitleStr);
+    copilot.batchRetry(titleStr);
   };
 
   const handleRegen = (field: string) => {
     const currentValue = String(form.getValues(field as keyof SceneFormValues) ?? "");
-    copilot.narrativeRegen(field, currentValue, chapterTitleStr);
+    copilot.narrativeRegen(field, currentValue, titleStr);
   };
 
   const handleAcceptRegen = (field: string) => {
@@ -349,9 +348,18 @@ export function SceneForm(props: SceneFormProps) {
         </div>
       ) : null}
 
-      {/* ── Title (narrative) ── */}
+      {/* ── Title (Scope Field) — with CopilotIcon ── */}
       <div className="space-y-2">
-        <Label htmlFor="title">标题</Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="title">标题</Label>
+          {copilot.dupConflict && (
+            <span className="text-xs text-destructive">该标题已存在</span>
+          )}
+          <CopilotIcon
+            state={copilot.isSuggesting ? "loading" : copilot.iconState}
+            onClick={() => copilot.triggerSuggest(getFormValuesForCopilot())}
+          />
+        </div>
         <Input
           id="title"
           {...form.register("title")}
@@ -362,14 +370,6 @@ export function SceneForm(props: SceneFormProps) {
             {form.formState.errors.title.message}
           </p>
         )}
-        <SceneNarrativeRegen
-          field="title"
-          currentValue={form.watch("title")}
-          pendingItem={copilot.pendingRegen["title"]}
-          onRegen={() => handleRegen("title")}
-          onAcceptRegen={() => handleAcceptRegen("title")}
-          onDismissRegen={() => copilot.dismissRegen("title")}
-        />
       </div>
 
       {/* ── Chapter Number + Chapter Title ── */}
@@ -391,21 +391,12 @@ export function SceneForm(props: SceneFormProps) {
           )}
         </div>
 
-        {/* ── Chapter Title (Scope Field) — with CopilotIcon ── */}
+        {/* ── Chapter Title (optional POV label) ── */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="chapter_title">章节标题</Label>
-            {copilot.dupConflict && (
-              <span className="text-xs text-destructive">该章节标题已存在</span>
-            )}
-            <CopilotIcon
-              state={copilot.isSuggesting ? "loading" : copilot.iconState}
-              onClick={() => copilot.triggerSuggest(getFormValuesForCopilot())}
-            />
-          </div>
+          <Label htmlFor="chapter_title">章节标题</Label>
           <Input
             id="chapter_title"
-            placeholder="可选，如：凛冬将至"
+            placeholder="可选，如：Bran I"
             {...form.register("chapter_title")}
             aria-invalid={!!form.formState.errors.chapter_title}
           />

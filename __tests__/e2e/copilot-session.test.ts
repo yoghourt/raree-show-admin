@@ -80,7 +80,7 @@ describe("RT-INV-12 / AC-11 — Accept All scope", () => {
     expect(getClassification("character", "name")).toBe("scope");
     expect(getClassification("character", "portraitUrl")).toBe("asset");
     expect(getClassification("location", "map_focus_x")).toBe("asset");
-    expect(getClassification("scene", "chapter_title")).toBe("scope");
+    expect(getClassification("scene", "title")).toBe("scope");
     expect(getClassification("scene", "story_images_v2")).toBe("asset");
   });
 });
@@ -106,10 +106,10 @@ describe("§9.5 — Narrative Regenerate eligibility by classification", () => {
   });
 
   it("Scene Regenerate eligible fields", () => {
-    expect(getClassification("scene", "title")).toBe("narrative");
     expect(getClassification("scene", "summary")).toBe("narrative");
+    expect(getClassification("scene", "title")).toBe("scope");
     expect(getClassification("scene", "chapter_number")).toBe("canonical"); // no regen
-    expect(getClassification("scene", "chapter_title")).toBe("scope");    // no regen
+    expect(getClassification("scene", "chapter_title")).toBe("canonical"); // no regen
     expect(getClassification("scene", "story_images_v2")).toBe("asset"); // no regen
   });
 });

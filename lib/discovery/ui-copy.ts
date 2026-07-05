@@ -60,6 +60,16 @@ export const discoveryReviewUi = {
   panelTitle: "人工审核",
   panelDescription:
     "每条候选须单独审核；采纳后仍停留本页，可继续处理其余结果。",
+  tabReview: "待审核",
+  tabAccepted: "已采纳暂存",
+  flowHintReview: "审核并采纳候选后，查看「已采纳暂存」确认内容",
+  flowHintReviewDone: "所有候选已处理完毕",
+  flowHintAccepted: "确认内容无误后，前往 Rollout 持久化并投影",
+  flowHintAcceptedEmpty: "暂无已采纳的 Story / Scene 候选",
+  nextStepAccepted: "已采纳暂存",
+  nextStepRollout: "前往 Rollout 投影",
+  noReviewItems: "暂无待审核候选",
+  pipelineBanner: "发现流水线",
   fullRePropose: "全部重新生成",
   fullReProposing: "全部重新生成中…",
   accept: "采纳",
@@ -79,6 +89,13 @@ export const discoveryReviewUi = {
   retryingType: "重试本类型中…",
   acceptedStoryStaging: "已采纳的故事单元（暂存）",
   acceptedSceneStaging: "已采纳的场景候选（暂存）",
+  goRollout: "前往 Rollout 投影",
+  editAfterAcceptSceneHint:
+    "章节序号 chapter_number 须为 ≥1 的整数；POV 名（如 Bran I）请写在 chapter_title。",
+  editStagingHint: "修改后暂存区与 Rollout 队列会同步更新。",
+  revokeAccept: "取消采纳",
+  confirmRevokeAccept:
+    "确定取消采纳？将回到上方待审核列表，并从 Rollout 待处理队列移除。",
   editDialogTitle: "编辑候选",
   editDialogAccepted:
     "保存后仍为已采纳状态；预填创建页与暂存区会同步更新。",

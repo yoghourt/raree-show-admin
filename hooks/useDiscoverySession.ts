@@ -41,6 +41,8 @@ import type {
   DiscoveryCandidate,
   DiscoveryCandidateType,
   ProposeTypeError,
+  SceneCandidateFields,
+  StoryCandidateFields,
 } from "@/lib/discovery/propose-types";
 import type {
   AcceptedSceneCandidateStaging,
@@ -61,6 +63,7 @@ import {
   markReviewAccepted,
   prepareAcceptReview,
   replaceReviewCandidate,
+  revokeReviewAccept,
   saveReviewEdit,
   buildAcceptPrefill,
   buildStoryStaging,
@@ -68,6 +71,14 @@ import {
   type ReviewEditPayload,
 } from "@/lib/discovery/review-state";
 import { storeDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
+import {
+  appendSceneStagingToRolloutQueue,
+  appendStoryStagingToRolloutQueue,
+  removeSceneStagingFromRolloutQueue,
+  removeStoryStagingFromRolloutQueue,
+  updateSceneStagingInRolloutQueue,
+  updateStoryStagingInRolloutQueue,
+} from "@/lib/rollout/sync-discovery-staging";
 import {
   clearDiscoveryReviewSnapshot,
   loadDiscoveryReviewSnapshot,
@@ -97,6 +108,8 @@ export interface RegenError {
 }
 
 export interface UseDiscoverySessionReturn {
+  workId: string;
+  operatorId: string;
   session: DiscoverySession;
   gateResult: NarrativeGateResult;
   gateFlags: NarrativeGateFlags;
@@ -126,7 +139,19 @@ export interface UseDiscoverySessionReturn {
   startPropose: () => Promise<boolean>;
   startFullRePropose: () => Promise<boolean>;
   discardCandidate: (reviewId: string) => void;
+  revokeStagingAccept: (
+    sourceReviewId: string,
+    kind: "story" | "scene"
+  ) => void;
   saveCandidateEdit: (reviewId: string, edit: ReviewEditPayload) => void;
+  saveStoryStagingEdit: (
+    sourceReviewId: string,
+    edit: ReviewEditPayload
+  ) => void;
+  saveSceneStagingEdit: (
+    sourceReviewId: string,
+    edit: ReviewEditPayload
+  ) => void;
   regenCandidate: (reviewId: string, feedback?: string | null) => Promise<boolean>;
   retryProposeType: (
     candidateType: DiscoveryCandidateType,
@@ -590,6 +615,25 @@ export function useDiscoverySession(
     setReviewItems((prev) => discardReviewItem(prev, reviewId));
   }, []);
 
+  const revokeStagingAccept = useCallback(
+    (sourceReviewId: string, kind: "story" | "scene") => {
+      setAcceptError(null);
+      setReviewItems((prev) => revokeReviewAccept(prev, sourceReviewId));
+      if (kind === "story") {
+        setAcceptedStoryUnits((prev) =>
+          prev.filter((unit) => unit.sourceReviewId !== sourceReviewId)
+        );
+        removeStoryStagingFromRolloutQueue(workId, operatorId, sourceReviewId);
+      } else {
+        setAcceptedSceneCandidates((prev) =>
+          prev.filter((scene) => scene.sourceReviewId !== sourceReviewId)
+        );
+        removeSceneStagingFromRolloutQueue(workId, operatorId, sourceReviewId);
+      }
+    },
+    [workId, operatorId]
+  );
+
   const saveCandidateEdit = useCallback(
     (reviewId: string, edit: ReviewEditPayload) => {
       setAcceptError(null);
@@ -609,6 +653,7 @@ export function useDiscoverySession(
                 unit.sourceReviewId === reviewId ? staging : unit
               )
             );
+            updateStoryStagingInRolloutQueue(workId, operatorId, staging);
           } else if (candidateType === "scene") {
             const staging = buildSceneStaging(item);
             setAcceptedSceneCandidates((scenes) =>
@@ -616,12 +661,73 @@ export function useDiscoverySession(
                 scene.sourceReviewId === reviewId ? staging : scene
               )
             );
+            updateSceneStagingInRolloutQueue(workId, operatorId, staging);
           }
         }
         return next;
       });
     },
-    []
+    [workId, operatorId]
+  );
+
+  const saveStoryStagingEdit = useCallback(
+    (sourceReviewId: string, edit: ReviewEditPayload) => {
+      setAcceptError(null);
+      const item = findReviewItem(reviewItems, sourceReviewId);
+      if (item) {
+        saveCandidateEdit(sourceReviewId, edit);
+        return;
+      }
+      const storyFields = edit.editedFields as StoryCandidateFields;
+      const staging: AcceptedStoryUnitStaging = {
+        workId,
+        sourceReviewId,
+        title: storyFields.title.trim(),
+        summary: storyFields.summary.trim(),
+        ...(typeof storyFields.boundaryHint === "string" &&
+        storyFields.boundaryHint.trim()
+          ? { boundaryHint: storyFields.boundaryHint.trim() }
+          : {}),
+        acceptedAt: new Date().toISOString(),
+      };
+      setAcceptedStoryUnits((prev) =>
+        prev.map((unit) =>
+          unit.sourceReviewId === sourceReviewId ? staging : unit
+        )
+      );
+      updateStoryStagingInRolloutQueue(workId, operatorId, staging);
+    },
+    [reviewItems, saveCandidateEdit, workId, operatorId]
+  );
+
+  const saveSceneStagingEdit = useCallback(
+    (sourceReviewId: string, edit: ReviewEditPayload) => {
+      setAcceptError(null);
+      const item = findReviewItem(reviewItems, sourceReviewId);
+      if (item) {
+        saveCandidateEdit(sourceReviewId, edit);
+        return;
+      }
+      const sceneFields = edit.editedFields as SceneCandidateFields;
+      const staging: AcceptedSceneCandidateStaging = {
+        workId,
+        sourceReviewId,
+        chapter_title: sceneFields.chapter_title ?? null,
+        chapter_number: sceneFields.chapter_number,
+        title: sceneFields.title.trim(),
+        ...(typeof sceneFields.summary === "string" && sceneFields.summary.trim()
+          ? { summary: sceneFields.summary.trim() }
+          : {}),
+        acceptedAt: new Date().toISOString(),
+      };
+      setAcceptedSceneCandidates((prev) =>
+        prev.map((scene) =>
+          scene.sourceReviewId === sourceReviewId ? staging : scene
+        )
+      );
+      updateSceneStagingInRolloutQueue(workId, operatorId, staging);
+    },
+    [reviewItems, saveCandidateEdit, workId, operatorId]
   );
 
   const regenCandidate = useCallback(
@@ -851,13 +957,15 @@ export function useDiscoverySession(
         storeDiscoveryAcceptPrefill(result.prefill);
       } else if (result.kind === "story_staging") {
         setAcceptedStoryUnits((prev) => [...prev, result.staging]);
+        appendStoryStagingToRolloutQueue(workId, operatorId, result.staging);
       } else if (result.kind === "scene_staging") {
         setAcceptedSceneCandidates((prev) => [...prev, result.staging]);
+        appendSceneStagingToRolloutQueue(workId, operatorId, result.staging);
       }
 
       return result;
     },
-    [reviewItems]
+    [reviewItems, workId, operatorId]
   );
 
   const activeReviewItems = useMemo(
@@ -866,6 +974,8 @@ export function useDiscoverySession(
   );
 
   return {
+    workId,
+    operatorId,
     session,
     gateResult,
     gateFlags,
@@ -896,7 +1006,10 @@ export function useDiscoverySession(
     startPropose,
     startFullRePropose,
     discardCandidate,
+    revokeStagingAccept,
     saveCandidateEdit,
+    saveStoryStagingEdit,
+    saveSceneStagingEdit,
     regenCandidate,
     retryProposeType,
     acceptCandidate,

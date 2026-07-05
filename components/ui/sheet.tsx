@@ -56,14 +56,24 @@ const sheetSideClasses: Record<SheetSide, string> = {
   right: "inset-y-0 right-0 h-full w-3/4 border-l data-open:slide-in-from-right data-closed:slide-out-to-right sm:max-w-sm",
 }
 
+type SheetSize = "default" | "lg" | "xl"
+
+const sheetSizeClasses: Record<SheetSize, string> = {
+  default: "",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
+}
+
 function SheetContent({
   side = "right",
+  size = "default",
   className,
   children,
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: SheetSide
+  size?: SheetSize
   showCloseButton?: boolean
 }) {
   return (
@@ -75,6 +85,7 @@ function SheetContent({
           "fixed z-50 flex flex-col gap-4 bg-background p-6 shadow-xl duration-200",
           "data-open:animate-in data-closed:animate-out data-closed:duration-300",
           sheetSideClasses[side],
+          sheetSizeClasses[size],
           className
         )}
         {...props}

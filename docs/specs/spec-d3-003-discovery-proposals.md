@@ -461,7 +461,7 @@ Expected implementation anchors (read-only planning reference):
 
 - `docs/specs/spec-d3-001-discovery-platform.md` — SPEC-D3-001 (Implemented; locked narrative + session states)
 - `docs/specs/spec-d3-002-discovery-human-review.md` — SPEC-D3-002 (Review / Re-propose; Implemented)
-- `docs/specs/spec-rol-001-governed-projection.md` — SPEC-ROL-001 (Approved; downstream Runtime projection)
+- `docs/specs/spec-rol-001-governed-projection.md` — SPEC-ROL-001 (Implemented; downstream Runtime projection)
 - `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 (field names and classifications)
 - `docs/specs/spec-d2-003-source-connector-v1.md` — SPEC-D2-003 (optional evidence orchestration)
 - `docs/specs/spec-d2-002-enrichment-copilot.md` — SPEC-D2-002 (Enrichment boundary; partial success reference)

@@ -520,7 +520,7 @@ Manual runtime checks:
 
 - `docs/specs/spec-d3-001-discovery-platform.md` — SPEC-D3-001 (Implemented; session + lock authority)
 - `docs/specs/spec-d3-003-discovery-proposals.md` — SPEC-D3-003 (Implemented; Candidate schema + regen API)
-- `docs/specs/spec-rol-001-governed-projection.md` — SPEC-ROL-001 (Approved; downstream Runtime projection)
+- `docs/specs/spec-rol-001-governed-projection.md` — SPEC-ROL-001 (Implemented; downstream Runtime projection)
 - `docs/specs/spec-core-001-entity-schema-registry.md` — SPEC-CORE-001 (Accept field validation)
 - `docs/specs/spec-d2-002-enrichment-copilot.md` — SPEC-D2-002 (Enrichment boundary; anti-pattern reference)
 

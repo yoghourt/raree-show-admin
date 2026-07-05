@@ -5,7 +5,7 @@
 | Field        | Value                                                                 |
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Governed Editorial↔Runtime Projection                                 |
-| Status       | Approved                                                              |
+| Status       | Implemented                                                           |
 | Version      | v1.0                                                                  |
 | Owner        | Architect                                                             |
 | Last Updated | 2026-07-05                                                            |
@@ -443,15 +443,15 @@ Rollout MUST surface existing Scene form validation errors rather than swallowin
 
 ### 8.2 Implementation criteria (verified at Implemented)
 
-- [ ] ROL-AC-IMP-01: Durable Approved Story unit persist from staging via Rollout API
-- [ ] ROL-AC-IMP-02: Scene Projection Accept creates or links Runtime Scene via existing CRUD path
-- [ ] ROL-AC-IMP-03: Story ↔ Scene link create/delete with explicit operator Accept
-- [ ] ROL-AC-IMP-04: Discovery Accept alone does not insert Scene or Story unit durable rows
-- [ ] ROL-AC-IMP-05: Work-scoped Rollout UI entry at `/works/{workId}/rollout` (or equivalent)
-- [ ] ROL-AC-IMP-06: Unit/integration tests for link guards, staging validation, and workId isolation
-- [ ] ROL-AC-IMP-07: Reader topology unchanged — no Story routable entity added
-- [ ] ROL-AC-IMP-08: Staging import from Discovery snapshot without calling propose/regen
-- [ ] ROL-AC-IMP-09: `sourceReviewId` provenance retained on durable persist
+- [x] ROL-AC-IMP-01: Durable Approved Story unit persist from staging via Rollout API
+- [x] ROL-AC-IMP-02: Scene Projection Accept creates or links Runtime Scene via existing CRUD path
+- [x] ROL-AC-IMP-03: Story ↔ Scene link create/delete with explicit operator Accept
+- [x] ROL-AC-IMP-04: Discovery Accept alone does not insert Scene or Story unit durable rows
+- [x] ROL-AC-IMP-05: Work-scoped Rollout UI entry at `/works/{workId}/rollout` (or equivalent)
+- [x] ROL-AC-IMP-06: Unit/integration tests for link guards, staging validation, and workId isolation
+- [x] ROL-AC-IMP-07: Reader topology unchanged — no Story routable entity added
+- [x] ROL-AC-IMP-08: Staging import from Discovery snapshot without calling propose/regen
+- [x] ROL-AC-IMP-09: `sourceReviewId` provenance retained on durable persist
 
 **Implementation authority:** SPEC Approved → implement §8.2 → run §10 → mark SPEC **Implemented**. A separate Implementation plan MAY be used when migrations are required.
 
@@ -491,7 +491,7 @@ Manual checks:
 - SPEC body English-only (no mixed CJK in normative text)
 - ROL-RC-02 two-step Accept explicitly testable
 
-### 10.2 Implementation validation (after Approved)
+### 10.2 Implementation validation (Implemented)
 
 ```bash
 npm run check:governance

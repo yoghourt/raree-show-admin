@@ -176,7 +176,7 @@ Optional per item: confidence ("green"|"yellow"|"red"), evidence ([{sourceLabel,
 
 Example shape for type "${candidateType}":
 ${TYPE_EXAMPLES[candidateType]}
-${candidateType === "scene" ? '\nScene fields MUST live under "fields" with chapter_number (number or string), title (required), optional chapter_title and summary.\n' : ""}
+${candidateType === "scene" ? '\nScene fields MUST live under "fields" with chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.\n' : ""}
 ${candidateType === "location" ? '\nLocation fields MUST use fields.name (place name). Do NOT return prose paragraphs as the only value.\n' : ""}
 
 Do NOT include asset fields (portraitUrl, map coordinates, story_images_v2, tags, locationId, characterIds).
