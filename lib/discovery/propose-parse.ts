@@ -31,6 +31,14 @@ function isCandidateLikeObject(value: unknown): boolean {
     "fields" in obj ||
     "name" in obj ||
     "title" in obj ||
+    "summary" in obj ||
+    "boundaryHint" in obj ||
+    "story_title" in obj ||
+    "story_summary" in obj ||
+    "storyTitle" in obj ||
+    "storySummary" in obj ||
+    "unit_title" in obj ||
+    "unit_summary" in obj ||
     "chapter_number" in obj ||
     "place_name" in obj ||
     "placeName" in obj ||
@@ -71,7 +79,20 @@ const TYPE_KEY_VARIANTS: Record<DiscoveryCandidateType, string[]> = {
     "settings",
     "setting",
   ],
-  story: ["story", "stories", "story_candidates", "storyCandidates"],
+  story: [
+    "story",
+    "stories",
+    "story_candidates",
+    "storyCandidates",
+    "story_units",
+    "storyUnits",
+    "story_unit",
+    "storyUnit",
+    "editorial_units",
+    "editorialUnits",
+    "narrative_units",
+    "narrativeUnits",
+  ],
   scene: [
     "scene",
     "scenes",
@@ -129,6 +150,7 @@ function collectFromObject(
 
   const arrayKeys = [
     "candidates",
+    "candidate",
     "items",
     "results",
     "data",
@@ -203,6 +225,16 @@ function findNestedCandidateArray(
     }
     if (isRawCandidateArray(value)) {
       return normalizeCandidateItems(value, candidateType);
+    }
+    const fromElements: unknown[] = [];
+    for (const element of value) {
+      const found = findNestedCandidateArray(element, candidateType, depth + 1);
+      if (found !== null && found.length > 0) {
+        fromElements.push(...found);
+      }
+    }
+    if (fromElements.length > 0) {
+      return fromElements;
     }
     return null;
   }

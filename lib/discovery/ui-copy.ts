@@ -117,6 +117,11 @@ export const discoveryReviewUi = {
   confirmFullRePropose: "确认重新生成",
 } as const;
 
+export const discoveryHandoffUi = {
+  backToDiscovery: "← 返回叙事发现",
+  breadcrumbDiscovery: "叙事发现",
+} as const;
+
 export const discoveryComposerUi = {
   sessionConflict:
     "当前作品已存在另一个发现会话。请关闭其他标签页后刷新。",

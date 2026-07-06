@@ -40,6 +40,7 @@ import type {
 import type {
   DiscoveryCandidate,
   DiscoveryCandidateType,
+  ProposeError,
   ProposeTypeError,
   SceneCandidateFields,
   StoryCandidateFields,
@@ -96,11 +97,7 @@ export interface LockNarrativeError {
   failures?: NarrativeGateResult["failures"];
 }
 
-export interface ProposeError {
-  code: string;
-  message: string;
-  errors?: ProposeTypeError[];
-}
+export type { ProposeError };
 
 export interface RegenError {
   code: string;
@@ -258,6 +255,7 @@ export function useDiscoverySession(
       setReviewItems(snapshot.reviewItems);
       setAcceptedStoryUnits(snapshot.acceptedStoryUnits);
       setAcceptedSceneCandidates(snapshot.acceptedSceneCandidates);
+      setProposeError(snapshot.proposeError ?? null);
     } else {
       setSession(
         createDiscoverySession(workId, operatorId, sessionIdRef.current)
@@ -266,10 +264,10 @@ export function useDiscoverySession(
       setReviewItems([]);
       setAcceptedStoryUnits([]);
       setAcceptedSceneCandidates([]);
+      setProposeError(null);
     }
     setGateFlags({});
     setLockError(null);
-    setProposeError(null);
     setRegenError(null);
     setAcceptError(null);
     setSessionConflict(false);
@@ -284,7 +282,8 @@ export function useDiscoverySession(
       reviewItems.length > 0 ||
       session.state === "review_pending" ||
       acceptedStoryUnits.length > 0 ||
-      acceptedSceneCandidates.length > 0;
+      acceptedSceneCandidates.length > 0 ||
+      (proposeError?.errors?.length ?? 0) > 0;
 
     if (!hasReviewProgress) {
       clearDiscoveryReviewSnapshot(workId, operatorId, session.sessionId);
@@ -300,6 +299,7 @@ export function useDiscoverySession(
       reviewItems,
       acceptedStoryUnits,
       acceptedSceneCandidates,
+      proposeError,
       savedAt: new Date().toISOString(),
     });
   }, [
@@ -310,6 +310,7 @@ export function useDiscoverySession(
     reviewItems,
     acceptedStoryUnits,
     acceptedSceneCandidates,
+    proposeError,
   ]);
 
   useEffect(() => {
@@ -829,7 +830,7 @@ export function useDiscoverySession(
       feedback?: string | null
     ): Promise<boolean> => {
       if (
-        session.state !== "review_pending" ||
+        (session.state !== "review_pending" && session.state !== "narrative_locked") ||
         !session.lockedAt ||
         sessionConflict ||
         isProposing ||

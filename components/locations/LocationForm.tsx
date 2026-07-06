@@ -80,13 +80,14 @@ function toSubmitError(e: unknown): string {
 }
 
 type LocationFormProps =
-  | { workId: string; mode: "create"; initialValues?: Partial<LocationFormValues> }
-  | { workId: string; mode: "edit"; defaultValues: Location };
+  | { workId: string; mode: "create"; initialValues?: Partial<LocationFormValues>; successRedirectHref?: string }
+  | { workId: string; mode: "edit"; defaultValues: Location; successRedirectHref?: string };
 
 export function LocationForm(props: LocationFormProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const listHref = `/works/${encodeURIComponent(props.workId)}/locations`;
+  const successHref = props.successRedirectHref ?? listHref;
 
   const defaultValues: LocationFormValues =
     props.mode === "edit"
@@ -157,7 +158,7 @@ export function LocationForm(props: LocationFormProps) {
           toPayload(values)
         );
       }
-      router.push(listHref);
+      router.push(successHref);
     } catch (e) {
       setSubmitError(toSubmitError(e));
     }

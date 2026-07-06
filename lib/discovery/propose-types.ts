@@ -73,6 +73,12 @@ export interface ProposeTypeError {
   message: string;
 }
 
+export interface ProposeError {
+  code: string;
+  message: string;
+  errors?: ProposeTypeError[];
+}
+
 export interface ProposeDiscoveryRequest {
   workId: string;
   sessionId: string;

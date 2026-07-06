@@ -62,6 +62,36 @@ describe("parseCandidateArray", () => {
     const items = parseCandidateArray(raw, "location");
     expect(items).toHaveLength(1);
   });
+
+  it("parses story candidates wrapper", () => {
+    const raw = `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial unit.","fields":{"title":"The Royal Visit","summary":"Prose summary."}}]}`;
+    const items = parseCandidateArray(raw, "story");
+    expect(items).toHaveLength(1);
+  });
+
+  it("parses story_units keyed array", () => {
+    const raw = `{"story_units":[{"story_title":"The Royal Visit","story_summary":"Editorial unit covering the royal arrival."}]}`;
+    const items = parseCandidateArray(raw, "story");
+    expect(items).toHaveLength(1);
+  });
+
+  it("parses stories array with nested story object", () => {
+    const raw = `{"stories":[{"story":{"title":"The Royal Visit","summary":"Editorial unit."}}]}`;
+    const items = parseCandidateArray(raw, "story");
+    expect(items).toHaveLength(1);
+  });
+
+  it("parses flat story object without candidates wrapper", () => {
+    const raw = `{"title":"The Royal Visit","summary":"Editorial unit.","boundaryHint":"Arrival through feast."}`;
+    const items = parseCandidateArray(raw, "story");
+    expect(items).toHaveLength(1);
+  });
+
+  it("parses singular candidate key for story", () => {
+    const raw = `{"candidate":{"displayName":"The Royal Visit","summary":"s","fields":{"title":"The Royal Visit","summary":"Editorial unit."}}}`;
+    const items = parseCandidateArray(raw, "story");
+    expect(items).toHaveLength(1);
+  });
 });
 
 describe("dedupeCandidates", () => {
@@ -104,6 +134,25 @@ describe("normalizeRawCandidate optional fields", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.candidate.confidence).toBeUndefined();
+    }
+  });
+
+  it("normalizes story_title and story_summary aliases", () => {
+    const result = normalizeRawCandidate(
+      {
+        story_title: "The Royal Visit",
+        story_summary: "Editorial unit covering the royal arrival.",
+      },
+      "story",
+      "work-1"
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.candidate.displayName).toBe("The Royal Visit");
+      expect(result.candidate.fields).toMatchObject({
+        title: "The Royal Visit",
+        summary: "Editorial unit covering the royal arrival.",
+      });
     }
   });
 });

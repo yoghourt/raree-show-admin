@@ -58,6 +58,10 @@ export function consumeDiscoveryAcceptPrefill(
   return prefill;
 }
 
+export function buildDiscoveryPagePath(workId: string): string {
+  return `/works/${encodeURIComponent(workId)}/discovery`;
+}
+
 export function buildEntityCreateHandoffPath(
   workId: string,
   reviewId: string,

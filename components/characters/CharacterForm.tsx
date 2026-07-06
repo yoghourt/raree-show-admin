@@ -86,14 +86,15 @@ function toSubmitError(e: unknown): string {
 }
 
 type CharacterFormProps =
-  | { workId: string; mode: "create"; initialValues?: Partial<CharacterFormValues> }
-  | { workId: string; mode: "edit"; defaultValues: Character };
+  | { workId: string; mode: "create"; initialValues?: Partial<CharacterFormValues>; successRedirectHref?: string }
+  | { workId: string; mode: "edit"; defaultValues: Character; successRedirectHref?: string };
 
 export function CharacterForm(props: CharacterFormProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [imageUploading, setImageUploading] = React.useState(false);
   const listHref = `/works/${encodeURIComponent(props.workId)}/characters`;
+  const successHref = props.successRedirectHref ?? listHref;
 
   const [avatarGenState, avatarGenAction, avatarGenPending] = useActionState<
     GenerateCharacterAvatarState | null,
@@ -189,7 +190,7 @@ export function CharacterForm(props: CharacterFormProps) {
           toPayload(values)
         );
       }
-      router.push(listHref);
+      router.push(successHref);
     } catch (e) {
       setSubmitError(toSubmitError(e));
     }

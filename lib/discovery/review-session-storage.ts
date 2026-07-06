@@ -2,7 +2,7 @@
  * SPEC-D3-002 — persist Review progress across navigation (client sessionStorage)
  */
 
-import type { DiscoveryCandidate } from "@/lib/discovery/propose-types";
+import type { DiscoveryCandidate, ProposeError } from "@/lib/discovery/propose-types";
 import type {
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
@@ -21,6 +21,7 @@ export interface DiscoveryReviewSnapshot {
   reviewItems: DiscoveryReviewItem[];
   acceptedStoryUnits: AcceptedStoryUnitStaging[];
   acceptedSceneCandidates: AcceptedSceneCandidateStaging[];
+  proposeError?: ProposeError | null;
   savedAt: string;
 }
 

@@ -58,8 +58,18 @@ function normalizeFieldsRecord(
   }
 
   if (candidateType === "story") {
-    if (!isNonEmptyString(out.title) && isNonEmptyString(out.story_title)) {
-      out.title = out.story_title;
+    if (!isNonEmptyString(out.title)) {
+      if (isNonEmptyString(out.story_title)) out.title = out.story_title;
+      else if (isNonEmptyString(out.storyTitle)) out.title = out.storyTitle;
+      else if (isNonEmptyString(out.unit_title)) out.title = out.unit_title;
+      else if (isNonEmptyString(out.name)) out.title = out.name;
+      else if (isNonEmptyString(out.displayName)) out.title = out.displayName;
+    }
+    if (!isNonEmptyString(out.summary)) {
+      if (isNonEmptyString(out.story_summary)) out.summary = out.story_summary;
+      else if (isNonEmptyString(out.storySummary)) out.summary = out.storySummary;
+      else if (isNonEmptyString(out.unit_summary)) out.summary = out.unit_summary;
+      else if (isNonEmptyString(out.description)) out.summary = out.description;
     }
   }
 
