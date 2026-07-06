@@ -7,8 +7,9 @@ import * as React from "react";
 
 import { CharacterForm, type CharacterFormValues } from "@/components/characters/CharacterForm";
 import { Button } from "@/components/ui/button";
-import { loadDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
+import { buildDiscoveryPagePath, loadDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
 import { characterPrefillToFormValues } from "@/lib/discovery/review-state";
+import { discoveryHandoffUi } from "@/lib/discovery/ui-copy";
 import { getWork } from "@/lib/works";
 import type { Work } from "@/lib/types";
 
@@ -79,6 +80,9 @@ export default function NewCharacterPage() {
   }, [workId]);
 
   const listHref = `/works/${encodeURIComponent(workId)}/characters`;
+  const discoveryHref = buildDiscoveryPagePath(workId);
+  const isDiscoveryHandoff = Boolean(discoveryReviewId);
+  const backHref = isDiscoveryHandoff ? discoveryHref : listHref;
   const workTitle =
     workLoading ? "加载中…" : work?.title ?? "未知作品";
 
@@ -111,16 +115,29 @@ export default function NewCharacterPage() {
         >
           {workTitle}
         </Link>
-        <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <Link href={listHref} className="transition-colors hover:text-zinc-800">
-          角色
-        </Link>
+        {isDiscoveryHandoff ? (
+          <>
+            <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
+            <Link href={discoveryHref} className="transition-colors hover:text-zinc-800">
+              {discoveryHandoffUi.breadcrumbDiscovery}
+            </Link>
+          </>
+        ) : (
+          <>
+            <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
+            <Link href={listHref} className="transition-colors hover:text-zinc-800">
+              角色
+            </Link>
+          </>
+        )}
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
         <span className="font-medium text-zinc-800">新增角色</span>
       </nav>
 
       <Button variant="ghost" size="sm" className="-ml-2" asChild>
-        <Link href={listHref}>← 返回角色列表</Link>
+        <Link href={backHref}>
+          {isDiscoveryHandoff ? discoveryHandoffUi.backToDiscovery : "← 返回角色列表"}
+        </Link>
       </Button>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">新增角色</h1>
@@ -138,6 +155,7 @@ export default function NewCharacterPage() {
           workId={workId}
           mode="create"
           initialValues={prefillValues}
+          successRedirectHref={isDiscoveryHandoff ? discoveryHref : undefined}
         />
       ) : (
         <p className="text-muted-foreground text-sm">无效的作品 ID。</p>

@@ -463,7 +463,9 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
 
   if (
     session.state !== "review_pending" &&
+    session.state !== "narrative_locked" &&
     reviewListItems.length === 0 &&
+    failedTypes.size === 0 &&
     visibleAcceptedStoryUnits.length === 0 &&
     visibleAcceptedSceneCandidates.length === 0
   ) {
@@ -600,7 +602,7 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
                             isProposing ||
                             isRegening ||
                             retryingType !== null ||
-                            session.state !== "review_pending"
+                            (session.state !== "review_pending" && session.state !== "narrative_locked")
                           }
                           onClick={() => {
                             setTypeRetryTarget(type);
