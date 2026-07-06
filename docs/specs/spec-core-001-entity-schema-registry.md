@@ -5,10 +5,10 @@
 | Field        | Value                                                              |
 | ------------ | ------------------------------------------------------------------ |
 | Title        | Entity Schema & Field Classification Registry                      |
-| Status       | Approved                                                           |
+| Status       | EffectiveInImplementation                                          |
 | Version      | v1.0                                                               |
 | Owner        | Architect                                                          |
-| Last Updated | 2026-06-29                                                         |
+| Last Updated | 2026-07-05                                                         |
 | Derived From | ADR-004 (`docs/adr/004-source-of-canonical-truth.md`)              |
 | Related      | SPEC-D2-002, SPEC-D2-003                                           |
 
@@ -114,9 +114,11 @@ interface FieldMetadata {
 | ---------- | ------------------ | ---------------- | --------------------------------- |
 | `character` | `name`            | `name`           | UNIQUE(`work_id`, `name`)         |
 | `location`  | `name`            | `name`           | UNIQUE(`work_id`, `name`)         |
-| `scene`     | `chapter_title`   | `chapter_title`  | UNIQUE(`work_id`, `chapter_title`) |
+| `scene`     | `title`           | `title`          | UNIQUE(`work_id`, `title`)         |
 
 **Note:** ADR-004 examples use `canonical_name` for Character/Location scope fields. That naming is illustrative only (ADR-004 Decision 11). Runtime Truth v1 uses `name` per existing Admin forms and database schema.
+
+**Scene scope anchor (Architect Decision 13):** `title` is the session anchor for Scene entities. It gates Copilot eligibility and duplicate detection (`useCopilotSession`, `SceneForm`). `chapter_title` is a canonical fact field (§4.3.4), not the primary scope anchor.
 
 §4.2 lists the **session anchor** scope field per entity (duplicate-check target and Copilot `scopeField`). Other fields MAY use `scope` classification when operator-defined and never AI-suggested; see §4.3.4 (`tags`).
 
@@ -140,6 +142,9 @@ This registry supersedes SPEC-D2-002 Appendix A as the authoritative source. The
 | `tags`          | classification=`excluded` ❌ | `scope` + route `excluded`         |
 | `locationId`    | classification=`reference` ❌ | `canonical` + route `reference`    |
 | `characterIds`  | classification=`reference` ❌ | `canonical` + route `reference`    |
+| Scene scope anchor | `chapter_title` = scope ❌ | `title` = scope (Decision 13)      |
+| `chapter_title` | scope / excluded            | `canonical` / `fact`               |
+| `title`         | narrative / narrative       | `scope` / `excluded`               |
 
 #### 4.3.2 Character (`characters` table)
 
@@ -169,9 +174,9 @@ This registry supersedes SPEC-D2-002 Appendix A as the authoritative source. The
 
 | Form field        | DB column         | Classification | Copilot route | Suggest? | Mandatory | Notes                                           |
 | ----------------- | ----------------- | -------------- | ------------- | -------- | --------- | ----------------------------------------------- |
-| `chapter_title`   | `chapter_title`   | `scope`        | `excluded`    | No       | No        | Duplicate check target; nullable in form        |
+| `title`           | `title`           | `scope`        | `excluded`    | No       | Yes       | Session anchor (§4.2); duplicate check target; operator-defined |
+| `chapter_title`   | `chapter_title`   | `canonical`    | `fact`        | Yes      | No        | Chapter heading; Source First; nullable in form |
 | `chapter_number`  | `chapter_number`  | `canonical`    | `fact`        | Yes      | Yes       | Chapter sequence number; Source First           |
-| `title`           | `title`           | `narrative`    | `narrative`   | Yes      | Yes       | Scene display title                             |
 | `summary`         | `summary`         | `narrative`    | `narrative`   | Yes      | No        | Scene summary prose                             |
 | `tags`            | `tags`            | `scope`        | `excluded`    | No       | No        | Curator-defined; hidden in UI; not AI-suggested. Not a session anchor (§4.2). Classified `scope` (not invalid Appendix A `excluded`) because operator-only metadata; ensures server rejects `tags` in `emptyFields` per D2-002 §7.6 |
 | `story_images_v2` | `story_images_v2` | `asset`        | `excluded`    | No       | No        | Story images JSONB                              |
@@ -262,13 +267,13 @@ Enrichment Copilot session state transitions remain governed by SPEC-D2-002.
 - [x] CORE-AC-03: No field uses a classification outside FC-04 (`scope`, `canonical`, `narrative`, `asset`)
 - [x] CORE-AC-04: All asset-classified fields have `copilot_route: excluded`
 - [x] CORE-AC-05: Reference-intent fields (`locationId`, `characterIds`) use `copilot_route: reference` with canonical classification
-- [x] CORE-AC-06: Appendix A content is fully represented in §4.3 including three governance corrections
+- [x] CORE-AC-06: Appendix A content is fully represented in §4.3 including documented governance corrections (§4.3.1)
 - [x] CORE-AC-07: SPEC-D2-002 references SPEC-CORE-001 §4.3 as sole registry authority
 
-### 8.2 Implementation criteria (verified after Approved — not in Draft scope)
+### 8.2 Implementation criteria (verified at EffectiveInImplementation)
 
-- [ ] CORE-AC-IMP-01: `lib/ai/field-registry.ts` mirrors §4.3 tables
-- [ ] CORE-AC-IMP-02: Unit tests verify FC-03 asset exclusion, reference v1 exclusion, and scope exclusion
+- [x] CORE-AC-IMP-01: `lib/ai/field-registry.ts` mirrors §4.3 tables
+- [x] CORE-AC-IMP-02: Unit tests verify FC-03 asset exclusion, reference v1 exclusion, and scope exclusion
 
 ---
 
@@ -296,9 +301,9 @@ Manual checks:
 
 - SPEC_RULES §6 section order and required metadata
 - Derived From references ADR-004 without version suffix in cross-references
-- §4.3 diff against superseded Appendix A limited to three documented corrections
+- §4.3 diff against superseded Appendix A limited to documented corrections in §4.3.1 (including Scene scope anchor, Decision 13)
 
-### 10.2 Implementation validation (after Approved)
+### 10.2 Implementation validation (EffectiveInImplementation)
 
 ```bash
 npm run test -- __tests__/ai/field-registry.test.ts

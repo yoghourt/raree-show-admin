@@ -79,7 +79,7 @@ ADR-001 (Bootstrap Pipeline) is superseded by ADR-004. The Bootstrap batch-persi
 ### 3.1 End-to-End Operator Journey
 
 ```text
-Operator enters Scope Field (canonical_name / chapter_title)
+Operator enters Scope Field (canonical_name / title for Scene)
     ↓
 Duplicate check fires automatically on Scope Field input (AC-24)
     ↓ [conflict → icon stays disabled]   [pass → icon enabled]
@@ -166,14 +166,14 @@ flowchart TD
 
 The operator enters the Scope Field for the entity:
 
-- **Character / Location:** `canonical_name`
-- **Scene:** `chapter_title`
+- **Character / Location:** `canonical_name` (form field `name`; SPEC-CORE-001 §4.2)
+- **Scene:** `title` (SPEC-CORE-001 §4.2)
 
 The Scope Field MUST be provided by the operator. AI MUST NOT propose or generate the Scope Field value (Decision 9, SD-02). The Copilot icon MUST remain disabled until the Scope Field is non-empty and has passed duplicate check.
 
 ### 4.2 Phase 2 — Identity Validation / Duplicate Check (Decision 5, AC-23/24)
 
-On Scope Field input, the system executes a `UNIQUE(work_id, name)` / `UNIQUE(work_id, chapter_title)` check using the **browser Supabase client** (`lib/supabase`) — no dedicated API endpoint is required (OQ-A).
+On Scope Field input, the system executes a `UNIQUE(work_id, name)` / `UNIQUE(work_id, title)` check using the **browser Supabase client** (`lib/supabase`) — no dedicated API endpoint is required (OQ-A).
 
 ```typescript
 // Character / Location duplicate check pattern
@@ -185,12 +185,12 @@ const { data } = await supabase
   .maybeSingle();
 const isDuplicate = data !== null;
 
-// Scene duplicate check pattern
+// Scene duplicate check pattern (scope anchor = title, SPEC-CORE-001 §4.2)
 const { data } = await supabase
   .from("scenes")
   .select("tsid")
   .eq("work_id", workId)
-  .eq("chapter_title", scopeFieldValue)
+  .eq("title", scopeFieldValue)
   .maybeSingle();
 const isDuplicate = data !== null;
 ```
@@ -1098,11 +1098,13 @@ System fields (`id`, `tsid`, `workId`, `createdAt`) are excluded from all Copilo
 
 ### A.3 Scene (`scenes` table)
 
+> **Historical.** Scene field classifications superseded by SPEC-CORE-001 §4.3.4 (including Architect Decision 13: `title` = scope anchor). Do not use for implementation.
+
 | Form field      | DB column       | Classification | Copilot route | Suggest? | Notes |
 | --------------- | --------------- | -------------- | ------------- | -------- | ----- |
-| `chapter_title` | `chapter_title` | `scope`        | `excluded`    | No  | Duplicate check target; operator-defined |
+| `title`         | `title`         | `scope`        | `excluded`    | No  | Session anchor; duplicate check target (Decision 13) |
+| `chapter_title` | `chapter_title` | `canonical`    | `fact`        | Yes | Chapter heading; Source First |
 | `chapter_number`| `chapter_number`| `canonical`    | `fact`        | Yes | Chapter sequence number; Source First |
-| `title`         | `title`         | `narrative`    | `narrative`   | Yes | Scene display title |
 | `summary`       | `summary`       | `narrative`    | `narrative`   | Yes | Scene summary prose |
 | `tags`          | `tags`          | `excluded`     | `excluded`    | No  | Curator-defined string array; not AI-suggested |
 | `story_images_v2`| `story_images_v2`| `asset`      | `excluded`    | No  | Story images JSONB; Asset |
