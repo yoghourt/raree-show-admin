@@ -351,7 +351,7 @@ These files are expected to mirror §4.3 after Implementation authorization.
 
 ## Legacy Alias Reference
 
-*Runtime vocabulary aligned with `docs/runtime-lexicon-v2.md` (ADR-BP-RT-001).*
+*Runtime vocabulary aligned with `governance/vocabulary/runtime-lexicon.md` (ADR-BP-RT-001).*
 
 | Normative Term | Legacy Term | Classification | Status |
 | -------------- | ----------- | -------------- | ------ |

@@ -16,7 +16,7 @@ A7 (ADR-007 Accepted — Editorial → Runtime Rollout Architecture; Architectur
 Follow-up chain terminates; cross-domain mapping deferral closed),
 A8 (Runtime Vocabulary Migration — vocabulary only; topology unchanged; Scene →
 Reading Route; Story Image → Reading Frame; normative vocabulary now in
-`docs/runtime-lexicon-v2.md`; no Decisions, topology, or contracts changed).
+`governance/vocabulary/runtime-lexicon.md`; no Decisions, topology, or contracts changed).
 No Decisions, Acceptance Criteria, routing logic, or topology changed.
 
 **A4 Historical Note:** Prior Follow-up Roadmap text described ADR-005 as
@@ -92,7 +92,7 @@ Work
 ```
 
 *Implementation symbols: `Reading Route` → `scenes` table; `Reading Frame` → `story_images_v2[]` element.
-See `docs/runtime-lexicon-v2.md` for the full normative vocabulary registry.*
+See `governance/vocabulary/runtime-lexicon.md` for the full normative vocabulary registry.*
 
 Definitions (descriptive; no future topology implied):
 
@@ -439,7 +439,7 @@ Bootstrap — catalog scope, no human acceptance gate
 > (`Work → Reading Route → Reading Frame`). `chapter_title` refers to the Scope
 > Field of the current Reading Route. This qualifier prevents ambiguity with any
 > future Story entity. See Known Constraint §15. For normative Runtime vocabulary
-> see `docs/runtime-lexicon-v2.md`.
+> see `governance/vocabulary/runtime-lexicon.md`.
 
 Every Copilot session MUST have a human-defined scope before AI suggestions are
 generated.
@@ -1865,7 +1865,7 @@ Canonical fields (name, house, region) SHALL only be set
 via human-initiated write operations.
 
 E.
-Narrative fields (description, signatureQuote, summary, imageCaption)
+Narrative fields (description, signatureQuote, summary, imageCaption (Deprecated))
 may be AI-suggested and human-accepted via the Copilot workflow.
 
 F.
@@ -1894,7 +1894,7 @@ Field value is present (SD-01).
 
 L.
 Scope Fields (canonical_name for Character/Location; chapter_title for current
-Runtime Scene) SHALL NEVER be generated, suggested, or modified by AI (SD-02).
+Runtime Reading Route (implementation: Scene)) SHALL NEVER be generated, suggested, or modified by AI (SD-02).
 
 M.
 AI suggestions SHALL be confined to Suggestible Fields only.
@@ -2062,8 +2062,9 @@ ADR-004 intentionally targets current Runtime Truth v1.
 
 The Copilot workflow, field classification model, suggestion pipelines
 (SC-01, SC-02, SC-03, SC-04), and runtime invariants (RT-INV-01 through
-RT-INV-13) defined in this ADR are scoped to the Work → Scene → Story Images
-topology described in the Runtime Truth v1 Topology section of **What** above.
+RT-INV-13) defined in this ADR are scoped to the Work → Reading Route → Reading Frame
+topology described in the Runtime Truth v1 Topology section of **What** above
+(implementation: Work → Scene → Story Images).
 
 The following are explicitly outside ADR-004 scope:
 
@@ -2083,7 +2084,7 @@ information-emergence **dependency order**. It does not modify Runtime Truth v1.
 
 Cross-domain mapping is governed by **ADR-007 — Editorial → Runtime Rollout
 Architecture** (Status: Accepted). ADR-007 defines governed projection from
- Editorial Story units to Runtime Scene association without redesigning Runtime
+ Editorial Story units to Runtime Reading Route (implementation: Scene) association without redesigning Runtime
  Truth v1. Until governed projection is implemented under downstream SPEC
  governance, the Runtime Truth v1 topology in **What** above remains authoritative
  for production behavior.
@@ -2260,7 +2261,7 @@ ADR-007 closes the cross-domain mapping deferral from ADR-004, ADR-005, and
 
 ```text
 Rollout governance (Editorial → Production → Runtime domain transition)
-Story ↔ Scene orthogonal association (N:M; no identity merge)
+Story ↔ Reading Route orthogonal association (N:M; no identity merge) (implementation: Scene)
 Story runtime representation — projection-only (not a routable Runtime entity)
 Dual-domain coexistence model and rollout phases (architectural intent)
 Authority reconciliation when Editorial and Runtime diverge (split precedence)
@@ -2316,7 +2317,7 @@ ADR-007     Editorial → Runtime Rollout Architecture (Accepted — Architectur
 
 ## Legacy Alias Reference (A8)
 
-*Added by Amendment A8 — Runtime Vocabulary Migration. See `docs/runtime-lexicon-v2.md` for the complete normative registry.*
+*Added by Amendment A8 — Runtime Vocabulary Migration. See `governance/vocabulary/runtime-lexicon.md` for the complete normative registry.*
 
 | Normative Term | Legacy Term | Classification | Status |
 | -------------- | ----------- | -------------- | ------ |

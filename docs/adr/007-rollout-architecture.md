@@ -4,7 +4,7 @@
 **Type:** Rollout ADR
 **Version:** 1.1
 **Last Updated:** 2026-07-07
-**Amendment:** A1 (Runtime Vocabulary Alignment — vocabulary only; Decision semantics and topology unchanged; Scene → Reading Route; Story Image → Reading Frame; normative vocabulary in `docs/runtime-lexicon-v2.md`).
+**Amendment:** A1 (Runtime Vocabulary Alignment — vocabulary only; Decision semantics and topology unchanged; Scene → Reading Route; Story Image → Reading Frame; normative vocabulary in `governance/vocabulary/runtime-lexicon.md`).
 **Owner:** Architect
 **Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Runtime Truth v1); ADR-005 (Narrative Information Model — Editorial Domain and Information Emergence); ADR-006 (Discovery Copilot Architecture — Authority Emergence and Discovery boundary); ADR-D2-001 (Canonical Metadata Authority)
 
@@ -39,11 +39,12 @@ The central architectural diagram of this ADR is the **Rollout Model**:
 Editorial Domain          Production Domain         Runtime Domain
 ─────────────────         ─────────────────         ──────────────
 
-Approved Story unit  ──►  (no Entity promotion) ──►  governed projection ──► Scene
-Approved Entity      ──►  Enrichment → Persist  ──►  Scene (existing path)
-                                                              │
+Approved Story unit  ──►  (no Entity promotion) ──►  governed projection ──► Reading Route
+Approved Entity      ──►  Enrichment → Persist  ──►  Reading Route (existing path)
+                                                              │         [impl: Scene]
                                                               ▼
-                                                         Story Images
+                                                         Reading Frame
+                                                         [impl: Story Images]
                                                          (Runtime Truth v1)
 ```
 
@@ -186,10 +187,10 @@ Terms **Story**, **Editorial Domain**, **Runtime Domain**, **Entity**,
  MUST NOT redefine them with conflicting semantics.
 
 **Reading Route** (normative; implementation alias: Scene) — The routable reading
- container in Runtime Truth v1. See `docs/runtime-lexicon-v2.md` RV-02.
+ container in Runtime Truth v1. See `governance/vocabulary/runtime-lexicon.md` RV-02.
 
 **Reading Frame** (normative; implementation alias: Story Image) — One ordered
- narrative-visual unit inside a Reading Route. See `docs/runtime-lexicon-v2.md` RV-04.
+ narrative-visual unit inside a Reading Route. See `governance/vocabulary/runtime-lexicon.md` RV-04.
 
 **Governed Projection**
 
@@ -337,7 +338,7 @@ Phase 1 — Editorial Production Without Runtime Projection
 Phase 2 — Governed Projection Enabled
   Human-accepted Editorial↔Runtime associations are permitted.
   Projection links Approved Story units (and editorial scene-level artifacts where
-  governed) to Runtime Scene records.
+  governed) to Runtime Reading Route records (implementation: Scene records).
   Runtime Truth v1 topology unchanged; projection is association metadata at the
   architectural layer — implementation deferred to SPEC.
 ```
@@ -470,7 +471,7 @@ ADR-004 remains authoritative for:
 ADR-007 owns:
 
 * Editorial↔Runtime rollout governance
-* Story ↔ Scene orthogonal association model
+* Story ↔ Reading Route orthogonal association model (implementation: Scene)
 * Governed projection principles
 * Dual-domain coexistence and authority reconciliation
 * Architecture Closure for Runtime Truth v1
@@ -491,7 +492,7 @@ ADR-005 provides:
 
 ADR-007 adds:
 
-* Governed projection from Approved Story units to Runtime Scene association
+* Governed projection from Approved Story units to Runtime Reading Route (implementation: Scene) association
 * Rollout phases and ROL-INV-* invariants
 * Architecture Closure
 
@@ -660,7 +661,7 @@ ADR-001 — Assisted Work Bootstrap Pipeline (Historical; Superseded)
 
 ## Legacy Alias Reference (A1)
 
-*Added by Amendment A1 — Runtime Vocabulary Alignment. See `docs/runtime-lexicon-v2.md` for the complete normative registry.*
+*Added by Amendment A1 — Runtime Vocabulary Alignment. See `governance/vocabulary/runtime-lexicon.md` for the complete normative registry.*
 
 | Normative Term | Legacy Term | Classification | Status |
 | -------------- | ----------- | -------------- | ------ |

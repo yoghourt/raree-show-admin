@@ -46,7 +46,7 @@ const LOCATION_REGISTRY: Record<string, FieldMetadata> = {
 
 // ---------------------------------------------------------------------------
 // §4.3.4 Reading Route (normative) — implementation: `scenes` table
-// Normative vocabulary: docs/runtime-lexicon-v2.md RV-02
+// Normative vocabulary: governance/vocabulary/runtime-lexicon.md RV-02
 //   summary       → Route Synopsis (RV-03)
 //   story_images_v2 → Reading Frames JSONB (RV-04); caption inside = Frame Narrative (RV-05)
 // ---------------------------------------------------------------------------

@@ -148,7 +148,7 @@ The governance and production layer where narrative units, boundaries, summaries
 The production-enforced layer where reading topology, persistence, and routing
  are implemented. Current Runtime Truth v1 (`Work → Reading Route → Reading Frame`,
  implementation: `Work → Scene → Story Images`) belongs to the Runtime Domain.
- See `docs/runtime-lexicon-v2.md` for normative Runtime vocabulary.
+ See `governance/vocabulary/runtime-lexicon.md` for normative Runtime vocabulary.
 
 **The ONE Rule**
 
@@ -544,7 +544,7 @@ ADR-007 — Editorial → Runtime Rollout Architecture (Accepted — Architectur
 
 ## Legacy Alias Reference (A3)
 
-*Added by Amendment A3 — Runtime Vocabulary Alignment. See `docs/runtime-lexicon-v2.md` for the complete normative registry.*
+*Added by Amendment A3 — Runtime Vocabulary Alignment. See `governance/vocabulary/runtime-lexicon.md` for the complete normative registry.*
 
 | Normative Term | Legacy Term | Classification | Status |
 | -------------- | ----------- | -------------- | ------ |

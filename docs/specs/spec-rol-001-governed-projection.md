@@ -204,7 +204,7 @@ interface ApprovedStoryUnit {
 
 Approved Story units MUST NOT use catalog Entity tsid prefixes (`char_`, `loc_`, `scene_`).
 
-### 4.3 Story ↔ Scene governed link
+### 4.3 Story ↔ Reading Route governed link (implementation: Scene)
 
 ```typescript
 interface StorySceneProjectionLink {
@@ -220,7 +220,7 @@ interface StorySceneProjectionLink {
 
 **Invariant:** A link record is **association metadata only**. It MUST NOT merge Story unit identity with Scene identity. Duplicate `(storyUnitId, sceneTsid)` pairs MUST be rejected (§6).
 
-### 4.4 Scene Projection Accept outcomes
+### 4.4 Reading Route Projection Accept outcomes (implementation: Scene)
 
 | Operator choice | Preconditions | Effect |
 | --------------- | ------------- | ------ |
@@ -300,7 +300,7 @@ Request body:
 
 Response: `{ ok: true, storyUnit: ApprovedStoryUnit }`.
 
-#### 4.7.3 Scene Projection Accept
+#### 4.7.3 Reading Route Projection Accept (implementation: Scene)
 
 `POST /api/admin/rollout/scene-projection`
 
@@ -433,7 +433,7 @@ Rollout MUST surface existing Scene form validation errors rather than swallowin
 
 ### 8.1 SPEC document criteria (verified at Approved)
 
-- [x] ROL-AC-01: Story↔Scene N:M association with no identity merge documented in §4.3 and ROL-RC-08
+- [x] ROL-AC-01: Story↔Reading Route (implementation: Scene) N:M association with no identity merge documented in §4.3 and ROL-RC-08
 - [x] ROL-AC-02: ROL-INV-01 through ROL-INV-07 mapped to testable ROL-RC-* in §3
 - [x] ROL-AC-03: SPEC-D3-002 staging consumption and two-step Accept documented in §4.1, §4.5, OQ-ROL-001-04
 - [x] ROL-AC-04: Scene Projection Accept create/link outcomes in §4.4 with CRUD delegation
@@ -580,7 +580,7 @@ Rollout MUST NOT modify Discovery Review actions, Narrative Gate rules, or Candi
 
 ## Legacy Alias Reference
 
-*Runtime vocabulary aligned with `docs/runtime-lexicon-v2.md` (ADR-BP-RT-001).*
+*Runtime vocabulary aligned with `governance/vocabulary/runtime-lexicon.md` (ADR-BP-RT-001).*
 
 | Normative Term | Legacy Term | Classification | Status |
 | -------------- | ----------- | -------------- | ------ |
