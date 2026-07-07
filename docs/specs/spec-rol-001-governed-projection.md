@@ -6,9 +6,9 @@
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Governed Editorial↔Runtime Projection                                 |
 | Status       | Implemented                                                           |
-| Version      | v1.0                                                                  |
+| Version      | v1.1                                                                  |
 | Owner        | Architect                                                             |
-| Last Updated | 2026-07-05                                                            |
+| Last Updated | 2026-07-07                                                            |
 | Derived From | ADR-007 (`docs/adr/007-rollout-architecture.md`)                      |
 | Related      | ADR-004, ADR-005, ADR-006, SPEC-D3-001, SPEC-D3-002, SPEC-CORE-001 |
 
@@ -24,14 +24,14 @@
 
 ## 1. Purpose
 
-ADR-007 closes Runtime Truth v1 architecture at the **What/Why** layer for Editorial↔Runtime governed projection and defers **projection schema, link model, and Scene Candidate→Runtime operator paths** to downstream specifications.
+ADR-007 closes Runtime Truth v1 architecture at the **What/Why** layer for Editorial↔Runtime governed projection and defers **projection schema, link model, and Scene Candidate→Runtime Reading Route operator paths** to downstream specifications.
 
 SPEC-ROL-001 closes that deferral for the **Rollout** layer. It becomes the **sole governance authority** for:
 
 - Work-scoped Rollout operator UX contract (normative behaviors; not pixel-level UI Spec)
 - Durable Approved Story unit persistence from Discovery Accept staging
-- Story ↔ Scene **governed link** create, list, and remove (N:M association; no identity merge)
-- Scene **Projection Accept** — editorial scene staging → Runtime Scene create or link to existing Scene
+- Story ↔ Reading Route (implementation: Scene) **governed link** create, list, and remove (N:M association; no identity merge)
+- Reading Route **Projection Accept** — editorial scene staging → Runtime Reading Route (implementation: Scene) create or link to existing Reading Route
 - Rollout-phase enforcement of ROL-INV-01 through ROL-INV-07 as testable runtime contracts
 
 This specification defines **How** and **Validation** for governed projection. It does not restate ADR-007 Rollout Model rationale. Discovery propose/regen, Human Review actions, and Candidate lifecycle belong to SPEC-D3-001, SPEC-D3-002, and SPEC-D3-003. Catalog Entity persist (Character, Location) remains the existing Production path unchanged.
@@ -47,9 +47,9 @@ On Story semantics conflicts, ADR-005 governs. On Discovery boundary conflicts, 
 - Rollout panel UX contract for Path C operator workflow (Master frozen intent §1.F)
 - Input consumption: `AcceptedStoryUnitStaging`, `AcceptedSceneCandidateStaging` (SPEC-D3-002 §4.5)
 - Approved Story unit durable storage v1 minimum (closes partial deferral of SPEC-D3-002 OQ-D3-002-02)
-- Story ↔ Scene governed link CRUD with explicit operator Accept per link
-- Scene Projection Accept: create new Runtime Scene from staging **or** associate staging with existing Scene (`scenes.tsid`)
-- Projection Accept MUST route through existing Scene CRUD validation and Human Save confirmation where applicable
+- Story ↔ Reading Route (implementation: Scene) governed link CRUD with explicit operator Accept per link
+- Reading Route Projection Accept: create new Runtime Reading Route (implementation: Scene) from staging **or** associate staging with existing Reading Route (`scenes.tsid`)
+- Projection Accept MUST route through existing Reading Route (implementation: Scene) CRUD validation and Human Save confirmation where applicable
 - ROL-RC-* runtime contracts and ROL-INV-* traceability in §3
 - Admin route contracts for persist, projection, and link operations (§4.7)
 - §2.1 boundary matrix with SPEC-D3-002 and existing Scene CRUD
@@ -66,7 +66,7 @@ On Story semantics conflicts, ADR-005 governs. On Discovery boundary conflicts, 
 | Character / Location catalog persist | Existing Production CRUD path (ADR-006 Catalog Entity outcome) |
 | Story ONE Rule adjudication UI | ADR-005 |
 | Batch projection sync, background reconciliation jobs | Deferred v1 (OQ-ROL-001-07) |
-| Reader routing changes, Story Images topology redesign | ADR-004 (ROL-INV-01) |
+| Reader routing changes, Reading Frame (Story Images) topology redesign | ADR-004 (ROL-INV-01) |
 | Knowledge Graph, Relationship Graph, Story Arc Runtime | Post-v1 capabilities |
 | Generative AI in Rollout | Prohibited v1 — no LLM routes under Rollout namespace |
 
@@ -76,8 +76,8 @@ On Story semantics conflicts, ADR-005 governs. On Discovery boundary conflicts, 
 | ----- | ------ | --------------------- | ------- |
 | Discovery Accept (story/scene) | Client staging only | — | Consumes staging |
 | Discovery Accept (character/location) | Prefill → CRUD create | Persist on Save | — |
-| Runtime Scene create/update | Prohibited | Yes (form Save) | Projection Accept **via** governed path |
-| Story ↔ Scene link | Prohibited | — | Yes |
+| Runtime Reading Route create/update | Prohibited | Yes (form Save) | Projection Accept **via** governed path |
+| Story ↔ Reading Route link | Prohibited | — | Yes |
 | Generative AI | D3-003 propose/regen | Enrichment suggest | **Prohibited** |
 | Human Accept gate | Review Accept | Form Save | **Projection Accept** / **Link Accept** |
 | Durable story/scene editorial state | Deferred in D3-002 v1 | — | Yes (Rollout persist) |
@@ -90,9 +90,9 @@ This matrix MUST remain consistent with SPEC-D3-002 §2.1. ROL-001 is **downstre
 | --------- | ----------------------------------- | --------------------- |
 | Editorial ingress | Discovery Accept → entity create prefill | Discovery Accept → story/scene staging |
 | First durable authority | Entity CRUD Save | Rollout Persist Story unit / Projection Accept Scene |
-| Runtime outcome | Scene references catalog IDs (existing) | Scene record + optional Story↔Scene link |
+| Runtime outcome | Reading Route (impl: Scene) references catalog IDs (existing) | Reading Route record + optional Story↔Reading Route link |
 | Generative AI | Enrichment (entity-scoped) | None |
-| Identity model | Catalog Entity tsid | Story unit id **distinct from** Scene tsid (N:M) |
+| Identity model | Catalog Entity tsid | Story unit id **distinct from** Reading Route ID (`scenes.tsid`) (N:M) |
 
 Rollout MUST NOT auto-promote Approved Story units to catalog Entities (ROL-INV-05).
 
@@ -102,11 +102,11 @@ Rollout MUST NOT auto-promote Approved Story units to catalog Entities (ROL-INV-
 
 **ROL-RC-01 — Runtime topology unchanged**
 
-Rollout operations MUST NOT alter the `Work → Scene → Story Images` topology defined by ADR-004. Story MUST NOT become a first-class Runtime routable entity in Reader paths (ROL-INV-01).
+Rollout operations MUST NOT alter the `Work → Reading Route → Reading Frame` topology defined by ADR-004 (implementation: `Work → Scene → Story Images`). Story MUST NOT become a first-class Runtime routable entity in Reader paths (ROL-INV-01).
 
 **ROL-RC-02 — No silent Editorial→Runtime conflation**
 
-Editorial approval alone MUST NOT create, modify, or equate Runtime Scene records. Discovery Review Accept for scene Candidates MUST NOT perform Runtime writes. **Discovery Accept ≠ Projection Accept** (OQ-ROL-001-04; ROL-INV-02).
+Editorial approval alone MUST NOT create, modify, or equate Runtime Reading Route records (implementation: Scene records). Discovery Review Accept for scene Candidates MUST NOT perform Runtime writes. **Discovery Accept ≠ Projection Accept** (OQ-ROL-001-04; ROL-INV-02).
 
 **ROL-RC-03 — Explicit operator Accept for projection**
 
@@ -126,19 +126,19 @@ Rollout routes and UI MUST NOT invoke Discovery propose/regen handlers, Enrichme
 
 **ROL-RC-07 — Runtime does not define Editorial Story boundaries**
 
-Scene ordering, routing, or storage convenience MUST NOT define Editorial Story unit boundaries. Story unit boundaries remain Editorial Domain authority (ROL-INV-07; ADR-005 NIM-INV-02).
+Reading Route (implementation: Scene) ordering, routing, or storage convenience MUST NOT define Editorial Story unit boundaries. Story unit boundaries remain Editorial Domain authority (ROL-INV-07; ADR-005 NIM-INV-02).
 
 **ROL-RC-08 — Story ↔ Scene N:M without identity merge**
 
-Story ↔ Scene association MUST allow many-to-many links. A Story unit MUST NOT be forced into 1:1 identity equivalence with a Scene. Link records are association metadata only; Scene identity (`scenes.tsid`) is unchanged by linking (ADR-007 Decision 2).
+Story ↔ Reading Route (implementation: Scene) association MUST allow many-to-many links. A Story unit MUST NOT be forced into 1:1 identity equivalence with a Reading Route. Link records are association metadata only; Reading Route identity (`scenes.tsid`) is unchanged by linking (ADR-007 Decision 2).
 
 **ROL-RC-09 — Projection Accept produces valid Scene business ID**
 
-Scene Projection Accept MUST result in a reference to a valid Runtime Scene business ID (`scene_` prefixed TSID per existing conventions) either by creating a new Scene through existing CRUD or by selecting an existing Scene within the same `workId`.
+Scene Projection Accept MUST result in a reference to a valid Reading Route business ID (implementation: `scene_` prefixed TSID per existing conventions) either by creating a new Reading Route (implementation: Scene) through existing CRUD or by selecting an existing Reading Route within the same `workId`.
 
 **ROL-RC-10 — Unlink does not silently delete domain objects**
 
-Removing a Story ↔ Scene link MUST NOT delete the Runtime Scene or archive the Approved Story unit unless the operator performs a separate explicit delete/archive action (ROL-INV-02).
+Removing a Story ↔ Reading Route (implementation: Scene) link MUST NOT delete the Runtime Reading Route or archive the Approved Story unit unless the operator performs a separate explicit delete/archive action (ROL-INV-02).
 
 **ROL-RC-11 — Provenance from Discovery**
 
@@ -237,15 +237,17 @@ When creating a Scene, operator MUST pass through the same Human Save confirmati
 | Action | Preconditions | Effects |
 | ------ | ------------- | ------- |
 | **Persist Story unit** | Valid `AcceptedStoryUnitStaging` or equivalent queue item | Insert `ApprovedStoryUnit`; remove staging from Rollout queue |
-| **Projection Accept (Scene)** | Valid scene staging; create **or** link target chosen | Runtime Scene create/link per §4.4; record provenance |
-| **Link Accept** | Active `ApprovedStoryUnit` and existing Scene in same `workId` | Insert `StorySceneProjectionLink` |
-| **Unlink** | Link exists | Delete link row; Scene and Story unit remain |
+| **Projection Accept (Reading Route)** | Valid scene staging; create **or** link target chosen | Runtime Reading Route (impl: Scene) create/link per §4.4; record provenance |
+| **Link Accept** | Active `ApprovedStoryUnit` and existing Reading Route (impl: Scene) in same `workId` | Insert `StorySceneProjectionLink` |
+| **Unlink** | Link exists | Delete link row; Reading Route and Story unit remain |
 | **Archive Story unit** | Unit `active` | Set `status` → `archived`; link retention policy per OQ-ROL-001-11 |
 | **Import staging snapshot** | Discovery session export JSON | Populate Rollout queue without Discovery route calls |
 
-### 4.6 Scene field mapping (staging → Runtime Scene create)
+### 4.6 Reading Route field mapping (staging → Runtime Reading Route create)
 
-Normative v1 mapping from `AcceptedSceneCandidateStaging` to existing Scene create fields:
+*Normative term: Reading Route. Implementation symbol: Scene (`scenes` table).*
+
+Normative v1 mapping from `AcceptedSceneCandidateStaging` to existing Reading Route (implementation: Scene) create fields:
 
 | Staging field | Scene field | Rule |
 | ------------- | ----------- | ---- |
@@ -259,7 +261,7 @@ Normative v1 mapping from `AcceptedSceneCandidateStaging` to existing Scene crea
 | — | `locationId` | Default `null` (unassigned) |
 | — | `characterIds` | Default `[]` |
 
-Unmapped Discovery Candidate fields MUST be ignored v1 (OQ-ROL-001-05). Implementation MUST reuse SPEC-CORE-001 / existing Scene form validation rules at Save time.
+Unmapped Discovery Candidate fields MUST be ignored v1 (OQ-ROL-001-05). Implementation MUST reuse SPEC-CORE-001 / existing Reading Route (implementation: Scene) form validation rules at Save time.
 
 ### 4.7 Admin route contracts (v1 minimum)
 
@@ -376,17 +378,17 @@ v1 MAY persist queue server-side (OQ-ROL-001-02) or rely on client-held snapshot
 
 [Discovery Accept scene] → AcceptedSceneCandidateStaging (D3-002, client)
   → [import snapshot] → Rollout queue
-  → [operator: Projection Accept create] → Runtime Scene (scenes.tsid)
+  → [operator: Projection Accept create] → Runtime Reading Route (scenes.tsid)
   → [optional: Link Accept] → StorySceneProjectionLink
 
 [Discovery Accept scene]
   → [operator: Projection Accept link_existing] → StorySceneProjectionLink only
 
-[ApprovedStoryUnit] + [Scene tsid]
+[ApprovedStoryUnit] + [Reading Route ID (scenes.tsid)]
   → [operator: Link Accept] → StorySceneProjectionLink
 
 [StorySceneProjectionLink]
-  → [operator: Unlink] → link removed (Scene + Story unit remain)
+  → [operator: Unlink] → link removed (Reading Route + Story unit remain)
 
 [ApprovedStoryUnit active]
   → [operator: Archive] → status archived
@@ -444,9 +446,9 @@ Rollout MUST surface existing Scene form validation errors rather than swallowin
 ### 8.2 Implementation criteria (verified at Implemented)
 
 - [x] ROL-AC-IMP-01: Durable Approved Story unit persist from staging via Rollout API
-- [x] ROL-AC-IMP-02: Scene Projection Accept creates or links Runtime Scene via existing CRUD path
-- [x] ROL-AC-IMP-03: Story ↔ Scene link create/delete with explicit operator Accept
-- [x] ROL-AC-IMP-04: Discovery Accept alone does not insert Scene or Story unit durable rows
+- [x] ROL-AC-IMP-02: Reading Route Projection Accept creates or links Runtime Reading Route (implementation: Scene) via existing CRUD path
+- [x] ROL-AC-IMP-03: Story ↔ Reading Route (implementation: Scene) link create/delete with explicit operator Accept
+- [x] ROL-AC-IMP-04: Discovery Accept alone does not insert Reading Route (Scene) or Story unit durable rows
 - [x] ROL-AC-IMP-05: Work-scoped Rollout UI entry at `/works/{workId}/rollout` (or equivalent)
 - [x] ROL-AC-IMP-06: Unit/integration tests for link guards, staging validation, and workId isolation
 - [x] ROL-AC-IMP-07: Reader topology unchanged — no Story routable entity added
@@ -462,7 +464,7 @@ Rollout MUST surface existing Scene form validation errors rather than swallowin
 - Discovery propose, regen, Review panel, or Candidate schema changes — SPEC-D3-001, SPEC-D3-002, SPEC-D3-003
 - Enrichment field suggestion, Accept All, Retry Queue — SPEC-D2-002
 - Story ONE Rule operator UI — ADR-005
-- Auto-sync Story units to Scenes by title similarity or LLM matching — prohibited v1
+- Auto-sync Story units to Reading Routes (implementation: Scenes) by title similarity or LLM matching — prohibited v1
 - Background reconciliation jobs comparing Editorial vs Runtime — Deferred
 - Reader routing, Story Images jsonb topology, or Scene ordering model changes — ADR-004
 - Promoting Approved Story units to catalog Entities — ROL-INV-05
@@ -571,5 +573,16 @@ Rollout MUST NOT modify Discovery Review actions, Narrative Gate rules, or Candi
 - `lib/discovery/review-session-storage.ts` — Discovery session snapshot
 - `hooks/useDiscoverySession.ts` — upstream staging producer
 - `components/discovery/DiscoveryReviewPanel.tsx` — no Runtime writes at Accept
-- `lib/scenes.ts` — Runtime Scene persist
-- `components/scenes/*` — Scene form fields
+- `lib/scenes.ts` — Runtime Reading Route (implementation: Scene) persist
+- `components/scenes/*` — Reading Route (implementation: Scene) form fields
+
+---
+
+## Legacy Alias Reference
+
+*Runtime vocabulary aligned with `docs/runtime-lexicon-v2.md` (ADR-BP-RT-001).*
+
+| Normative Term | Legacy Term | Classification | Status |
+| -------------- | ----------- | -------------- | ------ |
+| Reading Route | Scene | Implementation Alias | Active — implementation symbol `scenes` |
+| Reading Frame | Story Image | Implementation Alias | Active — implementation symbol `story_images_v2[]` element |

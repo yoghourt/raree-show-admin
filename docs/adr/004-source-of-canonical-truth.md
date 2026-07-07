@@ -2,8 +2,8 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.14
-**Last Updated:** 2026-06-29
+**Version:** 1.15
+**Last Updated:** 2026-07-07
 **Owner:** Architect
 **Supersedes:** ADR-001 (Assisted Work Bootstrap Pipeline — archived as Experimental Prototype)
 **Amendment:** Clarification only — A1 (Runtime Truth Topology), A2 (chapter_title qualifier),
@@ -13,8 +13,11 @@ A5 (ADR-006 Accepted — Discovery Copilot Architecture; §15, Follow-up §ADR-0
 RT-INV-04 Enrichment scope clarified),
 A6 (ADR-D2-001 vs ADR-006 — source extraction vs Discovery proposal; complementary paths),
 A7 (ADR-007 Accepted — Editorial → Runtime Rollout Architecture; Architecture Freeze;
-Follow-up chain terminates; cross-domain mapping deferral closed).
-No Decisions, Acceptance Criteria, or routing logic changed.
+Follow-up chain terminates; cross-domain mapping deferral closed),
+A8 (Runtime Vocabulary Migration — vocabulary only; topology unchanged; Scene →
+Reading Route; Story Image → Reading Frame; normative vocabulary now in
+`docs/runtime-lexicon-v2.md`; no Decisions, topology, or contracts changed).
+No Decisions, Acceptance Criteria, routing logic, or topology changed.
 
 **A4 Historical Note:** Prior Follow-up Roadmap text described ADR-005 as
 investigation-phase "Content Topology Normalization." ADR-005 is now **Accepted**
@@ -84,21 +87,27 @@ The current Runtime Truth v1 content topology is:
 
 ```text
 Work
- └─ Scene           (routable runtime reading unit)
-      └─ Story Images  (ordered visual frames inside a Scene)
+ └─ Reading Route           (routable reading container)
+      └─ Reading Frame       (ordered narrative-visual units inside a Reading Route)
 ```
+
+*Implementation symbols: `Reading Route` → `scenes` table; `Reading Frame` → `story_images_v2[]` element.
+See `docs/runtime-lexicon-v2.md` for the full normative vocabulary registry.*
 
 Definitions (descriptive; no future topology implied):
 
-* **Scene** — The routable runtime reading unit. Each Scene record belongs to
-  one Work, carries chapter metadata as descriptive fields, and contains an
-  ordered sequence of Story Images.
-* **Story Image** — One ordered visual frame inside a Scene, stored as
-  `{url, caption}` in the `story_images_v2` JSONB column. Story Images are
-  not independent routable entities.
-* **Chapter metadata** (`chapter_number`, `chapter_title`) — Descriptive
-  organisational fields on Scene. They are not a separate navigation layer in
-  Runtime Truth v1.
+* **Reading Route** (implementation: Scene) — The routable reading container in
+  Runtime Truth v1. Each Reading Route record belongs to one Work, carries
+  Chapter Metadata as descriptive fields, and contains an ordered sequence of
+  Reading Frames.
+* **Reading Frame** (implementation: Story Image) — One ordered narrative-visual
+  unit inside a Reading Route, stored as `{url, caption}` in the
+  `story_images_v2` JSONB column. Reading Frames are not independent routable
+  entities. The `caption` field carries the Frame Narrative — the primary text
+  carrier for reader progression.
+* **Chapter Metadata** (`chapter_number`, `chapter_title`) — Descriptive
+  organisational fields on a Reading Route. They are not a separate navigation
+  layer in Runtime Truth v1.
 
 This section describes the current runtime state only. The Editorial Domain
 Narrative Information Model is governed by ADR-005 (see Known Constraint §15). Cross-domain mapping is governed by ADR-007.
@@ -263,10 +272,11 @@ entity is like.
 Examples:
 
 ```text
-Character:  description, signatureQuote
-Location:   description
-Scene:      summary, imageCaption
-Avatar:     avatar prompt
+Character:      description, signatureQuote
+Location:       description
+Reading Route:  Route Synopsis (implementation: summary),
+                Frame Narrative (implementation: caption, formerly imageCaption — Deprecated)
+Avatar:         avatar prompt
 ```
 
 Rules:
@@ -310,8 +320,8 @@ UNIQUE(work_id, canonical_name) per entity type
 Enforcement:
 
 * The duplicate check SHALL occur at the point of Scope Field entry, immediately
-  after the operator provides the canonical_name (or chapter_title for Scene),
-  before the Copilot session is activated.
+  after the operator provides the canonical_name (or chapter_title for Reading
+  Route, implementation: Scene), before the Copilot session is activated.
 * If a duplicate is detected, the system SHALL surface the conflict to the human
   operator for resolution. The Copilot icon SHALL remain disabled until the
   conflict is resolved.
@@ -424,10 +434,12 @@ Bootstrap — catalog scope, no human acceptance gate
 
 ### Decision 9 — Scope Definition Model
 
-> **Terminology Note (A2):** Throughout this ADR, "Scene" refers to the current
-> Runtime Scene entity (Work → Scene → Story Images topology). `chapter_title`
-> refers to the Scope Field of the current Runtime Scene. This qualifier prevents
-> ambiguity with any future Story entity. See Known Constraint §15.
+> **Terminology Note (A2 + A8):** Throughout this ADR, "Scene" (implementation
+> symbol) refers to the Reading Route entity in the Runtime Truth v1 topology
+> (`Work → Reading Route → Reading Frame`). `chapter_title` refers to the Scope
+> Field of the current Reading Route. This qualifier prevents ambiguity with any
+> future Story entity. See Known Constraint §15. For normative Runtime vocabulary
+> see `docs/runtime-lexicon-v2.md`.
 
 Every Copilot session MUST have a human-defined scope before AI suggestions are
 generated.
@@ -967,8 +979,8 @@ Rules:
 ### 3. Duplicate Check Integration
 
 The duplicate check SHALL occur at Scope Field entry time — immediately after
-the operator enters a canonical_name (or chapter_title for Scene) — before the
-Copilot session is activated.
+the operator enters a canonical_name (or chapter_title for Reading Route,
+implementation: Scene) — before the Copilot session is activated.
 
 Sequence:
 
@@ -2299,3 +2311,17 @@ ADR-005     Narrative Information Model (Accepted — Editorial Domain and Story
 ADR-006     Discovery Copilot Architecture (Accepted — Authority Emergence and Discovery)
 ADR-007     Editorial → Runtime Rollout Architecture (Accepted — Architecture Freeze)
 ```
+
+---
+
+## Legacy Alias Reference (A8)
+
+*Added by Amendment A8 — Runtime Vocabulary Migration. See `docs/runtime-lexicon-v2.md` for the complete normative registry.*
+
+| Normative Term | Legacy Term | Classification | Status |
+| -------------- | ----------- | -------------- | ------ |
+| Reading Route | Scene | Implementation Alias | Active — appears as `(implementation: Scene)` |
+| Reading Frame | Story Image | Implementation Alias | Active — appears as `(implementation: Story Image)` |
+| Frame Narrative | caption | Documentation Alias | Active — implementation field name |
+| Route Synopsis | summary | Documentation Alias | Active — implementation column name |
+| Frame Narrative | imageCaption | Deprecated | Must not appear in new ADR/SPEC text |

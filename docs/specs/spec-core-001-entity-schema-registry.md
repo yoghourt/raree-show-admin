@@ -6,9 +6,9 @@
 | ------------ | ------------------------------------------------------------------ |
 | Title        | Entity Schema & Field Classification Registry                      |
 | Status       | EffectiveInImplementation                                          |
-| Version      | v1.0                                                               |
+| Version      | v1.1                                                               |
 | Owner        | Architect                                                          |
-| Last Updated | 2026-07-05                                                         |
+| Last Updated | 2026-07-07                                                         |
 | Derived From | ADR-004 (`docs/adr/004-source-of-canonical-truth.md`)              |
 | Related      | SPEC-D2-002, SPEC-D2-003                                           |
 
@@ -20,7 +20,7 @@ ADR-004 Decision 11–13 define the field classification taxonomy and Copilot ro
 
 SPEC-CORE-001 closes that deferral for Runtime Truth v1. It becomes the **sole governance authority** for:
 
-- Which fields exist on Character, Location, and Scene entity forms
+- Which fields exist on Character, Location, and Reading Route (implementation: Scene) entity forms
 - Each field's `classification` and `copilot_route` metadata
 - Scope field designation and mandatory-at-creation rules
 - The metadata contract consumed by the Enrichment Copilot runtime
@@ -118,7 +118,7 @@ interface FieldMetadata {
 
 **Note:** ADR-004 examples use `canonical_name` for Character/Location scope fields. That naming is illustrative only (ADR-004 Decision 11). Runtime Truth v1 uses `name` per existing Admin forms and database schema.
 
-**Scene scope anchor (Architect Decision 13):** `title` is the session anchor for Scene entities. It gates Copilot eligibility and duplicate detection (`useCopilotSession`, `SceneForm`). `chapter_title` is a canonical fact field (§4.3.4), not the primary scope anchor.
+**Reading Route scope anchor (Architect Decision 13):** `title` is the session anchor for Reading Route entities (implementation: Scene). It gates Copilot eligibility and duplicate detection (`useCopilotSession`, `SceneForm`). `chapter_title` is a canonical fact field (§4.3.4), not the primary scope anchor.
 
 §4.2 lists the **session anchor** scope field per entity (duplicate-check target and Copilot `scopeField`). Other fields MAY use `scope` classification when operator-defined and never AI-suggested; see §4.3.4 (`tags`).
 
@@ -142,7 +142,7 @@ This registry supersedes SPEC-D2-002 Appendix A as the authoritative source. The
 | `tags`          | classification=`excluded` ❌ | `scope` + route `excluded`         |
 | `locationId`    | classification=`reference` ❌ | `canonical` + route `reference`    |
 | `characterIds`  | classification=`reference` ❌ | `canonical` + route `reference`    |
-| Scene scope anchor | `chapter_title` = scope ❌ | `title` = scope (Decision 13)      |
+| Reading Route scope anchor | `chapter_title` = scope ❌ | `title` = scope (Decision 13) |
 | `chapter_title` | scope / excluded            | `canonical` / `fact`               |
 | `title`         | narrative / narrative       | `scope` / `excluded`               |
 
@@ -170,24 +170,24 @@ This registry supersedes SPEC-D2-002 Appendix A as the authoritative source. The
 
 **System fields excluded from Copilot:** `id`, `tsid`, `workId`, `createdAt`
 
-#### 4.3.4 Scene (`scenes` table)
+#### 4.3.4 Reading Route (implementation: `scenes` table)
 
 | Form field        | DB column         | Classification | Copilot route | Suggest? | Mandatory | Notes                                           |
 | ----------------- | ----------------- | -------------- | ------------- | -------- | --------- | ----------------------------------------------- |
 | `title`           | `title`           | `scope`        | `excluded`    | No       | Yes       | Session anchor (§4.2); duplicate check target; operator-defined |
 | `chapter_title`   | `chapter_title`   | `canonical`    | `fact`        | Yes      | No        | Chapter heading; Source First; nullable in form |
 | `chapter_number`  | `chapter_number`  | `canonical`    | `fact`        | Yes      | Yes       | Chapter sequence number; Source First           |
-| `summary`         | `summary`         | `narrative`    | `narrative`   | Yes      | No        | Scene summary prose                             |
+| `summary`         | `summary`         | `narrative`    | `narrative`   | Yes      | No        | Route Synopsis — container-level narrative prose for this Reading Route |
 | `tags`            | `tags`            | `scope`        | `excluded`    | No       | No        | Curator-defined; hidden in UI; not AI-suggested. Not a session anchor (§4.2). Classified `scope` (not invalid Appendix A `excluded`) because operator-only metadata; ensures server rejects `tags` in `emptyFields` per D2-002 §7.6 |
-| `story_images_v2` | `story_images_v2` | `asset`        | `excluded`    | No       | No        | Story images JSONB                              |
+| `story_images_v2` | `story_images_v2` | `asset`        | `excluded`    | No       | No        | Reading Frames JSONB — ordered array of `{url, caption}` (Reading Frame + Frame Narrative) |
 | `locationId`      | `location_id`     | `canonical`    | `reference`   | No       | No        | Location FK; v1 effective excluded (RS-04)      |
 | `characterIds`    | `character_ids`   | `canonical`    | `reference`   | No       | No        | Character FK array; v1 effective excluded (RS-04). React form field: `characterIdsTsids` / `characterIdsFallback`; client maps to `characterIds` for Copilot enumeration |
 
-**Form field aliases (Scene):** `SceneForm` registers `characterIdsTsids` and `characterIdsFallback` in React state. The Copilot registry key is `characterIds`; the client MUST map picker/fallback values to that key before calling `getSuggestableFields`.
+**Form field aliases (Reading Route, implementation: Scene):** `SceneForm` registers `characterIdsTsids` and `characterIdsFallback` in React state. The Copilot registry key is `characterIds`; the client MUST map picker/fallback values to that key before calling `getSuggestableFields`.
 
 **System fields excluded from Copilot:** `tsid`, `workId`, `order_index`
 
-Note: Scene table may have internal `id`; it is not used in Admin Copilot forms and is excluded.
+Note: Reading Route (`scenes`) table may have internal `id`; it is not used in Admin Copilot forms and is excluded.
 
 ### 4.4 Default Classification × Route Mapping
 
@@ -346,3 +346,16 @@ Tier and confidence conflicts between SPEC-D2-002 and SPEC-D2-003 remain governe
 - `lib/ai/copilot-types.ts`
 
 These files are expected to mirror §4.3 after Implementation authorization.
+
+---
+
+## Legacy Alias Reference
+
+*Runtime vocabulary aligned with `docs/runtime-lexicon-v2.md` (ADR-BP-RT-001).*
+
+| Normative Term | Legacy Term | Classification | Status |
+| -------------- | ----------- | -------------- | ------ |
+| Reading Route | Scene | Implementation Alias | Active — implementation symbol `scenes` |
+| Reading Frame | Story Image | Implementation Alias | Active — implementation symbol `story_images_v2[]` element |
+| Frame Narrative | caption | Documentation Alias | Active — implementation field name |
+| Route Synopsis | summary | Documentation Alias | Active — implementation column name |

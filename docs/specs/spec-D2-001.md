@@ -6,6 +6,12 @@
 **Owner:** Architect
 **Last Updated:** 2026-06-01
 
+> **Vocabulary Notice (ADR-BP-RT-001):** This document was authored before the Runtime Vocabulary Migration.
+> Throughout this document, "Scene" is an implementation symbol for the normative term **Reading Route**,
+> and "Story Images" / `story_images_v2` refers to the normative concept **Reading Frame**.
+> The normative Runtime vocabulary is defined in `docs/runtime-lexicon-v2.md`.
+> No content, contracts, or topology in this document has changed; only vocabulary names differ.
+
 ---
 
 ## Purpose
