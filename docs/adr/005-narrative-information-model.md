@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.3
-**Last Updated:** 2026-06-29
+**Version:** 1.4
+**Last Updated:** 2026-07-07
 **Owner:** Architect
 **Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Copilot authority); ADR-006 (Discovery Copilot Architecture — Authority Emergence and Human Review outcome paths); ADR-007 (Editorial → Runtime Rollout Architecture — Architecture Closure)
-**Amendment:** Clarification only — A1 (Relationship to ADR-006; Approved Story unit vs Production Entity), A2 (Relationship to ADR-007; cross-domain mapping deferral closed). No Decisions changed.
+**Amendment:** Clarification only — A1 (Relationship to ADR-006; Approved Story unit vs Production Entity), A2 (Relationship to ADR-007; cross-domain mapping deferral closed), A3 (Runtime Vocabulary Alignment — vocabulary only; references to Runtime Domain topology updated to normative vocabulary; no Decisions changed).
 
 ---
 
@@ -55,10 +55,11 @@ Author-defined chapters are publishing and reading-pause boundaries. They do not
 
 **Problem 2 — Scene-oriented modeling conflates the Runtime Domain with cognition.**
 
-Current Runtime Truth v1 routes reading through Scene records. Scene is a
- routable runtime unit in the **Runtime Domain** — not, by itself, a definition
- of editorial narrative completeness. Editorial decisions require a model grounded
- in reader cognition within the **Editorial Domain**, not storage convenience.
+Current Runtime Truth v1 routes reading through Reading Route records
+ (implementation: Scene). A Reading Route is the routable reading container in
+ the **Runtime Domain** — not, by itself, a definition of editorial narrative
+ completeness. Editorial decisions require a model grounded in reader cognition
+ within the **Editorial Domain**, not storage convenience.
 
 **Problem 3 — Knowledge defined before narrative.**
 
@@ -145,8 +146,9 @@ The governance and production layer where narrative units, boundaries, summaries
 **Runtime Domain**
 
 The production-enforced layer where reading topology, persistence, and routing
- are implemented. Current Runtime Truth v1 (`Work → Scene → Story Images`) belongs
- to the Runtime Domain.
+ are implemented. Current Runtime Truth v1 (`Work → Reading Route → Reading Frame`,
+ implementation: `Work → Scene → Story Images`) belongs to the Runtime Domain.
+ See `governance/vocabulary/runtime-lexicon.md` for normative Runtime vocabulary.
 
 **The ONE Rule**
 
@@ -291,9 +293,11 @@ The Story model defined by this ADR is **orthogonal** to current Runtime Truth v
 
 ```text
 Work
- └─ Scene              (routable runtime reading unit)
-      └─ Story Images  (ordered visual frames; JSONB)
+ └─ Reading Route              (routable reading container)
+      └─ Reading Frame         (ordered narrative-visual units; JSONB)
 ```
+
+*Implementation symbols: Reading Route → `scenes`; Reading Frame → `story_images_v2[]` element.*
 
 This ADR does not modify, endorse, or implement any mapping between domains.
 
@@ -535,3 +539,14 @@ ADR-004 — Source of Canonical Truth (parent)
 ADR-006 — Discovery Copilot Architecture (Accepted — Authority Emergence; Story vs Entity paths)
 ADR-007 — Editorial → Runtime Rollout Architecture (Accepted — Architecture Closure)
 ```
+
+---
+
+## Legacy Alias Reference (A3)
+
+*Added by Amendment A3 — Runtime Vocabulary Alignment. See `governance/vocabulary/runtime-lexicon.md` for the complete normative registry.*
+
+| Normative Term | Legacy Term | Classification | Status |
+| -------------- | ----------- | -------------- | ------ |
+| Reading Route | Scene | Implementation Alias | Active — appears as `(implementation: Scene)` |
+| Reading Frame | Story Image | Implementation Alias | Active — appears as `(implementation: Story Image)` |

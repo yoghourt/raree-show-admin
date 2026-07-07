@@ -45,16 +45,19 @@ const LOCATION_REGISTRY: Record<string, FieldMetadata> = {
 };
 
 // ---------------------------------------------------------------------------
-// §4.3.4 Scene — `scenes` table
+// §4.3.4 Reading Route (normative) — implementation: `scenes` table
+// Normative vocabulary: governance/vocabulary/runtime-lexicon.md RV-02
+//   summary       → Route Synopsis (RV-03)
+//   story_images_v2 → Reading Frames JSONB (RV-04); caption inside = Frame Narrative (RV-05)
 // ---------------------------------------------------------------------------
 
 const SCENE_REGISTRY: Record<string, FieldMetadata> = {
   title:          { classification: "scope",     copilot_route: "excluded"  },
   chapter_title:  { classification: "canonical",  copilot_route: "fact"      },
   chapter_number: { classification: "canonical",  copilot_route: "fact"      },
-  summary:        { classification: "narrative",  copilot_route: "narrative" },
+  summary:        { classification: "narrative",  copilot_route: "narrative" }, // Route Synopsis
   tags:           { classification: "scope",      copilot_route: "excluded"  },
-  story_images_v2:{ classification: "asset",      copilot_route: "excluded"  },
+  story_images_v2:{ classification: "asset",      copilot_route: "excluded"  }, // Reading Frames
   locationId:     { classification: "canonical",  copilot_route: "reference" },
   characterIds:   { classification: "canonical",  copilot_route: "reference" },
 };

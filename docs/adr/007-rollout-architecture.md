@@ -2,8 +2,9 @@
 
 **Status:** Accepted
 **Type:** Rollout ADR
-**Version:** 1.0
-**Last Updated:** 2026-06-29
+**Version:** 1.1
+**Last Updated:** 2026-07-07
+**Amendment:** A1 (Runtime Vocabulary Alignment — vocabulary only; Decision semantics and topology unchanged; Scene → Reading Route; Story Image → Reading Frame; normative vocabulary in `governance/vocabulary/runtime-lexicon.md`).
 **Owner:** Architect
 **Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Runtime Truth v1); ADR-005 (Narrative Information Model — Editorial Domain and Information Emergence); ADR-006 (Discovery Copilot Architecture — Authority Emergence and Discovery boundary); ADR-D2-001 (Canonical Metadata Authority)
 
@@ -38,11 +39,12 @@ The central architectural diagram of this ADR is the **Rollout Model**:
 Editorial Domain          Production Domain         Runtime Domain
 ─────────────────         ─────────────────         ──────────────
 
-Approved Story unit  ──►  (no Entity promotion) ──►  governed projection ──► Scene
-Approved Entity      ──►  Enrichment → Persist  ──►  Scene (existing path)
-                                                              │
+Approved Story unit  ──►  (no Entity promotion) ──►  governed projection ──► Reading Route
+Approved Entity      ──►  Enrichment → Persist  ──►  Reading Route (existing path)
+                                                              │         [impl: Scene]
                                                               ▼
-                                                         Story Images
+                                                         Reading Frame
+                                                         [impl: Story Images]
                                                          (Runtime Truth v1)
 ```
 
@@ -141,19 +143,22 @@ Editorial Domain          Production Domain         Runtime Domain
 ─────────────────         ─────────────────         ──────────────
 
 Narrative / Story         Catalog Entity path       Work
-Discovery / Candidates          │                    └─ Scene
-Human Review                  Enrichment                 └─ Story Images
+Discovery / Candidates          │                    └─ Reading Route
+Human Review                  Enrichment                 └─ Reading Frame
 Approved Story unit      Persist (existing)            Reader
+                                         [impl: Scene / Story Images]
         │                       │
-        └──── governed projection (human-accepted) ──► Scene association
+        └──── governed projection (human-accepted) ──► Reading Route association
+                                                       (implementation: Scene)
 ```
 
 **Catalog Entity path** — unchanged from ADR-004 and ADR-006. Approved Entities
  enter Runtime through existing Production persist paths.
 
 **Story unit path** — Approved Story units remain Editorial Domain artifacts.
- Entry into Runtime is **only** through **governed projection** to existing Scene
- records. Story does **not** become a new routable Runtime node.
+ Entry into Runtime is **only** through **governed projection** to existing
+ Reading Route records (implementation: Scene). Story does **not** become a new
+ routable Runtime node.
 
 ---
 
@@ -165,9 +170,9 @@ This section answers the architectural questions deferred by ADR-004, ADR-005,
 
 | Question | Rollout decision |
 | -------- | ---------------- |
-| Story ↔ Scene relationship | **Orthogonal and associative** — related but not equivalent; **N:M** permitted (one Scene may relate to multiple Stories; one Story may relate to multiple Scenes); **identity merge prohibited** |
-| Story runtime representation | **Projection-only** — Story is **not** a routable Runtime entity in Runtime Truth v1; association is governed projection onto **Scene** |
-| Scene Candidate vs Runtime Scene | Scene Candidate Generation produces **editorial scene-level artifacts**; they are **not** Runtime Scene records until human-accepted governed projection applies |
+| Story ↔ Reading Route relationship | **Orthogonal and associative** — related but not equivalent; **N:M** permitted (one Reading Route may relate to multiple Stories; one Story may relate to multiple Reading Routes); **identity merge prohibited** |
+| Story runtime representation | **Projection-only** — Story is **not** a routable Runtime entity in Runtime Truth v1; association is governed projection onto **Reading Route** (implementation: Scene) |
+| Scene Candidate (Discovery) vs Runtime Reading Route | Scene Candidate Generation produces **editorial scene-level artifacts**; they are **not** Reading Route records (implementation: Scene records) until human-accepted governed projection applies |
 | Dual-domain coexistence | **Coexistence without conflation** — Editorial may lead Runtime representation; domains remain distinct |
 | Authority when domains diverge | **Split precedence** (Decision 6) |
 | Rollout vs SPEC boundary | ADR defines principles, phases, invariants; SPEC defines schema, API, validation, sync |
@@ -176,16 +181,23 @@ This section answers the architectural questions deferred by ADR-004, ADR-005,
 
 ## Glossary
 
-Terms **Story**, **Scene**, **Editorial Domain**, **Runtime Domain**, **Entity**,
+Terms **Story**, **Editorial Domain**, **Runtime Domain**, **Entity**,
  **Approved Story unit**, and **Human Acceptance Gate** are defined in ADR-005,
  ADR-004, and ADR-006 respectively. This ADR references those definitions and
  MUST NOT redefine them with conflicting semantics.
+
+**Reading Route** (normative; implementation alias: Scene) — The routable reading
+ container in Runtime Truth v1. See `governance/vocabulary/runtime-lexicon.md` RV-02.
+
+**Reading Frame** (normative; implementation alias: Story Image) — One ordered
+ narrative-visual unit inside a Reading Route. See `governance/vocabulary/runtime-lexicon.md` RV-04.
 
 **Governed Projection**
 
 A **human-accepted** architectural association between an Editorial Domain
  artifact (typically an Approved Story unit) and Runtime Domain representation
- (Scene record(s)), without identity merge or silent conflation.
+ (Reading Route record(s), implementation: Scene record(s)), without identity
+ merge or silent conflation.
 
 **Orthogonal Coexistence**
 
@@ -195,9 +207,10 @@ The operational state in which Editorial Domain and Runtime Domain artifacts
 
 **Runtime Projection**
 
-The architectural association of Editorial Story content to Runtime Scene(s) under
- Rollout governance. Projection is **not** a new Runtime entity type and does not
- alter the `Work → Scene → Story Images` topology.
+The architectural association of Editorial Story content to Reading Route(s)
+ (implementation: Scene(s)) under Rollout governance. Projection is **not** a
+ new Runtime entity type and does not alter the
+ `Work → Reading Route → Reading Frame` topology.
 
 **Rollout Phase**
 
@@ -218,20 +231,20 @@ Rollout extends the architecture by defining cross-domain transition principles.
 
 ---
 
-### Decision 2 — Story and Scene Are Orthogonal
+### Decision 2 — Story and Reading Route Are Orthogonal
 
-**Story and Scene are orthogonal constructs in different domains.**
+**Story and Reading Route are orthogonal constructs in different domains.**
 
 | Construct | Domain | Role |
 | --------- | ------ | ---- |
 | **Story** | Editorial Domain | Cognitive narrative unit (ADR-005 Canonical Definition) |
-| **Scene** | Runtime Domain | Routable runtime reading unit (ADR-004 Runtime Truth v1) |
+| **Reading Route** (implementation: Scene) | Runtime Domain | Routable reading container (ADR-004 Runtime Truth v1) |
 
-Story and Scene MAY be **associated** through governed projection. They MUST NOT
- be treated as equivalent, interchangeable, or merged by identity.
+Story and Reading Route MAY be **associated** through governed projection. They
+ MUST NOT be treated as equivalent, interchangeable, or merged by identity.
 
-One Scene MAY relate to multiple Stories. One Story MAY relate to multiple Scenes.
- Forced 1:1 equivalence is prohibited.
+One Reading Route MAY relate to multiple Stories. One Story MAY relate to
+ multiple Reading Routes. Forced 1:1 equivalence is prohibited.
 
 ---
 
@@ -243,13 +256,13 @@ Runtime Truth v1 topology remains:
 
 ```text
 Work
- └─ Scene
-      └─ Story Images
+ └─ Reading Route          (implementation: Scene)
+      └─ Reading Frame      (implementation: Story Images / story_images_v2[])
 ```
 
 Editorial Story units enter Runtime influence **only** through **governed
- projection** onto existing Scene records. No new routable layer is introduced
- between Work and Scene.
+ projection** onto existing Reading Route records (implementation: Scene). No
+ new routable layer is introduced between Work and Reading Route.
 
 ---
 
@@ -263,7 +276,7 @@ Any association between an Editorial Domain artifact and Runtime Domain
 * be **explicit** — not inferred from persist, Discovery, or Enrichment alone;
 * be **human-accepted** — ADR-004 Decision 2 applies to projection decisions;
 * preserve **domain separation** — projection links artifacts; it does not merge
-  Story into Scene identity.
+  Story into Reading Route identity (implementation: Scene identity).
 
 Implicit mapping on entity persist, batch sync, or AI suggestion is prohibited.
 
@@ -325,7 +338,7 @@ Phase 1 — Editorial Production Without Runtime Projection
 Phase 2 — Governed Projection Enabled
   Human-accepted Editorial↔Runtime associations are permitted.
   Projection links Approved Story units (and editorial scene-level artifacts where
-  governed) to Runtime Scene records.
+  governed) to Runtime Reading Route records (implementation: Scene records).
   Runtime Truth v1 topology unchanged; projection is association metadata at the
   architectural layer — implementation deferred to SPEC.
 ```
@@ -364,13 +377,14 @@ The following invariants are **Rollout constraints**. They are not Runtime
 
 **ROL-INV-01 — Runtime Truth v1 topology unchanged**
 
-Rollout MUST NOT alter the `Work → Scene → Story Images` topology defined by
- ADR-004.
+Rollout MUST NOT alter the `Work → Reading Route → Reading Frame` topology
+ defined by ADR-004 (implementation: `Work → Scene → Story Images`).
 
 **ROL-INV-02 — No silent Editorial→Runtime conflation**
 
-Editorial approval MUST NOT silently create, modify, or equate Runtime Scene
- records. Association requires governed projection (Decision 4).
+Editorial approval MUST NOT silently create, modify, or equate Runtime Reading
+ Route records (implementation: Scene records). Association requires governed
+ projection (Decision 4).
 
 **ROL-INV-03 — Projection requires Human Acceptance**
 
@@ -457,7 +471,7 @@ ADR-004 remains authoritative for:
 ADR-007 owns:
 
 * Editorial↔Runtime rollout governance
-* Story ↔ Scene orthogonal association model
+* Story ↔ Reading Route orthogonal association model (implementation: Scene)
 * Governed projection principles
 * Dual-domain coexistence and authority reconciliation
 * Architecture Closure for Runtime Truth v1
@@ -478,7 +492,7 @@ ADR-005 provides:
 
 ADR-007 adds:
 
-* Governed projection from Approved Story units to Runtime Scene association
+* Governed projection from Approved Story units to Runtime Reading Route (implementation: Scene) association
 * Rollout phases and ROL-INV-* invariants
 * Architecture Closure
 
@@ -520,13 +534,15 @@ Current Runtime Truth v1 topology in the **Runtime Domain** is unchanged by this
 
 ```text
 Work
- └─ Scene              (routable runtime reading unit)
-      └─ Story Images  (ordered visual frames; JSONB)
+ └─ Reading Route              (routable reading container)
+      └─ Reading Frame         (ordered narrative-visual units; JSONB)
 ```
+
+*Implementation symbols: Reading Route → `scenes`; Reading Frame → `story_images_v2[]` element.*
 
 This ADR governs **how Editorial Domain artifacts may associate** with that
  topology through governed projection. It does not add Story as a routable node,
- replace Scene, or redesign the reading flow.
+ replace Reading Route (implementation: Scene), or redesign the reading flow.
 
 When Editorial Domain and Runtime Domain descriptions diverge, **split precedence**
  (Decision 6) applies.
@@ -541,7 +557,7 @@ The following are explicitly deferred. They MUST NOT be inferred from this ADR.
 | ------------- | ------------------------ |
 | Projection schema, link model, or API | SPEC |
 | Synchronization algorithms or batch migration | SPEC or Implementation |
-| Scene Candidate → Runtime Scene review UI | SPEC |
+| Scene Candidate → Runtime Reading Route review UI | SPEC |
 | Candidate persistence / Discovery session (Discovery) | SPEC (ADR-006) |
 | Relationship delta persistence | SPEC (post-v1 capability) |
 | Story Arc visibility in Runtime | SPEC or post-v1 capability |
@@ -558,7 +574,7 @@ Implementation of any deferred item MUST follow **ADR → SPEC → Implementatio
 This Rollout ADR explicitly excludes:
 
 * Runtime Truth v1 topology redesign
-* Story or Scene semantic redefinition
+* Runtime Truth v1 Reading Route or Reading Frame semantic redefinition
 * Discovery or Enrichment architecture changes
 * Knowledge Graph or Relationship Graph architecture
 * Database schema, API contracts, migration SQL, or UI design
@@ -592,9 +608,10 @@ Rejected. Violates Human Acceptance Gate for projection decisions and reproduces
 
 **Approved — Alternative E: Orthogonal coexistence with governed projection.**
 
-Story and Scene remain domain-distinct. Editorial→Runtime association requires
- explicit, human-accepted governed projection onto existing Scene records without
- topology redesign.
+Story and Reading Route (implementation: Scene) remain domain-distinct.
+ Editorial→Runtime association requires explicit, human-accepted governed
+ projection onto existing Reading Route records (implementation: Scene records)
+ without topology redesign.
 
 ---
 
@@ -612,7 +629,7 @@ Story and Scene remain domain-distinct. Editorial→Runtime association requires
 **Costs**
 
 * Dual-domain model with governed projection increases governance and SPEC complexity
-* Story has no independent Runtime route — reader navigation remains Scene-centric
+* Story has no independent Runtime route — reader navigation remains Reading Route-centric (implementation: Scene)
 * Operator must understand projection vs persist vs Enrichment vs Discovery
 * Phase 2 projection implementation remains entirely downstream in SPEC
 
@@ -639,3 +656,14 @@ ADR-006 — Discovery Copilot Architecture (parent; Authority Emergence and Disc
 ADR-D2-001 — Canonical Metadata Authority (Tier metadata ingress)
 ADR-001 — Assisted Work Bootstrap Pipeline (Historical; Superseded)
 ```
+
+---
+
+## Legacy Alias Reference (A1)
+
+*Added by Amendment A1 — Runtime Vocabulary Alignment. See `governance/vocabulary/runtime-lexicon.md` for the complete normative registry.*
+
+| Normative Term | Legacy Term | Classification | Status |
+| -------------- | ----------- | -------------- | ------ |
+| Reading Route | Scene | Implementation Alias | Active — appears as `(implementation: Scene)` |
+| Reading Frame | Story Image | Implementation Alias | Active — appears as `(implementation: Story Image)` |
