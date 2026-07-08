@@ -16,7 +16,10 @@ A7 (ADR-007 Accepted — Editorial → Runtime Rollout Architecture; Architectur
 Follow-up chain terminates; cross-domain mapping deferral closed),
 A8 (Runtime Vocabulary Migration — vocabulary only; topology unchanged; Scene →
 Reading Route; Story Image → Reading Frame; normative vocabulary now in
-`governance/vocabulary/runtime-lexicon.md`; no Decisions, topology, or contracts changed).
+`governance/vocabulary/runtime-lexicon.md`; no Decisions, topology, or contracts changed),
+A9 (ADR-008 Accepted — Runtime Vocabulary Convergence; Ubiquitous Language Policy and
+Inferability Principle established; alias model superseded by Alias Acceptance Rule;
+Vocabulary Debt classification introduced; no topology or contracts changed).
 No Decisions, Acceptance Criteria, routing logic, or topology changed.
 
 **A4 Historical Note:** Prior Follow-up Roadmap text described ADR-005 as
