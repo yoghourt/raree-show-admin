@@ -1,6 +1,6 @@
 /**
- * POST /api/admin/rollout/scene-projection/unproject
- * Cancel Scene projection — restore staging (delete created Scene when applicable)
+ * POST /api/admin/rollout/reading-route-projection/unproject
+ * Cancel Reading Route projection — restore staging (delete created Reading Route when applicable)
  */
 
 import { NextResponse } from "next/server";
@@ -11,7 +11,7 @@ import {
   parseJsonBody,
   requireRolloutAuth,
 } from "@/lib/rollout/rollout-route-helpers";
-import { unprojectScene } from "@/lib/rollout/scene-projection";
+import { unprojectReadingRoute } from "@/lib/rollout/reading-route-projection";
 
 const bodySchema = z.object({
   workId: z.string().min(1),
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await unprojectScene(
+    const result = await unprojectReadingRoute(
       auth.supabase,
       workId,
       sceneTsid,
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
         {
           error: {
             code: "SCENE_NOT_FOUND",
-            message: "Scene not found for unproject",
+            message: "Reading Route not found for unproject",
           },
         },
         { status: 404 }

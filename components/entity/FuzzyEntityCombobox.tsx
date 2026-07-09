@@ -19,14 +19,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { rankEntityOptions } from "@/lib/entity-fuzzy-rank"
+import { messages } from "@/lib/locale"
 import { cn } from "@/lib/utils"
 
-const EMPTY_COPY = "No matching results."
+const EMPTY_COPY = messages.common.noMatchingResults
 
 export function FuzzyEntityCombobox({
   value,
   options,
-  placeholder = "Search…",
+  placeholder = messages.common.search,
   loading = false,
   disabled = false,
   onSelect,
@@ -67,7 +68,7 @@ export function FuzzyEntityCombobox({
           )}
         >
           <span className="truncate">
-            {loading ? "Loading..." : selected?.label ?? placeholder}
+            {loading ? messages.common.loading : selected?.label ?? placeholder}
           </span>
           <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </button>
@@ -78,7 +79,7 @@ export function FuzzyEntityCombobox({
             className="flex min-h-48 items-center justify-center px-3 py-6 text-sm text-muted-foreground"
             aria-busy="true"
           >
-            Loading...
+            {messages.common.loading}
           </div>
         ) : (
           <Command shouldFilter={false}>

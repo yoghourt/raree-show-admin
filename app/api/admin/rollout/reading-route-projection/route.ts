@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/rollout/scene-projection
+ * POST /api/admin/rollout/reading-route-projection
  * SPEC-ROL-001 §4.7.3
  */
 
@@ -10,7 +10,7 @@ import {
   parseJsonBody,
   requireRolloutAuth,
 } from "@/lib/rollout/rollout-route-helpers";
-import { acceptSceneProjection } from "@/lib/rollout/scene-projection";
+import { acceptReadingRouteProjection } from "@/lib/rollout/reading-route-projection";
 import {
   assertStagingWorkId,
   sceneProjectionBodySchema,
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       {
         error: {
           code: "STAGING_INVALID",
-          message: "Invalid scene projection body",
+          message: "Invalid reading route projection body",
           fields: Object.keys(parsed.error.flatten().fieldErrors),
         },
       },
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await acceptSceneProjection(auth.supabase, {
+    const result = await acceptReadingRouteProjection(auth.supabase, {
       workId,
       staging,
       mode,
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
         {
           error: {
             code: "LINK_ALREADY_EXISTS",
-            message: "Story unit is already linked to this Scene",
+            message: "Story unit is already linked to this Reading Route",
           },
         },
         { status: 409 }

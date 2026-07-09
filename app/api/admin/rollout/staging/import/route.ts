@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     {
       workId,
       storyStaging: [],
-      sceneStaging: [],
+      readingRouteStaging: [],
       updatedAt: new Date().toISOString(),
     },
     { storyUnits, sceneCandidates }

@@ -111,8 +111,8 @@ export function updateSceneStagingInRolloutQueue(
   const current = loadRolloutQueue(workId, operatorId);
   const next = {
     ...current,
-    sceneStaging: [
-      ...current.sceneStaging.filter(
+    readingRouteStaging: [
+      ...current.readingRouteStaging.filter(
         (item) => item.sourceReviewId !== staging.sourceReviewId
       ),
       staging,

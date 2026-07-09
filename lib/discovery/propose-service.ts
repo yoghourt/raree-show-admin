@@ -35,14 +35,14 @@ const REGISTRY_FIELD_HINTS: Record<DiscoveryCandidateType, string[]> = {
   character: ["name", "house", "description", "signatureQuote"],
   location: ["name", "region", "description"],
   story: ["title", "summary", "boundaryHint"],
-  scene: ["chapter_title", "chapter_number", "title", "summary"],
+  readingRoute: ["chapter_title", "chapter_number", "title", "summary"],
 };
 
 const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
   character: `{"candidates":[{"displayName":"Arya Stark","summary":"Young Stark daughter.","fields":{"name":"Arya Stark","house":"Stark"}}]}`,
   location: `{"candidates":[{"displayName":"Winterfell","summary":"Seat of House Stark.","fields":{"name":"Winterfell","region":"The North"}}]}`,
   story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
-  scene: `{"candidates":[{"displayName":"Courtyard Welcome","summary":"Royal arrival scene.","fields":{"chapter_number":1,"chapter_title":"Bran I","title":"Courtyard Welcome","summary":"Household gathers in the courtyard."}}]}`,
+  readingRoute: `{"candidates":[{"displayName":"Courtyard Welcome","summary":"Royal arrival scene.","fields":{"chapter_number":1,"chapter_title":"Bran I","title":"Courtyard Welcome","summary":"Household gathers in the courtyard."}}]}`,
 };
 
 function mockCandidatesForType(
@@ -98,7 +98,7 @@ function mockCandidatesForType(
           },
         },
       ];
-    case "scene":
+    case "readingRoute":
       return [
         {
           candidateId: randomUUID(),
@@ -166,7 +166,7 @@ Generation rules (critical):
 - Include ONLY ${candidateType} entities explicitly supported by the narrative prose above.
 - Do NOT invent background cast, generic extras, or inferred entities not grounded in the text.
 - Do NOT pad the list to reach the cap. Prefer fewer accurate candidates.
-- For a single chapter excerpt, typical counts are: character 2-5, location 1-3, story 1-2, scene 1-4 — use what the text actually supports.
+- For a single chapter excerpt, typical counts are: character 2-5, location 1-3, story 1-2, readingRoute 1-4 — use what the text actually supports.
 - If the narrative supports zero distinct ${candidateType} units, return {"candidates":[]}.
 
 Return ONLY valid JSON — a single object {"candidates":[...]}. No markdown fences, no commentary.
@@ -176,7 +176,7 @@ Optional per item: confidence ("green"|"yellow"|"red"), evidence ([{sourceLabel,
 
 Example shape for type "${candidateType}":
 ${TYPE_EXAMPLES[candidateType]}
-${candidateType === "scene" ? '\nScene fields MUST live under "fields" with chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.\n' : ""}
+${candidateType === "readingRoute" ? '\nReading route fields MUST live under "fields" with chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.\n' : ""}
 ${candidateType === "location" ? '\nLocation fields MUST use fields.name (place name). Do NOT return prose paragraphs as the only value.\n' : ""}
 ${candidateType === "story" ? '\nStory fields MUST use fields.title and fields.summary (editorial story unit). Optional boundaryHint. Return {"candidates":[...]} — each item needs displayName, summary, and fields with title + summary.\n' : ""}
 

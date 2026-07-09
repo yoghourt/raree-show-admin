@@ -10,6 +10,7 @@ import type {
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
+import { messages } from "@/lib/locale";
 import {
   dismissSceneStagingItem,
   dismissStoryStagingItem,
@@ -33,7 +34,7 @@ import { syncRolloutQueueFromDiscovery } from "@/lib/rollout/sync-discovery-stag
 import type {
   ApprovedStoryUnit,
   RolloutQueueSnapshot,
-  StorySceneProjectionLink,
+  StoryReadingRouteProjectionLink,
 } from "@/lib/rollout/types";
 
 export interface UseRolloutConfig {
@@ -58,7 +59,7 @@ export interface UseRolloutReturn {
   error: string | null;
   queue: RolloutQueueSnapshot;
   storyUnits: ApprovedStoryUnit[];
-  links: StorySceneProjectionLink[];
+  links: StoryReadingRouteProjectionLink[];
   scenes: RolloutSceneBrief[];
   actionError: RolloutActionError | null;
   busy: boolean;
@@ -123,7 +124,7 @@ export function useRollout({
     loadRolloutQueue(workId, operatorId)
   );
   const [storyUnits, setStoryUnits] = useState<ApprovedStoryUnit[]>([]);
-  const [links, setLinks] = useState<StorySceneProjectionLink[]>([]);
+  const [links, setLinks] = useState<StoryReadingRouteProjectionLink[]>([]);
   const [scenes, setScenes] = useState<RolloutSceneBrief[]>([]);
 
   const persistQueue = useCallback(
@@ -156,7 +157,7 @@ export function useRollout({
       }
       const json = (await res.json()) as {
         storyUnits: ApprovedStoryUnit[];
-        links: StorySceneProjectionLink[];
+        links: StoryReadingRouteProjectionLink[];
         scenes: RolloutSceneBrief[];
       };
       const persistedUnits = json.storyUnits ?? [];
@@ -225,7 +226,7 @@ export function useRollout({
     }
     const merged = syncRolloutQueueFromDiscovery(workId, operatorId);
     setQueue(merged);
-    return merged.storyStaging.length > 0 || merged.sceneStaging.length > 0;
+    return merged.storyStaging.length > 0 || merged.readingRouteStaging.length > 0;
   }, [workId, operatorId]);
 
   const persistStoryUnit = useCallback(
@@ -264,7 +265,7 @@ export function useRollout({
       setBusy(true);
       setActionError(null);
       try {
-        const res = await fetch("/api/admin/rollout/scene-projection", {
+        const res = await fetch("/api/admin/rollout/reading-route-projection", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -307,7 +308,7 @@ export function useRollout({
       setBusy(true);
       setActionError(null);
       try {
-        const res = await fetch("/api/admin/rollout/scene-projection", {
+        const res = await fetch("/api/admin/rollout/reading-route-projection", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -481,7 +482,7 @@ export function useRollout({
       setBusy(true);
       setActionError(null);
       try {
-        const res = await fetch("/api/admin/rollout/scene-projection/unproject", {
+        const res = await fetch("/api/admin/rollout/reading-route-projection/unproject", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -524,7 +525,7 @@ export function useRollout({
         setActionError({
           code: "STAGING_NOT_FOUND",
           message:
-            "此 Scene 无 Rollout 投影记录，无法取消投影。请使用 Scenes 管理页编辑或删除。",
+            messages.rollout.unprojectNoRecord,
         });
         return false;
       }

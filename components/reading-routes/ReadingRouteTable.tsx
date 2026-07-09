@@ -22,15 +22,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Scene } from "@/lib/types";
+import type { ReadingRoute } from "@/lib/types";
+import { messages } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 
-function groupScenesByChapter(scenes: Scene[]): {
+function groupScenesByChapter(scenes: ReadingRoute[]): {
   chapterNumber: number;
   chapterTitle: string | null;
-  scenes: Scene[];
+  scenes: ReadingRoute[];
 }[] {
-  const map = new Map<number, Scene[]>();
+  const map = new Map<number, ReadingRoute[]>();
   for (const scene of scenes) {
     const n = scene.chapter_number;
     const list = map.get(n);
@@ -50,14 +51,14 @@ function groupScenesByChapter(scenes: Scene[]): {
   });
 }
 
-function chapterCellText(scene: Scene) {
+function chapterCellText(scene: ReadingRoute) {
   const t = scene.chapter_title;
   return t ? `${scene.chapter_number} · ${t}` : String(scene.chapter_number);
 }
 
-export type SceneTableProps = {
+export type ReadingRouteTableProps = {
   workId: string;
-  scenes: Scene[];
+  scenes: ReadingRoute[];
   loading: boolean;
   error: string | null;
   onDelete: (tsid: string) => Promise<void>;
@@ -78,19 +79,19 @@ function TableSkeleton() {
   );
 }
 
-export function SceneTable({
+export function ReadingRouteTable({
   workId,
   scenes,
   loading,
   error,
   onDelete,
-}: SceneTableProps) {
+}: ReadingRouteTableProps) {
   const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(
     null
   );
   const [deleteSubmitting, setDeleteSubmitting] = React.useState(false);
 
-  const scenesBase = `/works/${encodeURIComponent(workId)}/scenes`;
+  const scenesBase = `/works/${encodeURIComponent(workId)}/reading-routes`;
 
   const confirmDelete = async () => {
     if (!deleteTargetId) return;
@@ -134,10 +135,10 @@ export function SceneTable({
                 />
               </div>
               <p className="mt-5 text-sm font-medium text-zinc-800">
-                暂无场景
+                {messages.works.noReadingRoutes}
               </p>
               <p className="mt-1 max-w-sm text-sm text-zinc-500">
-                点击右上角「新增场景」创建第一条记录。
+                {messages.works.createFirstReadingRoute}
               </p>
             </div>
           ) : (
@@ -146,7 +147,7 @@ export function SceneTable({
                 <div key={group.chapterNumber}>
                   <div className="bg-zinc-100/90 px-4 py-2.5">
                     <h3 className="text-[13px] font-semibold text-zinc-800">
-                      Chapter {group.chapterNumber}
+                      {messages.common.chapterN(group.chapterNumber)}
                       {group.chapterTitle ? (
                         <span className="font-medium text-zinc-600">
                           {" "}
@@ -159,7 +160,7 @@ export function SceneTable({
                     <TableHeader>
                       <TableRow className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50">
                         <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                          TSID
+                          {messages.common.businessId}
                         </TableHead>
                         <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
                           标题
@@ -261,7 +262,7 @@ export function SceneTable({
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              确定要删除该场景吗？此操作将从数据库中永久移除该记录。
+              {messages.works.deleteConfirm}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">

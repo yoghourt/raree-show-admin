@@ -1,13 +1,15 @@
 /**
  * SPEC-D3-001 §4.4 — normative UI copy (zh-CN fixed locale until i18n)
+ * SPEC-VDC-001 — Runtime vocabulary strings sourced from lib/locale
  */
 
-export const DISCOVERY_NARRATIVE_HINT =
-  "叙事发现以正文为先。请勿单独使用关键词列表、运行时场景表导出或章节目录元数据作为唯一输入。";
+import { messages } from "@/lib/locale";
+
+export const DISCOVERY_NARRATIVE_HINT = messages.discovery.narrativeHint;
 
 export const DISCOVERY_FORBIDDEN_INPUTS = [
   "仅关键词列表",
-  "仅运行时场景标识或场景表导出",
+  messages.discovery.forbiddenRuntimeTableExport,
   "仅章节目录元数据",
 ] as const;
 
@@ -25,7 +27,7 @@ export const DISCOVERY_EXAMPLES = [
   },
   {
     label: "不合规",
-    example: "仅导出场景表标题/章号，无叙事摘录",
+    example: messages.discovery.forbiddenCatalogExportExample,
     verdict: "未通过（NG-06）",
   },
   {

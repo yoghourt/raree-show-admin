@@ -5,6 +5,7 @@ import { Dialog as SheetPrimitive } from "radix-ui"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { messages } from "@/lib/locale"
 import { Button } from "@/components/ui/button"
 
 function Sheet({
@@ -99,7 +100,7 @@ function SheetContent({
               className="absolute top-4 right-4"
             >
               <XIcon />
-              <span className="sr-only">关闭</span>
+              <span className="sr-only">{messages.common.close}</span>
             </Button>
           </SheetPrimitive.Close>
         )}

@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MapPicker } from "@/components/locations/MapPicker";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
+import { messages } from "@/lib/locale";
 import { getClassification } from "@/lib/ai/field-registry";
 import * as locationsApi from "@/lib/locations";
 import type { SuggestionItem } from "@/lib/ai/copilot-types";
@@ -283,7 +284,7 @@ export function LocationForm(props: LocationFormProps) {
         <SheetContent side="right" className="w-[420px] sm:max-w-[420px] overflow-y-auto flex flex-col gap-0">
           <SheetHeader className="pb-4 border-b">
             <div className="flex items-center gap-2">
-              <SheetTitle>Copilot 建议</SheetTitle>
+              <SheetTitle>{messages.copilot.suggestions}</SheetTitle>
               {copilot.suggestions.length > 0 && (
                 <span className="rounded-full bg-violet-100 dark:bg-violet-900 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-300 font-medium">
                   {copilot.suggestions.length} 条

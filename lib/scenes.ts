@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Scene, StoryImage } from "@/lib/types";
+import type { ReadingFrame, ReadingRoute } from "@/lib/types";
 
 const TABLE = "scenes";
 
@@ -14,7 +14,7 @@ function locationIdFromDb(raw: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-type SceneRow = {
+type ReadingRouteRow = {
   work_id: string;
   tsid: string;
   title: string;
@@ -28,10 +28,10 @@ type SceneRow = {
   character_ids: string[] | null;
 };
 
-function parseStoryImagesV2(raw: unknown): StoryImage[] | null {
+function parseStoryImagesV2(raw: unknown): ReadingFrame[] | null {
   if (raw == null) return null;
   if (!Array.isArray(raw)) return null;
-  const out: StoryImage[] = [];
+  const out: ReadingFrame[] = [];
   for (const item of raw) {
     if (
       item &&
@@ -48,7 +48,7 @@ function parseStoryImagesV2(raw: unknown): StoryImage[] | null {
   return out;
 }
 
-function rowToScene(row: SceneRow): Scene {
+function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
   return {
     workId: row.work_id,
     tsid: row.tsid,
@@ -65,7 +65,7 @@ function rowToScene(row: SceneRow): Scene {
 
 function toInsertRow(
   workId: string,
-  data: Omit<Scene, "tsid" | "workId"> & { tsid: string }
+  data: Omit<ReadingRoute, "tsid" | "workId"> & { tsid: string }
 ): Record<string, unknown> {
   return {
     work_id: workId,
@@ -82,7 +82,7 @@ function toInsertRow(
   };
 }
 
-function toUpdateRow(data: Omit<Scene, "tsid" | "workId">): Record<string, unknown> {
+function toUpdateRow(data: Omit<ReadingRoute, "tsid" | "workId">): Record<string, unknown> {
   return {
     title: data.title,
     chapter_number: data.chapter_number,
@@ -95,7 +95,7 @@ function toUpdateRow(data: Omit<Scene, "tsid" | "workId">): Record<string, unkno
   };
 }
 
-export async function getScenes(workId: string): Promise<Scene[]> {
+export async function getScenes(workId: string): Promise<ReadingRoute[]> {
   try {
     const { data, error } = await supabase
       .from(TABLE)
@@ -108,7 +108,7 @@ export async function getScenes(workId: string): Promise<Scene[]> {
       throw new Error(error.message);
     }
 
-    return (data as SceneRow[] | null)?.map(rowToScene) ?? [];
+    return (data as ReadingRouteRow[] | null)?.map(rowToReadingRoute) ?? [];
   } catch (e) {
     if (e instanceof Error) {
       throw e;
@@ -120,7 +120,7 @@ export async function getScenes(workId: string): Promise<Scene[]> {
 export async function getScene(
   workId: string,
   tsid: string
-): Promise<Scene | null> {
+): Promise<ReadingRoute | null> {
   try {
     const { data, error } = await supabase
       .from(TABLE)
@@ -137,7 +137,7 @@ export async function getScene(
       return null;
     }
 
-    return rowToScene(data as SceneRow);
+    return rowToReadingRoute(data as ReadingRouteRow);
   } catch (e) {
     if (e instanceof Error) {
       throw e;
@@ -148,12 +148,12 @@ export async function getScene(
 
 export async function createScene(
   workId: string,
-  data: Omit<Scene, "tsid" | "workId"> & { tsid?: string }
-): Promise<Scene> {
+  data: Omit<ReadingRoute, "tsid" | "workId"> & { tsid?: string }
+): Promise<ReadingRoute> {
   try {
     const { tsid: optionalTsid, ...rest } = data;
     const tsid = optionalTsid?.trim() || `scene_${Date.now()}`;
-    const full: Omit<Scene, "tsid" | "workId"> & { tsid: string } = {
+    const full: Omit<ReadingRoute, "tsid" | "workId"> & { tsid: string } = {
       tsid,
       title: rest.title,
       chapter_number: rest.chapter_number,
@@ -178,7 +178,7 @@ export async function createScene(
       throw new Error(error.message);
     }
 
-    return rowToScene(inserted as SceneRow);
+    return rowToReadingRoute(inserted as ReadingRouteRow);
   } catch (e) {
     if (e instanceof Error) {
       throw e;
@@ -190,7 +190,7 @@ export async function createScene(
 export async function updateScene(
   workId: string,
   tsid: string,
-  data: Omit<Scene, "tsid" | "workId">
+  data: Omit<ReadingRoute, "tsid" | "workId">
 ): Promise<void> {
   try {
     const updateRow = toUpdateRow(data);

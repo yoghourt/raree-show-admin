@@ -8,7 +8,7 @@ import type {
 } from "@/lib/discovery/review-types";
 import type {
   ApprovedStoryUnit,
-  ProjectedSceneRecord,
+  ProjectedReadingRouteRecord,
   RolloutQueueSnapshot,
 } from "@/lib/rollout/types";
 
@@ -26,7 +26,7 @@ export function emptyRolloutQueue(
   return {
     workId,
     storyStaging: [],
-    sceneStaging: [],
+    readingRouteStaging: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -43,21 +43,27 @@ export function loadRolloutQueue(
     return emptyRolloutQueue(workId, operatorId);
   }
   try {
-    const parsed = JSON.parse(raw) as RolloutQueueSnapshot;
+    const parsed = JSON.parse(raw) as RolloutQueueSnapshot & {
+      sceneStaging?: AcceptedSceneCandidateStaging[];
+      processedSceneReviewIds?: string[];
+      dismissedSceneStaging?: AcceptedSceneCandidateStaging[];
+      dismissedSceneReviewIds?: string[];
+      projectedScenes?: ProjectedReadingRouteRecord[];
+    };
     if (parsed.workId !== workId) {
       return emptyRolloutQueue(workId, operatorId);
     }
     return {
       workId,
       storyStaging: parsed.storyStaging ?? [],
-      sceneStaging: parsed.sceneStaging ?? [],
+      readingRouteStaging: parsed.readingRouteStaging ?? parsed.sceneStaging ?? [],
       processedStoryReviewIds: parsed.processedStoryReviewIds ?? [],
-      processedSceneReviewIds: parsed.processedSceneReviewIds ?? [],
+      processedReadingRouteReviewIds: parsed.processedReadingRouteReviewIds ?? parsed.processedSceneReviewIds ?? [],
       dismissedStoryStaging: parsed.dismissedStoryStaging ?? [],
-      dismissedSceneStaging: parsed.dismissedSceneStaging ?? [],
+      dismissedReadingRouteStaging: parsed.dismissedReadingRouteStaging ?? parsed.dismissedSceneStaging ?? [],
       dismissedStoryReviewIds: parsed.dismissedStoryReviewIds ?? [],
-      dismissedSceneReviewIds: parsed.dismissedSceneReviewIds ?? [],
-      projectedScenes: parsed.projectedScenes ?? [],
+      dismissedReadingRouteReviewIds: parsed.dismissedReadingRouteReviewIds ?? parsed.dismissedSceneReviewIds ?? [],
+      projectedReadingRoutes: parsed.projectedReadingRoutes ?? parsed.projectedScenes ?? [],
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
   } catch {
@@ -131,17 +137,17 @@ export function mergeRolloutQueue(
       ...current.storyStaging,
       ...(incoming.storyUnits ?? []),
     ]),
-    sceneStaging: dedupeSceneStaging([
-      ...current.sceneStaging,
+    readingRouteStaging: dedupeSceneStaging([
+      ...current.readingRouteStaging,
       ...(incoming.sceneCandidates ?? []),
     ]),
     processedStoryReviewIds: current.processedStoryReviewIds ?? [],
-    processedSceneReviewIds: current.processedSceneReviewIds ?? [],
+    processedReadingRouteReviewIds: current.processedReadingRouteReviewIds ?? [],
     dismissedStoryStaging: current.dismissedStoryStaging ?? [],
-    dismissedSceneStaging: current.dismissedSceneStaging ?? [],
+    dismissedReadingRouteStaging: current.dismissedReadingRouteStaging ?? [],
     dismissedStoryReviewIds: current.dismissedStoryReviewIds ?? [],
-    dismissedSceneReviewIds: current.dismissedSceneReviewIds ?? [],
-    projectedScenes: current.projectedScenes ?? [],
+    dismissedReadingRouteReviewIds: current.dismissedReadingRouteReviewIds ?? [],
+    projectedReadingRoutes: current.projectedReadingRoutes ?? [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -165,7 +171,7 @@ export function removeSceneStagingByReviewId(
 ): RolloutQueueSnapshot {
   return {
     ...queue,
-    sceneStaging: queue.sceneStaging.filter(
+    readingRouteStaging: queue.readingRouteStaging.filter(
       (s) => s.sourceReviewId !== sourceReviewId
     ),
     updatedAt: new Date().toISOString(),
@@ -200,8 +206,8 @@ export function markSceneReviewIdProcessed(
 ): RolloutQueueSnapshot {
   return {
     ...removeSceneStagingByReviewId(queue, sourceReviewId),
-    processedSceneReviewIds: addProcessedReviewId(
-      queue.processedSceneReviewIds,
+    processedReadingRouteReviewIds: addProcessedReviewId(
+      queue.processedReadingRouteReviewIds,
       sourceReviewId
     ),
   };
@@ -213,7 +219,7 @@ export function unmarkSceneReviewIdProcessed(
 ): RolloutQueueSnapshot {
   return {
     ...queue,
-    processedSceneReviewIds: (queue.processedSceneReviewIds ?? []).filter(
+    processedReadingRouteReviewIds: (queue.processedReadingRouteReviewIds ?? []).filter(
       (id) => id !== sourceReviewId
     ),
     updatedAt: new Date().toISOString(),
@@ -229,8 +235,8 @@ function blockedStoryReviewIds(queue: RolloutQueueSnapshot): Set<string> {
 
 function blockedSceneReviewIds(queue: RolloutQueueSnapshot): Set<string> {
   return new Set([
-    ...(queue.processedSceneReviewIds ?? []),
-    ...(queue.dismissedSceneReviewIds ?? []),
+    ...(queue.processedReadingRouteReviewIds ?? []),
+    ...(queue.dismissedReadingRouteReviewIds ?? []),
   ]);
 }
 
@@ -287,7 +293,7 @@ export function dismissSceneStagingItem(
   queue: RolloutQueueSnapshot,
   sourceReviewId: string
 ): RolloutQueueSnapshot {
-  const item = queue.sceneStaging.find(
+  const item = queue.readingRouteStaging.find(
     (staging) => staging.sourceReviewId === sourceReviewId
   );
   if (!item) {
@@ -296,12 +302,12 @@ export function dismissSceneStagingItem(
 
   return {
     ...removeSceneStagingByReviewId(queue, sourceReviewId),
-    dismissedSceneStaging: dedupeSceneStaging([
-      ...(queue.dismissedSceneStaging ?? []),
+    dismissedReadingRouteStaging: dedupeSceneStaging([
+      ...(queue.dismissedReadingRouteStaging ?? []),
       item,
     ]),
-    dismissedSceneReviewIds: addProcessedReviewId(
-      queue.dismissedSceneReviewIds,
+    dismissedReadingRouteReviewIds: addProcessedReviewId(
+      queue.dismissedReadingRouteReviewIds,
       sourceReviewId
     ),
   };
@@ -311,7 +317,7 @@ export function restoreSceneStagingItem(
   queue: RolloutQueueSnapshot,
   sourceReviewId: string
 ): RolloutQueueSnapshot {
-  const item = (queue.dismissedSceneStaging ?? []).find(
+  const item = (queue.dismissedReadingRouteStaging ?? []).find(
     (staging) => staging.sourceReviewId === sourceReviewId
   );
   if (!item) {
@@ -321,10 +327,10 @@ export function restoreSceneStagingItem(
   return mergeRolloutQueue(
     {
       ...queue,
-      dismissedSceneStaging: (queue.dismissedSceneStaging ?? []).filter(
+      dismissedReadingRouteStaging: (queue.dismissedReadingRouteStaging ?? []).filter(
         (staging) => staging.sourceReviewId !== sourceReviewId
       ),
-      dismissedSceneReviewIds: (queue.dismissedSceneReviewIds ?? []).filter(
+      dismissedReadingRouteReviewIds: (queue.dismissedReadingRouteReviewIds ?? []).filter(
         (id) => id !== sourceReviewId
       ),
     },
@@ -334,17 +340,17 @@ export function restoreSceneStagingItem(
 
 export function recordProjectedScene(
   queue: RolloutQueueSnapshot,
-  record: ProjectedSceneRecord
+  record: ProjectedReadingRouteRecord
 ): RolloutQueueSnapshot {
-  const projectedScenes = [
-    ...(queue.projectedScenes ?? []).filter(
+  const projectedReadingRoutes = [
+    ...(queue.projectedReadingRoutes ?? []).filter(
       (item) => item.sourceReviewId !== record.sourceReviewId
     ),
     record,
   ];
   return {
     ...queue,
-    projectedScenes,
+    projectedReadingRoutes,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -355,7 +361,7 @@ export function removeProjectedScene(
 ): RolloutQueueSnapshot {
   return {
     ...queue,
-    projectedScenes: (queue.projectedScenes ?? []).filter(
+    projectedReadingRoutes: (queue.projectedReadingRoutes ?? []).filter(
       (item) => item.sourceReviewId !== sourceReviewId
     ),
     updatedAt: new Date().toISOString(),
@@ -365,8 +371,8 @@ export function removeProjectedScene(
 export function findProjectedScene(
   queue: RolloutQueueSnapshot,
   sourceReviewId: string
-): ProjectedSceneRecord | undefined {
-  return (queue.projectedScenes ?? []).find(
+): ProjectedReadingRouteRecord | undefined {
+  return (queue.projectedReadingRoutes ?? []).find(
     (item) => item.sourceReviewId === sourceReviewId
   );
 }
@@ -374,8 +380,8 @@ export function findProjectedScene(
 export function findProjectedSceneByTsid(
   queue: RolloutQueueSnapshot,
   sceneTsid: string
-): ProjectedSceneRecord | undefined {
-  return (queue.projectedScenes ?? []).find(
+): ProjectedReadingRouteRecord | undefined {
+  return (queue.projectedReadingRoutes ?? []).find(
     (item) => item.sceneTsid === sceneTsid
   );
 }
@@ -403,7 +409,7 @@ export function filterPendingStaging(queue: RolloutQueueSnapshot): RolloutQueueS
     storyStaging: queue.storyStaging.filter(
       (item) => !processedStory.has(item.sourceReviewId)
     ),
-    sceneStaging: queue.sceneStaging.filter(
+    readingRouteStaging: queue.readingRouteStaging.filter(
       (item) => !processedScene.has(item.sourceReviewId)
     ),
     updatedAt: new Date().toISOString(),

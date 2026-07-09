@@ -192,7 +192,7 @@ describe("proposeAllCandidateTypes (mock)", () => {
     expect(types.has("character")).toBe(true);
     expect(types.has("location")).toBe(true);
     expect(types.has("story")).toBe(true);
-    expect(types.has("scene")).toBe(true);
+    expect(types.has("readingRoute")).toBe(true);
   });
 });
 
@@ -202,9 +202,9 @@ describe("proposeCandidateTypes (mock)", () => {
       workId: "work-1",
       workTitle: "Test Work",
       narrative: validNarrative,
-      candidateTypes: ["scene"],
+      candidateTypes: ["readingRoute"],
     });
-    expect(result.candidates.every((c) => c.candidateType === "scene")).toBe(true);
+    expect(result.candidates.every((c) => c.candidateType === "readingRoute")).toBe(true);
     expect(result.candidates.length).toBeGreaterThan(0);
   });
 });

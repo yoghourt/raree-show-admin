@@ -4,11 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { mapSceneStagingToCreatePayload } from "@/lib/rollout/staging-mapper";
+import { mapSceneStagingToReadingRoutePayload } from "@/lib/rollout/staging-mapper";
 
-describe("mapSceneStagingToCreatePayload", () => {
-  it("maps valid staging to scene create payload", () => {
-    const result = mapSceneStagingToCreatePayload({
+describe("mapSceneStagingToReadingRoutePayload", () => {
+  it("maps valid staging to reading route create payload", () => {
+    const result = mapSceneStagingToReadingRoutePayload({
       workId: "work-1",
       sourceReviewId: "rev-1",
       title: "The Wall",
@@ -31,10 +31,10 @@ describe("mapSceneStagingToCreatePayload", () => {
   });
 
   it("coerces string chapter_number", () => {
-    const result = mapSceneStagingToCreatePayload({
+    const result = mapSceneStagingToReadingRoutePayload({
       workId: "work-1",
       sourceReviewId: "rev-2",
-      title: "Scene",
+      title: "Reading Route",
       chapter_number: "12",
       acceptedAt: "2026-07-05T00:00:00.000Z",
     });
@@ -46,10 +46,10 @@ describe("mapSceneStagingToCreatePayload", () => {
   });
 
   it("rejects invalid chapter_number", () => {
-    const result = mapSceneStagingToCreatePayload({
+    const result = mapSceneStagingToReadingRoutePayload({
       workId: "work-1",
       sourceReviewId: "rev-3",
-      title: "Scene",
+      title: "Reading Route",
       chapter_number: "abc",
       acceptedAt: "2026-07-05T00:00:00.000Z",
     });
@@ -58,7 +58,7 @@ describe("mapSceneStagingToCreatePayload", () => {
   });
 
   it("rejects empty title", () => {
-    const result = mapSceneStagingToCreatePayload({
+    const result = mapSceneStagingToReadingRoutePayload({
       workId: "work-1",
       sourceReviewId: "rev-4",
       title: "   ",

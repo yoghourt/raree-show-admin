@@ -8,12 +8,12 @@ export type Work = {
   createdAt: string;
 };
 
-export type StoryImage = {
+export type ReadingFrame = {
   url: string;
   caption: string;
 };
 
-export type Scene = {
+export type ReadingRoute = {
   workId: string;
   tsid: string;
   title: string;
@@ -21,8 +21,8 @@ export type Scene = {
   chapter_title: string | null;
   summary: string;
   tags: string[];
-  /** 场景配图序列（jsonb，唯一数据源） */
-  story_images_v2: StoryImage[] | null;
+  /** 阅读帧序列（jsonb，唯一数据源；implementation column: story_images_v2） */
+  story_images_v2: ReadingFrame[] | null;
   locationId: string | null;
   characterIds: string[];
 };

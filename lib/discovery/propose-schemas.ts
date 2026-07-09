@@ -63,7 +63,7 @@ const sceneFieldsSchema = z.object({
 
 export const discoveryCandidateSchema = z.object({
   candidateId: z.string().min(1),
-  candidateType: z.enum(["character", "location", "story", "scene"]),
+  candidateType: z.enum(["character", "location", "story", "readingRoute"]),
   workId: z.string().min(1),
   displayName: z.string(),
   summary: z.string(),

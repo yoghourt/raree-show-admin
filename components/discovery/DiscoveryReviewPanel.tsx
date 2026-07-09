@@ -47,6 +47,7 @@ import type {
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
+import { messages } from "@/lib/locale";
 import {
   loadRolloutQueue,
   ROLLOUT_QUEUE_UPDATED_EVENT,
@@ -132,7 +133,7 @@ function PipelineBreadcrumb({ activeStep }: { activeStep: string }) {
   const steps = [
     { id: "review", label: "① 待审核" },
     { id: "accepted", label: "② 已采纳暂存" },
-    { id: "rollout", label: "Rollout 投影", external: true },
+    { id: "rollout", label: messages.discovery.tabRollout, external: true },
   ];
   return (
     <div className="flex flex-wrap items-center gap-1 text-xs" aria-hidden="true">
@@ -221,7 +222,7 @@ function sceneStagingToReviewItem(
     candidate: {
       candidateId: scene.sourceReviewId,
       workId: scene.workId,
-      candidateType: "scene",
+      candidateType: "readingRoute",
       displayName: scene.title,
       summary: scene.summary ?? "",
       fields: {
@@ -289,8 +290,8 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
     [rolloutQueue.processedStoryReviewIds]
   );
   const processedSceneIds = React.useMemo(
-    () => new Set(rolloutQueue.processedSceneReviewIds ?? []),
-    [rolloutQueue.processedSceneReviewIds]
+    () => new Set(rolloutQueue.processedReadingRouteReviewIds ?? []),
+    [rolloutQueue.processedReadingRouteReviewIds]
   );
 
   const visibleAcceptedStoryUnits = React.useMemo(
@@ -389,7 +390,7 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
         (typeof parsedRecord.name === "string" ? parsedRecord.name : "");
     } else if (
       editItem.candidate.candidateType === "story" ||
-      editItem.candidate.candidateType === "scene"
+      editItem.candidate.candidateType === "readingRoute"
     ) {
       parsedRecord.title =
         trimmedDisplayName ||
@@ -405,7 +406,7 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
 
     if (editItem.candidate.candidateType === "story") {
       saveStoryStagingEdit(editItem.reviewId, payload);
-    } else if (editItem.candidate.candidateType === "scene") {
+    } else if (editItem.candidate.candidateType === "readingRoute") {
       saveSceneStagingEdit(editItem.reviewId, payload);
     } else {
       saveCandidateEdit(editItem.reviewId, payload);
@@ -847,7 +848,7 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
                         <div className="min-w-0">
                           <div className="font-medium">{scene.title}</div>
                           <p className="text-muted-foreground">
-                            Ch.{scene.chapter_number}
+                            {messages.common.chapterN(scene.chapter_number)}
                             {scene.chapter_title
                               ? ` — ${scene.chapter_title}`
                               : ""}
@@ -881,7 +882,7 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
                               ) {
                                 return;
                               }
-                              revokeStagingAccept(scene.sourceReviewId, "scene");
+                              revokeStagingAccept(scene.sourceReviewId, "readingRoute");
                             }}
                           >
                             {discoveryReviewUi.revokeAccept}

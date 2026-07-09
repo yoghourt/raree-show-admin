@@ -5,13 +5,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as React from "react";
 
-import { SceneForm } from "@/components/scenes/SceneForm";
+import { ReadingRouteForm } from "@/components/reading-routes/ReadingRouteForm";
 import { Button } from "@/components/ui/button";
 import * as charactersApi from "@/lib/characters";
 import * as locationsApi from "@/lib/locations";
 import { getScene } from "@/lib/scenes";
 import { getWork } from "@/lib/works";
-import type { Character, Location, Scene, Work } from "@/lib/types";
+import type { Character, Location, ReadingRoute, Work } from "@/lib/types";
 
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) {
@@ -20,16 +20,16 @@ function toErrorMessage(e: unknown): string {
   return String(e);
 }
 
-export default function EditScenePage() {
+export default function EditReadingRoutePage() {
   const params = useParams();
   const rawWork = params.workId;
   const workId = Array.isArray(rawWork) ? rawWork[0] : rawWork ?? "";
-  const rawScene = params.sceneId;
-  const sceneIdParam = Array.isArray(rawScene) ? rawScene[0] : rawScene ?? "";
-  const sceneTsid = sceneIdParam ? decodeURIComponent(sceneIdParam) : "";
+  const rawRoute = params.readingRouteId;
+  const routeIdParam = Array.isArray(rawRoute) ? rawRoute[0] : rawRoute ?? "";
+  const sceneTsid = routeIdParam ? decodeURIComponent(routeIdParam) : "";
 
   const [work, setWork] = React.useState<Work | null>(null);
-  const [scene, setScene] = React.useState<Scene | null>(null);
+  const [scene, setScene] = React.useState<ReadingRoute | null>(null);
   const [characters, setCharacters] = React.useState<Character[]>([]);
   const [locations, setLocations] = React.useState<Location[]>([]);
   const [pageLoading, setPageLoading] = React.useState(true);
@@ -81,14 +81,14 @@ export default function EditScenePage() {
     };
   }, [workId, sceneTsid]);
 
-  const scenesHref = `/works/${encodeURIComponent(workId)}/scenes`;
+  const routesHref = `/works/${encodeURIComponent(workId)}/reading-routes`;
   const workTitle = work?.title ?? "未知作品";
 
   if (pageLoading) {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={scenesHref}>← 返回场景列表</Link>
+          <Link href={routesHref}>← 返回阅读路线列表</Link>
         </Button>
         <p className="text-muted-foreground text-sm" aria-busy="true">
           加载中…
@@ -101,7 +101,7 @@ export default function EditScenePage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={scenesHref}>← 返回场景列表</Link>
+          <Link href={routesHref}>← 返回阅读路线列表</Link>
         </Button>
         <div
           className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
@@ -117,10 +117,10 @@ export default function EditScenePage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={scenesHref}>← 返回场景列表</Link>
+          <Link href={routesHref}>← 返回阅读路线列表</Link>
         </Button>
         <p className="text-muted-foreground">
-          未找到该场景（tsid：{sceneTsid || "—"}）。
+          未找到该阅读路线（tsid：{sceneTsid || "—"}）。
         </p>
       </div>
     );
@@ -141,29 +141,29 @@ export default function EditScenePage() {
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
         <Link
-          href={scenesHref}
+          href={routesHref}
           className="max-w-[140px] truncate transition-colors hover:text-zinc-800"
         >
           {workTitle}
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <Link href={scenesHref} className="transition-colors hover:text-zinc-800">
-          场景
+        <Link href={routesHref} className="transition-colors hover:text-zinc-800">
+          阅读路线
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">编辑场景</span>
+        <span className="font-medium text-zinc-800">编辑阅读路线</span>
       </nav>
 
       <Button variant="ghost" size="sm" className="-ml-2" asChild>
-        <Link href={scenesHref}>← 返回场景列表</Link>
+        <Link href={routesHref}>← 返回阅读路线列表</Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">编辑场景</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">编辑阅读路线</h1>
         <p className="text-muted-foreground mt-1 font-mono text-sm">
           {scene.tsid}
         </p>
       </div>
-      <SceneForm
+      <ReadingRouteForm
         key={scene.tsid}
         workId={workId}
         mode="edit"

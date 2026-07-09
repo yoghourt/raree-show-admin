@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { messages } from "@/lib/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -69,11 +70,8 @@ export function RagBackfillPanel({ workId }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">RAG 嵌入回填</CardTitle>
-        <CardDescription>
-          为当前作品下场景生成 <code className="text-xs">rag_text</code> 与{" "}
-          <code className="text-xs">rag_embedding</code>（Gemini）。适合数据迁移后一次性回填。
-        </CardDescription>
+        <CardTitle className="text-base">{messages.works.ragBackfillTitle}</CardTitle>
+        <CardDescription>{messages.works.ragBackfillDesc}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -85,11 +83,11 @@ export function RagBackfillPanel({ workId }: Props) {
               disabled={loading}
             />
             <Label htmlFor="rag-force" className="cursor-pointer font-normal">
-              强制重新嵌入（覆盖已有向量）
+              {messages.works.ragBackfillForceLabel}
             </Label>
           </div>
           <Button type="button" disabled={loading || !workId} onClick={onBackfill}>
-            {loading ? "处理中…" : "回填 RAG 向量"}
+            {loading ? messages.works.ragBackfillProcessing : messages.works.ragBackfillButton}
           </Button>
         </div>
 
@@ -104,27 +102,27 @@ export function RagBackfillPanel({ workId }: Props) {
 
         {result ? (
           <div className="space-y-2 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
-            <p className="font-medium text-foreground">结果</p>
+            <p className="font-medium text-foreground">{messages.works.ragBackfillResultTitle}</p>
             <ul className="grid gap-1 text-muted-foreground sm:grid-cols-2">
               <li>
-                场景总数：<span className="text-foreground">{result.totalScenes}</span>
+                {messages.works.ragBackfillTotal}：<span className="text-foreground">{result.totalScenes}</span>
               </li>
               <li>
-                跳过（已有向量）：<span className="text-foreground">{result.skipped}</span>
+                {messages.works.ragBackfillSkipped}：<span className="text-foreground">{result.skipped}</span>
               </li>
               <li>
-                本轮处理：<span className="text-foreground">{result.processed}</span>
+                {messages.works.ragBackfillProcessed}：<span className="text-foreground">{result.processed}</span>
               </li>
               <li>
-                成功：<span className="text-foreground">{result.success}</span>
+                {messages.works.ragBackfillSuccess}：<span className="text-foreground">{result.success}</span>
               </li>
               <li>
-                失败：<span className="text-foreground">{result.failure}</span>
+                {messages.works.ragBackfillFailure}：<span className="text-foreground">{result.failure}</span>
               </li>
             </ul>
             {result.errors.length > 0 ? (
               <div className="mt-3 border-t pt-3">
-                <p className="mb-2 font-medium text-destructive">失败明细</p>
+                <p className="mb-2 font-medium text-destructive">{messages.works.ragBackfillErrorsTitle}</p>
                 <ul className="max-h-48 space-y-2 overflow-auto text-xs">
                   {result.errors.map((err, i) => (
                     <li key={`${err.tsid}-${i}`} className="rounded bg-background/80 px-2 py-1">

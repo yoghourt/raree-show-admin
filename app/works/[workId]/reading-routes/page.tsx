@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import * as React from "react";
 
 import { RolloutDrawer } from "@/components/rollout/RolloutDrawer";
-import { SceneTable } from "@/components/scenes/SceneTable";
+import { ReadingRouteTable } from "@/components/reading-routes/ReadingRouteTable";
 import { RagBackfillPanel } from "@/components/works/RagBackfillPanel";
 import { Button } from "@/components/ui/button";
 import { useScenes } from "@/hooks/useScenes";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/rollout/rollout-queue-storage";
 import { supabase } from "@/lib/supabase";
 import { getWork } from "@/lib/works";
+import { messages } from "@/lib/locale";
 import type { Work } from "@/lib/types";
 
 function toErrorMessage(e: unknown): string {
@@ -33,7 +34,7 @@ function useRolloutPendingCount(workId: string, operatorId: string | null): numb
       return;
     }
     const q = loadRolloutQueue(workId, operatorId);
-    setCount(q.storyStaging.length + q.sceneStaging.length);
+    setCount(q.storyStaging.length + q.readingRouteStaging.length);
   }, [workId, operatorId]);
 
   React.useEffect(() => {
@@ -52,7 +53,7 @@ function useRolloutPendingCount(workId: string, operatorId: string | null): numb
   return count;
 }
 
-export default function WorkScenesPage() {
+export default function WorkReadingRoutesPage() {
   const params = useParams();
   const raw = params.workId;
   const workId = Array.isArray(raw) ? raw[0] : (raw ?? "");
@@ -90,7 +91,6 @@ export default function WorkScenesPage() {
     };
   }, [workId]);
 
-  // Resolve operatorId once for badge computation
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -107,7 +107,7 @@ export default function WorkScenesPage() {
   const pendingCount = useRolloutPendingCount(workId, operatorId);
 
   const workTitle = workLoading ? "加载中…" : (work?.title ?? "未知作品");
-  const scenesBase = `/works/${encodeURIComponent(workId)}/scenes`;
+  const routesBase = `/works/${encodeURIComponent(workId)}/reading-routes`;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
@@ -136,34 +136,32 @@ export default function WorkScenesPage() {
           {workTitle}
         </span>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">场景</span>
+        <span className="font-medium text-zinc-800">阅读路线</span>
       </nav>
 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            Scenes
+            {messages.nav.readingRoutes}
           </h1>
-          <p className="text-muted-foreground text-sm">管理当前作品下的场景数据</p>
+          <p className="text-muted-foreground text-sm">{messages.works.manageReadingRoutes}</p>
         </div>
 
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-row sm:items-center">
-          {/* Discovery — 跳转独立页 */}
           <Button variant="outline" asChild className="w-full shrink-0 sm:w-auto">
             <Link href={`/works/${encodeURIComponent(workId)}/discovery`}>
               <Sparkles className="size-4" aria-hidden />
-              Discovery
+              {messages.nav.discovery}
             </Link>
           </Button>
 
-          {/* Rollout — 打开抽屉 */}
           <Button
             variant="outline"
             className="relative w-full shrink-0 sm:w-auto"
             onClick={() => setRolloutOpen(true)}
           >
             <FlaskConical className="size-4" aria-hidden />
-            Rollout 投影
+            {messages.rollout.pageTitle}
             {pendingCount > 0 ? (
               <span className="absolute -top-1.5 -right-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground tabular-nums">
                 {pendingCount}
@@ -171,11 +169,10 @@ export default function WorkScenesPage() {
             ) : null}
           </Button>
 
-          {/* 新增场景 */}
           <Button asChild className="w-full shrink-0 sm:w-auto">
-            <Link href={`${scenesBase}/new`}>
+            <Link href={`${routesBase}/new`}>
               <PlusIcon className="size-4" aria-hidden />
-              新增场景
+              新增阅读路线
             </Link>
           </Button>
         </div>
@@ -183,7 +180,7 @@ export default function WorkScenesPage() {
 
       <RagBackfillPanel workId={workId} />
 
-      <SceneTable
+      <ReadingRouteTable
         workId={workId}
         scenes={scenes}
         loading={loading}
@@ -191,7 +188,6 @@ export default function WorkScenesPage() {
         onDelete={deleteScene}
       />
 
-      {/* Rollout 抽屉 — 延迟渲染直到首次打开，保留挂载状态避免 sessionStorage 丢失 */}
       {rolloutOpen ? (
         <RolloutDrawer
           workId={workId}

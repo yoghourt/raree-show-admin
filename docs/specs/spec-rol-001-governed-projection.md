@@ -128,13 +128,13 @@ Rollout routes and UI MUST NOT invoke Discovery propose/regen handlers, Enrichme
 
 Reading Route (implementation: Scene) ordering, routing, or storage convenience MUST NOT define Editorial Story unit boundaries. Story unit boundaries remain Editorial Domain authority (ROL-INV-07; ADR-005 NIM-INV-02).
 
-**ROL-RC-08 — Story ↔ Scene N:M without identity merge**
+**ROL-RC-08 — Story ↔ Reading Route (implementation: Scene) N:M without identity merge**
 
 Story ↔ Reading Route (implementation: Scene) association MUST allow many-to-many links. A Story unit MUST NOT be forced into 1:1 identity equivalence with a Reading Route. Link records are association metadata only; Reading Route identity (`scenes.tsid`) is unchanged by linking (ADR-007 Decision 2).
 
-**ROL-RC-09 — Projection Accept produces valid Scene business ID**
+**ROL-RC-09 — Reading Route Projection Accept produces valid business ID**
 
-Scene Projection Accept MUST result in a reference to a valid Reading Route business ID (implementation: `scene_` prefixed TSID per existing conventions) either by creating a new Reading Route (implementation: Scene) through existing CRUD or by selecting an existing Reading Route within the same `workId`.
+Reading Route Projection Accept MUST result in a reference to a valid Reading Route business ID (implementation: `scene_` prefixed TSID per existing conventions) either by creating a new Reading Route (implementation: Scene) through existing CRUD or by selecting an existing Reading Route within the same `workId`.
 
 **ROL-RC-10 — Unlink does not silently delete domain objects**
 

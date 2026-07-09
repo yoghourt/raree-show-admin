@@ -18,7 +18,8 @@ import { FuzzyEntityCombobox } from "@/components/entity/FuzzyEntityCombobox";
 import type { EntityOption } from "@/components/entity/types";
 import { CopilotIcon } from "@/components/copilot/CopilotIcon";
 import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
-import { MultiImageUploader } from "@/components/scenes/MultiImageUploader";
+import { messages } from "@/lib/locale";
+import { MultiImageUploader } from "@/components/reading-routes/MultiImageUploader";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -33,7 +34,7 @@ import { useCopilotSession } from "@/hooks/useCopilotSession";
 import { getClassification } from "@/lib/ai/field-registry";
 import { createScene, updateScene } from "@/lib/scenes";
 import type { SuggestionItem } from "@/lib/ai/copilot-types";
-import type { Character, Location, Scene, StoryImage } from "@/lib/types";
+import type { Character, Location, ReadingFrame, ReadingRoute } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Scene Copilot field labels
@@ -87,19 +88,19 @@ const sceneFormSchema = z.object({
   characterIdsFallback: z.string(),
 });
 
-export type SceneFormValues = {
+export type ReadingRouteFormValues = {
   title: string;
   chapter_number: number;
   chapter_title: string | null;
   summary: string;
   tags: string;
-  story_images_v2: StoryImage[];
+  story_images_v2: ReadingFrame[];
   locationId: string;
   characterIdsTsids: string[];
   characterIdsFallback: string;
 };
 
-function sceneToFormValues(scene: Scene): SceneFormValues {
+function sceneToFormValues(scene: ReadingRoute): ReadingRouteFormValues {
   const story_images_v2 = scene.story_images_v2 ?? [];
 
   return {
@@ -116,9 +117,9 @@ function sceneToFormValues(scene: Scene): SceneFormValues {
 }
 
 function formValuesToPayload(
-  values: SceneFormValues,
+  values: ReadingRouteFormValues,
   hasCharacterPicker: boolean
-): Omit<Scene, "tsid" | "workId"> {
+): Omit<ReadingRoute, "tsid" | "workId"> {
   const characterIds = hasCharacterPicker
     ? values.characterIdsTsids
     : commaListToArray(values.characterIdsFallback);
@@ -142,28 +143,28 @@ function toSubmitError(e: unknown): string {
   return String(e);
 }
 
-type SceneFormBase = {
+type ReadingRouteFormBase = {
   workId: string;
   characters: Character[];
   locations: Location[];
   entitiesLoading?: boolean;
 };
 
-type SceneFormProps =
-  | (SceneFormBase & { mode: "create" })
-  | (SceneFormBase & { mode: "edit"; defaultValues: Scene });
+type ReadingRouteFormProps =
+  | (ReadingRouteFormBase & { mode: "create" })
+  | (ReadingRouteFormBase & { mode: "edit"; defaultValues: ReadingRoute });
 
-export function SceneForm(props: SceneFormProps) {
+export function ReadingRouteForm(props: ReadingRouteFormProps) {
   const { workId, characters, locations, entitiesLoading = false } = props;
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = React.useState(false);
-  const listHref = `/works/${encodeURIComponent(workId)}/scenes`;
+  const listHref = `/works/${encodeURIComponent(workId)}/reading-routes`;
 
   const hasLocationPicker = locations.length > 0 || entitiesLoading;
   const hasCharacterPicker = characters.length > 0 || entitiesLoading;
 
-  const defaultValues: SceneFormValues =
+  const defaultValues: ReadingRouteFormValues =
     props.mode === "edit"
       ? sceneToFormValues(props.defaultValues)
       : {
@@ -178,8 +179,8 @@ export function SceneForm(props: SceneFormProps) {
           characterIdsFallback: "",
         };
 
-  const form = useForm<SceneFormValues>({
-    resolver: zodResolver(sceneFormSchema) as Resolver<SceneFormValues>,
+  const form = useForm<ReadingRouteFormValues>({
+    resolver: zodResolver(sceneFormSchema) as Resolver<ReadingRouteFormValues>,
     defaultValues,
   });
 
@@ -306,8 +307,8 @@ export function SceneForm(props: SceneFormProps) {
     copilot.accept(
       field,
       value,
-      form.getValues(field as keyof SceneFormValues),
-      (f, v) => form.setValue(f as keyof SceneFormValues, v as never, { shouldDirty: true })
+      form.getValues(field as keyof ReadingRouteFormValues),
+      (f, v) => form.setValue(f as keyof ReadingRouteFormValues, v as never, { shouldDirty: true })
     );
   };
 
@@ -324,14 +325,14 @@ export function SceneForm(props: SceneFormProps) {
   };
 
   const handleRegen = (field: string) => {
-    const currentValue = String(form.getValues(field as keyof SceneFormValues) ?? "");
+    const currentValue = String(form.getValues(field as keyof ReadingRouteFormValues) ?? "");
     copilot.narrativeRegen(field, currentValue, titleStr);
   };
 
   const handleAcceptRegen = (field: string) => {
     copilot.acceptRegen(
       field,
-      (f, v) => form.setValue(f as keyof SceneFormValues, v as never, { shouldDirty: true })
+      (f, v) => form.setValue(f as keyof ReadingRouteFormValues, v as never, { shouldDirty: true })
     );
   };
 
@@ -396,7 +397,7 @@ export function SceneForm(props: SceneFormProps) {
           <Label htmlFor="chapter_title">章节标题</Label>
           <Input
             id="chapter_title"
-            placeholder="可选，如：Bran I"
+            placeholder={messages.forms.chapterTitlePlaceholder}
             {...form.register("chapter_title")}
             aria-invalid={!!form.formState.errors.chapter_title}
           />
@@ -405,7 +406,7 @@ export function SceneForm(props: SceneFormProps) {
 
       {/* ── Summary (narrative) ── */}
       <div className="space-y-2">
-        <Label htmlFor="summary">摘要 (可选)</Label>
+        <Label htmlFor="summary">{messages.forms.summaryOptional}</Label>
         <Textarea
           id="summary"
           {...form.register("summary")}
@@ -426,12 +427,11 @@ export function SceneForm(props: SceneFormProps) {
         />
       </div>
 
-      {/* ── Story Sequence (asset — excluded from Copilot, FC-03) ── */}
+      {/* ── Reading Frame (asset — excluded from Copilot, FC-03) ── */}
       <div className="space-y-2">
-        <Label>Story Sequence</Label>
+        <Label>{messages.domain.readingFrame}</Label>
         <p className="text-muted-foreground text-xs">
-          Each segment is one frame of the scene. Caption first, then add the
-          image.
+          {messages.forms.readingFrameHint}
         </p>
         <Controller
           name="story_images_v2"
@@ -467,12 +467,12 @@ export function SceneForm(props: SceneFormProps) {
         ) : (
           <>
             <p className="text-muted-foreground text-xs">
-              当前作品暂无地点数据，请手动填写地点 TSID。
+              {messages.forms.noLocationDataHint}
             </p>
             <Input
               id="locationId"
               {...form.register("locationId")}
-              placeholder="例如：loc_winterfell"
+              placeholder={messages.forms.locationIdPlaceholder}
               aria-invalid={!!form.formState.errors.locationId}
             />
           </>
@@ -501,14 +501,14 @@ export function SceneForm(props: SceneFormProps) {
                     options={characterEntityOptions}
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="搜索角色…"
+                    placeholder={messages.forms.searchCharacters}
                     loading={entitiesLoading}
                     disabled={form.formState.isSubmitting}
                   />
                   {orphans.length > 0 ? (
                     <div className="rounded-lg border border-border p-3 pt-2">
                       <p className="text-muted-foreground mb-2 text-xs">
-                        以下 TSID 不在当前角色库中，仍将写入场景；可移除。
+                        {messages.works.orphanTsidWriteHint}
                       </p>
                       <div className="flex flex-wrap gap-1">
                         {orphans.map((id) => (
@@ -536,12 +536,12 @@ export function SceneForm(props: SceneFormProps) {
         ) : (
           <>
             <p className="text-muted-foreground text-xs">
-              当前作品暂无角色数据，请用英文逗号分隔填写角色 TSID。
+              {messages.forms.noCharacterDataHint}
             </p>
             <Input
               id="characterIdsFallback"
               {...form.register("characterIdsFallback")}
-              placeholder="例如：char_arya, char_jon"
+              placeholder={messages.forms.characterIdsPlaceholder}
             />
           </>
         )}
@@ -552,7 +552,7 @@ export function SceneForm(props: SceneFormProps) {
         <SheetContent side="right" className="w-[420px] sm:max-w-[420px] overflow-y-auto flex flex-col gap-0">
           <SheetHeader className="pb-4 border-b">
             <div className="flex items-center gap-2">
-              <SheetTitle>Copilot 建议</SheetTitle>
+              <SheetTitle>{messages.copilot.suggestions}</SheetTitle>
               {copilot.suggestions.length > 0 && (
                 <span className="rounded-full bg-violet-100 dark:bg-violet-900 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-300 font-medium">
                   {copilot.suggestions.length} 条

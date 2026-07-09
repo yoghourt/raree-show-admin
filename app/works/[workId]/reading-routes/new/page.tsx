@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as React from "react";
 
-import { SceneForm } from "@/components/scenes/SceneForm";
+import { ReadingRouteForm } from "@/components/reading-routes/ReadingRouteForm";
 import { Button } from "@/components/ui/button";
 import * as charactersApi from "@/lib/characters";
 import * as locationsApi from "@/lib/locations";
@@ -19,7 +19,7 @@ function toErrorMessage(e: unknown): string {
   return String(e);
 }
 
-export default function NewScenePage() {
+export default function NewReadingRoutePage() {
   const params = useParams();
   const raw = params.workId;
   const workId = Array.isArray(raw) ? raw[0] : raw ?? "";
@@ -99,7 +99,7 @@ export default function NewScenePage() {
     };
   }, [workId]);
 
-  const scenesHref = `/works/${encodeURIComponent(workId)}/scenes`;
+  const routesHref = `/works/${encodeURIComponent(workId)}/reading-routes`;
   const workTitle =
     workLoading ? "加载中…" : work?.title ?? "未知作品";
 
@@ -138,30 +138,30 @@ export default function NewScenePage() {
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
         <Link
-          href={scenesHref}
+          href={routesHref}
           className="max-w-[160px] truncate transition-colors hover:text-zinc-800"
         >
           {workTitle}
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <Link href={scenesHref} className="transition-colors hover:text-zinc-800">
-          场景
+        <Link href={routesHref} className="transition-colors hover:text-zinc-800">
+          阅读路线
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">新增场景</span>
+        <span className="font-medium text-zinc-800">新增阅读路线</span>
       </nav>
 
       <Button variant="ghost" size="sm" className="-ml-2" asChild>
-        <Link href={scenesHref}>← 返回场景列表</Link>
+        <Link href={routesHref}>← 返回阅读路线列表</Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">新增场景</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">新增阅读路线</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           地点、角色从当前作品已维护的数据中选择；若无数据可手动填写 TSID。
         </p>
       </div>
       {formReady ? (
-        <SceneForm
+        <ReadingRouteForm
           workId={workId}
           mode="create"
           characters={characters}

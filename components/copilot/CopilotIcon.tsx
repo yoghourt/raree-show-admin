@@ -19,6 +19,7 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import type { CopilotIconState } from "@/lib/ai/copilot-types";
+import { messages } from "@/lib/locale";
 
 interface CopilotIconProps {
   state: CopilotIconState;
@@ -31,10 +32,10 @@ export function CopilotIcon({ state, onClick, className }: CopilotIconProps) {
 
   const label =
     state === "loading"
-      ? "正在获取建议…"
+      ? messages.copilot.loadingSuggest
       : state === "enabled"
-        ? "Copilot 建议"
-        : "请先填写名称并通过重名检测";
+        ? messages.copilot.enabledLabel
+        : messages.copilot.disabledLabel;
 
   return (
     <Button
@@ -52,7 +53,7 @@ export function CopilotIcon({ state, onClick, className }: CopilotIconProps) {
       ) : (
         <SparkleIcon disabled={isDisabled} />
       )}
-      <span>Copilot</span>
+      <span>{messages.copilot.brand}</span>
     </Button>
   );
 }
