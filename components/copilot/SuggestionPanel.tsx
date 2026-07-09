@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfidenceBadge } from "@/components/copilot/ConfidenceBadge";
 import type { RetryQueueEntry, SuggestionItem } from "@/lib/ai/copilot-types";
+import { messages } from "@/lib/locale";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -288,10 +289,10 @@ export function SuggestionPanel({
       {showHeader && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">Copilot 建议</span>
+            <span className="text-sm font-semibold">{messages.copilot.suggestions}</span>
             {suggestions.length > 0 && (
               <span className="rounded-full bg-violet-100 dark:bg-violet-900 px-2 py-0.5 text-xs text-violet-700 dark:text-violet-300 font-medium">
-                {suggestions.length} 条
+                {messages.copilot.suggestionCount(suggestions.length)}
               </span>
             )}
           </div>
@@ -301,7 +302,7 @@ export function SuggestionPanel({
             variant="ghost"
             className="h-7 w-7 p-0 text-muted-foreground"
             onClick={onClose}
-            aria-label="关闭建议面板"
+            aria-label={messages.copilot.closePanelAria}
           >
             <CloseIcon />
           </Button>
@@ -312,7 +313,7 @@ export function SuggestionPanel({
       {suggestErrors.length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
           <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
-            以下字段生成失败，可稍后再次点击 Copilot 重试：
+            {messages.discovery.review.copilotRetryFailed}
           </p>
           <ul className="mt-1 space-y-0.5 text-xs text-amber-700 dark:text-amber-300">
             {suggestErrors.map((err) => (

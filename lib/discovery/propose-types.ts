@@ -8,13 +8,13 @@ export type DiscoveryCandidateType =
   | "character"
   | "location"
   | "story"
-  | "scene";
+  | "readingRoute";
 
 export const DISCOVERY_CANDIDATE_TYPES: DiscoveryCandidateType[] = [
   "character",
   "location",
   "story",
-  "scene",
+  "readingRoute",
 ];
 
 export interface DiscoveryEvidenceRef {

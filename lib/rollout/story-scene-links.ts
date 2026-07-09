@@ -4,7 +4,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { StorySceneProjectionLink } from "@/lib/rollout/types";
+import type { StoryReadingRouteProjectionLink } from "@/lib/rollout/types";
 
 const TABLE = "story_scene_links";
 
@@ -18,7 +18,7 @@ type LinkRow = {
   source: string;
 };
 
-function rowToLink(row: LinkRow): StorySceneProjectionLink {
+function rowToLink(row: LinkRow): StoryReadingRouteProjectionLink {
   return {
     id: row.id,
     workId: row.work_id,
@@ -33,7 +33,7 @@ function rowToLink(row: LinkRow): StorySceneProjectionLink {
 export async function listStorySceneLinks(
   supabase: SupabaseClient,
   workId: string
-): Promise<StorySceneProjectionLink[]> {
+): Promise<StoryReadingRouteProjectionLink[]> {
   const { data, error } = await supabase
     .from(TABLE)
     .select("*")
@@ -51,7 +51,7 @@ export async function getStorySceneLink(
   supabase: SupabaseClient,
   workId: string,
   linkId: string
-): Promise<StorySceneProjectionLink | null> {
+): Promise<StoryReadingRouteProjectionLink | null> {
   const { data, error } = await supabase
     .from(TABLE)
     .select("*")
@@ -75,7 +75,7 @@ export async function findExistingLink(
   workId: string,
   storyUnitId: string,
   sceneTsid: string
-): Promise<StorySceneProjectionLink | null> {
+): Promise<StoryReadingRouteProjectionLink | null> {
   const { data, error } = await supabase
     .from(TABLE)
     .select("*")
@@ -101,7 +101,7 @@ export async function createStorySceneLink(
   storyUnitId: string,
   sceneTsid: string,
   linkedBy: string
-): Promise<StorySceneProjectionLink> {
+): Promise<StoryReadingRouteProjectionLink> {
   const existing = await findExistingLink(
     supabase,
     workId,

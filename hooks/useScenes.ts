@@ -8,7 +8,7 @@ import {
   getScenes,
   updateScene as updateSceneApi,
 } from "@/lib/scenes";
-import type { Scene } from "@/lib/types";
+import type { ReadingRoute } from "@/lib/types";
 
 function toErrorMessage(e: unknown): string {
   if (e instanceof Error) {
@@ -18,7 +18,7 @@ function toErrorMessage(e: unknown): string {
 }
 
 export function useScenes(workId: string) {
-  const [scenes, setScenes] = React.useState<Scene[]>([]);
+  const [scenes, setScenes] = React.useState<ReadingRoute[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -55,7 +55,7 @@ export function useScenes(workId: string) {
   }, [load]);
 
   const createScene = React.useCallback(
-    async (data: Omit<Scene, "tsid" | "workId"> & { tsid?: string }) => {
+    async (data: Omit<ReadingRoute, "tsid" | "workId"> & { tsid?: string }) => {
       try {
         await createSceneApi(workId, data);
         await refresh();
@@ -68,7 +68,7 @@ export function useScenes(workId: string) {
   );
 
   const updateScene = React.useCallback(
-    async (tsid: string, data: Omit<Scene, "tsid" | "workId">) => {
+    async (tsid: string, data: Omit<ReadingRoute, "tsid" | "workId">) => {
       try {
         await updateSceneApi(workId, tsid, data);
         await refresh();

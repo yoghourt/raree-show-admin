@@ -9,6 +9,7 @@ import { LocationTable } from "@/components/locations/LocationTable";
 import { Button } from "@/components/ui/button";
 import { useLocations } from "@/hooks/useLocations";
 import { getWork } from "@/lib/works";
+import { messages } from "@/lib/locale";
 import type { Work } from "@/lib/types";
 
 function toErrorMessage(e: unknown): string {
@@ -98,7 +99,7 @@ export default function WorkLocationsPage() {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            Locations
+            {messages.nav.locations}
           </h1>
           <p className="text-muted-foreground text-sm">
             管理当前作品下的地点数据

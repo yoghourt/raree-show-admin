@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 
+import { messages } from "@/lib/locale";
 import {
   assertWorkAccessible,
   requireRolloutAuth,
@@ -123,8 +124,7 @@ export async function DELETE(request: Request, context: RouteContext) {
           {
             error: {
               code: "UNPERSIST_BLOCKED",
-              message:
-                "存在 Story ↔ Scene 关联，请先解除全部关联后再取消持久化。",
+              message: messages.rollout.associationBlocked,
             },
           },
           { status: 409 }

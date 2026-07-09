@@ -8,6 +8,7 @@ import * as React from "react";
 import { RolloutPanel } from "@/components/rollout/RolloutPanel";
 import { useRollout } from "@/hooks/useRollout";
 import { rolloutUi } from "@/lib/rollout/ui-copy";
+import { messages } from "@/lib/locale";
 import { getWork } from "@/lib/works";
 import { supabase } from "@/lib/supabase";
 import type { Work } from "@/lib/types";
@@ -129,7 +130,7 @@ export default function WorkRolloutPage() {
           {workTitle}
         </span>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">Rollout</span>
+        <span className="font-medium text-zinc-800">{messages.nav.rollout}</span>
       </nav>
 
       <header className="space-y-1">

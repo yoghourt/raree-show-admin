@@ -1,28 +1,28 @@
 /**
- * SPEC-ROL-001 §4.4 — Scene Projection Accept (server)
+ * SPEC-ROL-001 §4.4 — Reading Route Projection Accept (server)
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
-import { mapSceneStagingToCreatePayload } from "@/lib/rollout/staging-mapper";
+import { mapSceneStagingToReadingRoutePayload } from "@/lib/rollout/staging-mapper";
 import {
   createStorySceneLink,
   sceneExistsInWork,
 } from "@/lib/rollout/story-scene-links";
-import type { StorySceneProjectionLink } from "@/lib/rollout/types";
-import type { Scene } from "@/lib/types";
+import type { StoryReadingRouteProjectionLink } from "@/lib/rollout/types";
+import type { ReadingRoute } from "@/lib/types";
 
 function locationIdToDb(locationId: string | null): string {
   const trimmed = locationId?.trim();
   return trimmed ? trimmed : "";
 }
 
-export type SceneProjectionResult =
+export type ReadingRouteProjectionResult =
   | {
       ok: true;
       sceneTsid: string;
-      link?: StorySceneProjectionLink;
+      link?: StoryReadingRouteProjectionLink;
     }
   | {
       ok: false;
@@ -31,11 +31,11 @@ export type SceneProjectionResult =
       message: string;
     };
 
-async function insertScene(
+async function insertReadingRoute(
   supabase: SupabaseClient,
   workId: string,
-  payload: Omit<Scene, "tsid" | "workId">
-): Promise<Scene> {
+  payload: Omit<ReadingRoute, "tsid" | "workId">
+): Promise<ReadingRoute> {
   const tsid = `scene_${Date.now()}`;
   const insertRow = {
     work_id: workId,
@@ -88,7 +88,7 @@ async function insertScene(
   };
 }
 
-export async function acceptSceneProjection(
+export async function acceptReadingRouteProjection(
   supabase: SupabaseClient,
   params: {
     workId: string;
@@ -98,7 +98,7 @@ export async function acceptSceneProjection(
     linkToStoryUnitId?: string;
     operatorId: string;
   }
-): Promise<SceneProjectionResult> {
+): Promise<ReadingRouteProjectionResult> {
   const { workId, staging, mode, sceneTsid, linkToStoryUnitId, operatorId } =
     params;
 
@@ -113,17 +113,17 @@ export async function acceptSceneProjection(
   let resolvedSceneTsid: string;
 
   if (mode === "create") {
-    const mapped = mapSceneStagingToCreatePayload(staging);
+    const mapped = mapSceneStagingToReadingRoutePayload(staging);
     if (!mapped.ok) {
       return {
         ok: false,
         code: "SCENE_VALIDATION_FAILED",
-        message: "Scene staging failed validation",
+        message: "Reading route staging failed validation",
         fieldErrors: mapped.fieldErrors,
       };
     }
 
-    const created = await insertScene(supabase, workId, mapped.payload);
+    const created = await insertReadingRoute(supabase, workId, mapped.payload);
     resolvedSceneTsid = created.tsid;
   } else {
     const target = sceneTsid?.trim();
@@ -140,14 +140,14 @@ export async function acceptSceneProjection(
       return {
         ok: false,
         code: "SCENE_NOT_FOUND",
-        message: "Scene not found in work",
+        message: "Reading route not found in work",
       };
     }
 
     resolvedSceneTsid = target;
   }
 
-  let link: StorySceneProjectionLink | undefined;
+  let link: StoryReadingRouteProjectionLink | undefined;
   if (linkToStoryUnitId) {
     link = await createStorySceneLink(
       supabase,
@@ -161,7 +161,7 @@ export async function acceptSceneProjection(
   return { ok: true, sceneTsid: resolvedSceneTsid, link };
 }
 
-export async function unprojectScene(
+export async function unprojectReadingRoute(
   supabase: SupabaseClient,
   workId: string,
   sceneTsid: string,

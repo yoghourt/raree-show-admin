@@ -29,13 +29,13 @@ describe("parseCandidateArray", () => {
 
   it("parses single scene object under scenes key", () => {
     const raw = `{"scenes":{"displayName":"Courtyard","summary":"s","fields":{"chapter_number":1,"title":"Courtyard","summary":"x"}}}`;
-    const items = parseCandidateArray(raw, "scene");
+    const items = parseCandidateArray(raw, "readingRoute");
     expect(items).toHaveLength(1);
   });
 
   it("parses scene items without fields wrapper", () => {
     const raw = `{"candidates":[{"displayName":"Feast","summary":"s","chapter_number":2,"chapter_title":"Catelyn I","title":"The Feast","summary":"Banquet scene."}]}`;
-    const items = parseCandidateArray(raw, "scene");
+    const items = parseCandidateArray(raw, "readingRoute");
     expect(items).toHaveLength(1);
   });
 

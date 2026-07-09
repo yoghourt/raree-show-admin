@@ -12,11 +12,12 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-import type { StoryImage } from "@/lib/types";
+import { messages } from "@/lib/locale";
+import type { ReadingFrame } from "@/lib/types";
 
 type MultiImageUploaderProps = {
-  value: StoryImage[];
-  onChange: (next: StoryImage[]) => void;
+  value: ReadingFrame[];
+  onChange: (next: ReadingFrame[]) => void;
   onUploadingChange?: (uploading: boolean) => void;
 };
 
@@ -132,7 +133,7 @@ export function MultiImageUploader({
               className="size-8"
               disabled={index === 0}
               onClick={() => moveUp(index)}
-              aria-label="Move up"
+              aria-label={messages.forms.moveUp}
             >
               <ArrowUp className="size-4" aria-hidden />
             </Button>
@@ -143,7 +144,7 @@ export function MultiImageUploader({
               className="size-8"
               disabled={index === value.length - 1}
               onClick={() => moveDown(index)}
-              aria-label="Move down"
+              aria-label={messages.forms.moveDown}
             >
               <ArrowDown className="size-4" aria-hidden />
             </Button>
@@ -153,7 +154,7 @@ export function MultiImageUploader({
               variant="ghost"
               className="size-8 text-destructive hover:text-destructive"
               onClick={() => remove(index)}
-              aria-label="Remove segment"
+              aria-label={messages.forms.removeSegment}
             >
               <X className="size-4" aria-hidden />
             </Button>
@@ -164,14 +165,14 @@ export function MultiImageUploader({
               captionTextareaRefs.current[index] = el;
             }}
             rows={3}
-            placeholder="What's happening in this scene?"
+            placeholder={messages.forms.captionPlaceholder}
             value={item.caption}
             onChange={(e) => updateCaption(index, e.target.value)}
             className="w-full max-w-none resize-y"
             aria-invalid={item.caption === ""}
           />
           {item.caption === "" ? (
-            <p className="text-destructive mt-1 text-sm">Caption is required</p>
+            <p className="text-destructive mt-1 text-sm">{messages.forms.captionRequired}</p>
           ) : null}
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -179,7 +180,7 @@ export function MultiImageUploader({
               {isUploading && uploadingIndex === index ? (
                 <div className="text-muted-foreground flex items-center gap-2 text-sm">
                   <Loader2Icon className="size-4 shrink-0 animate-spin" />
-                  Uploading...
+                  {messages.common.uploading}
                 </div>
               ) : item.url ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -190,7 +191,7 @@ export function MultiImageUploader({
                 />
               ) : (
                 <span className="text-muted-foreground text-sm">
-                  No image yet
+                  {messages.forms.noImageYet}
                 </span>
               )}
             </div>
@@ -217,17 +218,17 @@ export function MultiImageUploader({
                 {isUploading && uploadingIndex === index ? (
                   <>
                     <Loader2Icon className="size-4 animate-spin" aria-hidden />
-                    Uploading...
+                    {messages.common.uploading}
                   </>
                 ) : item.url ? (
                   <>
                     <UploadIcon className="size-4" aria-hidden />
-                    Replace image
+                    {messages.forms.replaceImage}
                   </>
                 ) : (
                   <>
                     <UploadIcon className="size-4" aria-hidden />
-                    Add image
+                    {messages.forms.addImage}
                   </>
                 )}
               </Button>
@@ -243,7 +244,7 @@ export function MultiImageUploader({
         className="w-full sm:w-auto"
         onClick={addSegment}
       >
-        + Add new segment
+        {messages.forms.addSegment}
       </Button>
     </div>
   );

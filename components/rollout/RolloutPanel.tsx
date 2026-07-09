@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/tabs";
 import type { UseRolloutReturn } from "@/hooks/useRollout";
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
+import { messages } from "@/lib/locale";
 import { rolloutUi } from "@/lib/rollout/ui-copy";
 import type { ApprovedStoryUnit } from "@/lib/rollout/types";
 
@@ -114,10 +115,10 @@ function FlowHint({
 /** Thin pipeline breadcrumb — shows the full flow across Discovery + Rollout. */
 function PipelineBreadcrumb({ activeStep }: { activeStep: string }) {
   const steps = [
-    { id: "discovery", label: "Discovery 采纳", external: true },
+    { id: "discovery", label: rolloutUi.pipelineFromDiscovery, external: true },
     { id: "pending", label: "① 待处理" },
-    { id: "story-units", label: "② Story 单元" },
-    { id: "runtime-scenes", label: "③ Runtime Scene" },
+    { id: "story-units", label: `② ${rolloutUi.tabStoryUnits}` },
+    { id: "runtime-scenes", label: `③ ${messages.domain.readingRoute}` },
     { id: "links", label: "④ 关联" },
   ];
 
@@ -346,7 +347,7 @@ function SceneProjectionDialog({
               <option value="">—</option>
               {scenes.map((s) => (
                 <option key={s.tsid} value={s.tsid}>
-                  Ch.{s.chapter_number} {s.title} ({s.tsid})
+                  {messages.common.chapterN(s.chapter_number)} {s.title} ({s.tsid})
                 </option>
               ))}
             </select>
@@ -424,18 +425,18 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
   const projectedBySceneTsid = React.useMemo(() => {
     const map = new Map<
       string,
-      NonNullable<typeof rollout.queue.projectedScenes>[number]
+      NonNullable<typeof rollout.queue.projectedReadingRoutes>[number]
     >();
-    for (const record of rollout.queue.projectedScenes ?? [])
+    for (const record of rollout.queue.projectedReadingRoutes ?? [])
       map.set(record.sceneTsid, record);
     return map;
-  }, [rollout.queue.projectedScenes]);
+  }, [rollout.queue.projectedReadingRoutes]);
 
   const pendingCount =
-    rollout.queue.storyStaging.length + rollout.queue.sceneStaging.length;
+    rollout.queue.storyStaging.length + rollout.queue.readingRouteStaging.length;
   const dismissedCount =
     (rollout.queue.dismissedStoryStaging?.length ?? 0) +
-    (rollout.queue.dismissedSceneStaging?.length ?? 0);
+    (rollout.queue.dismissedReadingRouteStaging?.length ?? 0);
 
   const goTo = (tab: string) => setActiveTab(tab);
 
@@ -558,7 +559,7 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
             <TabsContent value="pending" className="min-h-72 space-y-6">
               <TabSection
                 title={rolloutUi.storyStagingTitle}
-                description="Discovery 采纳 → 持久化为 DB 中的 Story 单元"
+                description={messages.rollout.tabDescriptionPending}
               >
                 {rollout.queue.storyStaging.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
@@ -604,15 +605,17 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
 
               <TabSection
                 title={rolloutUi.sceneStagingTitle}
-                description="Discovery 采纳 → 投影为 Runtime Scene"
+                description={messages.rollout.tabDescriptionReadingRoutes(
+                  messages.domain.readingRoute
+                )}
               >
-                {rollout.queue.sceneStaging.length === 0 ? (
+                {rollout.queue.readingRouteStaging.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
                     {rolloutUi.noSceneStaging}
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {rollout.queue.sceneStaging.map((staging) => (
+                    {rollout.queue.readingRouteStaging.map((staging) => (
                       <div
                         key={staging.sourceReviewId}
                         className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -620,7 +623,7 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
                         <div className="min-w-0 text-sm">
                           <p className="font-medium">{staging.title}</p>
                           <p className="text-muted-foreground">
-                            Ch.{staging.chapter_number}
+                            {messages.common.chapterN(staging.chapter_number)}
                             {staging.chapter_title
                               ? ` — ${staging.chapter_title}`
                               : ""}
@@ -695,13 +698,17 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
                           <p className="font-medium">
                             {unit.title}{" "}
                             <span className="text-muted-foreground font-normal">
-                              ({unit.status})
+                              (
+                              {unit.status === "active"
+                                ? messages.common.statusActive
+                                : messages.common.statusArchived}
+                              )
                             </span>
                           </p>
                           <p className="text-muted-foreground text-xs">
                             {unit.sourceReviewId}
                             {linkCount > 0
-                              ? ` · ${linkCount} 个 Scene 关联`
+                              ? ` · ${linkCount} 个 ${messages.domain.readingRoute} 关联`
                               : null}
                           </p>
                         </div>
@@ -755,7 +762,7 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
               />
             </TabsContent>
 
-            {/* ── Tab 3: Runtime Scene ── */}
+            {/* ── Tab 3: Reading Routes ── */}
             <TabsContent value="runtime-scenes" className="min-h-72 space-y-3">
               {rollout.scenes.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
@@ -774,7 +781,7 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
                       >
                         <div className="min-w-0 text-sm">
                           <p className="font-medium">
-                            Ch.{scene.chapter_number} {scene.title}
+                            {messages.common.chapterN(scene.chapter_number)} {scene.title}
                           </p>
                           <p className="text-muted-foreground text-xs">
                             {scene.tsid}
@@ -802,7 +809,7 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
                         <div className="flex shrink-0 flex-wrap gap-2">
                           <Button asChild size="sm" variant="outline">
                             <Link
-                              href={`/works/${encodeURIComponent(workId)}/scenes/${encodeURIComponent(scene.tsid)}/edit`}
+                              href={`/works/${encodeURIComponent(workId)}/reading-routes/${encodeURIComponent(scene.tsid)}/edit`}
                             >
                               {rolloutUi.goEditScene}
                             </Link>
@@ -843,7 +850,7 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
                 </Button>
               ) : (
                 <Button variant="ghost" size="sm" asChild className="mt-1">
-                  <Link href={`/works/${encodeURIComponent(workId)}/scenes`}>
+                  <Link href={`/works/${encodeURIComponent(workId)}/reading-routes`}>
                     {rolloutUi.goScenesList}
                   </Link>
                 </Button>
@@ -972,13 +979,13 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
               </TabSection>
 
               <TabSection title={rolloutUi.dismissedSceneTitle}>
-                {(rollout.queue.dismissedSceneStaging?.length ?? 0) === 0 ? (
+                {(rollout.queue.dismissedReadingRouteStaging?.length ?? 0) === 0 ? (
                   <p className="text-muted-foreground text-sm">
                     {rolloutUi.noDismissedSceneStaging}
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {rollout.queue.dismissedSceneStaging?.map((staging) => (
+                    {rollout.queue.dismissedReadingRouteStaging?.map((staging) => (
                       <div
                         key={staging.sourceReviewId}
                         className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -986,7 +993,7 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
                         <div className="min-w-0 text-sm">
                           <p className="font-medium">{staging.title}</p>
                           <p className="text-muted-foreground">
-                            Ch.{staging.chapter_number}
+                            {messages.common.chapterN(staging.chapter_number)}
                             {staging.chapter_title
                               ? ` — ${staging.chapter_title}`
                               : ""}

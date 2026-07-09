@@ -6,6 +6,7 @@ import Link from "next/link";
 import { WorkTable } from "@/components/works/WorkTable";
 import { Button } from "@/components/ui/button";
 import { useWorks } from "@/hooks/useWorks";
+import { messages } from "@/lib/locale";
 
 export default function WorksPage() {
   const { works, loading, error, deleteWork } = useWorks();
@@ -26,7 +27,7 @@ export default function WorksPage() {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            Works
+            {messages.nav.works}
           </h1>
           <p className="text-muted-foreground text-sm">管理所有作品与内容入口</p>
         </div>

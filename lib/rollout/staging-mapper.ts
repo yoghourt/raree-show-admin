@@ -1,14 +1,14 @@
 /**
- * SPEC-ROL-001 §4.6 — Scene staging → Runtime Scene create payload
+ * SPEC-ROL-001 §4.6 — Reading Route staging → Runtime ReadingRoute create payload
  */
 
 import { z } from "zod";
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
 import { parseSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
-import type { Scene } from "@/lib/types";
+import type { ReadingRoute } from "@/lib/types";
 
-const sceneCreateSchema = z.object({
+const readingRouteCreateSchema = z.object({
   title: z.string().trim().min(1, "title is required"),
   chapter_number: z.number().int().min(1, "chapter_number must be at least 1"),
   chapter_title: z.string().nullable(),
@@ -19,15 +19,15 @@ const sceneCreateSchema = z.object({
   characterIds: z.array(z.string()),
 });
 
-export type SceneCreatePayload = Omit<Scene, "tsid" | "workId">;
+export type ReadingRouteCreatePayload = Omit<ReadingRoute, "tsid" | "workId">;
 
-export type SceneMappingResult =
-  | { ok: true; payload: SceneCreatePayload }
+export type ReadingRouteMappingResult =
+  | { ok: true; payload: ReadingRouteCreatePayload }
   | { ok: false; fieldErrors: Record<string, string[]> };
 
-export function mapSceneStagingToCreatePayload(
+export function mapSceneStagingToReadingRoutePayload(
   staging: AcceptedSceneCandidateStaging
-): SceneMappingResult {
+): ReadingRouteMappingResult {
   const chapterNumber = parseSceneChapterNumber(staging.chapter_number);
   if (chapterNumber === null) {
     return {
@@ -50,7 +50,7 @@ export function mapSceneStagingToCreatePayload(
     characterIds: [] as string[],
   };
 
-  const parsed = sceneCreateSchema.safeParse(raw);
+  const parsed = readingRouteCreateSchema.safeParse(raw);
   if (!parsed.success) {
     return {
       ok: false,

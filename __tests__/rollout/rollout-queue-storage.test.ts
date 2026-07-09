@@ -43,7 +43,7 @@ describe("rollout queue storage", () => {
           acceptedAt: "2026-07-05T00:00:00.000Z",
         },
       ],
-      sceneStaging: [],
+      readingRouteStaging: [],
       updatedAt: "2026-07-05T00:00:00.000Z",
     };
 

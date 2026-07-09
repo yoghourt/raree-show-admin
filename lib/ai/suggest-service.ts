@@ -23,6 +23,7 @@ import {
   bundleToConfidence,
   normalizeEvidence,
 } from "@/lib/ai/normalize-evidence";
+import { messages } from "@/lib/locale";
 import { getFieldMetadata, getFieldLabel } from "@/lib/ai/field-registry";
 
 const LLM_CALL_GAP_MS = Number(
@@ -34,7 +35,7 @@ function entityTypeLabel(entityType: EntityType): string {
     ? "角色"
     : entityType === "location"
       ? "地点"
-      : "场景";
+      : messages.copilot.readingRouteEntity;
 }
 
 function sleep(ms: number): Promise<void> {

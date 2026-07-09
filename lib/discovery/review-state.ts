@@ -224,7 +224,7 @@ export function isStoryOrSceneAcceptedInStaging(
   return (
     item.status === "accepted" &&
     (item.candidate.candidateType === "story" ||
-      item.candidate.candidateType === "scene")
+      item.candidate.candidateType === "readingRoute")
   );
 }
 
@@ -424,7 +424,7 @@ export function prepareAcceptReview(
         staging: buildStoryStaging(item),
       };
     }
-    case "scene": {
+    case "readingRoute": {
       const validation = validateSceneAcceptFields(fields);
       if (!validation.ok) {
         return {

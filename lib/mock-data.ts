@@ -1,9 +1,9 @@
-import type { Scene } from "@/lib/types";
+import type { ReadingRoute } from "@/lib/types";
 
 /** 占位 work id，仅作本地示例/种子参考；线上数据以 Supabase 为准 */
 const PLACEHOLDER_WORK_ID = "00000000-0000-0000-0000-000000000000";
 
-export const MOCK_SCENES: Scene[] = [
+export const MOCK_SCENES: ReadingRoute[] = [
   {
     workId: PLACEHOLDER_WORK_ID,
     tsid: "scene_winterfell_gate",

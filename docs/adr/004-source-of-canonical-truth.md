@@ -452,7 +452,7 @@ Scope is constituted by a single, human-provided Scope Field per entity type:
 ```text
 Character:  canonical_name  (human-provided)
 Location:   canonical_name  (human-provided)
-Scene:      chapter_title   (human-provided; current Runtime Scene)
+Scene:      chapter_title   (human-provided; current Runtime Reading Route — implementation: Scene)
 ```
 
 Rules:
@@ -1090,7 +1090,7 @@ Entity Type   Scope Field      Examples
 ──────────────────────────────────────────────────────────────
 Character     canonical_name   Jon Snow, Daenerys Targaryen
 Location      canonical_name   King's Landing, The Wall
-Scene         chapter_title    Chapter 1: The Prologue   [current Runtime Scene scope field]
+Scene         chapter_title    Chapter 1: The Prologue   [current Runtime Reading Route (implementation: Scene) scope field]
 ```
 
 #### Suggestible Fields
@@ -1760,7 +1760,7 @@ Location    description         Narrative        Narrative Suggestion
 Location    map_focus_x/y       Asset*           Excluded
              * coordinate pair — not text content; dedicated MapPicker tooling
 
-Scene       chapter_title       Scope            Excluded    [current Runtime Scene scope field]
+Scene       chapter_title       Scope            Excluded    [current Runtime Reading Route (implementation: Scene) scope field]
 Scene       summary             Narrative        Narrative Suggestion
 Scene       scene_description   Narrative        Narrative Suggestion
 ```
@@ -1995,7 +1995,7 @@ AC-11:  Accept All is scoped to the current entity only; no cross-entity accepta
 AC-12:  Sources displayed to the operator are drawn from external references, not from AI-invented citations.
 AC-13:  The Copilot suggestion UI does not activate until the operator has entered a Scope Field value (SD-01).
 AC-14:  The suggestion endpoint rejects requests that do not include a Scope Field value (SD-01).
-AC-15:  Scope Fields (canonical_name for Character/Location; chapter_title for current Runtime Scene) do not appear in the suggestion response payload (SD-02).
+AC-15:  Scope Fields (canonical_name for Character/Location; chapter_title for current Runtime Reading Route (implementation: Scene)) do not appear in the suggestion response payload (SD-02).
 AC-16:  No provider prompt construction includes an instruction to generate a Scope Field value (SD-02, SD-03).
 AC-17:  Fact Suggestion fields and Narrative Suggestion fields are classified in the suggestion response payload (SC-01, SC-02).
 AC-18:  Fact Suggestion pipeline performs source retrieval before LLM generation when Tier-1 or Tier-2 sources exist (SC-01, SC-04).

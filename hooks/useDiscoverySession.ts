@@ -138,7 +138,7 @@ export interface UseDiscoverySessionReturn {
   discardCandidate: (reviewId: string) => void;
   revokeStagingAccept: (
     sourceReviewId: string,
-    kind: "story" | "scene"
+    kind: "story" | "readingRoute"
   ) => void;
   saveCandidateEdit: (reviewId: string, edit: ReviewEditPayload) => void;
   saveStoryStagingEdit: (
@@ -617,7 +617,7 @@ export function useDiscoverySession(
   }, []);
 
   const revokeStagingAccept = useCallback(
-    (sourceReviewId: string, kind: "story" | "scene") => {
+    (sourceReviewId: string, kind: "story" | "readingRoute") => {
       setAcceptError(null);
       setReviewItems((prev) => revokeReviewAccept(prev, sourceReviewId));
       if (kind === "story") {
@@ -655,7 +655,7 @@ export function useDiscoverySession(
               )
             );
             updateStoryStagingInRolloutQueue(workId, operatorId, staging);
-          } else if (candidateType === "scene") {
+          } else if (candidateType === "readingRoute") {
             const staging = buildSceneStaging(item);
             setAcceptedSceneCandidates((scenes) =>
               scenes.map((scene) =>

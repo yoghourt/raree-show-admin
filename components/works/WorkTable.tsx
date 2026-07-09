@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Work } from "@/lib/types";
+import { messages } from "@/lib/locale";
 import { DISCOVERY_PAGE_TITLE } from "@/lib/discovery/ui-copy";
 import { cn } from "@/lib/utils";
 
@@ -118,7 +119,7 @@ export function WorkTable({
                     标题
                   </TableHead>
                   <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 sm:table-cell">
-                    TSID
+                    {messages.common.businessId}
                   </TableHead>
                   <TableHead className="hidden h-10 max-w-[280px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
                     描述
@@ -167,9 +168,9 @@ export function WorkTable({
                       <div className="flex flex-wrap justify-end gap-1">
                         <Button variant="outline" size="sm" asChild>
                           <Link
-                            href={`/works/${encodeURIComponent(work.id)}/scenes`}
+                            href={`/works/${encodeURIComponent(work.id)}/reading-routes`}
                           >
-                            场景
+                            {messages.domain.readingRoute}
                           </Link>
                         </Button>
                         <Button variant="outline" size="sm" asChild>
@@ -230,7 +231,7 @@ export function WorkTable({
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              确定要删除该作品吗？请先处理或迁移其下的场景、角色、地点数据，或在数据库外键上启用级联删除。
+              确定要删除该作品吗？请先处理或迁移其下的{messages.domain.readingRoute}、角色、地点数据，或在数据库外键上启用级联删除。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">

@@ -19,9 +19,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { rankEntityOptions } from "@/lib/entity-fuzzy-rank"
+import { messages } from "@/lib/locale"
 import { cn } from "@/lib/utils"
 
-const EMPTY_COPY = "No matching results."
+const EMPTY_COPY = messages.common.noMatchingResults
 
 export type EntityMultiFuzzyPickerProps = {
   options: EntityOption[]
@@ -36,7 +37,7 @@ export function EntityMultiFuzzyPicker({
   options,
   value,
   onChange,
-  placeholder = "Search characters…",
+  placeholder = messages.forms.searchCharacters,
   loading = false,
   disabled = false,
 }: EntityMultiFuzzyPickerProps) {
@@ -89,7 +90,7 @@ export function EntityMultiFuzzyPicker({
             )}
           >
             <span className="truncate">
-              {loading ? "Loading..." : summary}
+              {loading ? messages.common.loading : summary}
             </span>
             <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
           </button>
@@ -100,7 +101,7 @@ export function EntityMultiFuzzyPicker({
               className="flex min-h-48 items-center justify-center px-3 py-6 text-sm text-muted-foreground"
               aria-busy="true"
             >
-              Loading...
+              {messages.common.loading}
             </div>
           ) : (
             <Command shouldFilter={false}>

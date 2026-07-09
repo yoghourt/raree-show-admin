@@ -93,7 +93,13 @@ const TYPE_KEY_VARIANTS: Record<DiscoveryCandidateType, string[]> = {
     "narrative_units",
     "narrativeUnits",
   ],
-  scene: [
+  readingRoute: [
+    "readingRoute",
+    "reading_route",
+    "readingRoutes",
+    "reading_routes",
+    "reading_route_candidates",
+    "readingRouteCandidates",
     "scene",
     "scenes",
     "scene_candidates",
@@ -126,7 +132,7 @@ function normalizeCandidateItems(
               fields: { title: label, summary: label },
             },
           ];
-        case "scene":
+        case "readingRoute":
           return [
             {
               displayName: label,

@@ -20,7 +20,7 @@ export interface ApprovedStoryUnit {
   status: StoryUnitStatus;
 }
 
-export interface StorySceneProjectionLink {
+export interface StoryReadingRouteProjectionLink {
   id: string;
   workId: string;
   storyUnitId: string;
@@ -30,8 +30,8 @@ export interface StorySceneProjectionLink {
   source: "operator_projection_accept";
 }
 
-/** Client-side record for reversing Scene projection back to staging */
-export interface ProjectedSceneRecord {
+/** Client-side record for reversing Reading Route projection back to staging */
+export interface ProjectedReadingRouteRecord {
   sourceReviewId: string;
   sceneTsid: string;
   mode: "create" | "link_existing";
@@ -41,18 +41,18 @@ export interface ProjectedSceneRecord {
 export interface RolloutQueueSnapshot {
   workId: string;
   storyStaging: AcceptedStoryUnitStaging[];
-  sceneStaging: AcceptedSceneCandidateStaging[];
+  readingRouteStaging: AcceptedSceneCandidateStaging[];
   /** Staging already persisted to story_units — excluded from pending import */
   processedStoryReviewIds?: string[];
-  /** Staging already projected to Runtime Scene — excluded from pending import */
-  processedSceneReviewIds?: string[];
+  /** Staging already projected to Runtime Reading Route — excluded from pending import */
+  processedReadingRouteReviewIds?: string[];
   /** Removed from pending queue — shown in dismissed list until restored */
   dismissedStoryStaging?: AcceptedStoryUnitStaging[];
-  dismissedSceneStaging?: AcceptedSceneCandidateStaging[];
+  dismissedReadingRouteStaging?: AcceptedSceneCandidateStaging[];
   dismissedStoryReviewIds?: string[];
-  dismissedSceneReviewIds?: string[];
-  /** Scene projection records for cancel-projection (client v1) */
-  projectedScenes?: ProjectedSceneRecord[];
+  dismissedReadingRouteReviewIds?: string[];
+  /** Reading Route projection records for cancel-projection (client v1) */
+  projectedReadingRoutes?: ProjectedReadingRouteRecord[];
   updatedAt: string;
 }
 
@@ -61,7 +61,7 @@ export interface RolloutStateResponse {
   workId: string;
   queue: RolloutQueueSnapshot;
   storyUnits: ApprovedStoryUnit[];
-  links: StorySceneProjectionLink[];
+  links: StoryReadingRouteProjectionLink[];
   scenes: Array<{ tsid: string; title: string; chapter_number: number }>;
 }
 

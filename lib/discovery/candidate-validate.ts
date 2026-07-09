@@ -73,7 +73,7 @@ function normalizeFieldsRecord(
     }
   }
 
-  if (candidateType === "scene") {
+  if (candidateType === "readingRoute") {
     if (!isNonEmptyString(out.title) && isNonEmptyString(out.scene_title)) {
       out.title = out.scene_title;
     }
@@ -215,8 +215,8 @@ function validateFieldsForType(
       return validateLocationFields(normalizeFieldsRecord("location", record));
     case "story":
       return validateStoryFields(normalizeFieldsRecord("story", record));
-    case "scene":
-      return validateSceneFields(normalizeFieldsRecord("scene", record));
+    case "readingRoute":
+      return validateSceneFields(normalizeFieldsRecord("readingRoute", record));
   }
 }
 

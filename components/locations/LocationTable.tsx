@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Location } from "@/lib/types";
+import { messages } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 
 export type LocationTableProps = {
@@ -115,7 +116,7 @@ export function LocationTable({
               <TableHeader>
                 <TableRow className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50">
                   <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                    TSID
+                    {messages.common.businessId}
                   </TableHead>
                   <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
                     名称

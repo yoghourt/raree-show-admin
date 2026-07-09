@@ -6,5 +6,5 @@ type Props = {
 
 export default async function WorkRootPage({ params }: Props) {
   const { workId } = await params;
-  redirect(`/works/${workId}/scenes`);
+  redirect(`/works/${workId}/reading-routes`);
 }
