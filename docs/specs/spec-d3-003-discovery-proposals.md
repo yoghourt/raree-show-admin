@@ -108,11 +108,11 @@ Story Candidates MUST align with ADR-005 Story unit semantics. Proposed `fields`
 
 **D3-RC-PRO-07 — Scene Candidate semantics**
 
-Scene Candidates are editorial proposals only. They MUST NOT be treated as Runtime Scene records. Cross-domain mapping requires human-accepted governed projection per ADR-007.
+Scene Candidates propose **Editorial Scene** content (ADR-005 v2.0 Layer 3). They MUST NOT be treated as Reading Route records (implementation: Scene records) or Reading Frame records. Discovery Accept does **not** authorize cross-domain mapping. **Approved Story unit ↔ Reading Route** governed association and **Editorial Scene → Reading Route Projection Accept** (when operator-initiated) belong to SPEC-ROL-001 under ADR-007 v1.2 architecture deferral — not to propose/Accept alone.
 
 **D3-RC-PRO-08 — Narrative-first input**
 
-Propose generation MUST use the locked `NarrativeInputBundle` as primary LLM context. Runtime Scene exports or catalog spine MUST NOT replace narrative input (already gated by SPEC-D3-001; propose MUST NOT accept unlock bypass).
+Propose generation MUST use the locked `NarrativeInputBundle` as primary LLM context. Reading Route exports (`scenes` table metadata) or catalog spine MUST NOT replace narrative input (already gated by SPEC-D3-001; propose MUST NOT accept unlock bypass).
 
 **D3-RC-PRO-09 — Regen uses Discovery session**
 
@@ -391,7 +391,7 @@ Client-side ephemeral Candidate list MUST be cleared on session teardown (D3-001
 - Enrichment field suggestion, Accept All, Retry Queue — SPEC-D2-002
 - Field registry Copilot routing rules — SPEC-CORE-001
 - Story ONE Rule operator UI — ADR-005
-- Runtime Scene CRUD or governed projection writes — SPEC-ROL-001 / ADR-007
+- Reading Route CRUD or governed Projection Accept from accepted scene Candidates — SPEC-ROL-001 / ADR-007 v1.2
 - Work-level batch propose or Accept All Candidates — ADR-006 Decision 8
 - Knowledge Graph extraction — ADR-005 deferred capability
 - Modifying SPEC-D3-001 Narrative Gate thresholds or NG rules
@@ -455,7 +455,7 @@ Expected implementation anchors (read-only planning reference):
 
 - `docs/adr/006-discovery-copilot-architecture.md` — ADR-006 (parent; Decision 2–3, 5–6; DISC-INV-*; capability classes)
 - `docs/adr/005-narrative-information-model.md` — ADR-005 (Story semantics; narrative-first)
-- `docs/adr/007-rollout-architecture.md` — ADR-007 (Scene Candidate vs Runtime Scene; reference only)
+- `docs/adr/007-rollout-architecture.md` — ADR-007 v1.2 (Editorial Scene vs Reading Route; reference only)
 
 ### Related SPECs
 

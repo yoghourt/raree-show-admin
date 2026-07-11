@@ -134,7 +134,7 @@ Accept on `story` Candidates MUST produce an Approved Story unit semantic object
 
 **D3-RC-REV-09 — Scene Accept path**
 
-Accept on `scene` Candidates MUST mark an accepted editorial scene candidate in client staging. Accept MUST NOT create or update Runtime Scene records. Governed projection belongs to SPEC-ROL-001 / ADR-007.
+Accept on `scene` Candidates MUST mark an **Editorial Scene** candidate as `AcceptedSceneCandidateStaging` in client staging (ADR-006 v1.3 Scene unit path; ADR-005 v2.0 Approved Scene unit semantics at Rollout persist). Accept MUST NOT create or update Reading Route records (implementation: Scene records). **Editorial Scene ↔ Runtime** association requires explicit **Projection Accept** per SPEC-ROL-001 — not Discovery Accept alone (ADR-007 v1.2 §Deferred Decisions).
 
 **D3-RC-REV-10 — No work-level Accept All**
 
@@ -253,7 +253,7 @@ Durable Approved Story unit storage is owned by **SPEC-ROL-001** (Rollout persis
 | ---- | -------- |
 | 1 | Construct `AcceptedSceneCandidateStaging` object in client session state (§4.5) |
 | 2 | Mark review item `accepted` |
-| 3 | MUST NOT create or update Runtime Scene records (D3-RC-REV-09) |
+| 3 | MUST NOT create or update Reading Route records (implementation: Scene records) (D3-RC-REV-09) |
 
 SPEC-ROL-001 consumes accepted scene staging for governed projection.
 
@@ -346,7 +346,7 @@ When SPEC-D3-003 returns `errors[]` for failed types alongside successful `candi
 | -- | ---------- |
 | OQ-D3-002-01 | Accept v1 MUST NOT silent DB insert. Character/location Accept = navigate prefill + existing CRUD Save. Story/scene Accept = client staging objects only |
 | OQ-D3-002-02 | Durable Approved Story unit DB schema **Deferred**. v1 uses `AcceptedStoryUnitStaging` in client session |
-| OQ-D3-002-03 | Scene Accept marks `AcceptedSceneCandidateStaging` only; no Runtime Scene write in D3-002; ROL-001 owns projection |
+| OQ-D3-002-03 | Scene Accept marks `AcceptedSceneCandidateStaging` only (Editorial Scene); no Reading Route write in D3-002; SPEC-ROL-001 Projection Accept owns Runtime association |
 | OQ-D3-002-04 | Review staging v1 is **client session state** aligned with D3-001 (no durable review DB). UI warns on navigation away with pending items |
 | OQ-D3-002-05 | Edit UX v1: modal editor for `fields`, `displayName`, `summary`; save → `edited_pending_accept` |
 | OQ-D3-002-06 | `review_pending` **reuses** locked narrative for Re-propose/regen without unlock (D3-RC-REV-15). Session remains `review_pending` until operator teardown; terminal review items do not auto-unlock narrative |
@@ -439,7 +439,7 @@ Re-propose during Review MUST NOT transition narrative to editable `draft` witho
 - Enrichment field suggestion, Retry Queue, Narrative Regenerate on entity forms — SPEC-D2-002
 - Field registry Copilot routing rules — SPEC-CORE-001
 - Story ONE Rule operator UI — ADR-005
-- Governed projection API, Runtime Scene writes from accepted scene Candidates — SPEC-ROL-001
+- Governed projection API, Reading Route writes from accepted scene Candidates — SPEC-ROL-001 (Projection Accept; not Discovery Accept)
 - Work-level Accept All Candidates — ADR-006 Decision 8
 - Durable review staging database — deferred beyond v1 (OQ-D3-002-04)
 - Modifying SPEC-D3-003 regen or propose contracts
@@ -514,7 +514,7 @@ Manual runtime checks:
 
 - `docs/adr/006-discovery-copilot-architecture.md` — ADR-006 (parent; Decision 4; Human Review outcome paths; DISC-INV-*)
 - `docs/adr/005-narrative-information-model.md` — ADR-005 (Story unit semantics)
-- `docs/adr/007-rollout-architecture.md` — ADR-007 (Scene Candidate vs Runtime Scene; projection deferral)
+- `docs/adr/007-rollout-architecture.md` — ADR-007 v1.2 (Editorial Scene vs Reading Route; Scene↔Runtime deferred at architecture layer; SPEC-ROL-001 operational path)
 
 ### Related SPECs
 

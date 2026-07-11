@@ -9,12 +9,12 @@
 | Version      | v1.1                                                                  |
 | Owner        | Architect                                                             |
 | Last Updated | 2026-07-07                                                            |
-| Derived From | ADR-007 (`docs/adr/007-rollout-architecture.md`)                      |
+| Derived From | ADR-007 v1.2 (`docs/adr/007-rollout-architecture.md`)                      |
 | Related      | ADR-004, ADR-005, ADR-006, SPEC-D3-001, SPEC-D3-002, SPEC-CORE-001 |
 
 **ADR-004 note:** Listed under Related for Human Acceptance Gate (Decision 2) and Runtime Truth v1 topology. Projection Accept MUST satisfy explicit operator acceptance; no silent Runtime writes.
 
-**ADR-005 note:** Listed under Related for Approved Story unit semantics and Editorial Domain authority. Story boundary adjudication (ONE Rule) remains ADR-005 authority; this SPEC MUST NOT define ONE Rule UI or alternate Story definitions (ROL-INV-04).
+**ADR-005 note:** Listed under Related for Approved Story unit and **Approved Scene unit** (Editorial Scene) semantics and Editorial Domain authority. Story and Scene boundary adjudication remain ADR-005 v2.0 authority; this SPEC MUST NOT define ONE Rule UI, alternate Story/Scene definitions, or treat **Reading Frame** as Editorial Scene (NIM-INV-06; ROL-INV-04).
 
 **ADR-006 note:** Discovery Accept for story/scene Candidates produces client staging only (SPEC-D3-002). Rollout MUST NOT collapse Discovery session semantics or reuse Enrichment Accept paths (ROL-INV-06).
 
@@ -31,7 +31,7 @@ SPEC-ROL-001 closes that deferral for the **Rollout** layer. It becomes the **so
 - Work-scoped Rollout operator UX contract (normative behaviors; not pixel-level UI Spec)
 - Durable Approved Story unit persistence from Discovery Accept staging
 - Story ↔ Reading Route (implementation: Scene) **governed link** create, list, and remove (N:M association; no identity merge)
-- Reading Route **Projection Accept** — editorial scene staging → Runtime Reading Route (implementation: Scene) create or link to existing Reading Route
+- Reading Route **Projection Accept** — **Editorial Scene** staging (`AcceptedSceneCandidateStaging`) → Runtime Reading Route (implementation: Scene) create or link to existing Reading Route. **Not** Reading Frame. Operator-initiated; architecture deferral closed at SPEC layer (ADR-007 v1.2 §Deferred Decisions → SPEC-ROL-001).
 - Rollout-phase enforcement of ROL-INV-01 through ROL-INV-07 as testable runtime contracts
 
 This specification defines **How** and **Validation** for governed projection. It does not restate ADR-007 Rollout Model rationale. Discovery propose/regen, Human Review actions, and Candidate lifecycle belong to SPEC-D3-001, SPEC-D3-002, and SPEC-D3-003. Catalog Entity persist (Character, Location) remains the existing Production path unchanged.
