@@ -2,15 +2,17 @@
 
 **Status:** Accepted  
 **Type:** Architecture ADR  
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 2026-07-08  
+**Last Updated:** 2026-07-11  
 **Owner:** Architect  
 **Related ADR:** ADR-004 (Source of Canonical Truth — Runtime Truth v1 topology);
-ADR-005 (Narrative Information Model — Editorial Domain glossary);
-ADR-006 (Discovery Copilot Architecture — candidate lifecycle);
-ADR-007 (Editorial → Runtime Rollout Architecture — governed projection)  
+ADR-005 v2.0 (Narrative Information Model — Editorial Domain Story and Scene glossary);
+ADR-006 v1.3 (Discovery Copilot Architecture — candidate lifecycle);
+ADR-007 v1.2 (Editorial → Runtime Rollout Architecture — governed projection);
+ADR-009 (Vocabulary Architecture — multi-layer vocabulary coexistence)  
 **Supersedes:** None  
-**Amendment:** —
+**Amendment:** A2 (Cross-domain vocabulary disambiguation — Editorial Scene vs Reading Route implementation alias; evidence and debt classification updates; **no** RV-01 ~ RV-07 change, Runtime topology change, or implementation mandate change)
 
 ---
 
@@ -29,14 +31,17 @@ It defines:
 * The definition of **Vocabulary Debt** and the classification of existing
   terminology against that definition.
 * The **Runtime Truth Language Architecture** — the target topology in which every
-  layer communicates using the same language.
+  Runtime layer communicates using the same language.
+* **Cross-domain term disambiguation** — how Runtime canonical vocabulary coexists
+  with Editorial Layer 3 terms (Story, Scene) without conflation (ADR-005 v2.0,
+  ADR-007 v1.2, ADR-009).
 
 This ADR does **not** govern:
 
 * Runtime Truth v1 topology, database schema, or routing (ADR-004 remains authoritative).
-* Editorial Domain Story semantics or the ONE Rule (ADR-005).
-* Discovery Candidate lifecycle or Authority Emergence (ADR-006).
-* Governed projection rules (ADR-007).
+* Editorial Domain Story or Scene semantics or the ONE Rule (ADR-005 v2.0).
+* Discovery Candidate lifecycle or Authority Emergence (ADR-006 v1.3).
+* Governed projection rules or Editorial Scene ↔ Runtime deferral (ADR-007 v1.2).
 * Specific rename targets, migration sequences, or acceptance criteria — these are
   the responsibility of the implementation SPEC authorized by this ADR:
   `docs/specs/spec-vdc-001-vocabulary-debt-closure.md`.
@@ -53,13 +58,15 @@ A vocabulary audit conducted on 2026-07-08 (findings embedded below) produced th
    Domain, Discovery artifacts, implementation symbols, and UI labels.
 
 2. **The word "Story" carries four distinct concepts**: the Editorial narrative
-   unit (ADR-005), the Discovery candidate type, the Reading Frame collection
-   prefix (`StoryImage`, `story_images_v2`), and an ad-hoc admin UI label
+   unit (ADR-005 v2.0 Layer 3), the Discovery candidate type, the Reading Frame
+   collection prefix (`StoryImage`, `story_images_v2`), and an ad-hoc admin UI label
    (`Story Sequence`).
 
-3. **The word "Scene" carries three distinct concepts**: the Runtime Reading Route
-   (implementation alias), the Discovery Editorial-layer scene candidate, and general
-   UI operational language.
+3. **The word "Scene" carries four distinct concepts**: the **Editorial Scene**
+   progression unit within Story (ADR-005 v2.0 Layer 3), the Runtime **Reading Route**
+   (RV-02 normative term; implementation alias `Scene`), Discovery-layer scene /
+   reading-route candidate artifacts (ADR-006 v1.3 — Editorial Scene proposals, not
+   Runtime records), and general UI operational language.
 
 4. **Reading Frame alone has eight or more active aliases** across the admin and web
    repositories: `StoryImage`, `story_images_v2`, `EffectiveStorySlide`,
@@ -100,6 +107,32 @@ vocabulary must be implemented directly*, not merely documented.
 
 ## How
 
+### Cross-Domain Vocabulary Boundaries (A2)
+
+ADR-008 governs **Runtime vocabulary only** (Layer 5). Editorial vocabulary is
+ authoritative in ADR-005 v2.0 (Layer 3). This ADR **does not** redefine, absorb,
+ or converge Editorial terms into Runtime identifiers.
+
+| Term | Layer | Authority | ADR-008 scope |
+| ---- | ----- | --------- | ------------- |
+| **Story** | Editorial (L3) | ADR-005 | Reference only — not a Runtime ubiquitous language target |
+| **Scene** (Editorial) | Editorial (L3) | ADR-005 | **Out of scope** — progression unit within Story |
+| **Reading Route** | Runtime (L5) | RV-02 / ADR-004 | **In scope** — canonical Runtime term |
+| **Scene** (implementation alias) | Runtime (L5 impl) | `runtime-lexicon.md` | **In scope** — legacy alias for Reading Route only |
+| **Reading Frame** | Runtime (L5) | RV-04 / ADR-004 | **In scope** — canonical Runtime term |
+
+**Governance rule:** Implementation identifiers named `Scene` or `scene` MUST be
+ interpreted as **Reading Route** legacy aliases when in Runtime scope. They MUST
+ NOT be interpreted as **Editorial Scene** (ADR-005). Editorial Scene ↔ Runtime
+ mapping is deferred (ADR-007 v1.2 §Deferred Decisions); this ADR does not
+ authorize identity merge or synonym substitution across layers.
+
+Discovery candidate symbols (`scene`, `readingRoute`) are **Layer 3 artifacts**
+ (ADR-006 v1.3). Their convergence is governed by Discovery SPECs and ADR-009
+ VOC-GOV rules — not by Runtime Vocabulary Debt closure alone.
+
+---
+
 ### Decision 1 — Ubiquitous Language
 
 **Runtime Truth v1 adopts a single ubiquitous language as the long-term architectural
@@ -108,11 +141,11 @@ target.**
 > One concept → one directly inferable identifier, at every layer.
 
 The canonical vocabulary established in `governance/vocabulary/runtime-lexicon.md`
-(RV-01 ~ RV-07) is the ubiquitous language for the Runtime domain.
+(RV-01 ~ RV-07) is the ubiquitous language for the **Runtime domain**.
 
-Every layer — Governance, SPEC, TypeScript type, React component, API contract,
-route path, UI label, AI prompt, documentation, and test assertion — is a consumer
-of this language and must implement it directly.
+Every **Runtime** layer — Governance, SPEC, TypeScript type, React component,
+API contract, route path, UI label, AI prompt, documentation, and test assertion
+for Runtime concepts — is a consumer of this language and must implement it directly.
 
 The ubiquitous language is not a translation reference. It is the identifier set
 used in production.
@@ -212,11 +245,16 @@ Historical aliases that require Glossary lookup are classified as **Vocabulary D
 
 **Consequences of this rule:**
 
-* `scenes` (database table name) is acceptable as an alias for Reading Route
-  (implementation): a newcomer infers a collection of scene-like reading units,
-  which is adjacent to the domain meaning of a navigable reading container. The
-  alias is tolerable within the database layer where changing table names carries
-  high migration cost.
+* `scenes` (database table name) is acceptable as an alias for **Reading Route**
+  (Runtime implementation): a newcomer infers a collection of scene-like reading
+  units, which is adjacent to the domain meaning of a navigable reading container.
+  The alias is tolerable within the database layer where changing table names carries
+  high migration cost. **`scenes` MUST NOT be read as Editorial Scene** (ADR-005).
+
+* `Scene` (TypeScript type name in Runtime code) is a **legacy implementation alias**
+  for Reading Route within Runtime scope. It is Vocabulary Debt at TypeScript /
+  component / UI layers (see Decision 5). It MUST NOT be used to name Editorial
+  Scene concepts (Layer 3).
 
 * `story_images_v2` is **not acceptable** as a normative identifier: the alias does
   not yield inferability of Reading Frame from the name alone. It is Vocabulary Debt.
@@ -269,11 +307,11 @@ ambiguity imposes systematic translation cost.
 | `StoryImage` | High | No inferability of Reading Frame; false inference toward story-related images |
 | `story_images_v2` | High | No inferability; version suffix implies technical artifact |
 | `Story Sequence` (UI label) | High | Unregistered alias; collides with three other "Story" concepts |
-| `story` (Discovery candidate type) | Medium | Collides with Editorial Story (ADR-005) and with StoryImage prefix |
-| `scene` (Discovery candidate type) | Medium | Collides with RV-02 Reading Route implementation alias |
+| `story` (Discovery candidate type) | Medium | Collides with Editorial Story (ADR-005 Layer 3) and with StoryImage prefix; Layer 3 — outside Runtime convergence scope |
+| `scene` / `readingRoute` (Discovery candidate type) | Medium | Collides with **Editorial Scene** (ADR-005 Layer 3) and **Reading Route** alias (RV-02); Layer 3 Discovery artifact — not a Runtime identifier |
 | `segment` (UI informal) | Medium | No governance registration; domain meaning not directly inferable |
 | `slide` / `EffectiveStorySlide` | Medium | Carries no Reading Frame inferability |
-| `Scene` (TypeScript type) | Low | Direct legacy alias; inferability partially preserved within implementation context |
+| `Scene` (TypeScript type) | Low | Legacy alias for **Reading Route** in Runtime implementation context only; MUST NOT name Editorial Scene; inferability partially preserved within Runtime scope |
 | `caption` (field name) | None | Directly inferable as Frame Narrative; acceptable alias |
 | `summary` (field name) | None | Directly inferable as Route Synopsis within context; acceptable alias |
 
@@ -323,9 +361,13 @@ consistent with `Reading Route` provided a localization mapping is registered in
 the implementation SPEC.
 
 What is not consistent: a TypeScript type `Scene`, a React component `SceneForm`,
-an API route `/scenes`, and a UI label `场景` when the canonical term is
+an API route `/scenes`, and a UI label `场景` when the canonical **Runtime** term is
 `Reading Route` — because each layer independently uses the alias without
 transmitting the canonical form.
+
+Using `Scene` as an identifier for **Editorial Scene** (ADR-005) in Runtime layers
+ is also inconsistent — Editorial Scene is Layer 3 vocabulary and MUST NOT be
+ conflated with Reading Route (ADR-007 v1.2, ADR-005 NIM-INV-06).
 
 ---
 
@@ -343,6 +385,8 @@ Invariant checks established by this ADR:
 - **VDC-INV-02** — No new React component, TypeScript type, or API route field
   introduced after this ADR may use `Story` as a prefix or suffix when the
   intended domain concept is a Reading Frame, Reading Route, or Frame Narrative.
+  No new **Runtime** identifier may use `Scene` to mean **Editorial Scene**
+  (ADR-005 Layer 3).
 
 - **VDC-INV-03** — The UI label `Story Sequence` must be replaced in the
   implementation SPEC. Its continued presence in `SceneForm.tsx` after SPEC
@@ -359,9 +403,10 @@ Invariant checks established by this ADR:
 - Governance: `governance/FOUNDATION.md` — Runtime Supremacy Law
 - Vocabulary: `governance/vocabulary/runtime-lexicon.md` — RV-01 ~ RV-07
 - ADR-004 — Source of Canonical Truth (Runtime Truth v1 topology)
-- ADR-005 — Narrative Information Model (Editorial Domain glossary)
-- ADR-006 — Discovery Copilot Architecture
-- ADR-007 — Editorial → Runtime Rollout Architecture
+- ADR-005 v2.0 — Narrative Information Model (Editorial Domain Story and Scene glossary)
+- ADR-006 v1.3 — Discovery Copilot Architecture
+- ADR-007 v1.2 — Editorial → Runtime Rollout Architecture
+- ADR-009 — Vocabulary Architecture (multi-layer vocabulary coexistence)
 - `docs/specs/spec-vdc-001-vocabulary-debt-closure.md` — implementation SPEC (rename targets, phases, acceptance criteria)
 - `governance/vocabulary/runtime-lexicon.md §4` — DR-01 ~ DR-06 (authoring rules)
 - `governance/vocabulary/runtime-lexicon.md §6` — Governance Chain (vocabulary selection record)
@@ -384,8 +429,10 @@ SPEC authorized by this ADR.
 ### A — Retain the current alias model; document more thoroughly
 
 The prior alias model — codified in `governance/vocabulary/runtime-lexicon.md §3`
-— treats `Scene` and `StoryImage` as permanent acceptable aliases and requires
-only documentation-layer convergence.
+— treats `Scene` (Reading Route implementation alias) and `StoryImage` as permanent
+acceptable aliases at the implementation layer and requires only documentation-layer
+convergence. **Editorial Scene** (ADR-005 v2.0) is a separate Layer 3 term and is
+not subject to Runtime alias convergence.
 
 **Rejected.** The Vocabulary Audit demonstrates that documentation-layer convergence
 does not reduce cognitive cost in practice. After completing the most thorough
@@ -449,8 +496,12 @@ This ADR does **not**:
   on the Alias Acceptance Rule).
 * Define localization (Chinese) equivalents for canonical terms (implementation
   SPEC responsibility).
-* Address Editorial Domain vocabulary (ADR-005 governs that independently).
-* Address Discovery candidate naming (governed by ADR-006 downstream SPECs).
+* Address Editorial Domain vocabulary — **Story** and **Scene** (ADR-005 v2.0 governs
+  Editorial Layer 3 independently; ADR-009 governs cross-layer reference rules).
+* Address Discovery candidate naming beyond Runtime collision notes (governed by
+  ADR-006 v1.3 downstream SPECs and ADR-009 VOC-GOV).
+* Define Editorial Scene ↔ Runtime projection or mapping (ADR-007 v1.2 — deferred
+  to SPEC).
 
 ---
 
@@ -459,9 +510,11 @@ This ADR does **not**:
 *This ADR references Runtime vocabulary as defined in*
 `governance/vocabulary/runtime-lexicon.md`.
 
+### Runtime canonical vs implementation (in scope)
+
 | Normative Term | Legacy Term | Classification | Status under this ADR |
 |---|---|---|---|
-| Reading Route | Scene | Implementation Alias | Vocabulary Debt — fails IP-01 at TypeScript/component/UI layers; acceptable at DB layer only |
+| Reading Route | Scene | Implementation Alias | Vocabulary Debt — fails IP-01 at TypeScript/component/UI layers; acceptable at DB layer only when meaning **Reading Route** |
 | Reading Frame | Story Image | Implementation Alias | Vocabulary Debt — fails IP-01 at all layers |
 | Frame Narrative | caption | Documentation Alias | Acceptable — satisfies IP-01 |
 | Route Synopsis | summary | Documentation Alias | Acceptable — satisfies IP-01 within context |
@@ -469,3 +522,11 @@ This ADR does **not**:
 | Reading Frame | Story Sequence (UI label) | Unregistered ad-hoc | Vocabulary Debt — must be replaced (VDC-INV-03) |
 | Reading Frame | segment | Unregistered ad-hoc | Vocabulary Debt — must be replaced |
 | Reading Frame / Reader Step | slide | Technical leakage | Vocabulary Debt — to be addressed in implementation SPEC |
+
+### Cross-domain reference (out of scope — A2)
+
+| Term | Layer | Authority | ADR-008 treatment |
+| ---- | ----- | --------- | ----------------- |
+| **Scene** (Editorial) | Layer 3 | ADR-005 v2.0 | **Not** a Runtime alias target; MUST NOT be merged with Reading Route `Scene` |
+| **Story** (Editorial) | Layer 3 | ADR-005 v2.0 | **Not** a Runtime ubiquitous language term |
+| `scene` / `readingRoute` (Discovery candidate) | Layer 3 | ADR-006 v1.3 | Discovery artifact naming; Runtime VDC scope excludes Layer 3 convergence |
