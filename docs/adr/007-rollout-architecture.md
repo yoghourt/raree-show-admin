@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Type:** Rollout ADR
-**Version:** 1.1
-**Last Updated:** 2026-07-07
-**Amendment:** A1 (Runtime Vocabulary Alignment — vocabulary only; Decision semantics and topology unchanged; Scene → Reading Route; Story Image → Reading Frame; normative vocabulary in `governance/vocabulary/runtime-lexicon.md`).
+**Version:** 1.2
+**Last Updated:** 2026-07-11
+**Amendment:** A1 (Runtime Vocabulary Alignment — vocabulary only; Decision semantics and topology unchanged; Scene → Reading Route; Story Image → Reading Frame; normative vocabulary in `governance/vocabulary/runtime-lexicon.md`), A2 (Editorial Scene alignment with ADR-005 v2.0 — Story↔Reading Route projection unchanged; Editorial Scene ↔ Runtime mapping explicitly deferred; terminology and cross-references; **no** Decision semantics, Runtime topology, or projection architecture redesign). Prior amendment A1 preserved in substance.
 **Owner:** Architect
-**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Runtime Truth v1); ADR-005 (Narrative Information Model — Editorial Domain and Information Emergence); ADR-006 (Discovery Copilot Architecture — Authority Emergence and Discovery boundary); ADR-D2-001 (Canonical Metadata Authority)
+**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Runtime Truth v1); ADR-005 v2.0 (Narrative Information Model — Editorial Domain, Story and Scene ontology, Information Emergence); ADR-006 v1.3 (Discovery Copilot Architecture — Authority Emergence and Discovery boundary); ADR-D2-001 (Canonical Metadata Authority)
 
 ---
 
@@ -19,8 +19,11 @@ It defines:
 
 * **Rollout governance** — how accepted Editorial and Production capabilities
   integrate with the Runtime Domain without redesigning Runtime Truth v1.
-* The **Story ↔ Scene architectural relationship** — orthogonal constructs linked
-  by governed projection, not identity merge.
+* The **Story ↔ Reading Route architectural relationship** — orthogonal constructs
+  linked by governed projection, not identity merge.
+* The **Editorial narrative hierarchy** (Story → Scene per ADR-005 v2.0) and its
+  relationship to Runtime Domain representation — domain-separated; **Editorial
+  Scene ↔ Runtime mapping is not defined or authorized by this ADR** (deferred).
 * The **Dual-Domain Coexistence Model** — how Editorial and Runtime domains operate
   during rollout.
 * **Authority precedence and reconciliation** — how governance resolves divergence
@@ -40,6 +43,7 @@ Editorial Domain          Production Domain         Runtime Domain
 ─────────────────         ─────────────────         ──────────────
 
 Approved Story unit  ──►  (no Entity promotion) ──►  governed projection ──► Reading Route
+Approved Scene unit  ──►  (Editorial Domain only; Scene↔Runtime deferred)
 Approved Entity      ──►  Enrichment → Persist  ──►  Reading Route (existing path)
                                                               │         [impl: Scene]
                                                               ▼
@@ -51,7 +55,7 @@ Approved Entity      ──►  Enrichment → Persist  ──►  Reading Route
 This ADR explicitly does **not** govern:
 
 * Canonical Truth ownership or Human Acceptance semantics (ADR-004)
-* Story definition, Information Emergence, or ONE Rule (ADR-005)
+* Story and Scene definition, Information Emergence, or ONE Rule (ADR-005)
 * Discovery, Candidate lifecycle, or Authority Emergence (ADR-006)
 * Runtime Truth v1 topology redesign
 * Database schemas, API contracts, migration SQL, or UI
@@ -67,7 +71,7 @@ After ADR-006, the remaining architectural gap is **not** another domain model,
 authority model, or editorial capability. Those responsibilities are assigned:
 
 * ADR-004 — Canonical Truth, Human Acceptance, Enrichment, Runtime Truth v1.
-* ADR-005 — Editorial Domain, Story semantics, Information Emergence.
+* ADR-005 — Editorial Domain, Story and Scene semantics, Information Emergence.
 * ADR-006 — Discovery, Candidate semantics, Authority Emergence, Production Domain.
 
 What remains unresolved is the **governed relationship** between the accepted
@@ -77,18 +81,26 @@ Four structural problems motivate this Rollout ADR:
 
 **Problem 1 — Cross-domain mapping has no governance owner.**
 
-ADR-004, ADR-005, and ADR-006 each defer Editorial Domain Story ↔ Runtime Domain
- Scene mapping to a Rollout ADR. Without ADR-007, operators and implementers
- cannot determine how approved Editorial artifacts relate to Runtime Scene records
- without conflating domains.
+ADR-004, ADR-005, and ADR-006 each defer Editorial Domain **Approved Story unit
+ ↔ Runtime Domain Reading Route** governed projection to this Rollout ADR. Without
+ ADR-007, operators and implementers cannot determine how approved Editorial Story
+ artifacts relate to Reading Route records (implementation: Scene records) without
+ conflating domains.
 
-**Problem 2 — Story and Scene are conflated without a governed relationship.**
+**Problem 2 — Story and Reading Route are conflated without a governed relationship.**
 
-ADR-005 rejects Scene as the editorial definition of Story (Alternative B). ADR-004
- defines Scene as the Runtime routable unit. Neither ADR defines how an **Approved
- Story unit** (ADR-006 Story path) associates with Runtime Scene(s). Without an
- explicit orthogonal + associative model, implementers may silently equate Story
- with Scene or treat editorial approval as automatic Runtime persistence.
+ADR-005 v2.0 rejects **Scene equated to Story** (Alternative B — editorial Story-only
+ topology). ADR-005 defines **Editorial Scene** as the progression unit **within**
+ Story. ADR-004 defines **Reading Route** (implementation alias: Scene) as the
+ Runtime routable unit. Neither ADR-004 nor ADR-005 defines how an **Approved
+ Story unit** (ADR-006 Story path) associates with Reading Route record(s). Without
+ an explicit orthogonal + associative model, implementers may silently equate Story
+ with Reading Route or treat editorial approval as automatic Runtime persistence.
+
+**Editorial Scene** MUST NOT be conflated with **Reading Route** or **Reading Frame**.
+ Editorial Scene ↔ Runtime governed mapping is **deferred** (ADR-005 Deferred Decisions;
+ this ADR §Deferred Decisions) and is **not** closed by the Story ↔ Reading Route
+ projection model below.
 
 **Problem 3 — Dual-domain divergence lacks reconciliation rules.**
 
@@ -101,11 +113,13 @@ ADR-005 NIM-INV-04 states Editorial Domain truth precedes Runtime representation
 **Problem 4 — The Story path stops at the Editorial boundary.**
 
 ADR-006 distinguishes Catalog Entity path (Character, Location → Production Entity
- → Runtime) from Story unit path (Approved Story unit remains Editorial). Scene
- Candidate Generation outcomes are editorial artifacts, not Runtime Scene records.
- Rollout governance is required before Editorial Story units may enter Runtime
- through **governed projection** without violating Human Acceptance (ADR-004
- Decision 2) or Story semantics (ADR-005).
+ → Runtime) from Story unit path (Approved Story unit remains Editorial) and Scene
+ unit path (Approved Scene unit remains Editorial). Scene Candidate Generation
+ outcomes are **Editorial Scene** artifacts — **Approved Scene units** — not
+ Reading Route or Reading Frame records. Rollout governance is required before
+ **Approved Story units** may enter Runtime influence through **governed projection**
+ to Reading Route without violating Human Acceptance (ADR-004 Decision 2) or Story
+ semantics (ADR-005).
 
 This ADR resolves these problems at the **Rollout governance layer** without
  altering Runtime Truth v1 topology or redesigning Discovery or Enrichment.
@@ -119,13 +133,17 @@ This ADR resolves these problems at the **Rollout governance layer** without
 
 Corollaries:
 
-* **Story semantics** remain authoritative in the Editorial Domain (ADR-005).
+* **Story and Scene semantics** remain authoritative in the Editorial Domain
+  (ADR-005 v2.0).
 * **Runtime Truth v1 topology** remains authoritative in the Runtime Domain
   (ADR-004).
 * **No silent mapping** — Editorial→Runtime association requires explicit,
   human-accepted governed projection (ADR-004 Decision 2).
-* **Approved Story units** are not auto-promoted to Production Entities (ADR-006
-  Human Review outcome paths).
+* **Approved Story units** and **Approved Scene units** are not auto-promoted to
+  Production Entities (ADR-006 Human Review outcome paths).
+* **Governed projection at architecture layer** applies to **Approved Story unit ↔
+  Reading Route** only. **Editorial Scene ↔ Runtime** association is **not**
+  authorized here (deferred to downstream SPEC).
 * **Catalog Entity path** (Character, Location → Enrichment → Persist → Runtime)
   remains unchanged.
 
@@ -146,33 +164,40 @@ Narrative / Story         Catalog Entity path       Work
 Discovery / Candidates          │                    └─ Reading Route
 Human Review                  Enrichment                 └─ Reading Frame
 Approved Story unit      Persist (existing)            Reader
-                                         [impl: Scene / Story Images]
+Approved Scene unit      (Editorial only)              [impl: Scene / Story Images]
         │                       │
         └──── governed projection (human-accepted) ──► Reading Route association
-                                                       (implementation: Scene)
+              [Approved Story unit only]               (implementation: Scene)
 ```
 
 **Catalog Entity path** — unchanged from ADR-004 and ADR-006. Approved Entities
  enter Runtime through existing Production persist paths.
 
 **Story unit path** — Approved Story units remain Editorial Domain artifacts.
- Entry into Runtime is **only** through **governed projection** to existing
+ Entry into Runtime influence is **only** through **governed projection** to existing
  Reading Route records (implementation: Scene). Story does **not** become a new
  routable Runtime node.
+
+**Scene unit path** — Approved Scene units remain Editorial Domain artifacts within
+ their parent Approved Story unit (ADR-005). **No Scene → Reading Route or Scene →
+ Reading Frame governed mapping is defined or authorized by this ADR.** Cross-domain
+ association for Editorial Scene is **deferred** (see §Deferred Decisions).
 
 ---
 
 ## Domain Transition Model
 
 This section answers the architectural questions deferred by ADR-004, ADR-005,
- and ADR-006. It defines governance intent only. Implementation belongs to
- downstream SPECs.
+ and ADR-006 for **Approved Story unit ↔ Reading Route** governed projection.
+ **Editorial Scene ↔ Runtime** mapping is explicitly **not** answered here (deferred).
+ Governance intent only. Implementation belongs to downstream SPECs.
 
 | Question | Rollout decision |
 | -------- | ---------------- |
 | Story ↔ Reading Route relationship | **Orthogonal and associative** — related but not equivalent; **N:M** permitted (one Reading Route may relate to multiple Stories; one Story may relate to multiple Reading Routes); **identity merge prohibited** |
 | Story runtime representation | **Projection-only** — Story is **not** a routable Runtime entity in Runtime Truth v1; association is governed projection onto **Reading Route** (implementation: Scene) |
-| Scene Candidate (Discovery) vs Runtime Reading Route | Scene Candidate Generation produces **editorial scene-level artifacts**; they are **not** Reading Route records (implementation: Scene records) until human-accepted governed projection applies |
+| Editorial Scene ↔ Runtime Reading Route / Reading Frame | **Deferred** — Editorial Scene (ADR-005) is distinct from Reading Route and Reading Frame; **no** Scene → Runtime governed mapping is defined or authorized by this ADR; expected governance home: downstream SPEC (ADR-005 Deferred Decisions) |
+| Scene Candidate (Discovery) vs Runtime Reading Route | Scene Candidate Generation produces **Editorial Scene** Candidates; Human Review yields **Approved Scene units** — Editorial Domain artifacts **within** Story. They are **not** Reading Route records (implementation: Scene records) or Reading Frame records |
 | Dual-domain coexistence | **Coexistence without conflation** — Editorial may lead Runtime representation; domains remain distinct |
 | Authority when domains diverge | **Split precedence** (Decision 6) |
 | Rollout vs SPEC boundary | ADR defines principles, phases, invariants; SPEC defines schema, API, validation, sync |
@@ -181,10 +206,14 @@ This section answers the architectural questions deferred by ADR-004, ADR-005,
 
 ## Glossary
 
-Terms **Story**, **Editorial Domain**, **Runtime Domain**, **Entity**,
- **Approved Story unit**, and **Human Acceptance Gate** are defined in ADR-005,
- ADR-004, and ADR-006 respectively. This ADR references those definitions and
- MUST NOT redefine them with conflicting semantics.
+Terms **Story**, **Scene**, **Approved Story unit**, **Approved Scene unit**,
+ **Narrative Progression Step**, **Editorial Domain**, **Runtime Domain**, **Entity**,
+ and **Human Acceptance Gate** are defined in ADR-005 Glossary and Canonical
+ Definitions (and ADR-004 / ADR-006 where applicable). This ADR references those
+ definitions and MUST NOT redefine them with conflicting semantics.
+
+**Editorial Scene** (ADR-005) MUST NOT be conflated with **Reading Route**
+ (implementation alias: Scene) or **Reading Frame**.
 
 **Reading Route** (normative; implementation alias: Scene) — The routable reading
  container in Runtime Truth v1. See `governance/vocabulary/runtime-lexicon.md` RV-02.
@@ -195,9 +224,12 @@ Terms **Story**, **Editorial Domain**, **Runtime Domain**, **Entity**,
 **Governed Projection**
 
 A **human-accepted** architectural association between an Editorial Domain
- artifact (typically an Approved Story unit) and Runtime Domain representation
- (Reading Route record(s), implementation: Scene record(s)), without identity
- merge or silent conflation.
+ artifact and Runtime Domain representation without identity merge or silent
+ conflation.
+
+At the architecture layer, governed projection **closes** for **Approved Story
+ unit ↔ Reading Route** (implementation: Scene record(s)). **Editorial Scene ↔
+ Runtime** association is **not** defined or authorized by this ADR (deferred).
 
 **Orthogonal Coexistence**
 
@@ -207,10 +239,14 @@ The operational state in which Editorial Domain and Runtime Domain artifacts
 
 **Runtime Projection**
 
-The architectural association of Editorial Story content to Reading Route(s)
+The architectural association of Editorial **Story** content to Reading Route(s)
  (implementation: Scene(s)) under Rollout governance. Projection is **not** a
  new Runtime entity type and does not alter the
  `Work → Reading Route → Reading Frame` topology.
+
+**Editorial Scene** progression semantics (ADR-005 NIM-INV-06) MUST NOT be
+ redefined as Reading Frame identity. Scene-level Runtime representation — if
+ any — is **deferred** to downstream SPEC; this ADR does not authorize it.
 
 **Rollout Phase**
 
@@ -237,11 +273,18 @@ Rollout extends the architecture by defining cross-domain transition principles.
 
 | Construct | Domain | Role |
 | --------- | ------ | ---- |
-| **Story** | Editorial Domain | Cognitive narrative unit (ADR-005 Canonical Definition) |
+| **Story** | Editorial Domain | Cognitive narrative unit (ADR-005 Canonical Definition — Story) |
+| **Scene** | Editorial Domain | Progression unit within Story (ADR-005 Canonical Definition — Scene) |
 | **Reading Route** (implementation: Scene) | Runtime Domain | Routable reading container (ADR-004 Runtime Truth v1) |
+| **Reading Frame** | Runtime Domain | Ordered narrative-visual unit within Reading Route (ADR-004) |
 
-Story and Reading Route MAY be **associated** through governed projection. They
- MUST NOT be treated as equivalent, interchangeable, or merged by identity.
+Story and Reading Route MAY be **associated** through governed projection. **Editorial
+ Scene** and **Reading Route** / **Reading Frame** MUST NOT be treated as equivalent
+ or merged by identity. Editorial Scene ↔ Runtime association is **deferred** (see
+ §Deferred Decisions).
+
+Story and Reading Route MUST NOT be treated as equivalent, interchangeable, or
+ merged by identity.
 
 One Reading Route MAY relate to multiple Stories. One Story MAY relate to
  multiple Reading Routes. Forced 1:1 equivalence is prohibited.
@@ -278,6 +321,10 @@ Any association between an Editorial Domain artifact and Runtime Domain
 * preserve **domain separation** — projection links artifacts; it does not merge
   Story into Reading Route identity (implementation: Scene identity).
 
+At the architecture layer, the **closed** governed projection is **Approved Story
+ unit ↔ Reading Route**. **Editorial Scene ↔ Runtime** mapping is **not**
+ authorized by this ADR (deferred).
+
 Implicit mapping on entity persist, batch sync, or AI suggestion is prohibited.
 
 ---
@@ -303,17 +350,20 @@ During rollout:
 | Concern | Authoritative source |
 | ------- | -------------------- |
 | Production-enforced Runtime behavior | Runtime Domain — FOUNDATION Runtime Supremacy; ADR-004 Runtime Truth v1 |
-| Editorial Story semantics and boundaries | Editorial Domain — ADR-005 |
+| Editorial Story and Scene semantics and boundaries | Editorial Domain — ADR-005 v2.0 |
 | Catalog Entity canonical truth and Enrichment | ADR-004 |
 | Discovery and Candidate lifecycle | ADR-006 |
-| Editorial↔Runtime projection intent | Rollout governance (this ADR) + Human Acceptance (ADR-004 Decision 2) |
+| Editorial↔Runtime projection intent (Story ↔ Reading Route) | Rollout governance (this ADR) + Human Acceptance (ADR-004 Decision 2) |
+| Editorial Scene ↔ Runtime representation | **Deferred** — downstream SPEC (ADR-005 Deferred Decisions); not authorized here |
 
 **Reconciliation rules:**
 
-* Runtime MUST NOT **silently redefine** editorially approved Story boundaries
-  (NIM-INV-04).
+* Runtime MUST NOT **silently redefine** editorially approved Story or Scene
+  boundaries (NIM-INV-04).
 * Editorial Domain MUST NOT **override** production-enforced Runtime routing or
   persistence behavior.
+* Editorial Domain MUST NOT treat **Reading Frame** as the authoritative definition
+  of editorial progression (NIM-INV-06).
 * Temporary divergence during rollout is permitted. Resolution requires
   human-governed projection update — not automatic Runtime overwrite of Editorial
   truth and not silent Editorial bypass of Runtime enforcement.
@@ -331,16 +381,16 @@ Phase 0 — Orthogonal Coexistence (current baseline)
   No governed projection is required for Runtime operation.
 
 Phase 1 — Editorial Production Without Runtime Projection
-  Approved Story units and Approved Entities may exist in Editorial/Production.
-  Story units are NOT auto-projected to Runtime.
+  Approved Story units, Approved Scene units, and Approved Entities may exist in
+  Editorial/Production. Story and Scene units are NOT auto-projected to Runtime.
   Catalog Entity path continues through Enrichment → Persist → Runtime.
 
 Phase 2 — Governed Projection Enabled
-  Human-accepted Editorial↔Runtime associations are permitted.
-  Projection links Approved Story units (and editorial scene-level artifacts where
-  governed) to Runtime Reading Route records (implementation: Scene records).
-  Runtime Truth v1 topology unchanged; projection is association metadata at the
-  architectural layer — implementation deferred to SPEC.
+  Human-accepted **Approved Story unit ↔ Reading Route** associations are
+  permitted (implementation: Scene records). **Editorial Scene ↔ Runtime**
+  governed mapping is **not** authorized by this ADR (deferred to SPEC).
+  Runtime Truth v1 topology unchanged; Story projection is association metadata at
+  the architectural layer — implementation deferred to SPEC.
 ```
 
 Phases describe **architectural readiness**, not deployment commands, migration
@@ -359,8 +409,8 @@ Upon acceptance of this ADR:
   SPEC design begins.
 * All remaining work MUST follow **ADR → SPEC → Implementation**
   (`governance/ADR_RULES.md` §13, `governance/SPEC_RULES.md` §4).
-* SPEC design for Enrichment, Discovery, Editorial↔Runtime governed projection,
-  and related Runtime Truth v1 capabilities **MAY begin**.
+* SPEC design for Enrichment, Discovery, **Approved Story unit ↔ Reading Route**
+  governed projection, and related Runtime Truth v1 capabilities **MAY begin**.
 
 Post-v1 capabilities named in the Constitution capability roadmap (Character
  Relationships, Knowledge Graph, Complete Story Understanding, and similar) are
@@ -391,25 +441,29 @@ Editorial approval MUST NOT silently create, modify, or equate Runtime Reading
 Governed projection decisions MUST satisfy ADR-004 Decision 2 (Human Acceptance
  Gate).
 
-**ROL-INV-04 — Story semantics not redefined**
+**ROL-INV-04 — Story and Scene semantics not redefined**
 
-Rollout MUST NOT publish alternate Story definitions or Story boundary rules.
- ADR-005 remains authoritative for Story semantics.
+Rollout MUST NOT publish alternate Story or Scene definitions or Story boundary
+ rules. ADR-005 v2.0 remains authoritative for Story and Scene semantics.
+ Rollout MUST NOT treat Reading Frame as the authoritative definition of editorial
+ progression (NIM-INV-06).
 
-**ROL-INV-05 — Approved Story unit not auto-promoted to Entity**
+**ROL-INV-05 — Approved Story and Scene units not auto-promoted to Entity**
 
-Approved Story units MUST NOT be treated as Production Entities or catalog
- objects without explicit separate governance (ADR-006 Human Review outcome paths).
+Approved Story units and Approved Scene units MUST NOT be treated as Production
+ Entities or catalog objects without explicit separate governance (ADR-006 Human
+ Review outcome paths).
 
 **ROL-INV-06 — Discovery and Enrichment boundaries preserved**
 
 Rollout MUST NOT collapse Discovery (ADR-006) or Enrichment (ADR-004) authority
  boundaries. RT-INV-04 Enrichment scope remains in force for Copilot sessions.
 
-**ROL-INV-07 — Runtime never defines Editorial Story boundaries**
+**ROL-INV-07 — Runtime never defines Editorial Story or Scene boundaries**
 
 Runtime topology, routing, or storage convenience MUST NOT define Editorial Story
- boundaries (ADR-005 NIM-INV-02).
+ or Scene boundaries (ADR-005 NIM-INV-02, NIM-INV-07). Reading Frame MUST NOT
+ be treated as the authoritative definition of editorial progression (NIM-INV-06).
 
 ---
 
@@ -445,9 +499,15 @@ Review
 **Closure statements:**
 
 * Every architectural deferral recorded by ADR-004, ADR-005, and ADR-006 for
-  Runtime Truth v1 cross-domain mapping is **closed at the architecture layer**.
+  **Approved Story unit ↔ Reading Route** governed projection is **closed at the
+  architecture layer**.
+* **Editorial Scene ↔ Runtime Reading Route / Reading Frame** governed mapping
+  remains **deferred** to downstream SPEC (ADR-005 v2.0 Deferred Decisions). This
+  deferral does **not** block Architecture Freeze or SPEC design for closed
+  projection paths.
 * **SPEC design is authorized** for all capabilities whose parent ADRs are Accepted,
-  including Enrichment, Discovery, and Editorial↔Runtime governed projection.
+  including Enrichment, Discovery, and **Approved Story unit ↔ Reading Route**
+  governed projection.
 * Implementation MUST NOT begin from ADR text alone; Approved SPEC is required
   (`governance/SPEC_RULES.md` §4).
 * Post-v1 capabilities deferred by this ADR belong to **SPEC**, **Implementation**,
@@ -471,7 +531,9 @@ ADR-004 remains authoritative for:
 ADR-007 owns:
 
 * Editorial↔Runtime rollout governance
-* Story ↔ Reading Route orthogonal association model (implementation: Scene)
+* **Approved Story unit ↔ Reading Route** orthogonal association model
+  (implementation: Scene)
+* Explicit deferral of **Editorial Scene ↔ Runtime** governed mapping
 * Governed projection principles
 * Dual-domain coexistence and authority reconciliation
 * Architecture Closure for Runtime Truth v1
@@ -482,22 +544,26 @@ ADR-007 MUST NOT weaken any ADR-004 decision or invariant.
 
 ## Relationship to ADR-005
 
-ADR-007 **depends on** ADR-005 (Accepted).
+ADR-007 **depends on** ADR-005 v2.0 (Accepted).
 
 ADR-005 provides:
 
-* Editorial Domain and Story semantics (Canonical Definition, Glossary)
-* Information Emergence Model
-* ONE Rule and NIM-INV-01 through NIM-INV-05
+* Editorial Domain Story and Scene model (Canonical Definitions, Glossary)
+* Information Emergence Model (including Scene Sequence and Scene Completion)
+* ONE Rule and NIM-INV-01 through NIM-INV-07
 
 ADR-007 adds:
 
-* Governed projection from Approved Story units to Runtime Reading Route (implementation: Scene) association
+* Governed projection from Approved Story units to Runtime Reading Route
+  (implementation: Scene) association — **architecture layer closed**
+* Explicit deferral of Editorial Scene ↔ Runtime mapping to downstream SPEC
 * Rollout phases and ROL-INV-* invariants
 * Architecture Closure
 
-Rollout MUST respect ADR-005 Story boundaries. Governed projection MUST NOT use
- Runtime topology to define Story boundaries (NIM-INV-02, NIM-INV-07).
+Rollout MUST respect ADR-005 Story and Scene boundaries. Governed Story projection
+ MUST NOT use Runtime topology to define Story boundaries (NIM-INV-02). Scene
+ Candidates MUST NOT substitute for Story boundary adjudication (NIM-INV-07).
+ Reading Frame MUST NOT be treated as editorial progression authority (NIM-INV-06).
 
 This ADR MUST NOT weaken any ADR-005 decision or invariant.
 
@@ -505,20 +571,23 @@ This ADR MUST NOT weaken any ADR-005 decision or invariant.
 
 ## Relationship to ADR-006
 
-ADR-007 **depends on** ADR-006 (Accepted).
+ADR-007 **depends on** ADR-006 v1.3 (Accepted).
 
 ADR-006 provides:
 
 * Authority Emergence Model and Discovery boundary
-* Human Review outcome paths (Catalog Entity vs Story unit)
-* Scene Candidate Generation as editorial capability class
+* Human Review outcome paths (Catalog Entity vs Story unit vs Scene unit)
+* Scene Candidate Generation as editorial capability class producing **Editorial
+  Scene** Candidates
 
 ADR-007 clarifies:
 
-* Approved Story units reach Runtime only via governed projection — not Entity
-  promotion or silent persist
-* Scene Candidate outcomes are editorial artifacts until human-accepted governed
-  projection links them to Runtime Scene records
+* Approved Story units reach Runtime influence only via **Approved Story unit ↔
+  Reading Route** governed projection — not Entity promotion or silent persist
+* Approved Scene units remain Editorial Domain artifacts; **no** Scene → Runtime
+  governed mapping is defined or authorized by this ADR (deferred)
+* Scene Candidate outcomes yield **Approved Scene units** — not Reading Route or
+  Reading Frame records
 
 Discovery and Enrichment authority boundaries remain unchanged (DISC-INV-06,
  ROL-INV-06).
@@ -555,7 +624,8 @@ The following are explicitly deferred. They MUST NOT be inferred from this ADR.
 
 | Deferred item | Expected governance home |
 | ------------- | ------------------------ |
-| Projection schema, link model, or API | SPEC |
+| **Editorial Scene ↔ Runtime Reading Route / Reading Frame governed mapping** | **SPEC** (architecture deferral acknowledged; ADR-005 v2.0 Deferred Decisions) |
+| Projection schema, link model, or API (Story ↔ Reading Route) | SPEC |
 | Synchronization algorithms or batch migration | SPEC or Implementation |
 | Scene Candidate → Runtime Reading Route review UI | SPEC |
 | Candidate persistence / Discovery session (Discovery) | SPEC (ADR-006) |
@@ -575,6 +645,8 @@ This Rollout ADR explicitly excludes:
 
 * Runtime Truth v1 topology redesign
 * Runtime Truth v1 Reading Route or Reading Frame semantic redefinition
+* Editorial Scene → Reading Route or Editorial Scene → Reading Frame governed
+  mapping (deferred to SPEC)
 * Discovery or Enrichment architecture changes
 * Knowledge Graph or Relationship Graph architecture
 * Database schema, API contracts, migration SQL, or UI design
@@ -591,10 +663,11 @@ This Rollout ADR explicitly excludes:
 Rejected. Redesigns Runtime Truth v1. Violates ADR-004 Runtime topology and
  Rollout non-goals.
 
-**Alternative B — Scene subsumes Story (1:1 identity merge).**
+**Alternative B — Reading Route subsumes Story (1:1 identity merge).**
 
-Rejected. ADR-005 Alternative B rejected Scene as editorial Story definition.
- Identity merge conflates domains and violates ROL-INV-02.
+Rejected. ADR-005 Alternative B rejects **Scene equated to Story** — not Editorial
+ Scene **within** Story. Identity merge of Story with Reading Route conflates
+ domains and violates ROL-INV-02.
 
 **Alternative C — Story as a first-class Runtime routable entity.**
 
@@ -623,7 +696,7 @@ Story and Reading Route (implementation: Scene) remain domain-distinct.
   and ADR-006
 * Enables Architecture Freeze and authorized downstream SPEC design
 * Preserves Runtime Truth v1 stability while allowing Editorial evolution
-* Clear Story path vs Catalog Entity path through Runtime boundary
+* Clear Story path, Scene path, and Catalog Entity path through Runtime boundary
 * Split precedence reconciles Editorial truth with Runtime Supremacy
 
 **Costs**
@@ -631,7 +704,8 @@ Story and Reading Route (implementation: Scene) remain domain-distinct.
 * Dual-domain model with governed projection increases governance and SPEC complexity
 * Story has no independent Runtime route — reader navigation remains Reading Route-centric (implementation: Scene)
 * Operator must understand projection vs persist vs Enrichment vs Discovery
-* Phase 2 projection implementation remains entirely downstream in SPEC
+* Editorial Scene ↔ Runtime mapping deferred — additional SPEC work when authorized
+* Phase 2 Story projection implementation remains entirely downstream in SPEC
 
 ---
 
@@ -651,8 +725,8 @@ governance/specs/AUTHORITY_BOUNDARY_AND_PRECEDENCE_SPEC.md
 
 ```text
 ADR-004 — Source of Canonical Truth (parent; Runtime Truth v1 and Enrichment)
-ADR-005 — Narrative Information Model (parent; Editorial Domain and Story semantics)
-ADR-006 — Discovery Copilot Architecture (parent; Authority Emergence and Discovery)
+ADR-005 v2.0 — Narrative Information Model (parent; Editorial Domain Story and Scene)
+ADR-006 v1.3 — Discovery Copilot Architecture (parent; Authority Emergence and Discovery)
 ADR-D2-001 — Canonical Metadata Authority (Tier metadata ingress)
 ADR-001 — Assisted Work Bootstrap Pipeline (Historical; Superseded)
 ```
@@ -667,3 +741,7 @@ ADR-001 — Assisted Work Bootstrap Pipeline (Historical; Superseded)
 | -------------- | ----------- | -------------- | ------ |
 | Reading Route | Scene | Implementation Alias | Active — appears as `(implementation: Scene)` |
 | Reading Frame | Story Image | Implementation Alias | Active — appears as `(implementation: Story Image)` |
+
+**Layer disambiguation (A2):** **Editorial Scene** (ADR-005 Layer 3) is **not** the
+ Reading Route implementation alias Scene (Runtime Layer 5). Governance artifacts
+ MUST NOT conflate them.
