@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Type:** Architecture ADR
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.3
+**Last Updated:** 2026-07-11
 **Owner:** Architect
-**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Enrichment Copilot authority); ADR-005 (Narrative Information Model — Editorial Domain and Information Emergence); ADR-007 (Editorial → Runtime Rollout Architecture — Architecture Closure); ADR-D2-001 (Canonical Metadata Authority — Tier 1 / Tier 2 / Tier 3)
-**Amendment:** Clarification only — A1 (Human Review outcome paths: Catalog Entity vs Story unit; ADR-D2-001 relationship), A2 (Relationship to ADR-007; cross-domain mapping and Story runtime representation deferral closed). No Decisions, Acceptance Criteria, or routing logic changed.
+**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Enrichment Copilot authority); ADR-005 v2.0 (Narrative Information Model — Editorial Domain, Story and Scene ontology, Information Emergence); ADR-007 (Editorial → Runtime Rollout Architecture — Architecture Closure); ADR-D2-001 (Canonical Metadata Authority — Tier 1 / Tier 2 / Tier 3)
+**Amendment:** Clarification only — A1 (Human Review outcome paths: Catalog Entity vs Story unit; ADR-D2-001 relationship), A2 (Relationship to ADR-007; cross-domain mapping and Story runtime representation deferral closed), A3 (Editorial Scene alignment with ADR-005 v2.0 — terminology, Human Review Scene unit path, Information Emergence and invariant cross-references; **no** Decisions, Discovery capability, Authority Emergence topology, Runtime topology, or projection architecture changes). Prior amendments A1–A2 preserved in substance.
 
 ---
 
@@ -54,7 +54,7 @@ Persist
 ────────────────────────────
 Runtime Domain
       │
-Scene
+Reading Route          [impl: Scene]
       │
 Reader
 ```
@@ -82,8 +82,8 @@ Four structural problems motivate this ADR:
 The current D2 implementation is an **Enrichment Architecture** only. The
  repository implements field suggestion for entities the operator has already
  decided to create (`hooks/useCopilotSession.ts`, `lib/ai/suggest-service.ts`).
- No Character Discovery, Location Discovery, Story Discovery, or Candidate
- Generation capability exists. ADR-004 RT-INV-04 and AC-31 explicitly defer
+ No Character Discovery, Location Discovery, Story Discovery, Scene Candidate
+ Generation, or Candidate Generation capability exists. ADR-004 RT-INV-04 and AC-31 explicitly defer
  entity-discovery capabilities to ADR-006. This ADR closes that deferral at
  the **architecture layer**. ADR-006 introduces a **new architecture**, not a
  documentation exercise for existing Discovery code.
@@ -112,8 +112,8 @@ ADR-001 (Assisted Work Bootstrap Pipeline) combined Work metadata → AI generat
 **Problem 4 — Authority assignment lacks an emergence model.**
 
 ADR-005 defines **Information Emergence** — the dependency order in which
- editorial knowledge may be derived (Narrative → Story → Knowledge). It does
- not define **when canonical authority begins**. Without an Authority Emergence
+ editorial knowledge may be derived (Narrative → Story → Scene Sequence →
+ Knowledge). It does not define **when canonical authority begins**. Without an Authority Emergence
  model, AI proposals and human-approved entities share no explicit architectural
  boundary. Operators and implementers cannot determine where Discovery ends and
  Production begins.
@@ -130,7 +130,8 @@ This ADR resolves these problems within the **Editorial and Production boundary
 Authority Emergence corollary:
 
 > **Authority does not emerge when AI proposes; it emerges only after Human Review
-> transitions a Candidate into an approved Entity.**
+> transitions a Candidate into an Approved Entity (catalog path), Approved Story
+> unit, or Approved Scene unit (editorial paths).**
 
 Further corollaries:
 
@@ -188,7 +189,7 @@ Persist
 ────────────────────────────
 Runtime Domain
       │
-Scene
+Reading Route          [impl: Scene]
       │
 Reader
 ```
@@ -226,10 +227,15 @@ The first horizontal boundary marks the transition from Discovery to Production.
 
 **Runtime Domain (lower segment)**
 
-The second horizontal boundary separates Production from Runtime. **Scene** is
- the current Runtime Truth v1 routable reading unit. **Reader** consumes
- persisted, approved content. Runtime **never performs Discovery**. Runtime
- serves data that has already passed through Production authority gates.
+The second horizontal boundary separates Production from Runtime. **Reading Route**
+ (normative; implementation alias: Scene) is the current Runtime Truth v1
+ routable reading unit. **Reader** consumes persisted, approved content. Runtime
+ **never performs Discovery**. Runtime serves data that has already passed through
+ Production authority gates.
+
+**Editorial Scene** (ADR-005 Canonical Definition — Scene) is an **Editorial Domain**
+ object within Story. It MUST NOT be conflated with **Reading Route** (Runtime Domain)
+ or **Reading Frame** (Runtime representation).
 
 ### Node semantics
 
@@ -240,16 +246,17 @@ The second horizontal boundary separates Production from Runtime. **Scene** is
 | **Candidate** | Editorial | None | Proposed editorial object awaiting Human Review |
 | **Human Review** | Editorial | None | Operator accept, edit, or discard; last Discovery step |
 | **Approved Story unit** | Editorial | **First editorial authority** | Human-approved Story per ADR-005; not an Entity |
+| **Approved Scene unit** | Editorial | **Editorial authority** | Human-approved Scene within Story per ADR-005; not an Entity |
 | **Approved Entity** | Production | **First catalog authority** | Human-approved catalog object (Character, Location, etc.) |
 | **Enrichment** | Production | Inherited | Field completion on Approved Entity (ADR-004) |
 | **Persist** | Production | Inherited | Production write to durable storage |
-| **Scene** | Runtime | Served | Runtime Truth v1 routable unit |
+| **Reading Route** | Runtime | Served | Runtime Truth v1 routable unit (implementation alias: Scene) |
 | **Reader** | Runtime | Served | Reading and serving approved data |
 
 **Discarded Candidates** never cross the first boundary. They never gain
  canonical standing and never enter Production or Runtime as entities.
 
-### Human Review outcome paths (Catalog Entity vs Story unit)
+### Human Review outcome paths (Catalog Entity vs Story unit vs Scene unit)
 
 Human Review is the last step of Discovery for **all** Candidate types. The
  **outcome artifact class** after acceptance differs by Candidate type. Downstream
@@ -282,22 +289,46 @@ Knowledge Extraction …   ← per ADR-005 Information Emergence Model
 ```
 
 An **Approved Story unit** is an editorial narrative unit satisfying ADR-005
- Canonical Definition and NIM-INV-05. It is **not** an **Entity** as defined in
+ Canonical Definition — Story and NIM-INV-05. It is **not** an **Entity** as defined in
  this ADR's Glossary. Story units do not cross the Production Domain boundary as
  catalog Entities until governed projection per ADR-007 (Accepted).
 
-**Scene Candidate Generation** proposes editorial candidates related to scene-level
- content. Cross-domain mapping to Runtime Scene records is governed by **ADR-007**;
- Human Review outcomes for scene-level Candidates MUST NOT be assumed to be Runtime Scene
- records without human-accepted governed projection per ADR-007.
+**Scene unit path** (Scene Candidate Generation; ADR-005 Scene semantics):
+
+```text
+Scene Candidate
+        ↓
+Human Review (accept, edit, or discard)
+        ↓
+Approved Scene unit      ← Editorial Domain artifact (ADR-005); NOT an Entity
+        ↓
+Scene Completion …       ← per ADR-005 Information Emergence Model
+```
+
+An **Approved Scene unit** is an editorial progression unit within an Approved
+ Story unit, satisfying ADR-005 Canonical Definition — Scene and NIM-INV-05. It is
+ **not** an **Entity**, **not** a **Reading Route** (implementation: Scene record),
+ and **not** a **Reading Frame**. Scene units do not cross the Production Domain
+ boundary as catalog Entities.
+
+**Scene Candidate Generation** proposes **Editorial Scene** Candidates from narrative
+ understanding within Story scope. Cross-domain association with Runtime **Reading Route**
+ records (implementation: Scene records) is governed by **ADR-007** and is **not**
+ defined or authorized by this ADR. Human Review outcomes for Scene Candidates MUST
+ NOT be assumed to be Reading Route or Reading Frame records without human-accepted
+ governed projection per ADR-007.
 
 ### Relationship to Information Emergence
 
 Discovery sits on the **upstream side** of ADR-005's Information Emergence chain:
- it proposes editorial knowledge objects (Character, Location, Story, and related
- candidates) from Narrative understanding. Discovery **does not define Story
- boundaries** (ADR-005 NIM-INV-02). Story Discovery candidates MUST respect
- ADR-005 Story semantics and the ONE Rule when proposed for human review.
+ it proposes editorial knowledge objects (Character, Location, Story, Scene, and
+ related candidates) from Narrative understanding. Discovery **does not define Story
+ boundaries** (ADR-005 NIM-INV-02) and **does not define Scene boundaries as Story
+ boundary substitutes** (ADR-005 NIM-INV-07). Story Discovery candidates MUST respect
+ ADR-005 Story semantics and the ONE Rule when proposed for human review. Scene
+ Candidate proposals MUST respect ADR-005 Scene semantics and MUST NOT treat
+ **Reading Frame** as the authoritative definition of editorial progression
+ (ADR-005 NIM-INV-06).
 
 Information Emergence governs **what may depend on what**. Authority Emergence
  governs **when authority is assigned**. Both models MUST be satisfied; neither
@@ -311,16 +342,22 @@ The following terms are **canonical for the Discovery architecture** defined by
  this ADR. Downstream ADRs and SPECs MUST use these definitions and MUST NOT
  redefine them with conflicting semantics.
 
-Terms **Story**, **Knowledge Artifact**, **Editorial Domain**, **Runtime Domain**,
- **Chapter**, and **Human Acceptance Gate** are defined in ADR-005 Glossary and
- ADR-004 respectively. This ADR references those definitions and MUST NOT
- redefine them.
+Terms **Story**, **Scene**, **Approved Story unit**, **Approved Scene unit**,
+ **Narrative Progression Step**, **Knowledge Artifact**, **Editorial Domain**,
+ **Runtime Domain**, **Chapter**, and **Human Acceptance Gate** are defined in
+ ADR-005 Glossary and Canonical Definitions (and ADR-004 for Human Acceptance Gate).
+ This ADR references those definitions and MUST NOT redefine them.
+
+**Editorial Scene** (ADR-005) MUST NOT be conflated with Runtime **Reading Route**
+ (implementation alias: Scene) or **Reading Frame**.
 
 **Discovery**
 
 A capability that **proposes candidate editorial knowledge** — suggesting which
- Characters, Locations, Stories, or related editorial objects may exist based on
- narrative understanding. Discovery answers: *"What entities should exist?"*
+ Characters, Locations, Stories, Scenes, or related editorial objects may exist
+ based on narrative understanding. Discovery answers: *"What entities should exist?"*
+ (catalog path) and *"What editorial narrative units should exist?"* (Story and
+ Scene paths).
 
 **Candidate**
 
@@ -333,8 +370,8 @@ A **proposed editorial object** awaiting human review. A Candidate has **no
 A **human-approved catalog object** — the Production outcome when Human Review
  accepts or edits a **catalog-scoped** Candidate (Character, Location, or equivalent
  catalog object) into existence. An Entity is the first artifact in the Authority
- Emergence chain with **catalog** canonical standing. An **Approved Story unit**
- (Story Candidate path) is not an Entity; see **Human Review outcome paths**.
+ Emergence chain with **catalog** canonical standing. An **Approved Story unit** or **Approved Scene unit** (Story or Scene Candidate
+ paths) is not an Entity; see **Human Review outcome paths**.
 
 **Enrichment**
 
@@ -347,14 +384,15 @@ The completion of fields on an **Approved Entity** already in Production scope.
 The architectural domain where **human acceptance and persistence decisions**
  occur for **catalog objects**. Production begins when Human Review transitions a
  catalog-scoped Candidate into an Approved Entity. Production includes Enrichment
- and Persist. Story unit acceptance remains in the Editorial Domain (Approved Story
- unit path); see **Human Review outcome paths**.
+ and Persist. Story and Scene unit acceptance remains in the Editorial Domain
+ (Approved Story unit and Approved Scene unit paths); see **Human Review outcome paths**.
 
 **Runtime**
 
 The architectural domain where **approved data is read and served**. Current
- Runtime Truth v1 (`Work → Scene → Story Images`) belongs to the Runtime Domain.
- Runtime never performs Discovery.
+ Runtime Truth v1 (`Work → Reading Route → Reading Frame`; implementation:
+ `Work → Scene → Story Images`) belongs to the Runtime Domain. Runtime never
+ performs Discovery.
 
 ---
 
@@ -421,6 +459,10 @@ Human Review is the **last step of Discovery**. The operator accepts, edits, or
  entry action, not a Discovery action. It occurs **below** the first horizontal
  boundary in the Authority Emergence Model.
 
+**Candidate acceptance into an Approved Story unit or Approved Scene unit** is an
+ **Editorial Domain** outcome, not a Production Entity promotion. It occurs in the
+ Editorial segment of the Authority Emergence Model.
+
 Production MUST NOT begin without Human Review. Discovery MUST NOT bypass Human
  Review.
 
@@ -432,8 +474,8 @@ Production MUST NOT begin without Human Review. Discovery MUST NOT bypass Human
 
 Discovery MUST operate on **narrative understanding** — human-provided or
  human-approved editorial narrative input. Discovery MUST NOT use Runtime storage
- topology, Scene records, or database structure as primary inputs for proposing
- Candidates.
+ topology, Reading Route records (implementation: Scene records), or database
+ structure as primary inputs for proposing Candidates.
 
 This decision aligns with ADR-005 Decision 6 (Narrative Precedes Knowledge) and
  NIM-INV-02 (Knowledge does not define boundaries). Discovery proposes knowledge
@@ -474,13 +516,15 @@ This ADR does not modify, endorse, or implement Runtime Truth v1 topology:
 
 ```text
 Work
- └─ Scene              (routable runtime reading unit)
-      └─ Story Images  (ordered visual frames; JSONB)
+ └─ Reading Route       (normative; implementation alias: Scene)
+      └─ Reading Frame  (normative; implementation: Story Images)
 ```
 
-Scene Candidate Generation (a Discovery capability class) proposes editorial
- candidates derived from narrative understanding. It does not equate editorial
- Story units with Runtime Scene records. Cross-domain mapping is governed by **ADR-007**.
+Scene Candidate Generation (a Discovery capability class) proposes **Editorial Scene**
+ Candidates derived from narrative understanding within Story scope. It does not
+ equate Editorial Story or Scene units with Reading Route records (implementation:
+ Scene records) or Reading Frame records. Cross-domain association is governed by
+ **ADR-007**. **No Scene → Runtime mapping is defined or authorized by this ADR.**
 
 Until that Rollout ADR is Accepted and implemented, Runtime Domain supremacy
  applies unchanged (`governance/FOUNDATION.md` §1).
@@ -527,9 +571,12 @@ Candidate Review workflows
 **Story Discovery** — Proposes Story unit Candidates respecting ADR-005 Story
  semantics and the ONE Rule.
 
-**Scene Candidate Generation** — Proposes editorial candidates related to scene-level
- narrative content. MUST NOT treat Runtime Scene records as the editorial Story
- definition (ADR-005 Alternative B rejected).
+**Scene Candidate Generation** — Proposes **Editorial Scene** Candidates within
+ Story scope, respecting ADR-005 Scene semantics and NIM-INV-06/07. MUST NOT
+ equate Editorial Scene with Reading Route (implementation: Scene) or Reading Frame.
+ MUST NOT treat Runtime topology as the editorial Story or Scene definition
+ (ADR-005 Alternative B rejection scope: Scene **equated to** Story — not Scene
+ **within** Story).
 
 **Candidate Review workflows** — Human Review interfaces and processes for accept,
  edit, and discard decisions. Architecturally part of the Discovery boundary;
@@ -561,15 +608,17 @@ No Discovery path MAY assign canonical standing without Human Review. ADR-004
 Candidates MUST NOT be treated as Entities, Runtime Truth, or pre-approved
  Knowledge Artifacts at any layer — API, UI, or persistence design.
 
-**DISC-INV-04 — Discovery must not define Story boundaries**
+**DISC-INV-04 — Discovery must not define Story or Scene boundaries**
 
 Discovery MUST NOT use Character, Location, or catalog Candidates to define or
- redefine Story boundaries. Aligns with ADR-005 NIM-INV-02.
+ redefine Story boundaries. Discovery MUST NOT use Scene Candidates to define,
+ replace, or substitute for Story boundary adjudication. Aligns with ADR-005
+ NIM-INV-02 and NIM-INV-07.
 
 **DISC-INV-05 — Runtime never performs Discovery**
 
 The Runtime Domain MUST NOT initiate, host, or expose Discovery capabilities.
- Runtime serves persisted approved data only (Scene → Reader segment).
+ Runtime serves persisted approved data only (Reading Route → Reader segment).
 
 **DISC-INV-06 — Discovery must not operate within Enrichment authority**
 
@@ -627,15 +676,16 @@ Any implementation that introduces Discovery capabilities under ADR-004 Enrichme
 
 ## Relationship to ADR-005
 
-ADR-006 **depends on** ADR-005 (Accepted).
+ADR-006 **depends on** ADR-005 v2.0 (Accepted).
 
 ADR-005 provides:
 
-* Editorial Domain Story model, Canonical Definition, and Glossary
-* Information Emergence Model (knowledge dependency order)
+* Editorial Domain Story and Scene model, Canonical Definitions, and Glossary
+* Information Emergence Model (knowledge dependency order, including Scene Sequence
+  and Scene Completion)
 * ONE Rule and Narrative Closure principles
 * Multi-pass editorial philosophy
-* Editorial Architectural Invariants NIM-INV-01 through NIM-INV-05
+* Editorial Architectural Invariants NIM-INV-01 through NIM-INV-07
 
 ADR-006 adds:
 
@@ -650,10 +700,12 @@ ADR-006 adds:
 | Information Emergence | ADR-005 | Which artifacts may depend on which |
 | Authority Emergence | ADR-006 | When canonical authority is assigned |
 
-Discovery operates against the **Editorial Domain Story model** when proposing
- Story Candidates. Discovery MUST NOT bypass ADR-005 editorial boundary principles.
- Discovery MUST NOT use Knowledge Artifacts or catalog structure to define Story
- boundaries (NIM-INV-02).
+Discovery operates against the **Editorial Domain Story and Scene model** when
+ proposing Story and Scene Candidates. Discovery MUST NOT bypass ADR-005 editorial
+ boundary principles. Discovery MUST NOT use Knowledge Artifacts or catalog structure
+ to define Story boundaries (NIM-INV-02) or Scene boundaries as Story boundary
+ substitutes (NIM-INV-07). Discovery MUST NOT treat Reading Frame as the authoritative
+ definition of editorial progression (NIM-INV-06).
 
 This ADR MUST NOT weaken any ADR-005 decision or invariant.
 
@@ -671,7 +723,7 @@ These are **complementary architectural paths**, not competing authority sources
 | Path | ADR | Question | Typical output |
 | ---- | --- | -------- | ---------------- |
 | Source extraction | ADR-D2-001 | What does the source file or bibliographic record structurally contain? | Chapter Catalog spine; optional NER name lists as **evidence** |
-| Discovery proposal | ADR-006 | What editorial catalog objects should exist from narrative understanding? | Character, Location, Story, scene-related **Candidates** |
+| Discovery proposal | ADR-006 | What editorial catalog objects and narrative units should exist from narrative understanding? | Character, Location, Story, **Editorial Scene** **Candidates** |
 
 **Precedence and combination rules (architectural):**
 
@@ -700,11 +752,14 @@ ADR-007 (Accepted) governs **Editorial → Runtime Rollout** and **Architecture
  Closure**. This ADR governs **Discovery** and **Authority Emergence**.
 
 Cross-domain mapping and Story runtime representation (architecture intent) deferrals
- from this ADR are **closed** by ADR-007. Approved Story units and editorial
- scene-level artifacts reach Runtime only through **governed projection** — not
- Entity promotion or silent persist.
+ from this ADR are **closed** by ADR-007 for **Approved Story unit ↔ Reading Route**
+ governed projection. **Approved Scene unit** cross-domain association with Runtime
+ **Reading Route** or **Reading Frame** remains governed by **ADR-007** and downstream
+ SPEC — not by this ADR. Editorial artifacts reach Runtime only through **governed
+ projection** — not Entity promotion or silent persist.
 
-This ADR MUST NOT weaken ADR-007 rollout boundaries.
+This ADR MUST NOT weaken ADR-007 rollout boundaries or introduce Scene → Runtime
+ mapping not authorized by ADR-007.
 
 ---
 
@@ -818,11 +873,12 @@ Rejected. Extending Enrichment Copilot sessions to propose new entities violates
  Enrichment is entity-scoped and scope-first; Discovery is catalog-proposal-scoped
  and narrative-first. Shared infrastructure does not justify merged authority.
 
-**Alternative C — Runtime-driven Discovery (Scene topology as input).**
+**Alternative C — Runtime-driven Discovery (Reading Route topology as input).**
 
-Rejected. Using Runtime Scene records or storage structure as Discovery input
- conflates Runtime Domain with Editorial Domain cognition (ADR-005 Problem 2).
- Inverts Narrative-first Discovery (Decision 5) and NIM-INV-02.
+Rejected. Using Reading Route records (implementation: Scene records) or storage
+ structure as Discovery input conflates Runtime Domain with Editorial Domain
+ cognition (ADR-005 Problem 2). Inverts Narrative-first Discovery (Decision 5) and
+ NIM-INV-02.
 
 **Alternative D — Single-pass catalog generation.**
 
@@ -850,8 +906,9 @@ Rejected. Generating a full entity catalog in one undifferentiated pass without
 * Multi-pass Discovery and Review is slower than single-pass Bootstrap generation
 * Candidate persistence model deferred — Discovery cannot be runtime-enforced until
   downstream SPECs define staging behavior
-* Editorial Domain / Runtime Domain dual model persists until Rollout ADR maps Story
-  units to Runtime representation
+* Editorial Domain / Runtime Domain dual model persists until Rollout governs
+  **Approved Story unit ↔ Reading Route** projection per ADR-007; Editorial Scene
+  ↔ Runtime association remains deferred to ADR-007 / SPEC
 * Operator training burden — Discovery, Enrichment, and Production are three distinct
   architectural questions
 
@@ -869,7 +926,8 @@ docs/adr/004-source-of-canonical-truth.md
   — RT-INV-04; Follow-up §ADR-006; Decision 1, 2, 7, 8;
     Evidence Chain (EAR-D2-013–015 cited therein); AC-31
 docs/adr/005-narrative-information-model.md
-  — Information Emergence Model; NIM-INV-*; Editorial Domain; ONE Rule
+  — v2.0 Editorial Scene ontology; Information Emergence Model; NIM-INV-*;
+    Editorial Domain; ONE Rule
 docs/adr/001-assisted-work-bootstrap-pipeline.md
   — Historical; Bootstrap rejection context (Superseded by ADR-004)
 docs/adr/ADR-D2-001-canonical-metadata-authority.md
@@ -892,7 +950,7 @@ governance/specs/AUTHORITY_BOUNDARY_AND_PRECEDENCE_SPEC.md
 
 ```text
 ADR-004 — Source of Canonical Truth (parent; Enrichment authority)
-ADR-005 — Narrative Information Model (parent; Editorial Domain)
+ADR-005 v2.0 — Narrative Information Model (parent; Editorial Domain Story and Scene)
 ADR-001 — Assisted Work Bootstrap Pipeline (Historical; Superseded)
 ADR-D2-001 — Canonical Metadata Authority (Tier 1 / Tier 2 / Tier 3)
 ADR-007 — Editorial → Runtime Rollout Architecture (Architecture Closure)
