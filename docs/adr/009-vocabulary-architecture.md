@@ -2,19 +2,24 @@
 
 **Status:** Accepted  
 **Type:** Architecture ADR  
-**Version:** 1.1  
+**Version:** 1.2  
 **Date:** 2026-07-10  
+**Last Updated:** 2026-07-11  
 **Owner:** Architect  
 **Related ADR:** ADR-004 (Source of Canonical Truth — Runtime Truth v1 topology);
-ADR-005 (Narrative Information Model — Editorial Domain glossary);
-ADR-006 (Discovery Copilot Architecture — Authority Emergence and workflow vocabulary);
-ADR-007 (Editorial → Runtime Rollout Architecture — governed projection and cross-domain mapping);
-ADR-008 (Runtime Vocabulary Convergence — Runtime vocabulary policy within Runtime scope)  
+ADR-005 v2.0 (Narrative Information Model — Editorial Domain Story and Scene glossary);
+ADR-006 v1.3 (Discovery Copilot Architecture — Authority Emergence and workflow vocabulary);
+ADR-007 v1.2 (Editorial → Runtime Rollout Architecture — governed projection and cross-domain mapping);
+ADR-008 v1.1 (Runtime Vocabulary Convergence — Runtime vocabulary policy within Runtime scope)  
 **Supersedes:** None  
 **Amendment:** A1 (Architect review — consolidate vocabulary layers to five; classify
 Implementation and Surface as Runtime Representation, not vocabulary layers; add
 Semantic Contract sole-owner lifecycle rule; add mapping-follows-concept-ownership
-principle in Decision 5)
+principle in Decision 5), A2 (Editorial Scene alignment with ADR-005 v2.0 — Layer 3
+Story→Scene hierarchy, Layer 5 Reading Frame clarification, cross-layer VOC-GOV
+strengthening; **no** vocabulary architecture redesign, Runtime topology change,
+Scene→Runtime mapping, or Product vocabulary introduction). Prior amendment A1
+preserved in substance.
 
 ---
 
@@ -45,9 +50,10 @@ This ADR does **not** govern:
 * Discovery workflow, Candidate lifecycle, or Human Review semantics (ADR-006 and
   downstream SPECs remain authoritative).
 * Runtime Truth v1 topology, database schema, or routing (ADR-004).
-* Editorial Story semantics, Information Emergence, or the ONE Rule (ADR-005).
-* Governed projection behavior, Rollout phases, or Story ↔ Reading Route
-  association rules (ADR-007 and SPEC-ROL-001).
+* Editorial Story and Scene semantics, Information Emergence, or the ONE Rule
+  (ADR-005 v2.0).
+* Governed projection behavior, Rollout phases, Story ↔ Reading Route association
+  rules, or Editorial Scene ↔ Runtime mapping (ADR-007 v1.2 and SPEC-ROL-001).
 * Runtime normative term selection, IP-01, Alias Acceptance Rule, or Vocabulary
   Debt classification within Runtime scope (ADR-008 and `runtime-lexicon.md`).
 * Specific rename targets, migration sequences, localization strings, or
@@ -69,8 +75,9 @@ following validated findings:
 1. **Runtime Lexicon (RV-01 ~ RV-07) is suitable within Runtime scope** but
    **not sufficient as full-project Domain vocabulary**.
 2. **Editorial and Runtime represent different bounded contexts** with legitimately
-   different primary terms — notably **Story** (Editorial cognitive unit) and
-   **Reading Route** (Runtime routable container).
+   different primary terms — notably **Story** and **Scene** (Editorial Layer 3
+   cognitive and progression units) versus **Reading Route** and **Reading Frame**
+   (Runtime Layer 5 routable container and representation units).
 3. **High cognitive cost** arises primarily from **concept collision and missing
    cross-layer contracts**, not from the absence of a single surface term alone.
 4. Constitution capability roadmap language anchors on **Story Structure**, not
@@ -142,10 +149,12 @@ Corollaries:
   bounded contexts without contract evidence.
 * SPECs and ADRs MUST NOT resolve cross-layer ambiguity by informal synonymy.
 
-**Rationale.** ADR-007 establishes Story and Reading Route as **orthogonal**
-constructs. ADR-005 defines Story as a **reader cognitive unit**, not a Runtime
-routable record. Forcing terminological identity would obscure legitimately
-different concepts and increase silent conflation risk.
+**Rationale.** ADR-007 v1.2 establishes Story and Reading Route as **orthogonal**
+constructs. ADR-005 v2.0 defines **Story** as a **Mental Model Transition unit**
+and **Scene** as a **Narrative Progression Step within Story** — neither is a
+Runtime routable record. **Reading Frame** is a Runtime **representation** object
+(RV-04); it is **not** Editorial Scene (NIM-INV-06). Forcing terminological identity
+would obscure legitimately different concepts and increase silent conflation risk.
 
 ---
 
@@ -191,10 +200,22 @@ a substitute for bounded-context glossaries.
 
 | Field | Value |
 | ----- | ----- |
-| **Responsibility** | Narrative cognition, Story semantics, Discovery proposal and review, Production workflow boundaries |
+| **Responsibility** | Narrative cognition, Story and Scene semantics, Discovery proposal and review, Production workflow boundaries |
 | **Audience** | Editorial workflow, Discovery/Enrichment implementers, operator workflow designers |
-| **Authority** | ADR-005 Glossary and Canonical Definition; ADR-006 Glossary; SPEC-D3-*; SPEC-D2-* where applicable |
-| **Representative terminology** | Story, Chapter, Narrative, Mental Model Transition, Approved Story unit, Knowledge Artifact, ONE Rule; Discovery, Candidate, Human Review, Entity, Enrichment, Production, Catalog Entity path, Story unit path |
+| **Authority** | ADR-005 v2.0 Glossary and Canonical Definitions; ADR-006 v1.3 Glossary; SPEC-D3-*; SPEC-D2-* where applicable |
+| **Representative terminology** | **Story** (Mental Model Transition unit), **Scene** (Narrative Progression Step within Story), Chapter, Narrative, Mental Model Transition, Narrative Progression Step, Approved Story unit, Approved Scene unit, **Knowledge Artifact** (derived), ONE Rule; Discovery, Candidate, Human Review, Entity, Enrichment, Production, Catalog Entity path, Story unit path, Scene unit path |
+
+**Editorial hierarchy (Layer 3 canonical structure):**
+
+```text
+Story                    ← Mental Model Transition unit (ADR-005)
+ └── Scene               ← Narrative Progression Step within Story
+Knowledge Artifact       ← derived (Information Emergence downstream of Story/Scene)
+```
+
+Layer 3 owns **both** canonical Editorial narrative objects — **Story** and **Scene**.
+Knowledge Artifact remains a **derived** editorial concept, not a peer narrative
+container.
 
 Editorial and Discovery vocabulary MUST NOT be redefined by Runtime SPECs or
 Runtime Lexicon entries.
@@ -206,7 +227,7 @@ Runtime Lexicon entries.
 | **Responsibility** | Editorial↔Runtime integration without identity merge |
 | **Audience** | Rollout governance, projection operators, cross-domain SPEC authors |
 | **Authority** | ADR-007 Glossary; SPEC-ROL-001 |
-| **Representative terminology** | Rollout, Governed Projection, Orthogonal Coexistence, Runtime Projection, Story ↔ Reading Route association |
+| **Representative terminology** | Rollout, Governed Projection, Orthogonal Coexistence, Runtime Projection, Approved Story unit ↔ Reading Route association; Editorial Scene ↔ Runtime (deferred) |
 
 #### Layer 5 — Runtime Vocabulary
 
@@ -214,17 +235,36 @@ Runtime Lexicon entries.
 | ----- | ----- |
 | **Responsibility** | Runtime Truth v1 topology, routable containers, reader progression units |
 | **Audience** | Runtime services, Runtime CRUD, reader consumer repositories |
-| **Authority** | `governance/vocabulary/runtime-lexicon.md` (RV-01 ~ RV-07); ADR-004 §Runtime Truth v1 Topology; ADR-008 within Runtime scope |
+| **Authority** | `governance/vocabulary/runtime-lexicon.md` (RV-01 ~ RV-07); ADR-004 §Runtime Truth v1 Topology; ADR-008 v1.1 within Runtime scope |
 | **Representative terminology** | Work, Reading Route, Reading Frame, Frame Narrative, Route Synopsis, Reader Step, Chapter Metadata |
 
-Runtime vocabulary MUST NOT redefine Editorial Story semantics.
+**Runtime hierarchy (Layer 5 canonical structure — unchanged):**
+
+```text
+Work
+ └── Reading Route
+      └── Reading Frame        ← Runtime representation object (RV-04)
+           └── Reader Step     ← ordered progression within Reading Route (RV-05)
+```
+
+**Reading Frame** is a **Runtime representation** object — an ordered
+narrative-visual unit within a Reading Route. It is **not** Editorial **Scene**
+(ADR-005 Layer 3; NIM-INV-06). **Reader Step** is Runtime progression within
+Reading Route scope; it MUST NOT be treated as Editorial **Narrative Progression
+Step** (Scene) without an authorized cross-layer semantic contract — none exists
+for Editorial Scene ↔ Runtime at the architecture layer (ADR-007 v1.2 §Deferred
+Decisions).
+
+Runtime vocabulary MUST NOT redefine Editorial Story or Scene semantics.
 
 #### Runtime Representation (not a vocabulary layer)
 
-**Implementation symbols** (`scenes`, `story_images_v2`, `scene_` TSID) and
+**Implementation symbols** (`scenes`, `story_images_v2`, `scene_` TSID prefix) and
 **surface forms** (locale strings, operator labels) are **Runtime Representation**
 — how Runtime vocabulary is expressed in code and human-readable UI. They are
-**not** separate vocabulary layers.
+**not** separate vocabulary layers. **`scenes`** and **`scene_`** MUST NOT be
+interpreted as Editorial **Scene** (Layer 3) without an authorized semantic
+contract — none exists at architecture layer.
 
 | Field | Value |
 | ----- | ----- |
@@ -265,8 +305,8 @@ and constitute normative contract classes under this ADR:
 | -------------- | ------- | ------------------ |
 | **Notation contract** | Bind normative term to implementation symbol | runtime-lexicon DR-02 — owner: `runtime-lexicon.md` |
 | **Alias classification contract** | Declare whether a legacy term preserves inferability | runtime-lexicon §3; ADR-008 — owner: ADR-008 |
-| **Lifecycle outcome contract** | Define semantic state transition at authority boundary | ADR-006 Human Review outcome paths — owner: ADR-006 |
-| **Projection contract** | Associate orthogonal constructs without identity merge | ADR-007 Governed Projection — owner: ADR-007 |
+| **Lifecycle outcome contract** | Define semantic state transition at authority boundary | ADR-006 v1.3 Human Review outcome paths (Catalog Entity, Story unit, Scene unit) — owner: ADR-006 |
+| **Projection contract** | Associate orthogonal constructs without identity merge | ADR-007 v1.2 Governed Projection (Approved Story unit ↔ Reading Route) — owner: ADR-007 |
 | **Field mapping contract** | Specify structured field-level meaning transfer | SPEC-ROL-001 §4.6 — owner: SPEC-ROL-001 (under ADR-007) |
 | **Invariant boundary contract** | Forbid class of semantic drift | DISC-INV-*, NIM-INV-*, ROL-INV-* — owners: respective ADRs |
 | **Localization contract** | Map normative concept to surface string with non-contradiction rule | SPEC-VDC-001 §Deliverable 12 — owner: SPEC-VDC-001 (under ADR-008) |
@@ -278,7 +318,8 @@ Rules:
 * **VOC-SC-02** — Semantic contracts MUST identify source concept, target
   concept, bounded context of each, and **sole owning governance artifact**.
 * **VOC-SC-03** — Semantic contracts MUST NOT imply identity merge unless the
-  owning ADR explicitly authorizes equivalence (none do for Story ↔ Reading Route).
+  owning ADR explicitly authorizes equivalence (none do for Story ↔ Reading Route
+  or **Editorial Scene ↔ Reading Frame**).
 * **VOC-SC-04** — Implementation field names (`caption`, `summary`) MAY serve
   as Documentation Aliases when satisfying ADR-008 IP-01 within their declaration
   context; they are not automatic cross-domain synonyms.
@@ -295,7 +336,7 @@ Rules:
 | Vocabulary class | Scope | Authority | Governs |
 | ---------------- | ----- | --------- | ------- |
 | **Runtime Vocabulary** | Runtime bounded context | `runtime-lexicon.md`; ADR-008 | RV-01 ~ RV-07 terms, IP-01, Alias Acceptance, Vocabulary Debt within Runtime scope |
-| **Domain Vocabulary** | Editorial, Discovery, and Rollout bounded contexts | ADR-005, ADR-006, ADR-007 respective glossaries | Story, Candidate, Entity, Governed Projection, etc. |
+| **Domain Vocabulary** | Editorial, Discovery, and Rollout bounded contexts | ADR-005 v2.0, ADR-006 v1.3, ADR-007 v1.2 respective glossaries | Story, Scene, Candidate, Entity, Governed Projection, etc. |
 | **Runtime Representation** | Implementation and surface expression of Runtime concepts | runtime-lexicon §3; ADR-008; authorized implementation SPECs | `scenes`, locale keys, frozen symbols — **not** a vocabulary layer |
 
 **ADR-008 governance boundary (clarified, not reopened):**
@@ -341,11 +382,12 @@ modules that happen to persist `scenes` rows.
 
 | Mapping type | Owner | MUST NOT be owned by |
 | ------------ | ----- | -------------------- |
-| Editorial ↔ Runtime projection semantics (e.g. Story ↔ Reading Route) | **ADR-007**; SPEC-ROL-001 | Runtime Lexicon; Discovery SPECs alone |
-| Discovery outcome → Production/Rollout ingress | **ADR-006**; SPEC-D3-002; SPEC-ROL-001 | Runtime Lexicon |
-| Runtime normative ↔ implementation alias (e.g. Reading Route ↔ `scenes`) | **`runtime-lexicon.md`**; ADR-008 | Editorial ADRs |
+| Editorial ↔ Runtime projection semantics (e.g. Story ↔ Reading Route) | **ADR-007 v1.2**; SPEC-ROL-001 | Runtime Lexicon; Discovery SPECs alone |
+| Editorial Scene ↔ Runtime Reading Route / Reading Frame | **Deferred** — ADR-007 v1.2 §Deferred Decisions; downstream SPEC when authorized | ADR-009; Runtime Lexicon; informal synonymy |
+| Discovery outcome → Production/Rollout ingress | **ADR-006 v1.3**; SPEC-D3-002; SPEC-ROL-001 | Runtime Lexicon |
+| Runtime normative ↔ implementation alias (e.g. Reading Route ↔ `scenes`) | **`runtime-lexicon.md`**; ADR-008 v1.1 | Editorial ADRs |
 | Runtime normative ↔ localization surface | **SPEC-VDC-001** (under ADR-008) | Ad hoc UI strings |
-| Editorial concept definitions (e.g. Story) | **ADR-005** | Runtime SPECs |
+| Editorial concept definitions (Story, Scene) | **ADR-005 v2.0** | Runtime SPECs |
 
 #### Definition location
 
@@ -367,8 +409,9 @@ text.
 | **Narrative docs** | MUST NOT introduce normative mappings |
 
 A new mapping that equates concepts from different bounded contexts (e.g. equating
-Story with Reading Route) requires **Rollout ADR amendment** or a new Architecture
-ADR — it cannot be introduced in a Discovery or Runtime implementation SPEC alone.
+Story with Reading Route, or **Editorial Scene with Reading Frame**) requires
+**Rollout ADR amendment** or a new Architecture ADR — it cannot be introduced in
+a Discovery or Runtime implementation SPEC alone.
 
 #### Evolution
 
@@ -411,8 +454,20 @@ equivalence unless a semantic contract explicitly authorizes reuse or mapping.
 **VOC-GOV-05 — Orthogonal concept protection**
 
 Story (Editorial) and Reading Route (Runtime) MUST remain orthogonally governed.
-Vocabulary convergence MUST NOT be used to merge their identities (ADR-007
-Decision 2 preserved).
+**Editorial Scene** (Layer 3) and **Reading Frame** (Layer 5) MUST remain
+orthogonally governed. Vocabulary convergence MUST NOT be used to merge their
+identities (ADR-005 NIM-INV-06; ADR-007 v1.2 Decision 2 preserved).
+
+**VOC-GOV-12 — Editorial Scene and Reading Frame layer separation**
+
+**Editorial Scene** (ADR-005 v2.0 Layer 3) and **Reading Frame** (RV-04 Layer 5)
+belong to **different semantic layers**. They MUST NOT be treated as synonyms,
+equivalents, or identity-merge targets in normative governance artifacts.
+
+Runtime implementation aliases **`Scene`** and **`scenes`** remain **implementation
+aliases for Reading Route only** (runtime-lexicon §3; ADR-008 v1.1 A2). They MUST
+NOT be read as Editorial Scene (Layer 3) in Runtime scope or as authorization to
+equate Editorial Scene with Reading Frame.
 
 **VOC-GOV-06 — Runtime Lexicon exclusivity within Runtime scope**
 
@@ -430,8 +485,8 @@ Vocabulary Debt policy preserved).
 When Editorial and Runtime descriptions diverge:
 
 * **Runtime enforcement** prevails for production behavior (`FOUNDATION.md` §1).
-* **Editorial authority** prevails for Story semantics and Discovery boundaries
-  (ADR-005, ADR-006).
+* **Editorial authority** prevails for Story and Scene semantics and Discovery
+  boundaries (ADR-005 v2.0, ADR-006 v1.3).
 * **Rollout authority** prevails for governed projection semantics (ADR-007).
 
 Vocabulary Architecture MUST NOT collapse this split into a single terminology
@@ -443,15 +498,17 @@ authority.
 | ---------------- | -------------- |
 | Constitutional | `governance/Constitution.md` |
 | Architecture | ADR-004, ADR-005, ADR-006, ADR-007; `governance/FOUNDATION.md` |
-| Editorial and Discovery | ADR-005; ADR-006 (+ downstream SPECs for operational terms) |
-| Rollout | ADR-007 (+ SPEC-ROL-001 for operational mappings) |
+| Editorial and Discovery | ADR-005 v2.0; ADR-006 v1.3 (+ downstream SPECs for operational terms) |
+| Rollout | ADR-007 v1.2 (+ SPEC-ROL-001 for operational mappings) |
 | Runtime | `runtime-lexicon.md` |
 | Runtime Representation | runtime-lexicon §3 + authorized implementation SPECs (not a vocabulary layer) |
 
 **VOC-GOV-10 — Discovery SPEC vocabulary rule**
 
-Discovery SPECs MUST reference ADR-005/006/007/008 glossaries and Runtime
-Lexicon where applicable. Discovery SPECs MUST NOT redefine governed vocabulary
+Discovery SPECs MUST reference ADR-005 v2.0 / ADR-006 v1.3 / ADR-007 v1.2 /
+ADR-008 v1.1 glossaries and Runtime Lexicon where applicable. Governed terms
+include **Story**, **Scene**, **Approved Story unit**, and **Approved Scene unit**
+(Layer 3 — reference only). Discovery SPECs MUST NOT redefine governed vocabulary
 or justify Runtime term selection outside Runtime scope.
 
 **VOC-GOV-11 — Mapping follows concept ownership**
@@ -499,6 +556,28 @@ mapping contract.
 ```
 
 Five vocabulary layers. Runtime Representation is expression only.
+
+### Editorial vs Runtime Concept Hierarchies (A2)
+
+Layer separation MUST NOT be collapsed into a single vertical chain (e.g. Story →
+Reading Frame). Editorial and Runtime each maintain their own hierarchy:
+
+```text
+EDITORIAL (L3)                    RUNTIME (L5)
+──────────────                    ────────────
+
+Story                             Work
+ └── Scene                            └── Reading Route
+      (Narrative Progression              └── Reading Frame
+       Step within Story)                     (representation — NOT Editorial Scene)
+                                           └── Reader Step
+
+Knowledge Artifact (derived)
+```
+
+Cross-layer association occurs **only** through explicit semantic contracts.
+**Closed at architecture layer:** Approved Story unit ↔ Reading Route (ADR-007 v1.2).
+**Deferred:** Editorial Scene ↔ Runtime (ADR-007 v1.2 §Deferred Decisions).
 
 ### Semantic Contract Boundary (normative pattern)
 
@@ -550,27 +629,31 @@ Five vocabulary layers. Runtime Representation is expression only.
 
 ### ADR-005 — Narrative Information Model
 
-ADR-005 remains authoritative for **Editorial vocabulary within Layer 3**
-(Editorial and Discovery Vocabulary).
+ADR-005 v2.0 remains authoritative for **Editorial vocabulary within Layer 3**
+(Editorial and Discovery Vocabulary), including **Story** and **Scene** Canonical
+Definitions.
 
-ADR-009 does not modify Story Canonical Definition, Information Emergence, or
-NIM-INV-*. ADR-009 makes explicit that Editorial vocabulary is **sovereign**
-and MUST be referenced — not absorbed — by Runtime and Discovery artifacts.
+ADR-009 does not modify Story or Scene Canonical Definitions, Information Emergence,
+or NIM-INV-01 through NIM-INV-07. ADR-009 makes explicit that Editorial vocabulary
+is **sovereign** and MUST be referenced — not absorbed — by Runtime and Discovery
+artifacts.
 
 ### ADR-006 — Discovery Copilot Architecture
 
-ADR-006 remains authoritative for **Discovery vocabulary within Layer 3**
-and Human Review outcome paths (lifecycle outcome contract class).
+ADR-006 v1.3 remains authoritative for **Discovery vocabulary within Layer 3**
+and Human Review outcome paths (lifecycle outcome contract class), including
+**Scene unit path** and **Approved Scene unit**.
 
 ADR-009 does not modify DISC-INV-*, Authority Emergence, or Candidate semantics.
-Discovery SPECs gain a explicit rule (VOC-GOV-10) to reference glossaries without
+Discovery SPECs gain an explicit rule (VOC-GOV-10) to reference glossaries without
 redefining them.
 
 ### ADR-007 — Editorial → Runtime Rollout Architecture
 
-ADR-007 remains authoritative for **Rollout Vocabulary (Layer 4)**
+ADR-007 v1.2 remains authoritative for **Rollout Vocabulary (Layer 4)**
 and for **Governed Projection** as the primary Editorial↔Runtime semantic contract.
-Story ↔ Reading Route mapping ownership resides here (Decision 5).
+**Approved Story unit ↔ Reading Route** mapping ownership resides here (Decision 5).
+**Editorial Scene ↔ Runtime** mapping is **deferred** — not defined by ADR-009.
 
 ADR-009 does not modify ROL-INV-*, projection behavior, or Story ↔ Reading Route
 orthogonality. ADR-009 elevates governed projection from Rollout mechanism to
@@ -578,9 +661,11 @@ orthogonality. ADR-009 elevates governed projection from Rollout mechanism to
 
 ### ADR-008 — Runtime Vocabulary Convergence
 
-ADR-008 remains **Accepted** and authoritative for **Runtime Vocabulary scope**.
+ADR-008 v1.1 remains **Accepted** and authoritative for **Runtime Vocabulary scope**.
 
-ADR-009 **clarifies** ADR-008 boundary (Decision 4). ADR-009 does **not**:
+ADR-009 **clarifies** ADR-008 boundary (Decision 4). ADR-008 v1.1 A2 cross-domain
+disambiguation (Editorial Scene vs Reading Route alias) complements ADR-009
+VOC-GOV-12. ADR-009 does **not**:
 
 * modify RV-01 ~ RV-07;
 * supersede IP-01, Alias Acceptance Rule, or Vocabulary Debt definitions;
@@ -601,7 +686,7 @@ ADR-009 governs **multi-vocabulary coexistence** across bounded contexts.
 | D3 | Semantic contracts required at boundaries; sole owner per contract | Prevents contract drift across peer ADRs/SPECs | Accepted in this ADR |
 | D4 | ADR-008 scope clarified to Runtime + Representation | Resolves ADR-008/005/007 tension without reopening ADR-008 | Accepted in this ADR |
 | D5 | Mapping authority; mapping follows concept ownership | Closes authority loop; e.g. Story↔Reading Route owned by ADR-007 | Accepted in this ADR |
-| D6 | VOC-GOV-* governance rules | Implementation-independent stability | Accepted in this ADR |
+| D6 | VOC-GOV-* governance rules (incl. VOC-GOV-12 Scene ⊥ Reading Frame) | Implementation-independent stability; cross-layer separation | Accepted in this ADR |
 
 ---
 
@@ -613,7 +698,7 @@ ADR-009 governs **multi-vocabulary coexistence** across bounded contexts.
   ownership** — SPECs reference glossaries instead of re-deriving terms.
 * Runtime SPECs no longer carry burden of justifying Editorial vocabulary.
 * Cross-domain integration documents **must** cite contracts — reducing silent
-  Story ↔ Reading Route conflation.
+  Story ↔ Reading Route and **Editorial Scene ↔ Reading Frame** conflation.
 * New engineers and AI participants can determine whether term differences are
   **architectural layering** or **unresolved debt**.
 * ADR-008 Runtime convergence work retains authority within its correct scope.
@@ -655,10 +740,16 @@ ADR-009 governs **multi-vocabulary coexistence** across bounded contexts.
 ### Invariant checks established by this ADR
 
 - **VOC-INV-01** — No normative document may equate Story with Reading Route
-  without citing ADR-007 projection contract semantics (forbidden: identity merge).
+  without citing ADR-007 v1.2 projection contract semantics (forbidden: identity merge).
 
-- **VOC-INV-02** — No Discovery SPEC may redefine terms owned by ADR-005, ADR-006,
-  ADR-007, or runtime-lexicon.md.
+- **VOC-INV-06** — No normative document may equate **Editorial Scene** with
+  **Reading Frame** or **Reading Route** without citing an authorized projection
+  contract. No such contract exists at the architecture layer (ADR-007 v1.2
+  §Deferred Decisions). Runtime aliases `Scene` / `scenes` MUST NOT be used as
+  evidence of equivalence.
+
+- **VOC-INV-02** — No Discovery SPEC may redefine terms owned by ADR-005 v2.0,
+  ADR-006 v1.3, ADR-007 v1.2, or runtime-lexicon.md.
 
 - **VOC-INV-03** — Any cross-layer mapping introduced after this ADR MUST
   declare contract class, source context, target context, sole owner, and
@@ -679,7 +770,7 @@ npm run check:governance
 
 Manual checks:
 
-- ADR metadata and Related ADR references ADR-004, 005, 006, 007, 008
+- ADR metadata and Related ADR references ADR-004, 005 v2.0, 006 v1.3, 007 v1.2, 008 v1.1
 - Non-Goals exclude Discovery redesign, Runtime topology, Concept Registry
 - Relationship section preserves upstream ADR authority
 - No RV registry modification
@@ -702,10 +793,10 @@ Manual checks:
 ### Related ADRs
 
 - ADR-004 — Source of Canonical Truth (Runtime Truth v1 topology)
-- ADR-005 — Narrative Information Model (Editorial glossary)
-- ADR-006 — Discovery Copilot Architecture (workflow vocabulary; outcome paths)
-- ADR-007 — Editorial → Runtime Rollout Architecture (governed projection)
-- ADR-008 — Runtime Vocabulary Convergence (Runtime scope IP-01 and alias policy)
+- ADR-005 v2.0 — Narrative Information Model (Editorial Story and Scene glossary)
+- ADR-006 v1.3 — Discovery Copilot Architecture (workflow vocabulary; outcome paths)
+- ADR-007 v1.2 — Editorial → Runtime Rollout Architecture (governed projection)
+- ADR-008 v1.1 — Runtime Vocabulary Convergence (Runtime scope IP-01 and alias policy)
 
 ### Evidence inputs (EAR)
 
@@ -728,7 +819,7 @@ maintain sovereign glossaries**, and **cross-layer meaning is preserved only
 through explicit semantic contracts with exactly one owning governance artifact**.
 
 Runtime Vocabulary (ADR-008; `runtime-lexicon.md`) remains authoritative
-**within Runtime scope (Layer 5)**. Domain vocabularies (Editorial/Discovery,
+**within Runtime scope (Layer 5)**. Domain vocabularies (Editorial/Discovery including **Story** and **Scene**,
 Rollout) remain authoritative **within their respective scopes**. Implementation
 and surface forms are **Runtime Representation**, not vocabulary layers.
 
@@ -746,8 +837,9 @@ Require identical normative terms from Constitutional language through
 Implementation for all concepts, including Editorial Story and Runtime Reading
 Route.
 
-**Rejected.** Conflicts with ADR-005 Decision 8 (Editorial independence), ADR-007
-Decision 2 (Story ⊥ Reading Route), and EAR evidence that orthogonality is
+**Rejected.** Conflicts with ADR-005 v2.0 Decision 8 (Editorial independence),
+ADR-007 v1.2 Decision 2 (Story ⊥ Reading Route), ADR-005 NIM-INV-06 (Scene ⊥
+Reading Frame as progression authority), and EAR evidence that orthogonality is
 architectural — not debt. Would increase silent conflation risk at boundaries.
 
 ADR-008 is retained for Runtime scope; this alternative is rejected only as a
@@ -801,9 +893,12 @@ This ADR does **not**:
 
 * redesign Discovery workflow, Candidate lifecycle, or Human Review (ADR-006).
 * redesign Runtime Truth v1 topology (ADR-004).
-* rename Story, Reading Route, or any RV-01 ~ RV-07 term.
-* redesign Rollout, Governed Projection, or Story ↔ Reading Route association
-  semantics (ADR-007).
+* rename Story, Scene, Reading Route, Reading Frame, or any RV-01 ~ RV-07 term.
+* define **Editorial Scene → Runtime** governed projection or mapping (ADR-007 v1.2
+  §Deferred Decisions; ADR-009 mapping table).
+* redesign Rollout, Governed Projection, or **Approved Story unit ↔ Reading Route**
+  association semantics (ADR-007 v1.2).
+* introduce Product vocabulary or a Product glossary layer.
 * introduce a Knowledge Graph.
 * introduce a Canonical Concept Registry.
 * modify `governance/vocabulary/runtime-lexicon.md` entries.
@@ -819,5 +914,9 @@ This ADR does **not**:
 
 For Runtime normative terms and legacy aliases, see
 `governance/vocabulary/runtime-lexicon.md` §3 (authoritative).
+
+**Cross-layer note (A2):** **Editorial Scene** (Layer 3, ADR-005 v2.0) is **not**
+listed here. **`Scene`** in runtime-lexicon §3 is an **Implementation Alias for
+Reading Route only** — not for Editorial Scene.
 
 ADR-009 adds **no** new Implementation Aliases or Documentation Aliases.
