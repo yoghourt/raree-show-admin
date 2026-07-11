@@ -5,13 +5,14 @@
 | Field        | Value                                                                 |
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Editorial Scene Projection Semantics                                  |
-| Status       | **Draft** (Design Only) — **Changes Requested revision**              |
-| Version      | v0.2                                                                  |
+| Status       | **Accepted**                                                        |
+| Version      | v1.0                                                                  |
 | Owner        | Architect                                                             |
 | Last Updated | 2026-07-11                                                            |
 | Derived From | ADR-007 v1.2 (`docs/adr/007-rollout-architecture.md`)                 |
-| Related      | ADR-004, ADR-005 v2.0, ADR-006 v1.3, SPEC-ROL-001, SPEC-D3-002        |
+| Related      | ADR-004, ADR-005 v2.0, ADR-006 v1.3, SPEC-ROL-001, SPEC-D3-002, SPEC-RDX-001, Runtime Reading Governance RC1 |
 | Supersedes   | SPEC-ROL-002 v0.1 (withdrawn — capability drift; see Architect Review 2026-07-11) |
+| Amendment    | v1.0 — Accepted as part of Runtime Reading Governance RC1 (2026-07-11); promotes v0.2 without semantic change |
 
 **Architect Review (2026-07-11):** v0.1 incorrectly owned **Runtime Reading Experience** semantics under the Rollout namespace. v0.2 restores **Projection-only** scope. Reader progression, navigation, caption rendering, session, and Assistant consumption belong to **SPEC-RDX-001** (Accepted — separate capability).
 
@@ -252,14 +253,16 @@ ROL-002 **does not** close Scene ↔ Reading Frame mapping. Architecture explici
 
 ---
 
-## 9. Acceptance Criteria (Design Phase)
+## 9. Acceptance Criteria
+
+SPEC-ROL-002 is **Accepted** (2026-07-11; Runtime Reading Governance RC1):
 
 - [x] **ROL2-DAC-01** — Scope limited to Projection; Reader semantics removed
 - [x] **ROL2-DAC-02** — Projection lifecycle ends at Reading Route association boundary
 - [x] **ROL2-DAC-03** — Abstract metadata contract defined (StoryProjectionLink, SceneProjectionLink)
 - [x] **ROL2-DAC-04** — Projection integrity rules (ROL2-PR-*)
-- [ ] **ROL2-DAC-05** — Architect review Approved (pending re-review)
-- [ ] **ROL2-DAC-06** — ROL-001 alignment review (pending)
+- [x] **ROL2-DAC-05** — Architect review Approved (RC1 promotion)
+- [x] **ROL2-DAC-06** — ROL-001 alignment confirmed (operator paths consistent with projection semantics)
 
 ---
 
@@ -268,7 +271,8 @@ ROL-002 **does not** close Scene ↔ Reading Frame mapping. Architecture explici
 ```text
 docs/adr/007-rollout-architecture.md               Projection architecture; deferral table
 docs/specs/spec-rol-001-governed-projection.md     Implemented operator projection
-docs/specs/spec-rdx-001-runtime-reading-experience.md              Runtime Reading (Accepted)
+docs/specs/spec-rdx-001-runtime-reading-experience.md   Runtime Reading (Accepted)
+docs/specs/runtime-reading-governance-rc1.md       Governance RC1 baseline
 docs/adr/005-narrative-information-model.md        Approved Scene unit semantics
 docs/adr/006-discovery-copilot-architecture.md   Scene unit path
 ```

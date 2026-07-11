@@ -6,12 +6,12 @@
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Runtime Reading Experience                                          |
 | Status       | **Accepted**                                                        |
-| Version      | v1.2                                                                  |
+| Version      | v1.3                                                                  |
 | Owner        | Architect                                                             |
 | Last Updated | 2026-07-11                                                            |
 | Derived From | ADR-004, ADR-005 v2.0, ADR-007 v1.2, ADR-009 v1.2                     |
-| Related      | SPEC-ROL-001, SPEC-ROL-002, SPEC-CORE-001                           |
-| Amendment    | v1.1 — Architect Review minor revisions; v1.2 — capability boundary decision inlined, Accepted |
+| Related      | SPEC-ROL-001, SPEC-ROL-002, SPEC-CORE-001, Runtime Reading Governance RC1 |
+| Amendment    | v1.1 — Architect Review minor revisions; v1.2 — capability boundary inlined, Accepted; v1.3 — rendering owner wording aligned with W-01 v2.1 (no semantic change) |
 
 **Capability authority:** This SPEC is the **sole governance authority** for **Runtime Reading Experience**. **Reader Step** is the smallest architectural capability unit (§1.5). RDX MUST preserve **Editorial progression authority** without owning Editorial semantics. The accepted boundary model (Scene-aware Frame Reading) is **not** the capability name — it is the architectural model under which this capability operates (§1.5).
 
@@ -383,7 +383,7 @@ Constitution
     SPEC-ROL-001 (Implemented) ──► operator projection
               │
               ▼
-    SPEC-ROL-002 (Draft) ──► projection semantics
+    SPEC-ROL-002 (Accepted) ──► projection semantics
               │
               ▼
     ┌─────────────────────┐
@@ -430,19 +430,19 @@ Explicitly excluded from SPEC-RDX-001:
 | Projection association persistence design | SPEC-ROL-002 / SPEC-CORE-001 |
 | HTTP / API route design | Implementation |
 | UI layout, component structure | UI Spec (post-RDX) |
-| **Rendering policy** | W-01 / downstream web SPEC |
-| **Visual composition** | W-01 / downstream web SPEC |
-| **Animation** | W-01 / downstream web SPEC |
-| **Media presentation** (image display, reveal gates, layout) | W-01 / downstream web SPEC |
-| Assistant implementation, RAG oracle, chat UX | Web Assistant specs |
+| **Rendering policy** | Implementation / Presentation |
+| **Visual composition** | Implementation / Presentation |
+| **Animation** | Implementation / Presentation |
+| **Media presentation** (image display, reveal gates, layout) | Implementation / Presentation |
+| Assistant implementation, RAG oracle, chat UX | Web Assistant specs (Implementation) |
 | Progress persistence mechanism, session storage | Implementation (post-RDX) |
-| Navigation mechanics, swipe/tap, URL routing | W-01 / implementation |
-| Frame Narrative text rendering policy, caption fallback rules | W-01 / downstream web SPEC |
+| Browser navigation orchestration (commit order, URL) | W-01 (raree-show-web) |
+| Frame Narrative text rendering policy, caption fallback rules | Implementation / Presentation (downstream web SPEC) |
 | Reading Route authoring, Frame CRUD, Cloudinary upload | Admin Production / CORE-001 |
 | Cross-Route session continuation policy | Downstream web SPEC |
 | Vocabulary registry changes | ADR-008, ADR-009, runtime-lexicon |
 
-Rendering and presentation are **downstream web capabilities**. RDX governs consumption semantics only; W-01 MUST NOT absorb rendering into RDX ownership.
+Rendering and presentation are **Implementation / Presentation** responsibilities — not Runtime Reading capability. RDX governs consumption semantics only. W-01 (browser orchestration) MUST NOT absorb rendering into RDX ownership.
 
 ---
 
@@ -488,7 +488,8 @@ docs/adr/005-narrative-information-model.md              Story / Scene; NIM-INV-
 docs/adr/007-rollout-architecture.md                     Projection closure
 docs/adr/009-vocabulary-architecture.md                  Layer 5; Reader Step
 docs/specs/spec-rol-001-governed-projection.md           Rollout operator (Implemented)
-docs/specs/spec-rol-002-projection-semantics.md           Projection semantics (Draft)
+docs/specs/spec-rol-002-projection-semantics.md           Projection semantics (Accepted)
+docs/specs/runtime-reading-governance-rc1.md              Governance release baseline
 docs/specs/spec-core-001-entity-schema-registry.md         Runtime Representation (§3.2)
 governance/vocabulary/runtime-lexicon.md                   RV-02, RV-04, RV-06
 raree-show-web/docs/specs/w-01-visibility-synchronized-navigation.md   Downstream (authorized)
