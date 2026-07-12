@@ -212,14 +212,19 @@ Story Candidates propose **editorial Story units**, not Production Entities (ADR
 
 #### 4.4.4 Scene Candidate (`candidateType: "scene"`)
 
+Editorial hierarchy (ADR-005): **Work → Story → Scene**. Scene Candidates are Editorial Scenes that belong under a Story Candidate in the same propose batch. They MUST NOT be framed as Runtime Reading Routes.
+
 | Field | Required | Notes |
 | ----- | -------- | ----- |
+| `parentStoryCandidateId` | Yes | `candidateId` of a Story Candidate from the same propose batch |
 | `chapter_title` | No | Proposed scope; nullable per scene form |
-| `chapter_number` | Yes | Canonical ordering hint |
+| `chapter_number` | Yes | Canonical ordering hint (integer ≥ 1) |
 | `title` | Yes | Scene display title |
 | `summary` | No | Narrative prose |
 
 Excluded: `tags`, `story_images_v2`, `locationId`, `characterIds` in v1 propose output.
+
+Propose order MUST be Story-first within the type loop: `character` → `location` → `story` → `scene`. Scene generation MUST inject the proposed Story list and reject/drop Scenes whose `parentStoryCandidateId` is not in that set. LLM JSON parse MAY accept legacy aliases (`readingRoute`, `scenes`, …) but the public `candidateType` is `"scene"`.
 
 ### 4.5 Propose API (v1 minimum)
 

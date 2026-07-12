@@ -224,7 +224,7 @@ export function isStoryOrSceneAcceptedInStaging(
   return (
     item.status === "accepted" &&
     (item.candidate.candidateType === "story" ||
-      item.candidate.candidateType === "readingRoute")
+      item.candidate.candidateType === "scene")
   );
 }
 
@@ -288,6 +288,9 @@ export function validateSceneAcceptFields(
 ): { ok: true } | { ok: false; fieldErrors: string[] } {
   const scene = fields as SceneCandidateFields;
   const errors: string[] = [];
+  if (!isNonEmptyString(scene.parentStoryCandidateId)) {
+    errors.push("parentStoryCandidateId is required");
+  }
   if (!isValidSceneChapterNumber(scene.chapter_number)) {
     errors.push(
       "chapter_number must be a numeric chapter index (integer ≥ 1); use chapter_title for POV labels like \"Bran I\""
@@ -328,6 +331,7 @@ export function buildStoryStaging(
   return {
     workId: item.candidate.workId,
     sourceReviewId: item.reviewId,
+    sourceCandidateId: item.candidate.candidateId,
     title: fields.title.trim(),
     summary: fields.summary.trim(),
     ...(isNonEmptyString(fields.boundaryHint)
@@ -338,12 +342,15 @@ export function buildStoryStaging(
 }
 
 export function buildSceneStaging(
-  item: DiscoveryReviewItem
+  item: DiscoveryReviewItem,
+  parentStory: AcceptedStoryUnitStaging
 ): AcceptedSceneCandidateStaging {
   const fields = getEffectiveFields(item) as SceneCandidateFields;
   return {
     workId: item.candidate.workId,
     sourceReviewId: item.reviewId,
+    parentStorySourceReviewId: parentStory.sourceReviewId,
+    parentStoryTitle: parentStory.title,
     chapter_title: fields.chapter_title ?? null,
     chapter_number: fields.chapter_number,
     title: fields.title.trim(),
@@ -354,9 +361,33 @@ export function buildSceneStaging(
   };
 }
 
+export function findAcceptedParentStory(
+  items: DiscoveryReviewItem[],
+  acceptedStories: AcceptedStoryUnitStaging[],
+  parentStoryCandidateId: string
+): AcceptedStoryUnitStaging | undefined {
+  const bySourceCandidate = acceptedStories.find(
+    (s) =>
+      s.sourceCandidateId &&
+      s.sourceCandidateId === parentStoryCandidateId
+  );
+  if (bySourceCandidate) return bySourceCandidate;
+
+  // Fallback: match via accepted review item's candidateId
+  const parentItem = items.find(
+    (item) =>
+      item.status === "accepted" &&
+      item.candidate.candidateType === "story" &&
+      item.candidate.candidateId === parentStoryCandidateId
+  );
+  if (!parentItem) return undefined;
+  return acceptedStories.find((s) => s.sourceReviewId === parentItem.reviewId);
+}
+
 export function prepareAcceptReview(
   items: DiscoveryReviewItem[],
-  reviewId: string
+  reviewId: string,
+  acceptedStories: AcceptedStoryUnitStaging[] = []
 ): AcceptReviewResult | AcceptReviewError {
   const item = findReviewItem(items, reviewId);
   if (!item) {
@@ -424,7 +455,7 @@ export function prepareAcceptReview(
         staging: buildStoryStaging(item),
       };
     }
-    case "readingRoute": {
+    case "scene": {
       const validation = validateSceneAcceptFields(fields);
       if (!validation.ok) {
         return {
@@ -434,13 +465,46 @@ export function prepareAcceptReview(
           fieldErrors: validation.fieldErrors,
         };
       }
+      const sceneFields = fields as SceneCandidateFields;
+      const parentStory = findAcceptedParentStory(
+        items,
+        acceptedStories,
+        sceneFields.parentStoryCandidateId
+      );
+      if (!parentStory) {
+        return {
+          ok: false,
+          code: "PARENT_STORY_NOT_ACCEPTED",
+          message:
+            "Accept the parent Story Candidate before accepting this Scene",
+        };
+      }
       return {
         ok: true,
         kind: "scene_staging",
-        staging: buildSceneStaging(item),
+        staging: buildSceneStaging(item, parentStory),
       };
     }
   }
+}
+
+/** Child scene review ids whose parent story review is being revoked. */
+export function getChildSceneReviewIdsForStory(
+  items: DiscoveryReviewItem[],
+  storyReviewId: string
+): string[] {
+  const storyItem = findReviewItem(items, storyReviewId);
+  if (!storyItem || storyItem.candidate.candidateType !== "story") {
+    return [];
+  }
+  const storyCandidateId = storyItem.candidate.candidateId;
+  return items
+    .filter((item) => {
+      if (item.candidate.candidateType !== "scene") return false;
+      const fields = getEffectiveFields(item) as SceneCandidateFields;
+      return fields.parentStoryCandidateId === storyCandidateId;
+    })
+    .map((item) => item.reviewId);
 }
 
 export function characterPrefillToFormValues(

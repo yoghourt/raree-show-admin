@@ -206,6 +206,8 @@ export const zhCN = {
       '叙事优先的发现会话。锁定叙事后方可生成候选。',
     readingRouteCandidate: '阅读路线候选',
     readingRouteCandidateStaging: '阅读路线候选（暂存）',
+    sceneCandidate: '场景候选',
+    sceneCandidateStaging: '场景候选（暂存）',
     storyCandidate: '故事单元',
     narrativeHint:
       '叙事发现以正文为先。请勿单独使用关键词列表、运行时阅读路线表导出或章节目录元数据作为唯一输入。',
@@ -213,14 +215,16 @@ export const zhCN = {
     forbiddenCatalogExportExample: '仅导出阅读路线表标题/章号，无叙事摘录',
     runtimeExportOnlyFlag: '内容仅来自运行时阅读路线列表/元数据导出',
     flowHintAccepted: '确认内容无误后，前往投影工作台持久化并投影',
-    flowHintAcceptedEmpty: '暂无已采纳的故事单元 / 阅读路线候选',
+    flowHintAcceptedEmpty: '暂无已采纳的故事单元 / 场景候选',
     nextStepRollout: '前往投影工作台',
     goRollout: '前往投影工作台',
     editAfterAcceptSceneHint:
-      '章节序号须为 ≥1 的整数；视角名（如布兰一世）请写在章节标题。',
+      '章节序号须为 ≥1 的整数；视角名（如布兰一世）请写在章节标题。场景须挂在已采纳的故事单元下。',
     editStagingHint: '修改后暂存区与投影队列会同步更新。',
     confirmRevokeAccept:
       '确定取消采纳？将回到上方待审核列表，并从投影待处理队列移除。',
+    confirmRevokeStoryWithScenes:
+      '取消采纳该故事单元将同时移除其下已采纳的场景暂存。确定继续？',
     fieldsJsonLabel: '字段（结构化）',
     fieldsJsonParseError: '字段解析失败',
     tabRollout: '投影工作台',
@@ -253,6 +257,8 @@ export const zhCN = {
       boundaryHint: '边界提示',
       chapter_title: '章节标题',
       chapter_number: '章节序号',
+      parentStoryCandidateId: '所属故事候选',
+      parentStoryTitle: '所属故事',
     },
     handoff: {
       backToDiscovery: '← 返回叙事发现',

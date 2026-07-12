@@ -69,6 +69,8 @@ import {
   buildAcceptPrefill,
   buildStoryStaging,
   buildSceneStaging,
+  getChildSceneReviewIdsForStory,
+  findAcceptedParentStory,
   type ReviewEditPayload,
 } from "@/lib/discovery/review-state";
 import { storeDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
@@ -138,7 +140,7 @@ export interface UseDiscoverySessionReturn {
   discardCandidate: (reviewId: string) => void;
   revokeStagingAccept: (
     sourceReviewId: string,
-    kind: "story" | "readingRoute"
+    kind: "story" | "scene"
   ) => void;
   saveCandidateEdit: (reviewId: string, edit: ReviewEditPayload) => void;
   saveStoryStagingEdit: (
@@ -617,22 +619,48 @@ export function useDiscoverySession(
   }, []);
 
   const revokeStagingAccept = useCallback(
-    (sourceReviewId: string, kind: "story" | "readingRoute") => {
+    (sourceReviewId: string, kind: "story" | "scene") => {
       setAcceptError(null);
-      setReviewItems((prev) => revokeReviewAccept(prev, sourceReviewId));
       if (kind === "story") {
+        const childSceneReviewIds = getChildSceneReviewIdsForStory(
+          reviewItems,
+          sourceReviewId
+        );
+        const childFromStaging = acceptedSceneCandidates
+          .filter((s) => s.parentStorySourceReviewId === sourceReviewId)
+          .map((s) => s.sourceReviewId);
+        const allChildIds = [
+          ...new Set([...childSceneReviewIds, ...childFromStaging]),
+        ];
+
+        setReviewItems((prev) => {
+          let next = revokeReviewAccept(prev, sourceReviewId);
+          for (const childId of allChildIds) {
+            next = revokeReviewAccept(next, childId);
+          }
+          return next;
+        });
         setAcceptedStoryUnits((prev) =>
           prev.filter((unit) => unit.sourceReviewId !== sourceReviewId)
         );
+        setAcceptedSceneCandidates((prev) =>
+          prev.filter(
+            (scene) => scene.parentStorySourceReviewId !== sourceReviewId
+          )
+        );
         removeStoryStagingFromRolloutQueue(workId, operatorId, sourceReviewId);
+        for (const childId of allChildIds) {
+          removeSceneStagingFromRolloutQueue(workId, operatorId, childId);
+        }
       } else {
+        setReviewItems((prev) => revokeReviewAccept(prev, sourceReviewId));
         setAcceptedSceneCandidates((prev) =>
           prev.filter((scene) => scene.sourceReviewId !== sourceReviewId)
         );
         removeSceneStagingFromRolloutQueue(workId, operatorId, sourceReviewId);
       }
     },
-    [workId, operatorId]
+    [workId, operatorId, reviewItems, acceptedSceneCandidates]
   );
 
   const saveCandidateEdit = useCallback(
@@ -655,8 +683,17 @@ export function useDiscoverySession(
               )
             );
             updateStoryStagingInRolloutQueue(workId, operatorId, staging);
-          } else if (candidateType === "readingRoute") {
-            const staging = buildSceneStaging(item);
+          } else if (candidateType === "scene") {
+            const parent = findAcceptedParentStory(
+              next,
+              acceptedStoryUnits,
+              (getEffectiveCandidate(item).fields as SceneCandidateFields)
+                .parentStoryCandidateId
+            );
+            if (!parent) {
+              return next;
+            }
+            const staging = buildSceneStaging(item, parent);
             setAcceptedSceneCandidates((scenes) =>
               scenes.map((scene) =>
                 scene.sourceReviewId === reviewId ? staging : scene
@@ -668,7 +705,7 @@ export function useDiscoverySession(
         return next;
       });
     },
-    [workId, operatorId]
+    [workId, operatorId, acceptedStoryUnits]
   );
 
   const saveStoryStagingEdit = useCallback(
@@ -680,16 +717,20 @@ export function useDiscoverySession(
         return;
       }
       const storyFields = edit.editedFields as StoryCandidateFields;
+      const existing = acceptedStoryUnits.find(
+        (u) => u.sourceReviewId === sourceReviewId
+      );
       const staging: AcceptedStoryUnitStaging = {
         workId,
         sourceReviewId,
+        sourceCandidateId: existing?.sourceCandidateId ?? sourceReviewId,
         title: storyFields.title.trim(),
         summary: storyFields.summary.trim(),
         ...(typeof storyFields.boundaryHint === "string" &&
         storyFields.boundaryHint.trim()
           ? { boundaryHint: storyFields.boundaryHint.trim() }
           : {}),
-        acceptedAt: new Date().toISOString(),
+        acceptedAt: existing?.acceptedAt ?? new Date().toISOString(),
       };
       setAcceptedStoryUnits((prev) =>
         prev.map((unit) =>
@@ -698,7 +739,7 @@ export function useDiscoverySession(
       );
       updateStoryStagingInRolloutQueue(workId, operatorId, staging);
     },
-    [reviewItems, saveCandidateEdit, workId, operatorId]
+    [reviewItems, saveCandidateEdit, workId, operatorId, acceptedStoryUnits]
   );
 
   const saveSceneStagingEdit = useCallback(
@@ -710,16 +751,24 @@ export function useDiscoverySession(
         return;
       }
       const sceneFields = edit.editedFields as SceneCandidateFields;
+      const existing = acceptedSceneCandidates.find(
+        (s) => s.sourceReviewId === sourceReviewId
+      );
+      if (!existing) {
+        return;
+      }
       const staging: AcceptedSceneCandidateStaging = {
         workId,
         sourceReviewId,
+        parentStorySourceReviewId: existing.parentStorySourceReviewId,
+        parentStoryTitle: existing.parentStoryTitle,
         chapter_title: sceneFields.chapter_title ?? null,
         chapter_number: sceneFields.chapter_number,
         title: sceneFields.title.trim(),
         ...(typeof sceneFields.summary === "string" && sceneFields.summary.trim()
           ? { summary: sceneFields.summary.trim() }
           : {}),
-        acceptedAt: new Date().toISOString(),
+        acceptedAt: existing.acceptedAt,
       };
       setAcceptedSceneCandidates((prev) =>
         prev.map((scene) =>
@@ -728,7 +777,13 @@ export function useDiscoverySession(
       );
       updateSceneStagingInRolloutQueue(workId, operatorId, staging);
     },
-    [reviewItems, saveCandidateEdit, workId, operatorId]
+    [
+      reviewItems,
+      saveCandidateEdit,
+      workId,
+      operatorId,
+      acceptedSceneCandidates,
+    ]
   );
 
   const regenCandidate = useCallback(
@@ -748,6 +803,13 @@ export function useDiscoverySession(
           reviewId
         );
         const previousCandidate = getEffectiveCandidate(item);
+        const storyCandidates = reviewItems
+          .filter(
+            (r) =>
+              r.status !== "discarded" &&
+              r.candidate.candidateType === "story"
+          )
+          .map(getEffectiveCandidate);
 
         const res = await fetch("/api/admin/discovery/propose/regen", {
           method: "POST",
@@ -760,6 +822,7 @@ export function useDiscoverySession(
             candidateType: previousCandidate.candidateType,
             previousCandidate,
             siblingCandidates,
+            storyCandidates,
             feedback: feedback ?? null,
           }),
         });
@@ -844,6 +907,17 @@ export function useDiscoverySession(
       setRetryTypeError(null);
 
       try {
+        const existingStoryCandidates =
+          candidateType === "scene"
+            ? reviewItems
+                .filter(
+                  (r) =>
+                    r.status !== "discarded" &&
+                    r.candidate.candidateType === "story"
+                )
+                .map(getEffectiveCandidate)
+            : undefined;
+
         const res = await fetch("/api/admin/discovery/propose", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -853,6 +927,9 @@ export function useDiscoverySession(
             narrative: session.narrative,
             lockedAt: session.lockedAt,
             candidateTypes: [candidateType],
+            ...(existingStoryCandidates
+              ? { existingStoryCandidates }
+              : {}),
             feedback: feedback ?? null,
           }),
         });
@@ -940,12 +1017,17 @@ export function useDiscoverySession(
       isRegening,
       retryingType,
       workId,
+      reviewItems,
     ]
   );
 
   const acceptCandidate = useCallback(
     (reviewId: string): AcceptReviewResult | AcceptReviewError => {
-      const result = prepareAcceptReview(reviewItems, reviewId);
+      const result = prepareAcceptReview(
+        reviewItems,
+        reviewId,
+        acceptedStoryUnits
+      );
       if (!result.ok) {
         setAcceptError(result);
         return result;
@@ -966,7 +1048,7 @@ export function useDiscoverySession(
 
       return result;
     },
-    [reviewItems, workId, operatorId]
+    [reviewItems, acceptedStoryUnits, workId, operatorId]
   );
 
   const activeReviewItems = useMemo(

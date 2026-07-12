@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DiscoveryReviewSnapshot } from "@/lib/discovery/review-session-storage";
 import {
+  appendSceneStagingToRolloutQueue,
   appendStoryStagingToRolloutQueue,
   syncRolloutQueueFromDiscovery,
 } from "@/lib/rollout/sync-discovery-staging";
@@ -51,6 +52,7 @@ describe("sync-discovery-staging", () => {
         {
           workId: "work-1",
           sourceReviewId: "rev-1",
+          sourceCandidateId: "cand-story-1",
           title: "Northern arc",
           summary: "Story summary",
           acceptedAt: "2026-07-05T00:00:00.000Z",
@@ -74,6 +76,7 @@ describe("sync-discovery-staging", () => {
     appendStoryStagingToRolloutQueue("work-1", "op-1", {
       workId: "work-1",
       sourceReviewId: "rev-2",
+      sourceCandidateId: "cand-2",
       title: "Immediate",
       summary: "s",
       acceptedAt: "2026-07-05T00:00:00.000Z",
@@ -97,6 +100,7 @@ describe("sync-discovery-staging", () => {
         {
           workId: "work-1",
           sourceReviewId: "rev-done",
+          sourceCandidateId: "cand-done",
           title: "Done story",
           summary: "s",
           acceptedAt: "2026-07-05T00:00:00.000Z",
@@ -126,6 +130,7 @@ describe("sync-discovery-staging", () => {
     const staging = {
       workId: "work-1",
       sourceReviewId: "rev-dismiss",
+      sourceCandidateId: "cand-dismiss",
       title: "Dismiss me",
       summary: "s",
       acceptedAt: "2026-07-05T00:00:00.000Z",
@@ -161,5 +166,48 @@ describe("sync-discovery-staging", () => {
     const restored = restoreStoryStagingItem(synced, "rev-dismiss");
     expect(restored.storyStaging).toHaveLength(1);
     expect(restored.dismissedStoryStaging).toHaveLength(0);
+  });
+
+  it("passes parent Story fields on scene staging into rollout queue", () => {
+    appendSceneStagingToRolloutQueue("work-1", "op-1", {
+      workId: "work-1",
+      sourceReviewId: "rev-scene-1",
+      parentStorySourceReviewId: "rev-story-1",
+      parentStoryTitle: "Northern arc",
+      chapter_number: 1,
+      title: "Courtyard",
+      acceptedAt: "2026-07-05T00:00:00.000Z",
+    });
+    const queue = loadRolloutQueue("work-1", "op-1");
+    expect(queue.readingRouteStaging).toHaveLength(1);
+    expect(queue.readingRouteStaging[0]?.parentStorySourceReviewId).toBe(
+      "rev-story-1"
+    );
+    expect(queue.readingRouteStaging[0]?.parentStoryTitle).toBe("Northern arc");
+  });
+
+  it("reads legacy sceneStaging alias from storage", () => {
+    store.set(
+      "rollout_queue:work-1:op-1",
+      JSON.stringify({
+        workId: "work-1",
+        storyStaging: [],
+        sceneStaging: [
+          {
+            workId: "work-1",
+            sourceReviewId: "rev-legacy",
+            parentStorySourceReviewId: "rev-parent",
+            parentStoryTitle: "Parent",
+            chapter_number: 2,
+            title: "Legacy Scene",
+            acceptedAt: "2026-07-05T00:00:00.000Z",
+          },
+        ],
+        updatedAt: "2026-07-05T00:00:00.000Z",
+      })
+    );
+    const queue = loadRolloutQueue("work-1", "op-1");
+    expect(queue.readingRouteStaging).toHaveLength(1);
+    expect(queue.readingRouteStaging[0]?.title).toBe("Legacy Scene");
   });
 });

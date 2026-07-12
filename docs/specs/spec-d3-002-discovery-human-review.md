@@ -206,7 +206,7 @@ Implementation MUST provide, for each active (non-discarded) review item:
 | Discard | Enabled for `pending` and `edited_pending_accept` |
 | Regen | Enabled for `pending` and `edited_pending_accept`; opens optional feedback input |
 
-Review MUST be grouped by `candidateType` (`character`, `location`, `story`, `scene`) to support chunked operator review without work-level Accept All.
+Review MUST present Candidates under Editorial hierarchy **Work → Story → Scene**: Character and Location as top-level type groups; Scene items MUST nest under their parent Story by `parentStoryCandidateId` (no parallel Work-level Scene section).
 
 ### 4.3 Operator action contracts
 
@@ -251,11 +251,14 @@ Durable Approved Story unit storage is owned by **SPEC-ROL-001** (Rollout persis
 
 | Step | Behavior |
 | ---- | -------- |
-| 1 | Construct `AcceptedSceneCandidateStaging` object in client session state (§4.5) |
-| 2 | Mark review item `accepted` |
-| 3 | MUST NOT create or update Reading Route records (implementation: Scene records) (D3-RC-REV-09) |
+| 1 | Require a matching **accepted** parent Story (`AcceptedStoryUnitStaging.sourceCandidateId === Scene.fields.parentStoryCandidateId`) |
+| 2 | Construct `AcceptedSceneCandidateStaging` with `parentStorySourceReviewId` + `parentStoryTitle` in client session state (§4.5) |
+| 3 | Mark review item `accepted` |
+| 4 | MUST NOT create or update Reading Route records (implementation: Scene records) (D3-RC-REV-09) |
 
-SPEC-ROL-001 consumes accepted scene staging for governed projection.
+If parent Story is not accepted, Accept MUST fail with `PARENT_STORY_NOT_ACCEPTED`. Revoking Story Accept MUST cascade-remove child Scene staging.
+
+SPEC-ROL-001 consumes accepted scene staging for governed projection (parent Story refs are pass-through metadata only).
 
 #### 4.4.5 Entity create prefill contract (character / location)
 
@@ -279,26 +282,29 @@ Implementation MUST pass `DiscoveryAcceptPrefill` via router state or equivalent
 
 ```typescript
 interface AcceptedStoryUnitStaging {
-  workId:        string;
-  sourceReviewId: string;
-  title:         string;
-  summary:       string;
-  boundaryHint?: string;
-  acceptedAt:    string;
+  workId:             string;
+  sourceReviewId:     string;
+  sourceCandidateId:  string;  // propose candidateId — resolves Scene parent links
+  title:              string;
+  summary:            string;
+  boundaryHint?:      string;
+  acceptedAt:         string;
 }
 
 interface AcceptedSceneCandidateStaging {
-  workId:         string;
-  sourceReviewId: string;
-  chapter_title?: string | null;
-  chapter_number: number | string;
-  title:          string;
-  summary?:       string;
-  acceptedAt:     string;
+  workId:                      string;
+  sourceReviewId:              string;
+  parentStorySourceReviewId:   string;
+  parentStoryTitle:            string;
+  chapter_title?:              string | null;
+  chapter_number:              number | string;
+  title:                       string;
+  summary?:                    string;
+  acceptedAt:                  string;
 }
 ```
 
-These objects are **Editorial staging** only. They MUST NOT be written to Supabase in v1 Accept handler code within this SPEC scope.
+These objects are **Editorial staging** only. They MUST NOT be written to Supabase in v1 Accept handler code within this SPEC scope. Scene staging MUST always reference a parent Story; Work-level sibling Scene staging (without parent Story) is prohibited.
 
 ### 4.6 Regen invoke contract (consumer of SPEC-D3-003 §4.6)
 

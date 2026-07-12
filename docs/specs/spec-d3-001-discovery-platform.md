@@ -78,7 +78,7 @@ On narrative semantics conflicts, ADR-005 governs. On Discovery boundary conflic
 
 **D3-RC-01 — Work-scoped session**
 
-Discovery Session MUST be scoped to a single `workId`. MUST NOT be entity-scoped like Enrichment (SPEC-D2-002 scope-field model).
+Discovery Session MUST be scoped to a single `workId`. MUST NOT be entity-scoped like Enrichment (SPEC-D2-002 scope-field model). Propose Candidate hierarchy within a session is **Story-scoped for Scenes** (Work → Story → Scene per ADR-005 / SPEC-D3-003); the session itself remains work-scoped.
 
 **D3-RC-02 — Separate from Enrichment**
 

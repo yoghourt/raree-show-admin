@@ -2,6 +2,7 @@
  * SPEC-D3-003 §4.7 — Discovery Proposals generation service
  *
  * Reuses callCopilotTextLlm (ADR-006 Decision 6). MUST NOT use suggest-service.
+ * Story-first order: character → location → story → scene (Sprint #2).
  */
 
 import { randomUUID } from "crypto";
@@ -11,6 +12,7 @@ import { MAX_CANDIDATES_PER_TYPE } from "@/lib/discovery/constants";
 import {
   capCandidatesByType,
   dedupeCandidates,
+  filterScenesWithValidParents,
   getCandidateDedupeKey,
   getCandidateLabelKey,
   normalizeRawCandidate,
@@ -21,6 +23,8 @@ import {
   type DiscoveryCandidate,
   type DiscoveryCandidateType,
   type ProposeTypeError,
+  type SceneCandidateFields,
+  type StoryCandidateFields,
 } from "@/lib/discovery/propose-types";
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
 
@@ -35,19 +39,26 @@ const REGISTRY_FIELD_HINTS: Record<DiscoveryCandidateType, string[]> = {
   character: ["name", "house", "description", "signatureQuote"],
   location: ["name", "region", "description"],
   story: ["title", "summary", "boundaryHint"],
-  readingRoute: ["chapter_title", "chapter_number", "title", "summary"],
+  scene: [
+    "parentStoryCandidateId",
+    "chapter_title",
+    "chapter_number",
+    "title",
+    "summary",
+  ],
 };
 
 const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
   character: `{"candidates":[{"displayName":"Arya Stark","summary":"Young Stark daughter.","fields":{"name":"Arya Stark","house":"Stark"}}]}`,
   location: `{"candidates":[{"displayName":"Winterfell","summary":"Seat of House Stark.","fields":{"name":"Winterfell","region":"The North"}}]}`,
   story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
-  readingRoute: `{"candidates":[{"displayName":"Courtyard Welcome","summary":"Royal arrival scene.","fields":{"chapter_number":1,"chapter_title":"Bran I","title":"Courtyard Welcome","summary":"Household gathers in the courtyard."}}]}`,
+  scene: `{"candidates":[{"displayName":"Courtyard Welcome","summary":"Royal arrival scene.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Bran I","title":"Courtyard Welcome","summary":"Household gathers in the courtyard."}}]}`,
 };
 
 function mockCandidatesForType(
   workId: string,
-  candidateType: DiscoveryCandidateType
+  candidateType: DiscoveryCandidateType,
+  storyCandidates: DiscoveryCandidate[] = []
 ): DiscoveryCandidate[] {
   switch (candidateType) {
     case "character":
@@ -98,7 +109,11 @@ function mockCandidatesForType(
           },
         },
       ];
-    case "readingRoute":
+    case "scene": {
+      const parent =
+        storyCandidates.find((c) => c.candidateType === "story") ??
+        storyCandidates[0];
+      const parentStoryCandidateId = parent?.candidateId ?? randomUUID();
       return [
         {
           candidateId: randomUUID(),
@@ -107,6 +122,7 @@ function mockCandidatesForType(
           displayName: "Courtyard Welcome",
           summary: "The royal party is received in the courtyard.",
           fields: {
+            parentStoryCandidateId,
             chapter_number: 1,
             chapter_title: "Bran I",
             title: "Courtyard Welcome",
@@ -114,7 +130,22 @@ function mockCandidatesForType(
           },
         },
       ];
+    }
   }
+}
+
+function formatStoryListForPrompt(
+  storyCandidates: DiscoveryCandidate[]
+): string {
+  if (storyCandidates.length === 0) {
+    return "(none — do not invent parentStoryCandidateId; return {\"candidates\":[]})";
+  }
+  return storyCandidates
+    .map((c) => {
+      const fields = c.fields as StoryCandidateFields;
+      return `- candidateId: ${c.candidateId} | title: ${fields.title} | summary: ${fields.summary}`;
+    })
+    .join("\n");
 }
 
 function buildProposePrompt(params: {
@@ -124,6 +155,7 @@ function buildProposePrompt(params: {
   feedback?: string | null;
   previousCandidate?: DiscoveryCandidate;
   excludeCandidates?: DiscoveryCandidate[];
+  storyCandidates?: DiscoveryCandidate[];
 }): string {
   const {
     workTitle,
@@ -132,6 +164,7 @@ function buildProposePrompt(params: {
     feedback,
     previousCandidate,
     excludeCandidates,
+    storyCandidates = [],
   } = params;
   const hints = REGISTRY_FIELD_HINTS[candidateType].join(", ");
 
@@ -148,6 +181,15 @@ function buildProposePrompt(params: {
         .join("\n")}\n`
     : "";
 
+  const storyParentBlock =
+    candidateType === "scene"
+      ? `\nEditorial hierarchy: Work → Story → Scene.
+Scene candidates are Editorial Scenes that belong under a Story (NOT Runtime Reading Routes).
+Proposed Story candidates in this batch (you MUST set fields.parentStoryCandidateId to one of these candidateId values):
+${formatStoryListForPrompt(storyCandidates)}
+Do NOT use Reading-route framing. Do NOT invent parentStoryCandidateId values.\n`
+      : "";
+
   return `You are a Discovery Copilot generating editorial Candidates for a narrative work.
 Work title: ${workTitle}
 Candidate type: ${candidateType}
@@ -155,7 +197,7 @@ Hard cap (never exceed): ${MAX_CANDIDATES_PER_TYPE} per type
 
 Locked narrative bundle (JSON):
 ${JSON.stringify(narrative, null, 2)}
-${regenBlock}${excludeBlock}
+${regenBlock}${excludeBlock}${storyParentBlock}
 Generation rules (critical):
 - OUTPUT LANGUAGE (mandatory): Every string in your JSON response MUST be English (Latin script only).
   This includes displayName, summary, all fields values, evidence sourceLabel/excerpt, chapter_title, title, name, etc.
@@ -166,7 +208,7 @@ Generation rules (critical):
 - Include ONLY ${candidateType} entities explicitly supported by the narrative prose above.
 - Do NOT invent background cast, generic extras, or inferred entities not grounded in the text.
 - Do NOT pad the list to reach the cap. Prefer fewer accurate candidates.
-- For a single chapter excerpt, typical counts are: character 2-5, location 1-3, story 1-2, readingRoute 1-4 — use what the text actually supports.
+- For a single chapter excerpt, typical counts are: character 2-5, location 1-3, story 1-2, scene 1-4 — use what the text actually supports.
 - If the narrative supports zero distinct ${candidateType} units, return {"candidates":[]}.
 
 Return ONLY valid JSON — a single object {"candidates":[...]}. No markdown fences, no commentary.
@@ -176,7 +218,7 @@ Optional per item: confidence ("green"|"yellow"|"red"), evidence ([{sourceLabel,
 
 Example shape for type "${candidateType}":
 ${TYPE_EXAMPLES[candidateType]}
-${candidateType === "readingRoute" ? '\nReading route fields MUST live under "fields" with chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.\n' : ""}
+${candidateType === "scene" ? '\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.\n' : ""}
 ${candidateType === "location" ? '\nLocation fields MUST use fields.name (place name). Do NOT return prose paragraphs as the only value.\n' : ""}
 ${candidateType === "story" ? '\nStory fields MUST use fields.title and fields.summary (editorial story unit). Optional boundaryHint. Return {"candidates":[...]} — each item needs displayName, summary, and fields with title + summary.\n' : ""}
 
@@ -192,11 +234,27 @@ async function generateForType(params: {
   feedback?: string | null;
   previousCandidate?: DiscoveryCandidate;
   excludeCandidates?: DiscoveryCandidate[];
+  storyCandidates?: DiscoveryCandidate[];
 }): Promise<{ candidates: DiscoveryCandidate[]; error?: ProposeTypeError }> {
-  const { workId, workTitle, narrative, candidateType } = params;
+  const { workId, workTitle, narrative, candidateType, storyCandidates = [] } =
+    params;
+
+  if (candidateType === "scene" && storyCandidates.length === 0) {
+    return {
+      candidates: [],
+      error: {
+        candidateType,
+        code: "SCENE_REQUIRES_STORY",
+        message:
+          "Scene propose requires at least one Story candidate in the same batch",
+      },
+    };
+  }
 
   if (isDiscoveryProposeMockMode()) {
-    return { candidates: mockCandidatesForType(workId, candidateType) };
+    return {
+      candidates: mockCandidatesForType(workId, candidateType, storyCandidates),
+    };
   }
 
   try {
@@ -218,10 +276,21 @@ async function generateForType(params: {
 
     const candidates: DiscoveryCandidate[] = [];
     const validationErrors: string[] = [];
+    const storyIds = new Set(storyCandidates.map((c) => c.candidateId));
 
     for (const item of items) {
       const normalized = normalizeRawCandidate(item, candidateType, workId);
       if (normalized.ok) {
+        if (candidateType === "scene") {
+          const parentId = (normalized.candidate.fields as SceneCandidateFields)
+            .parentStoryCandidateId;
+          if (!storyIds.has(parentId)) {
+            validationErrors.push(
+              `parentStoryCandidateId "${parentId}" is not a proposed Story candidate`
+            );
+            continue;
+          }
+        }
         candidates.push(normalized.candidate);
       } else {
         validationErrors.push(...normalized.errors);
@@ -283,28 +352,57 @@ export async function proposeCandidateTypes(params: {
   workTitle: string;
   narrative: NarrativeInputBundle;
   candidateTypes?: DiscoveryCandidateType[];
+  /** Story candidates from an open review session (scene-only retry). */
+  existingStoryCandidates?: DiscoveryCandidate[];
   feedback?: string | null;
 }): Promise<{ candidates: DiscoveryCandidate[]; errors: ProposeTypeError[] }> {
   const types = params.candidateTypes ?? [...DISCOVERY_CANDIDATE_TYPES];
-  const allCandidates: DiscoveryCandidate[] = [];
+  const allCandidates: DiscoveryCandidate[] = [
+    ...(params.existingStoryCandidates ?? []).filter(
+      (c) => c.candidateType === "story"
+    ),
+  ];
+  const seededStoryIds = new Set(allCandidates.map((c) => c.candidateId));
   const errors: ProposeTypeError[] = [];
+  const newlyGenerated: DiscoveryCandidate[] = [];
 
+  // Story-first: process types in order so Scene sees prior Story candidates
   for (const candidateType of types) {
+    const storyCandidates = allCandidates.filter(
+      (c) => c.candidateType === "story"
+    );
     const result = await generateForType({
       workId: params.workId,
       workTitle: params.workTitle,
       narrative: params.narrative,
       candidateType,
       feedback: params.feedback,
+      storyCandidates:
+        candidateType === "scene" ? storyCandidates : undefined,
     });
     allCandidates.push(...result.candidates);
+    newlyGenerated.push(...result.candidates);
     if (result.error) {
       errors.push(result.error);
     }
   }
 
+  // Do not re-emit seeded existing stories as propose output
+  const outputCandidates = newlyGenerated.filter(
+    (c) => !(c.candidateType === "story" && seededStoryIds.has(c.candidateId))
+  );
+
+  const withParentsVisible = [
+    ...allCandidates.filter((c) => c.candidateType === "story"),
+    ...outputCandidates.filter((c) => c.candidateType !== "story"),
+  ];
+
   return {
-    candidates: capCandidatesByType(dedupeCandidates(allCandidates)),
+    candidates: filterScenesWithValidParents(
+      capCandidatesByType(dedupeCandidates(withParentsVisible))
+    ).filter(
+      (c) => !(c.candidateType === "story" && seededStoryIds.has(c.candidateId))
+    ),
     errors,
   };
 }
@@ -324,6 +422,8 @@ export async function regenCandidate(params: {
   candidateType: DiscoveryCandidateType;
   previousCandidate: DiscoveryCandidate;
   siblingCandidates?: DiscoveryCandidate[];
+  /** Story candidates in session — required when regenerating scene. */
+  storyCandidates?: DiscoveryCandidate[];
   feedback?: string | null;
 }): Promise<{ candidate?: DiscoveryCandidate; error?: ProposeTypeError }> {
   if (params.previousCandidate.candidateType !== params.candidateType) {
@@ -345,6 +445,10 @@ export async function regenCandidate(params: {
     };
   }
 
+  const storyCandidates =
+    params.storyCandidates ??
+    (params.siblingCandidates ?? []).filter((c) => c.candidateType === "story");
+
   const result = await generateForType({
     workId: params.workId,
     workTitle: params.workTitle,
@@ -353,6 +457,8 @@ export async function regenCandidate(params: {
     feedback: params.feedback,
     previousCandidate: params.previousCandidate,
     excludeCandidates: params.siblingCandidates,
+    storyCandidates:
+      params.candidateType === "scene" ? storyCandidates : undefined,
   });
 
   const excludeKeys = new Set(
@@ -382,6 +488,27 @@ export async function regenCandidate(params: {
         message: "Regen produced no candidate",
       },
     };
+  }
+
+  // Preserve parent link on scene regen when model omits / changes unexpectedly
+  if (
+    params.candidateType === "scene" &&
+    "parentStoryCandidateId" in params.previousCandidate.fields
+  ) {
+    const prevParent = (
+      params.previousCandidate.fields as SceneCandidateFields
+    ).parentStoryCandidateId;
+    const nextFields = candidate.fields as SceneCandidateFields;
+    if (
+      prevParent &&
+      (!nextFields.parentStoryCandidateId ||
+        !storyCandidates.some((s) => s.candidateId === nextFields.parentStoryCandidateId))
+    ) {
+      candidate.fields = {
+        ...nextFields,
+        parentStoryCandidateId: prevParent,
+      };
+    }
   }
 
   return { candidate };

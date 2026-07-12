@@ -124,6 +124,19 @@ describe("POST /api/admin/discovery/propose", () => {
     const body = await res.json();
     expect(body.state).toBe("review_pending");
     expect(body.candidates.length).toBeGreaterThan(0);
+    const types = new Set(
+      body.candidates.map((c: { candidateType: string }) => c.candidateType)
+    );
+    expect(types.has("story")).toBe(true);
+    expect(types.has("scene")).toBe(true);
+    expect(types.has("readingRoute")).toBe(false);
+    const story = body.candidates.find(
+      (c: { candidateType: string }) => c.candidateType === "story"
+    );
+    const scene = body.candidates.find(
+      (c: { candidateType: string }) => c.candidateType === "scene"
+    );
+    expect(scene.fields.parentStoryCandidateId).toBe(story.candidateId);
   });
 
   it("does not call insert/update on Supabase (DISC-INV-01)", async () => {

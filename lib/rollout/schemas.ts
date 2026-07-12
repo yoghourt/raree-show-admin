@@ -9,6 +9,7 @@ const stagingWorkId = z.string().min(1);
 export const acceptedStoryUnitStagingSchema = z.object({
   workId: stagingWorkId,
   sourceReviewId: z.string().min(1),
+  sourceCandidateId: z.string().min(1).optional(),
   title: z.string().trim().min(1),
   summary: z.string(),
   boundaryHint: z.string().optional(),
@@ -18,6 +19,8 @@ export const acceptedStoryUnitStagingSchema = z.object({
 export const acceptedSceneCandidateStagingSchema = z.object({
   workId: stagingWorkId,
   sourceReviewId: z.string().min(1),
+  parentStorySourceReviewId: z.string().min(1).optional(),
+  parentStoryTitle: z.string().optional(),
   chapter_title: z.string().nullable().optional(),
   chapter_number: z.union([z.number(), z.string()]),
   title: z.string().trim().min(1),

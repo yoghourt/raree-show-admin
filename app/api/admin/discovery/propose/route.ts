@@ -42,8 +42,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { workId, sessionId, narrative, lockedAt, candidateTypes, feedback } =
-    parsed.data;
+  const {
+    workId,
+    sessionId,
+    narrative,
+    lockedAt,
+    candidateTypes,
+    existingStoryCandidates,
+    feedback,
+  } = parsed.data;
 
   const workResult = await assertWorkAccessible(auth.supabase, workId);
   if (!workResult.ok) {
@@ -77,6 +84,7 @@ export async function POST(request: Request) {
     workTitle: workResult.title,
     narrative,
     candidateTypes,
+    existingStoryCandidates,
     feedback,
   });
 

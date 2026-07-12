@@ -1,5 +1,7 @@
 /**
  * SPEC-D3-002 §4 — Discovery Human Review data contracts
+ *
+ * Editorial hierarchy: Scene staging always references parent Story.
  */
 
 import type {
@@ -37,6 +39,8 @@ export interface DiscoveryAcceptPrefill {
 export interface AcceptedStoryUnitStaging {
   workId: string;
   sourceReviewId: string;
+  /** Candidate id from propose — used to resolve Scene parent links. Required for Sprint #2 Accept. */
+  sourceCandidateId?: string;
   title: string;
   summary: string;
   boundaryHint?: string;
@@ -46,6 +50,9 @@ export interface AcceptedStoryUnitStaging {
 export interface AcceptedSceneCandidateStaging {
   workId: string;
   sourceReviewId: string;
+  /** Accepted Story staging sourceReviewId (parent). Required for Sprint #2 Accept. */
+  parentStorySourceReviewId?: string;
+  parentStoryTitle?: string;
   chapter_title?: string | null;
   chapter_number: number | string;
   title: string;
@@ -60,8 +67,16 @@ export type AcceptReviewResult =
       path: string;
       prefill: DiscoveryAcceptPrefill;
     }
-  | { ok: true; kind: "story_staging"; staging: AcceptedStoryUnitStaging }
-  | { ok: true; kind: "scene_staging"; staging: AcceptedSceneCandidateStaging };
+  | {
+      ok: true;
+      kind: "story_staging";
+      staging: AcceptedStoryUnitStaging;
+    }
+  | {
+      ok: true;
+      kind: "scene_staging";
+      staging: AcceptedSceneCandidateStaging;
+    };
 
 export type AcceptReviewError = {
   ok: false;
@@ -69,5 +84,3 @@ export type AcceptReviewError = {
   message: string;
   fieldErrors?: string[];
 };
-
-export { DISCOVERY_CANDIDATE_TYPE_LABELS } from "@/lib/discovery/ui-copy";

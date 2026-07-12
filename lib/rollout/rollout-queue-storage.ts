@@ -81,7 +81,13 @@ export function saveRolloutQueue(
   }
   sessionStorage.setItem(
     storageKey(workId, operatorId),
-    JSON.stringify({ ...queue, workId, updatedAt: new Date().toISOString() })
+    JSON.stringify({
+      ...queue,
+      workId,
+      // Prefer sceneStaging going forward; keep readingRouteStaging for Rollout UI / old readers
+      sceneStaging: queue.readingRouteStaging,
+      updatedAt: new Date().toISOString(),
+    })
   );
   if (typeof window !== "undefined") {
     window.dispatchEvent(

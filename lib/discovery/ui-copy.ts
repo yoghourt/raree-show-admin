@@ -19,7 +19,7 @@ export const DISCOVERY_CANDIDATE_TYPE_LABELS: Record<
   character: d.candidateTypes.character,
   location: d.candidateTypes.location,
   story: d.storyCandidate,
-  readingRoute: d.readingRouteCandidate,
+  scene: d.sceneCandidate,
 };
 
 export const REVIEW_STATUS_LABELS: Record<ReviewItemStatus, string> =
@@ -40,11 +40,12 @@ export const discoveryReviewUi = {
   flowHintAccepted: d.flowHintAccepted,
   flowHintAcceptedEmpty: d.flowHintAcceptedEmpty,
   nextStepRollout: d.nextStepRollout,
-  acceptedSceneStaging: d.readingRouteCandidateStaging,
+  acceptedSceneStaging: d.sceneCandidateStaging,
   goRollout: d.goRollout,
   editAfterAcceptSceneHint: d.editAfterAcceptSceneHint,
   editStagingHint: d.editStagingHint,
   confirmRevokeAccept: d.confirmRevokeAccept,
+  confirmRevokeStoryWithScenes: d.confirmRevokeStoryWithScenes,
   fieldsJsonLabel: d.fieldsJsonLabel,
   fieldsJsonParseError: d.fieldsJsonParseError,
 } as const;

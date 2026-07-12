@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 
+import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import type { DiscoveryCandidate } from "@/lib/discovery/propose-types";
 import {
   createReviewItems,
@@ -137,9 +138,10 @@ describe("Accept handoff guards", () => {
     }
   });
 
-  it("story accept returns staging object", () => {
+  it("story accept returns staging object with sourceCandidateId", () => {
     const items = createReviewItems([
       makeCandidate({
+        candidateId: "story-cand-1",
         candidateType: "story",
         displayName: "Red Wedding Arc",
         fields: {
@@ -152,7 +154,87 @@ describe("Accept handoff guards", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.kind).toBe("story_staging");
+      if (result.kind === "story_staging") {
+        expect(result.staging.sourceCandidateId).toBe("story-cand-1");
+      }
     }
+  });
+
+  it("blocks scene accept when parent Story is not accepted", () => {
+    const story = makeCandidate({
+      candidateId: "story-cand-1",
+      candidateType: "story",
+      displayName: "Arc",
+      fields: { title: "Arc", summary: "Summary" },
+    });
+    const scene = makeCandidate({
+      candidateId: "scene-cand-1",
+      candidateType: "scene",
+      displayName: "Courtyard",
+      fields: {
+        parentStoryCandidateId: "story-cand-1",
+        chapter_number: 1,
+        title: "Courtyard",
+      },
+    });
+    const items = createReviewItems([story, scene]);
+    const result = prepareAcceptReview(items, items[1]!.reviewId, []);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("PARENT_STORY_NOT_ACCEPTED");
+    }
+  });
+
+  it("scene accept writes parent Story staging fields", () => {
+    const story = makeCandidate({
+      candidateId: "story-cand-1",
+      candidateType: "story",
+      displayName: "Arc",
+      fields: { title: "The Arc", summary: "Summary" },
+    });
+    const scene = makeCandidate({
+      candidateId: "scene-cand-1",
+      candidateType: "scene",
+      displayName: "Courtyard",
+      fields: {
+        parentStoryCandidateId: "story-cand-1",
+        chapter_number: 1,
+        title: "Courtyard",
+        summary: "Arrival",
+      },
+    });
+    const items = createReviewItems([story, scene]);
+    const storyAccept = prepareAcceptReview(items, items[0]!.reviewId);
+    expect(storyAccept.ok).toBe(true);
+    if (!storyAccept.ok || storyAccept.kind !== "story_staging") {
+      throw new Error("expected story staging");
+    }
+    const acceptedItems = markReviewAccepted(items, items[0]!.reviewId);
+    const sceneAccept = prepareAcceptReview(
+      acceptedItems,
+      items[1]!.reviewId,
+      [storyAccept.staging]
+    );
+    expect(sceneAccept.ok).toBe(true);
+    if (sceneAccept.ok && sceneAccept.kind === "scene_staging") {
+      expect(sceneAccept.staging.parentStorySourceReviewId).toBe(
+        items[0]!.reviewId
+      );
+      expect(sceneAccept.staging.parentStoryTitle).toBe("The Arc");
+    }
+  });
+
+  it("requires parentStoryCandidateId on scene fields", () => {
+    const result = normalizeRawCandidate(
+      {
+        displayName: "Courtyard",
+        summary: "s",
+        fields: { chapter_number: 1, title: "Courtyard" },
+      },
+      "scene",
+      "work-1"
+    );
+    expect(result.ok).toBe(false);
   });
 
   it("blocks accept when character name missing", () => {
