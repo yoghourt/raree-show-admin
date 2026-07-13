@@ -120,11 +120,19 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     if (!result.ok) {
       if (result.code === "UNPERSIST_BLOCKED") {
+        const message =
+          result.blockedBy === "discovery_frames"
+            ? messages.rollout.unpersistBlockedByProjection
+            : result.blockedBy === "scene_projection"
+              ? messages.rollout.unpersistBlockedByProjection
+              : result.blockedBy === "story_links"
+                ? messages.rollout.unpersistBlockedByLinks
+                : messages.rollout.associationBlocked;
         return NextResponse.json(
           {
             error: {
               code: "UNPERSIST_BLOCKED",
-              message: messages.rollout.associationBlocked,
+              message,
             },
           },
           { status: 409 }

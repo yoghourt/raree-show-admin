@@ -41,15 +41,22 @@ import {
 } from "@/lib/discovery/normative-copy";
 import { discoveryComposerUi } from "@/lib/discovery/ui-copy";
 import type { UseDiscoverySessionReturn } from "@/hooks/useDiscoverySession";
+import type { UseRolloutReturn } from "@/hooks/useRollout";
 import { DiscoveryReviewPanel } from "@/components/discovery/DiscoveryReviewPanel";
 import { Input } from "@/components/ui/input";
 import type { NarrativeExcerpt } from "@/lib/discovery/types";
 
 export interface DiscoveryComposerProps {
   discovery: UseDiscoverySessionReturn;
+  rollout?: UseRolloutReturn;
+  initialStep?: "review" | "rollout";
 }
 
-export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
+export function DiscoveryComposer({
+  discovery,
+  rollout,
+  initialStep,
+}: DiscoveryComposerProps) {
   const {
     session,
     gateResult,
@@ -126,48 +133,6 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>{discoveryComposerUi.narrativeGuideTitle}</CardTitle>
-          <CardDescription>{DISCOVERY_NARRATIVE_HINT}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm font-medium text-zinc-800">
-            {discoveryComposerUi.forbiddenInputsTitle}
-          </p>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            {DISCOVERY_FORBIDDEN_INPUTS.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{discoveryComposerUi.examplesTitle}</CardTitle>
-          <CardDescription>{discoveryComposerUi.examplesDescription}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {DISCOVERY_EXAMPLES.map((row, index) => (
-              <div
-                key={`${row.label}-${row.verdict}-${index}`}
-                className="rounded-lg border border-zinc-200 p-3 text-sm"
-              >
-                <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{row.label}</span>
-                  <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
-                    {row.verdict}
-                  </span>
-                </div>
-                <p className="text-muted-foreground">{row.example}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>{discoveryComposerUi.narrativeInputTitle}</CardTitle>
           <CardDescription>
             {session.state === "narrative_locked"
@@ -179,6 +144,46 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <details className="rounded-lg border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm">
+            <summary className="cursor-pointer font-medium text-zinc-800">
+              {discoveryComposerUi.helpToggle}
+            </summary>
+            <div className="mt-3 space-y-4 text-muted-foreground">
+              <p>{DISCOVERY_NARRATIVE_HINT}</p>
+              <div>
+                <p className="mb-1 font-medium text-zinc-700">
+                  {discoveryComposerUi.forbiddenInputsTitle}
+                </p>
+                <ul className="list-disc space-y-1 pl-5">
+                  {DISCOVERY_FORBIDDEN_INPUTS.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <p className="font-medium text-zinc-700">
+                  {discoveryComposerUi.examplesTitle}
+                </p>
+                {DISCOVERY_EXAMPLES.slice(0, 3).map((row, index) => (
+                  <div
+                    key={`${row.label}-${row.verdict}-${index}`}
+                    className="rounded-md border border-zinc-200 bg-white p-2.5"
+                  >
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-zinc-800">
+                        {row.label}
+                      </span>
+                      <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
+                        {row.verdict}
+                      </span>
+                    </div>
+                    <p>{row.example}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
+
           <div className="space-y-2">
             <Label htmlFor="input-mode">{discoveryComposerUi.inputModeLabel}</Label>
             <Select
@@ -307,41 +312,43 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
           ) : null}
 
           {editable ? (
-            <div className="space-y-3 rounded-lg border border-dashed border-zinc-300 p-4">
-              <p className="text-sm font-medium">
+            <details className="rounded-lg border border-dashed border-zinc-300 px-4 py-3">
+              <summary className="cursor-pointer text-sm font-medium">
                 {discoveryComposerUi.importFlagsTitle}
-              </p>
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="catalog-only"
-                  checked={gateFlags.catalogOnly === true}
-                  onCheckedChange={(checked) =>
-                    setGateFlags({
-                      ...gateFlags,
-                      catalogOnly: checked === true,
-                    })
-                  }
-                />
-                <Label htmlFor="catalog-only" className="leading-snug">
-                  {discoveryComposerUi.catalogOnlyFlag}
-                </Label>
+              </summary>
+              <div className="mt-3 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="catalog-only"
+                    checked={gateFlags.catalogOnly === true}
+                    onCheckedChange={(checked) =>
+                      setGateFlags({
+                        ...gateFlags,
+                        catalogOnly: checked === true,
+                      })
+                    }
+                  />
+                  <Label htmlFor="catalog-only" className="leading-snug">
+                    {discoveryComposerUi.catalogOnlyFlag}
+                  </Label>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="runtime-export-only"
+                    checked={gateFlags.runtimeExportOnly === true}
+                    onCheckedChange={(checked) =>
+                      setGateFlags({
+                        ...gateFlags,
+                        runtimeExportOnly: checked === true,
+                      })
+                    }
+                  />
+                  <Label htmlFor="runtime-export-only" className="leading-snug">
+                    {discoveryComposerUi.runtimeExportOnlyFlag}
+                  </Label>
+                </div>
               </div>
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="runtime-export-only"
-                  checked={gateFlags.runtimeExportOnly === true}
-                  onCheckedChange={(checked) =>
-                    setGateFlags({
-                      ...gateFlags,
-                      runtimeExportOnly: checked === true,
-                    })
-                  }
-                />
-                <Label htmlFor="runtime-export-only" className="leading-snug">
-                  {discoveryComposerUi.runtimeExportOnlyFlag}
-                </Label>
-              </div>
-            </div>
+            </details>
           ) : null}
 
           {!gateResult.pass && editable ? (
@@ -461,7 +468,11 @@ export function DiscoveryComposer({ discovery }: DiscoveryComposerProps) {
         </DialogContent>
       </Dialog>
 
-      <DiscoveryReviewPanel discovery={discovery} />
+      <DiscoveryReviewPanel
+        discovery={discovery}
+        rollout={rollout}
+        initialStep={initialStep}
+      />
     </div>
   );
 }

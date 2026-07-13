@@ -36,6 +36,23 @@ export interface DiscoveryAcceptPrefill {
   summary: string;
 }
 
+export interface StoryRelatedCharacterRef {
+  sourceReviewId: string;
+  name: string;
+  matchedTsid?: string;
+  house?: string;
+  description?: string;
+  signatureQuote?: string | null;
+}
+
+export interface StoryRelatedLocationRef {
+  sourceReviewId: string;
+  name: string;
+  matchedTsid?: string;
+  region?: string;
+  description?: string;
+}
+
 export interface AcceptedStoryUnitStaging {
   workId: string;
   sourceReviewId: string;
@@ -45,6 +62,16 @@ export interface AcceptedStoryUnitStaging {
   summary: string;
   boundaryHint?: string;
   acceptedAt: string;
+  /** Optional chapter metadata for write preview / persist. */
+  chapter_number?: number;
+  chapter_title?: string | null;
+  /** Batch characters treated as story attributes (resolved at persist). */
+  relatedCharacterRefs?: StoryRelatedCharacterRef[];
+  /** Batch locations treated as story attributes (first used as route location). */
+  relatedLocationRefs?: StoryRelatedLocationRef[];
+  /** Resolved tsids ready for Reading Route write. */
+  characterIds?: string[];
+  locationId?: string | null;
 }
 
 export interface AcceptedSceneCandidateStaging {

@@ -27,9 +27,17 @@ import {
   StepTabsTrigger,
   Tabs,
   TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { UseDiscoverySessionReturn } from "@/hooks/useDiscoverySession";
+import type { UseRolloutReturn } from "@/hooks/useRollout";
+import { RolloutPanel } from "@/components/rollout/RolloutPanel";
+import * as charactersApi from "@/lib/characters";
+import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
+import * as locationsApi from "@/lib/locations";
+import type { Character, Location } from "@/lib/types";
 import {
   type DiscoveryCandidateFields,
   type DiscoveryCandidateType,
@@ -54,9 +62,6 @@ import {
   ROLLOUT_QUEUE_UPDATED_EVENT,
 } from "@/lib/rollout/rollout-queue-storage";
 import {
-  buildEntityCreateHandoffPath,
-} from "@/lib/discovery/accept-prefill";
-import {
   CONFIDENCE_LABELS,
   DISCOVERY_CANDIDATE_TYPE_LABELS,
   REVIEW_STATUS_LABELS,
@@ -67,18 +72,8 @@ import {
 
 export interface DiscoveryReviewPanelProps {
   discovery: UseDiscoverySessionReturn;
-}
-
-function StepBadge({ step }: { step: number }) {
-  return (
-    <span
-      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold
-        border-border bg-muted text-muted-foreground
-        group-data-[state=active]/step:border-transparent group-data-[state=active]/step:bg-primary group-data-[state=active]/step:text-primary-foreground"
-    >
-      {step}
-    </span>
-  );
+  rollout?: UseRolloutReturn;
+  initialStep?: "review" | "rollout";
 }
 
 function CountBadge({ count }: { count: number }) {
@@ -126,12 +121,11 @@ function FlowHint({
   );
 }
 
-/** Pipeline breadcrumb showing the full Discovery → Rollout flow. */
+/** Compact step hint: 确认 → 写入作品 */
 function PipelineBreadcrumb({ activeStep }: { activeStep: string }) {
   const steps = [
-    { id: "review", label: "① 待审核" },
-    { id: "accepted", label: "② 已采纳暂存" },
-    { id: "rollout", label: messages.discovery.tabRollout, external: true },
+    { id: "review", label: discoveryReviewUi.tabReview },
+    { id: "rollout", label: messages.discovery.tabRollout },
   ];
   return (
     <div className="flex flex-wrap items-center gap-1 text-xs" aria-hidden="true">
@@ -144,9 +138,7 @@ function PipelineBreadcrumb({ activeStep }: { activeStep: string }) {
             className={
               step.id === activeStep
                 ? "rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary"
-                : step.external
-                  ? "rounded border px-1.5 py-0.5 text-muted-foreground"
-                  : "text-muted-foreground"
+                : "text-muted-foreground"
             }
           >
             {step.label}
@@ -165,12 +157,23 @@ function confidenceLabel(confidence: "green" | "yellow" | "red"): string {
   return CONFIDENCE_LABELS[confidence];
 }
 
-function FieldsPreview({ fields }: { fields: DiscoveryCandidateFields }) {
+function FieldsPreview({
+  fields,
+  candidateType,
+}: {
+  fields: DiscoveryCandidateFields;
+  candidateType?: DiscoveryCandidateType;
+}) {
   const entries = Object.entries(
     fields as unknown as Record<string, unknown>
-  ).filter(
-    ([, value]) => value !== undefined && value !== null && value !== ""
-  );
+  ).filter(([key, value]) => {
+    if (value === undefined || value === null || value === "") return false;
+    // 画面只展示标题与摘要；章节序号等归属故事
+    if (candidateType === "scene") {
+      return key === "title" || key === "summary";
+    }
+    return true;
+  });
   if (entries.length === 0) {
     return (
       <p className="text-muted-foreground text-xs">{discoveryReviewUi.noFields}</p>
@@ -224,10 +227,13 @@ function sceneStagingToReviewItem(
       displayName: scene.title,
       summary: scene.summary ?? "",
       fields: {
+        // 父子与章节属故事侧数据；画面 UI 仅展示 title/summary
         parentStoryCandidateId: scene.parentStorySourceReviewId ?? "",
-        title: scene.title,
         chapter_number: scene.chapter_number,
-        chapter_title: scene.chapter_title,
+        ...(scene.chapter_title != null
+          ? { chapter_title: scene.chapter_title }
+          : {}),
+        title: scene.title,
         ...(scene.summary ? { summary: scene.summary } : {}),
       },
     },
@@ -238,6 +244,9 @@ function ReviewItemCard({
   item,
   busy,
   actionable,
+  showAccept = true,
+  acceptLabel,
+  existingBadge,
   onAccept,
   onEdit,
   onDiscard,
@@ -246,16 +255,27 @@ function ReviewItemCard({
   item: DiscoveryReviewItem;
   busy: boolean;
   actionable: boolean;
+  showAccept?: boolean;
+  acceptLabel?: string;
+  /** When set, show catalog match status (e.g. 已存在). */
+  existingBadge?: string | null;
   onAccept: () => void;
   onEdit: () => void;
   onDiscard: () => void;
   onRegen: () => void;
 }) {
   return (
-    <li className="space-y-3 rounded-lg border border-zinc-200 p-4">
+    <div className="space-y-3 rounded-lg border border-zinc-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="font-medium">{getEffectiveDisplayName(item)}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{getEffectiveDisplayName(item)}</span>
+            {existingBadge ? (
+              <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                {existingBadge}
+              </span>
+            ) : null}
+          </div>
           <p className="text-muted-foreground text-sm">
             {getEffectiveSummary(item)}
           </p>
@@ -267,7 +287,10 @@ function ReviewItemCard({
             : ""}
         </span>
       </div>
-      <FieldsPreview fields={getEffectiveFields(item)} />
+      <FieldsPreview
+        fields={getEffectiveFields(item)}
+        candidateType={item.candidate.candidateType}
+      />
       {item.candidate.evidence?.length ? (
         <div className="space-y-1">
           <p className="text-muted-foreground text-xs font-medium">
@@ -295,14 +318,16 @@ function ReviewItemCard({
       <div className="flex flex-wrap gap-2">
         {actionable ? (
           <>
-            <Button
-              type="button"
-              size="sm"
-              disabled={busy}
-              onClick={onAccept}
-            >
-              {discoveryReviewUi.accept}
-            </Button>
+            {showAccept ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={busy}
+                onClick={onAccept}
+              >
+                {acceptLabel ?? discoveryReviewUi.accept}
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -332,34 +357,16 @@ function ReviewItemCard({
             </Button>
           </>
         ) : null}
-        {item.status === "accepted" &&
-        (item.candidate.candidateType === "character" ||
-          item.candidate.candidateType === "location") ? (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="secondary" asChild>
-              <Link
-                href={buildEntityCreateHandoffPath(
-                  item.candidate.workId,
-                  item.reviewId,
-                  item.candidate.candidateType
-                )}
-              >
-                {item.candidate.candidateType === "character"
-                  ? discoveryReviewUi.goCreateCharacter
-                  : discoveryReviewUi.goCreateLocation}
-              </Link>
-            </Button>
-            <p className="text-muted-foreground self-center text-xs">
-              {discoveryReviewUi.editAfterAcceptHint}
-            </p>
-          </div>
-        ) : null}
       </div>
-    </li>
+    </div>
   );
 }
 
-export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
+export function DiscoveryReviewPanel({
+  discovery,
+  rollout,
+  initialStep,
+}: DiscoveryReviewPanelProps) {
   const {
     workId,
     operatorId,
@@ -387,7 +394,35 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
     retryTypeError,
   } = discovery;
 
-  const rolloutHref = `/works/${encodeURIComponent(session.workId)}/rollout`;
+  const [characterCatalog, setCharacterCatalog] = React.useState<Character[]>(
+    []
+  );
+  const [locationCatalog, setLocationCatalog] = React.useState<Location[]>([]);
+
+  React.useEffect(() => {
+    if (!workId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [characters, locations] = await Promise.all([
+          charactersApi.getAll(workId),
+          locationsApi.getAll(workId),
+        ]);
+        if (!cancelled) {
+          setCharacterCatalog(characters);
+          setLocationCatalog(locations);
+        }
+      } catch {
+        if (!cancelled) {
+          setCharacterCatalog([]);
+          setLocationCatalog([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workId]);
 
   const [rolloutQueue, setRolloutQueue] = React.useState(() =>
     loadRolloutQueue(workId, operatorId)
@@ -467,7 +502,25 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
     setEditItem(item);
     setEditDisplayName(getEffectiveDisplayName(item));
     setEditSummary(getEffectiveSummary(item));
-    setEditFieldsJson(JSON.stringify(getEffectiveFields(item), null, 2));
+    const fields = getEffectiveFields(item);
+    const fieldsForEdit =
+      item.candidate.candidateType === "scene"
+        ? {
+            title:
+              typeof (fields as SceneCandidateFields).title === "string"
+                ? (fields as SceneCandidateFields).title
+                : getEffectiveDisplayName(item),
+            ...((fields as SceneCandidateFields).summary ||
+            getEffectiveSummary(item)
+              ? {
+                  summary:
+                    (fields as SceneCandidateFields).summary ||
+                    getEffectiveSummary(item),
+                }
+              : {}),
+          }
+        : fields;
+    setEditFieldsJson(JSON.stringify(fieldsForEdit, null, 2));
     setEditParseError(null);
   };
 
@@ -520,7 +573,25 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
         trimmedDisplayName ||
         (typeof parsedRecord.title === "string" ? parsedRecord.title : "");
     }
-    parsed = parsedRecord as unknown as DiscoveryCandidateFields;
+    if (editItem.candidate.candidateType === "scene") {
+      const original = getEffectiveFields(editItem) as SceneCandidateFields;
+      parsed = {
+        parentStoryCandidateId: original.parentStoryCandidateId,
+        chapter_number: original.chapter_number,
+        ...(original.chapter_title != null
+          ? { chapter_title: original.chapter_title }
+          : {}),
+        title:
+          typeof parsedRecord.title === "string" ? parsedRecord.title : "",
+        ...(typeof parsedRecord.summary === "string" && parsedRecord.summary
+          ? { summary: parsedRecord.summary }
+          : editSummary.trim()
+            ? { summary: editSummary.trim() }
+            : {}),
+      };
+    } else {
+      parsed = parsedRecord as unknown as DiscoveryCandidateFields;
+    }
 
     const payload = {
       editedFields: parsed,
@@ -539,7 +610,7 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
   };
 
   const handleAccept = (item: DiscoveryReviewItem) => {
-    acceptCandidate(item.reviewId);
+    void acceptCandidate(item.reviewId);
   };
 
   const handleRegen = async () => {
@@ -581,10 +652,48 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
   const acceptedCount =
     visibleAcceptedStoryUnits.length + visibleAcceptedSceneCandidates.length;
 
+  const rolloutPendingCount = rollout
+    ? rollout.queue.storyStaging.length +
+      rollout.queue.readingRouteStaging.length
+    : 0;
+
+  const hasRolloutSurface =
+    Boolean(rollout) &&
+    (rolloutPendingCount > 0 ||
+      (rollout?.storyUnits.length ?? 0) > 0 ||
+      acceptedCount > 0);
+
   const defaultTab =
-    reviewListItems.length === 0 && acceptedCount > 0 ? "accepted" : "review";
+    initialStep === "rollout" && rollout ? "rollout" : "review";
 
   const [activeTab, setActiveTab] = React.useState(defaultTab);
+  const [confirmSubTab, setConfirmSubTab] = React.useState(
+    reviewListItems.length === 0 && acceptedCount > 0 ? "accepted" : "pending"
+  );
+
+  React.useEffect(() => {
+    if (initialStep === "rollout" && rollout) {
+      setActiveTab("rollout");
+    }
+  }, [initialStep, rollout]);
+
+  React.useEffect(() => {
+    if (reviewListItems.length === 0 && acceptedCount > 0) {
+      setConfirmSubTab("accepted");
+    } else if (reviewListItems.length > 0 && confirmSubTab === "accepted" && acceptedCount === 0) {
+      setConfirmSubTab("pending");
+    }
+  }, [reviewListItems.length, acceptedCount, confirmSubTab]);
+
+  React.useEffect(() => {
+    if (activeTab !== "rollout" || !rollout) {
+      return;
+    }
+    void rollout.refresh();
+    rollout.importFromDiscovery();
+    // Only when entering the write step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional tab-enter sync
+  }, [activeTab]);
 
   if (
     session.state !== "review_pending" &&
@@ -592,7 +701,8 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
     reviewListItems.length === 0 &&
     failedTypes.size === 0 &&
     visibleAcceptedStoryUnits.length === 0 &&
-    visibleAcceptedSceneCandidates.length === 0
+    visibleAcceptedSceneCandidates.length === 0 &&
+    !hasRolloutSurface
   ) {
     return null;
   }
@@ -674,110 +784,105 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <StepTabsList className="mb-2">
               <StepTabsTrigger value="review">
-                <StepBadge step={1} />
                 {discoveryReviewUi.tabReview}
-                <CountBadge count={reviewListItems.length} />
+                <CountBadge
+                  count={reviewListItems.length + acceptedCount}
+                />
               </StepTabsTrigger>
-              <ChevronRight
-                className="mx-0.5 size-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <StepTabsTrigger value="accepted">
-                <StepBadge step={2} />
-                {discoveryReviewUi.tabAccepted}
-                <CountBadge count={acceptedCount} />
-              </StepTabsTrigger>
+              {rollout ? (
+                <>
+                  <ChevronRight
+                    className="mx-0.5 size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <StepTabsTrigger value="rollout">
+                    {messages.discovery.tabRollout}
+                    <CountBadge count={rolloutPendingCount} />
+                  </StepTabsTrigger>
+                </>
+              ) : null}
             </StepTabsList>
 
-            {/* ── Tab 1: 待审核 ── */}
+            {/* ── Tab 1: 确认（内分子 tab：待确认 / 已确认）── */}
             <TabsContent value="review" className="min-h-72 space-y-4">
+              <Tabs
+                value={confirmSubTab}
+                onValueChange={setConfirmSubTab}
+                className="w-full"
+              >
+                <TabsList className="mb-4">
+                  <TabsTrigger value="pending">
+                    {discoveryReviewUi.tabPendingConfirm}
+                    <CountBadge count={reviewListItems.length} />
+                  </TabsTrigger>
+                  <TabsTrigger value="accepted">
+                    {discoveryReviewUi.tabAccepted}
+                    <CountBadge count={acceptedCount} />
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="pending" className="space-y-4">
               {reviewListItems.length === 0 && !failedTypes.size ? (
                 <p className="text-muted-foreground text-sm">
                   {discoveryReviewUi.noReviewItems}
                 </p>
               ) : null}
 
-              {(["character", "location"] as DiscoveryCandidateType[]).map((type) => {
-                const typedItems = reviewListItems.filter(
-                  (item) => item.candidate.candidateType === type
-                );
-                const showEmpty = typedItems.length === 0 && failedTypes.has(type);
-
-                if (typedItems.length === 0 && !showEmpty) return null;
-
-                return (
-                  <div key={type} className="space-y-3">
-                    <h3 className="text-sm font-semibold">
+              {(["character", "location", "story", "scene"] as DiscoveryCandidateType[])
+                .filter((type) => failedTypes.has(type))
+                .map((type) => (
+                  <div
+                    key={`fail-${type}`}
+                    className="space-y-3 rounded-lg border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                  >
+                    <p className="font-medium">
                       {DISCOVERY_CANDIDATE_TYPE_LABELS[type]}
-                    </h3>
-                    {showEmpty ? (
-                      <div className="space-y-3 rounded-lg border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        <p>{discoveryReviewUi.typeProposeFailed}</p>
-                        {getTypeProposeError(type) ? (
-                          <p className="text-xs text-amber-800/90">
-                            {getTypeProposeError(type)?.code}:{" "}
-                            {getTypeProposeError(type)?.message}
-                          </p>
-                        ) : null}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={
-                            isProposing ||
-                            isRegening ||
-                            retryingType !== null ||
-                            (session.state !== "review_pending" &&
-                              session.state !== "narrative_locked")
-                          }
-                          onClick={() => {
-                            setTypeRetryTarget(type);
-                            setTypeRetryFeedback("");
-                          }}
-                        >
-                          {retryingType === type
-                            ? discoveryReviewUi.retryingType
-                            : discoveryReviewUi.retryType(
-                                DISCOVERY_CANDIDATE_TYPE_LABELS[type]
-                              )}
-                        </Button>
-                      </div>
+                    </p>
+                    <p>{discoveryReviewUi.typeProposeFailed}</p>
+                    {getTypeProposeError(type) ? (
+                      <p className="text-xs text-amber-800/90">
+                        {getTypeProposeError(type)?.code}:{" "}
+                        {getTypeProposeError(type)?.message}
+                      </p>
                     ) : null}
-                    <ul className="space-y-3">
-                      {typedItems.map((item) => {
-                        const actionable =
-                          item.status === "pending" ||
-                          item.status === "edited_pending_accept";
-                        const busy =
-                          isRegening && regenReviewId === item.reviewId;
-                        return (
-                          <ReviewItemCard
-                            key={item.reviewId}
-                            item={item}
-                            busy={busy}
-                            actionable={actionable}
-                            onAccept={() => handleAccept(item)}
-                            onEdit={() => openEdit(item)}
-                            onDiscard={() => discardCandidate(item.reviewId)}
-                            onRegen={() => {
-                              setRegenItem(item);
-                              setRegenFeedback("");
-                            }}
-                          />
-                        );
-                      })}
-                    </ul>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={
+                        isProposing ||
+                        isRegening ||
+                        retryingType !== null ||
+                        (session.state !== "review_pending" &&
+                          session.state !== "narrative_locked")
+                      }
+                      onClick={() => {
+                        setTypeRetryTarget(type);
+                        setTypeRetryFeedback("");
+                      }}
+                    >
+                      {retryingType === type
+                        ? discoveryReviewUi.retryingType
+                        : discoveryReviewUi.retryType(
+                            DISCOVERY_CANDIDATE_TYPE_LABELS[type]
+                          )}
+                    </Button>
                   </div>
-                );
-              })}
+                ))}
 
-              {/* Story → nested Scene (no parallel top-level Scene section) */}
+              {/* Story-centric: characters / locations / frames under each story */}
               {(() => {
                 const storyItems = reviewListItems.filter(
                   (item) => item.candidate.candidateType === "story"
                 );
                 const sceneItems = reviewListItems.filter(
                   (item) => item.candidate.candidateType === "scene"
+                );
+                const characterItems = reviewListItems.filter(
+                  (item) => item.candidate.candidateType === "character"
+                );
+                const locationItems = reviewListItems.filter(
+                  (item) => item.candidate.candidateType === "location"
                 );
                 const storyIds = new Set(
                   storyItems.map((item) => item.candidate.candidateId)
@@ -788,92 +893,37 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
                   ).parentStoryCandidateId;
                   return !parent || !storyIds.has(parent);
                 });
-                const showStoryEmpty =
-                  storyItems.length === 0 && failedTypes.has("story");
-                const showSceneEmpty =
-                  sceneItems.length === 0 && failedTypes.has("scene");
+
+                const entityBadge = (item: DiscoveryReviewItem) => {
+                  const name = getEffectiveDisplayName(item);
+                  if (item.candidate.candidateType === "character") {
+                    return findExistingByName(name, characterCatalog)
+                      ? discoveryReviewUi.alreadyExists
+                      : discoveryReviewUi.willCreateOnWrite;
+                  }
+                  if (item.candidate.candidateType === "location") {
+                    return findExistingByName(name, locationCatalog)
+                      ? discoveryReviewUi.alreadyExists
+                      : discoveryReviewUi.willCreateOnWrite;
+                  }
+                  return null;
+                };
 
                 if (
                   storyItems.length === 0 &&
                   sceneItems.length === 0 &&
-                  !showStoryEmpty &&
-                  !showSceneEmpty
+                  characterItems.length === 0 &&
+                  locationItems.length === 0
                 ) {
                   return null;
                 }
 
                 return (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold">
-                      {DISCOVERY_CANDIDATE_TYPE_LABELS.story}
-                    </h3>
-                    {showStoryEmpty ? (
-                      <div className="space-y-3 rounded-lg border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        <p>{discoveryReviewUi.typeProposeFailed}</p>
-                        {getTypeProposeError("story") ? (
-                          <p className="text-xs text-amber-800/90">
-                            {getTypeProposeError("story")?.code}:{" "}
-                            {getTypeProposeError("story")?.message}
-                          </p>
-                        ) : null}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={
-                            isProposing ||
-                            isRegening ||
-                            retryingType !== null ||
-                            (session.state !== "review_pending" &&
-                              session.state !== "narrative_locked")
-                          }
-                          onClick={() => {
-                            setTypeRetryTarget("story");
-                            setTypeRetryFeedback("");
-                          }}
-                        >
-                          {retryingType === "story"
-                            ? discoveryReviewUi.retryingType
-                            : discoveryReviewUi.retryType(
-                                DISCOVERY_CANDIDATE_TYPE_LABELS.story
-                              )}
-                        </Button>
-                      </div>
-                    ) : null}
-                    {showSceneEmpty ? (
-                      <div className="space-y-3 rounded-lg border border-dashed border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        <p>{discoveryReviewUi.typeProposeFailed}</p>
-                        {getTypeProposeError("scene") ? (
-                          <p className="text-xs text-amber-800/90">
-                            {getTypeProposeError("scene")?.code}:{" "}
-                            {getTypeProposeError("scene")?.message}
-                          </p>
-                        ) : null}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={
-                            isProposing ||
-                            isRegening ||
-                            retryingType !== null ||
-                            (session.state !== "review_pending" &&
-                              session.state !== "narrative_locked")
-                          }
-                          onClick={() => {
-                            setTypeRetryTarget("scene");
-                            setTypeRetryFeedback("");
-                          }}
-                        >
-                          {retryingType === "scene"
-                            ? discoveryReviewUi.retryingType
-                            : discoveryReviewUi.retryType(
-                                DISCOVERY_CANDIDATE_TYPE_LABELS.scene
-                              )}
-                        </Button>
-                      </div>
-                    ) : null}
-                    <ul className="space-y-4">
+                  <div className="space-y-4">
+                    <p className="text-muted-foreground text-xs">
+                      {discoveryReviewUi.storyCentricHint}
+                    </p>
+                    <ul className="space-y-6">
                       {storyItems.map((story) => {
                         const childScenes = sceneItems.filter((item) => {
                           const parent = (
@@ -887,43 +937,142 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
                         const busy =
                           isRegening && regenReviewId === story.reviewId;
                         return (
-                          <li key={story.reviewId} className="space-y-3">
-                            <ul className="space-y-3">
-                              <ReviewItemCard
-                                item={story}
-                                busy={busy}
-                                actionable={actionable}
-                                onAccept={() => handleAccept(story)}
-                                onEdit={() => openEdit(story)}
-                                onDiscard={() =>
-                                  discardCandidate(story.reviewId)
-                                }
-                                onRegen={() => {
-                                  setRegenItem(story);
-                                  setRegenFeedback("");
-                                }}
-                              />
-                            </ul>
+                          <li
+                            key={story.reviewId}
+                            className="space-y-4 rounded-xl border border-zinc-200 p-4"
+                          >
+                            <ReviewItemCard
+                              item={story}
+                              busy={busy}
+                              actionable={actionable}
+                              acceptLabel={discoveryReviewUi.acceptWithStoryAttrs}
+                              onAccept={() => handleAccept(story)}
+                              onEdit={() => openEdit(story)}
+                              onDiscard={() =>
+                                discardCandidate(story.reviewId)
+                              }
+                              onRegen={() => {
+                                setRegenItem(story);
+                                setRegenFeedback("");
+                              }}
+                            />
+
+                            {characterItems.length > 0 ? (
+                              <div className="ml-2 space-y-2 border-l pl-4">
+                                <div className="space-y-0.5">
+                                  <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                                    {DISCOVERY_CANDIDATE_TYPE_LABELS.character}
+                                  </h4>
+                                  {actionable ? (
+                                    <p className="text-muted-foreground text-xs">
+                                      {discoveryReviewUi.entityAcceptsWithStory}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <ul className="space-y-3">
+                                  {characterItems.map((item) => {
+                                    const itemActionable =
+                                      item.status === "pending" ||
+                                      item.status === "edited_pending_accept";
+                                    return (
+                                      <ReviewItemCard
+                                        key={`${story.reviewId}-${item.reviewId}`}
+                                        item={item}
+                                        busy={
+                                          isRegening &&
+                                          regenReviewId === item.reviewId
+                                        }
+                                        actionable={itemActionable}
+                                        showAccept={false}
+                                        existingBadge={entityBadge(item)}
+                                        onAccept={() => undefined}
+                                        onEdit={() => openEdit(item)}
+                                        onDiscard={() =>
+                                          discardCandidate(item.reviewId)
+                                        }
+                                        onRegen={() => {
+                                          setRegenItem(item);
+                                          setRegenFeedback("");
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            ) : null}
+
+                            {locationItems.length > 0 ? (
+                              <div className="ml-2 space-y-2 border-l pl-4">
+                                <div className="space-y-0.5">
+                                  <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                                    {DISCOVERY_CANDIDATE_TYPE_LABELS.location}
+                                  </h4>
+                                  {actionable ? (
+                                    <p className="text-muted-foreground text-xs">
+                                      {discoveryReviewUi.entityAcceptsWithStory}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <ul className="space-y-3">
+                                  {locationItems.map((item) => {
+                                    const itemActionable =
+                                      item.status === "pending" ||
+                                      item.status === "edited_pending_accept";
+                                    return (
+                                      <ReviewItemCard
+                                        key={`${story.reviewId}-${item.reviewId}`}
+                                        item={item}
+                                        busy={
+                                          isRegening &&
+                                          regenReviewId === item.reviewId
+                                        }
+                                        actionable={itemActionable}
+                                        showAccept={false}
+                                        existingBadge={entityBadge(item)}
+                                        onAccept={() => undefined}
+                                        onEdit={() => openEdit(item)}
+                                        onDiscard={() =>
+                                          discardCandidate(item.reviewId)
+                                        }
+                                        onRegen={() => {
+                                          setRegenItem(item);
+                                          setRegenFeedback("");
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            ) : null}
+
                             {childScenes.length > 0 ? (
-                              <div className="ml-4 space-y-2 border-l pl-4">
-                                <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                                  {DISCOVERY_CANDIDATE_TYPE_LABELS.scene}
-                                </h4>
+                              <div className="ml-2 space-y-2 border-l pl-4">
+                                <div className="space-y-0.5">
+                                  <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                                    {DISCOVERY_CANDIDATE_TYPE_LABELS.scene}
+                                  </h4>
+                                  {actionable ? (
+                                    <p className="text-muted-foreground text-xs">
+                                      {discoveryReviewUi.sceneAcceptsWithStory}
+                                    </p>
+                                  ) : null}
+                                </div>
                                 <ul className="space-y-3">
                                   {childScenes.map((scene) => {
                                     const sceneActionable =
                                       scene.status === "pending" ||
                                       scene.status === "edited_pending_accept";
-                                    const sceneBusy =
-                                      isRegening &&
-                                      regenReviewId === scene.reviewId;
                                     return (
                                       <ReviewItemCard
                                         key={scene.reviewId}
                                         item={scene}
-                                        busy={sceneBusy}
+                                        busy={
+                                          isRegening &&
+                                          regenReviewId === scene.reviewId
+                                        }
                                         actionable={sceneActionable}
-                                        onAccept={() => handleAccept(scene)}
+                                        showAccept={false}
+                                        onAccept={() => undefined}
                                         onEdit={() => openEdit(scene)}
                                         onDiscard={() =>
                                           discardCandidate(scene.reviewId)
@@ -941,36 +1090,43 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
                           </li>
                         );
                       })}
+
                       {orphanScenes.length > 0 ? (
                         <li className="space-y-2">
-                          <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                            {DISCOVERY_CANDIDATE_TYPE_LABELS.scene}（无匹配故事）
-                          </h4>
+                          <div className="space-y-0.5">
+                            <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                              {DISCOVERY_CANDIDATE_TYPE_LABELS.scene}
+                              （无匹配故事）
+                            </h4>
+                            <p className="text-muted-foreground text-xs">
+                              {discoveryReviewUi.orphanSceneHint}
+                            </p>
+                          </div>
                           <ul className="space-y-3">
-                            {orphanScenes.map((scene) => {
-                              const sceneActionable =
-                                scene.status === "pending" ||
-                                scene.status === "edited_pending_accept";
-                              const sceneBusy =
-                                isRegening && regenReviewId === scene.reviewId;
-                              return (
-                                <ReviewItemCard
-                                  key={scene.reviewId}
-                                  item={scene}
-                                  busy={sceneBusy}
-                                  actionable={sceneActionable}
-                                  onAccept={() => handleAccept(scene)}
-                                  onEdit={() => openEdit(scene)}
-                                  onDiscard={() =>
-                                    discardCandidate(scene.reviewId)
-                                  }
-                                  onRegen={() => {
-                                    setRegenItem(scene);
-                                    setRegenFeedback("");
-                                  }}
-                                />
-                              );
-                            })}
+                            {orphanScenes.map((scene) => (
+                              <ReviewItemCard
+                                key={scene.reviewId}
+                                item={scene}
+                                busy={
+                                  isRegening &&
+                                  regenReviewId === scene.reviewId
+                                }
+                                actionable={
+                                  scene.status === "pending" ||
+                                  scene.status === "edited_pending_accept"
+                                }
+                                showAccept={false}
+                                onAccept={() => undefined}
+                                onEdit={() => openEdit(scene)}
+                                onDiscard={() =>
+                                  discardCandidate(scene.reviewId)
+                                }
+                                onRegen={() => {
+                                  setRegenItem(scene);
+                                  setRegenFeedback("");
+                                }}
+                              />
+                            ))}
                           </ul>
                         </li>
                       ) : null}
@@ -978,173 +1134,159 @@ export function DiscoveryReviewPanel({ discovery }: DiscoveryReviewPanelProps) {
                   </div>
                 );
               })()}
+                </TabsContent>
 
-              <FlowHint
-                text={
-                  reviewListItems.length > 0
-                    ? discoveryReviewUi.flowHintReview
-                    : discoveryReviewUi.flowHintReviewDone
-                }
-                nextLabel={
-                  acceptedCount > 0
-                    ? discoveryReviewUi.nextStepAccepted
-                    : undefined
-                }
-                onNext={acceptedCount > 0 ? () => setActiveTab("accepted") : undefined}
-              />
-            </TabsContent>
-
-            {/* ── Tab 2: 已采纳暂存 ── */}
-            <TabsContent value="accepted" className="min-h-72 space-y-6">
-              {visibleAcceptedStoryUnits.length > 0 ? (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold">
-                    {discoveryReviewUi.acceptedStoryStaging}
-                  </h3>
-                  <ul className="space-y-4 text-sm">
-                    {visibleAcceptedStoryUnits.map((unit) => {
-                      const childScenes = visibleAcceptedSceneCandidates.filter(
-                        (scene) =>
-                          scene.parentStorySourceReviewId === unit.sourceReviewId
-                      );
-                      return (
-                        <li key={unit.sourceReviewId} className="space-y-2">
-                          <div className="flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0">
-                              <div className="font-medium">{unit.title}</div>
-                              <p className="text-muted-foreground">{unit.summary}</p>
-                            </div>
-                            <div className="flex shrink-0 flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  openEditByReviewId(unit.sourceReviewId)
-                                }
-                              >
-                                {discoveryReviewUi.edit}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  const hasChildren = childScenes.length > 0;
-                                  const msg = hasChildren
-                                    ? discoveryReviewUi.confirmRevokeStoryWithScenes
-                                    : discoveryReviewUi.confirmRevokeAccept;
-                                  if (!window.confirm(msg)) {
-                                    return;
+                <TabsContent value="accepted" className="space-y-4">
+                  {visibleAcceptedStoryUnits.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      {discoveryReviewUi.flowHintAcceptedEmpty}
+                    </p>
+                  ) : (
+                    <ul className="space-y-4 text-sm">
+                      {visibleAcceptedStoryUnits.map((unit) => {
+                        const childScenes =
+                          visibleAcceptedSceneCandidates.filter(
+                            (scene) =>
+                              scene.parentStorySourceReviewId ===
+                              unit.sourceReviewId
+                          );
+                        return (
+                          <li key={unit.sourceReviewId} className="space-y-2">
+                            <div className="flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
+                                <div className="font-medium">{unit.title}</div>
+                                <p className="text-muted-foreground">
+                                  {unit.summary}
+                                </p>
+                                {unit.relatedCharacterRefs?.length ||
+                                unit.relatedLocationRefs?.length ? (
+                                  <p className="text-muted-foreground mt-1 text-xs">
+                                    {[
+                                      ...(unit.relatedCharacterRefs ?? []).map(
+                                        (r) =>
+                                          `${r.name}${r.matchedTsid ? `（${discoveryReviewUi.alreadyExists}）` : ""}`
+                                      ),
+                                      ...(unit.relatedLocationRefs ?? []).map(
+                                        (r) =>
+                                          `${r.name}${r.matchedTsid ? `（${discoveryReviewUi.alreadyExists}）` : ""}`
+                                      ),
+                                    ].join(" · ")}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <div className="flex shrink-0 flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    openEditByReviewId(unit.sourceReviewId)
                                   }
-                                  revokeStagingAccept(
-                                    unit.sourceReviewId,
-                                    "story"
-                                  );
-                                }}
-                              >
-                                {discoveryReviewUi.revokeAccept}
-                              </Button>
+                                >
+                                  {discoveryReviewUi.edit}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    const hasChildren = childScenes.length > 0;
+                                    const msg = hasChildren
+                                      ? discoveryReviewUi.confirmRevokeStoryWithScenes
+                                      : discoveryReviewUi.confirmRevokeAccept;
+                                    if (!window.confirm(msg)) {
+                                      return;
+                                    }
+                                    revokeStagingAccept(
+                                      unit.sourceReviewId,
+                                      "story"
+                                    );
+                                  }}
+                                >
+                                  {discoveryReviewUi.revokeAccept}
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                          {childScenes.length > 0 ? (
-                            <div className="ml-4 space-y-2 border-l pl-4">
-                              <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                                {discoveryReviewUi.acceptedSceneStaging}
-                              </h4>
-                              <ul className="space-y-2">
-                                {childScenes.map((scene) => (
-                                  <li
-                                    key={scene.sourceReviewId}
-                                    className="flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
-                                  >
-                                    <div className="min-w-0">
-                                      <div className="font-medium">
-                                        {scene.title}
+                            {childScenes.length > 0 ? (
+                              <div className="ml-4 space-y-2 border-l pl-4">
+                                <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                                  {discoveryReviewUi.acceptedSceneStaging}
+                                </h4>
+                                <ul className="space-y-2">
+                                  {childScenes.map((scene) => (
+                                    <li
+                                      key={scene.sourceReviewId}
+                                      className="flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="font-medium">
+                                          {scene.title}
+                                        </div>
+                                        {scene.summary ? (
+                                          <p className="text-muted-foreground mt-1">
+                                            {scene.summary}
+                                          </p>
+                                        ) : null}
                                       </div>
-                                      <p className="text-muted-foreground">
-                                        {messages.common.chapterN(
-                                          scene.chapter_number
-                                        )}
-                                        {scene.chapter_title
-                                          ? ` — ${scene.chapter_title}`
-                                          : ""}
-                                      </p>
-                                      {scene.summary ? (
-                                        <p className="text-muted-foreground mt-1">
-                                          {scene.summary}
-                                        </p>
-                                      ) : null}
-                                    </div>
-                                    <div className="flex shrink-0 flex-wrap gap-2">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() =>
-                                          openEditByReviewId(
-                                            scene.sourceReviewId
-                                          )
-                                        }
-                                      >
-                                        {discoveryReviewUi.edit}
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => {
-                                          if (
-                                            !window.confirm(
-                                              discoveryReviewUi.confirmRevokeAccept
+                                      <div className="flex shrink-0 flex-wrap gap-2">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            openEditByReviewId(
+                                              scene.sourceReviewId
                                             )
-                                          ) {
-                                            return;
                                           }
-                                          revokeStagingAccept(
-                                            scene.sourceReviewId,
-                                            "scene"
-                                          );
-                                        }}
-                                      >
-                                        {discoveryReviewUi.revokeAccept}
-                                      </Button>
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <p className="text-muted-foreground text-xs">
-                    {discoveryReviewUi.editAfterAcceptSceneHint}
-                  </p>
-                </div>
-              ) : null}
-
-              {acceptedCount === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  {discoveryReviewUi.flowHintAcceptedEmpty}
-                </p>
-              ) : null}
+                                        >
+                                          {discoveryReviewUi.edit}
+                                        </Button>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </TabsContent>
+              </Tabs>
 
               <FlowHint
                 text={
-                  acceptedCount > 0
-                    ? discoveryReviewUi.flowHintAccepted
-                    : discoveryReviewUi.flowHintAcceptedEmpty
+                  confirmSubTab === "pending"
+                    ? reviewListItems.length > 0
+                      ? discoveryReviewUi.flowHintReview
+                      : discoveryReviewUi.flowHintReviewDone
+                    : acceptedCount > 0
+                      ? discoveryReviewUi.flowHintAccepted
+                      : discoveryReviewUi.flowHintAcceptedEmpty
                 }
                 nextLabel={
-                  acceptedCount > 0
+                  acceptedCount > 0 && rollout
                     ? discoveryReviewUi.nextStepRollout
                     : undefined
                 }
-                href={acceptedCount > 0 ? rolloutHref : undefined}
+                onNext={
+                  acceptedCount > 0 && rollout
+                    ? () => setActiveTab("rollout")
+                    : undefined
+                }
               />
             </TabsContent>
+
+            {rollout ? (
+              <TabsContent value="rollout" className="min-h-72 space-y-4">
+                <RolloutPanel
+                  workId={workId}
+                  rollout={rollout}
+                  embedded
+                />
+              </TabsContent>
+            ) : null}
 
           </Tabs>
         </CardContent>

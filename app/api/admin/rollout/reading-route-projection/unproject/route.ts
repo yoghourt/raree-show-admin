@@ -1,10 +1,9 @@
 /**
  * POST /api/admin/rollout/reading-route-projection/unproject
- * Cancel Reading Route projection — restore staging (delete created Reading Route when applicable)
+ * Remove SceneProjectionLink (+ companion Story link). Keeps Reading Route + Approved Scene.
  */
 
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 import {
   assertWorkAccessible,
@@ -12,12 +11,7 @@ import {
   requireRolloutAuth,
 } from "@/lib/rollout/rollout-route-helpers";
 import { unprojectReadingRoute } from "@/lib/rollout/reading-route-projection";
-
-const bodySchema = z.object({
-  workId: z.string().min(1),
-  sceneTsid: z.string().min(1),
-  mode: z.enum(["create", "link_existing"]),
-});
+import { unprojectBodySchema } from "@/lib/rollout/schemas";
 
 export async function POST(request: Request) {
   const auth = await requireRolloutAuth();
@@ -30,7 +24,7 @@ export async function POST(request: Request) {
     return bodyResult.response;
   }
 
-  const parsed = bodySchema.safeParse(bodyResult.json);
+  const parsed = unprojectBodySchema.safeParse(bodyResult.json);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -44,7 +38,20 @@ export async function POST(request: Request) {
     );
   }
 
-  const { workId, sceneTsid, mode } = parsed.data;
+  const { workId, sourceReviewId, sceneProjectionLinkId, sceneTsid, mode } =
+    parsed.data;
+
+  if (!sourceReviewId && !sceneProjectionLinkId) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "STAGING_INVALID",
+          message: "sourceReviewId or sceneProjectionLinkId is required",
+        },
+      },
+      { status: 422 }
+    );
+  }
 
   const workResult = await assertWorkAccessible(auth.supabase, workId);
   if (!workResult.ok) {
@@ -52,24 +59,28 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await unprojectReadingRoute(
-      auth.supabase,
-      workId,
+    const result = await unprojectReadingRoute(auth.supabase, workId, {
+      sourceReviewId,
+      sceneProjectionLinkId,
       sceneTsid,
-      mode
-    );
+      mode,
+    });
     if (!result.ok) {
       return NextResponse.json(
         {
           error: {
-            code: "SCENE_NOT_FOUND",
-            message: "Reading Route not found for unproject",
+            code: result.code,
+            message: result.message,
           },
         },
-        { status: 404 }
+        { status: result.code === "STAGING_NOT_FOUND" ? 404 : 422 }
       );
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      sourceReviewId: result.sourceReviewId,
+      readingRouteTsid: result.readingRouteTsid,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return NextResponse.json(

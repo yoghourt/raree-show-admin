@@ -1,14 +1,35 @@
 # SPEC-ROL-001 — Governed Editorial↔Runtime Projection
 
+## Hotfix amendment (2026-07-12) — Product Target Recovery
+
+**Status addendum:** Product Freeze Hotfix recovers the intended storage mapping. Discovery candidate vocabulary remains Story / Scene (SPEC-D3-002). Rollout durable targets:
+
+| Discovery staging | Rollout Persist target | Implementation |
+| ----------------- | ---------------------- | -------------- |
+| Story Candidate (`AcceptedStoryUnitStaging`) | **Reading Route** | `scenes` row (`discovery_source_review_id`) |
+| Scene Candidate (`AcceptedSceneCandidateStaging`) | **Reading Frame** | `story_images_v2[]` element on **parent** Route |
+
+Normative Hotfix rules:
+
+- Rollout MUST NOT create a new Reading Route from Scene staging.
+- Rollout MUST NOT write `story_units` / `approved_scene_units` / `scene_projection_links` as editorial authority on the happy path (soft-deprecated).
+- Parent gate for Scene → Frame: parent Story staging MUST already be persisted as a Reading Route.
+- Reader / SPEC-RDX-001 / Runtime topology unchanged (`Work → Reading Route → Reading Frame`).
+- Full recovery note: `docs/implementation/rollout-hotfix-product-recovery.md`.
+
+Sections below that still say “Approved Story unit” / “Scene → Reading Route” describe the **pre-Hotfix** Sprint #1 contract; **Hotfix supersedes** those storage targets for implementation.
+
+---
+
 ## Metadata
 
 | Field        | Value                                                                 |
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Governed Editorial↔Runtime Projection                                 |
 | Status       | Implemented                                                           |
-| Version      | v1.1                                                                  |
+| Version      | v1.2 (Hotfix Product Recovery)                                       |
 | Owner        | Architect                                                             |
-| Last Updated | 2026-07-07                                                            |
+| Last Updated | 2026-07-12                                                            |
 | Derived From | ADR-007 v1.2 (`docs/adr/007-rollout-architecture.md`)                      |
 | Related      | ADR-004, ADR-005, ADR-006, SPEC-D3-001, SPEC-D3-002, SPEC-CORE-001 |
 
@@ -222,15 +243,24 @@ interface StorySceneProjectionLink {
 
 ### 4.4 Reading Route Projection Accept outcomes (implementation: Scene)
 
-| Operator choice | Preconditions | Effect |
-| --------------- | ------------- | ------ |
-| **Create Scene from staging** | Valid `AcceptedSceneCandidateStaging`; operator confirms create | Map staging → Scene create payload (§4.6); invoke existing Scene CRUD persist; optional auto-link to selected Story unit |
-| **Link staging to existing Scene** | Staging present; target `sceneTsid` exists in same `workId` | No duplicate Scene row; association via StorySceneProjectionLink when Story unit selected |
-| **Dismiss staging** | Staging in Rollout queue | Remove from Rollout queue; no Runtime write |
+**Sprint #1 (ACA-004):** Projection Accept runs through an explicit **Projection Engine** (`validate` → `execute`). Runtime writes occur only after validation. Parent Story MUST be persisted (`story_units`, active, matching `parentStorySourceReviewId`). Successful Accept persists:
+
+1. Runtime Reading Route (create or `link_existing`)
+2. `approved_scene_units` (Editorial Approved Scene unit)
+3. `scene_projection_links` (SceneProjectionLink)
+4. Companion `story_scene_links` to parent Story when missing
+
+Transport path alias: `POST /api/admin/rollout/reading-route-projection` (equivalent to §4.7.3 `scene-projection`). Unproject removes SceneProjectionLink (+ companion Story link if owned); does **not** delete Reading Route or Approved Scene unit (ROL2-PR-06).
 
 **Invariant:** Projection Accept MUST NOT be implemented inside Discovery propose, regen, or Review route handlers (ROL-RC-06, ROL-RC-13).
 
-When creating a Scene, operator MUST pass through the same Human Save confirmation semantics as existing Scene create forms. Prefilled values from staging remain editable before Save.
+| Operator choice | Preconditions | Effect |
+| --------------- | ------------- | ------ |
+| **Create Scene from staging** | Valid `AcceptedSceneCandidateStaging`; parent Story persisted; operator confirms create | Projection Engine validate→execute; Runtime Route + Approved Scene + SceneProjectionLink |
+| **Link staging to existing Scene** | Staging present; parent Story persisted; target `sceneTsid` exists in same `workId` | Same metadata boundary; no duplicate Scene row when linking |
+| **Dismiss staging** | Staging in Rollout queue | Remove from Rollout queue; no Runtime write |
+
+When creating a Scene via Projection Accept, operator confirms through the Projection dialog (Sprint #1). Full Scene form prefill loop remains deferred.
 
 ### 4.5 Rollout operator actions
 

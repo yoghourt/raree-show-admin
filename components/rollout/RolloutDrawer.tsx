@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * RolloutDrawer — 阅读路线页面内嵌的 Rollout 工作台抽屉
+ * RolloutDrawer — 故事页面内嵌的写入作品抽屉
  *
  * 将原 /works/[workId]/rollout 页面内容迁移到 Sheet，
- * 供阅读路线页面通过右侧抽屉打开，无需跳转页面。
+ * 供故事页面通过右侧抽屉打开，无需跳转页面。
  */
 
 import * as React from "react";

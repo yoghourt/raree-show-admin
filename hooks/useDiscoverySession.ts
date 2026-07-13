@@ -63,6 +63,7 @@ import {
   hasPendingReviewItems,
   markReviewAccepted,
   prepareAcceptReview,
+  prepareAcceptStoryWithChildScenes,
   replaceReviewCandidate,
   revokeReviewAccept,
   saveReviewEdit,
@@ -74,6 +75,8 @@ import {
   type ReviewEditPayload,
 } from "@/lib/discovery/review-state";
 import { storeDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
+import * as charactersApi from "@/lib/characters";
+import * as locationsApi from "@/lib/locations";
 import {
   appendSceneStagingToRolloutQueue,
   appendStoryStagingToRolloutQueue,
@@ -158,7 +161,7 @@ export interface UseDiscoverySessionReturn {
   ) => Promise<boolean>;
   acceptCandidate: (
     reviewId: string
-  ) => AcceptReviewResult | AcceptReviewError;
+  ) => Promise<AcceptReviewResult | AcceptReviewError>;
   teardown: () => void;
 }
 
@@ -622,6 +625,9 @@ export function useDiscoverySession(
     (sourceReviewId: string, kind: "story" | "scene") => {
       setAcceptError(null);
       if (kind === "story") {
+        const revokedStory = acceptedStoryUnits.find(
+          (unit) => unit.sourceReviewId === sourceReviewId
+        );
         const childSceneReviewIds = getChildSceneReviewIdsForStory(
           reviewItems,
           sourceReviewId
@@ -632,11 +638,34 @@ export function useDiscoverySession(
         const allChildIds = [
           ...new Set([...childSceneReviewIds, ...childFromStaging]),
         ];
+        const relatedEntityIds = [
+          ...(revokedStory?.relatedCharacterRefs ?? []).map(
+            (r) => r.sourceReviewId
+          ),
+          ...(revokedStory?.relatedLocationRefs ?? []).map(
+            (r) => r.sourceReviewId
+          ),
+        ];
+        const remainingStories = acceptedStoryUnits.filter(
+          (unit) => unit.sourceReviewId !== sourceReviewId
+        );
+        const stillNeededEntityIds = new Set(
+          remainingStories.flatMap((unit) => [
+            ...(unit.relatedCharacterRefs ?? []).map((r) => r.sourceReviewId),
+            ...(unit.relatedLocationRefs ?? []).map((r) => r.sourceReviewId),
+          ])
+        );
+        const entityIdsToRevoke = relatedEntityIds.filter(
+          (id) => !stillNeededEntityIds.has(id)
+        );
 
         setReviewItems((prev) => {
           let next = revokeReviewAccept(prev, sourceReviewId);
           for (const childId of allChildIds) {
             next = revokeReviewAccept(next, childId);
+          }
+          for (const entityId of entityIdsToRevoke) {
+            next = revokeReviewAccept(next, entityId);
           }
           return next;
         });
@@ -660,7 +689,13 @@ export function useDiscoverySession(
         removeSceneStagingFromRolloutQueue(workId, operatorId, sourceReviewId);
       }
     },
-    [workId, operatorId, reviewItems, acceptedSceneCandidates]
+    [
+      workId,
+      operatorId,
+      reviewItems,
+      acceptedSceneCandidates,
+      acceptedStoryUnits,
+    ]
   );
 
   const saveCandidateEdit = useCallback(
@@ -762,12 +797,15 @@ export function useDiscoverySession(
         sourceReviewId,
         parentStorySourceReviewId: existing.parentStorySourceReviewId,
         parentStoryTitle: existing.parentStoryTitle,
-        chapter_title: sceneFields.chapter_title ?? null,
-        chapter_number: sceneFields.chapter_number,
+        // 章节属性归属故事；画面编辑只改标题与摘要
+        chapter_title: existing.chapter_title,
+        chapter_number: existing.chapter_number,
         title: sceneFields.title.trim(),
         ...(typeof sceneFields.summary === "string" && sceneFields.summary.trim()
           ? { summary: sceneFields.summary.trim() }
-          : {}),
+          : typeof edit.editedSummary === "string" && edit.editedSummary.trim()
+            ? { summary: edit.editedSummary.trim() }
+            : {}),
         acceptedAt: existing.acceptedAt,
       };
       setAcceptedSceneCandidates((prev) =>
@@ -1022,7 +1060,78 @@ export function useDiscoverySession(
   );
 
   const acceptCandidate = useCallback(
-    (reviewId: string): AcceptReviewResult | AcceptReviewError => {
+    async (
+      reviewId: string
+    ): Promise<AcceptReviewResult | AcceptReviewError> => {
+      const target = findReviewItem(reviewItems, reviewId);
+
+      // Story confirm cascades to frames + related characters/locations.
+      if (target?.candidate.candidateType === "story") {
+        let catalogs = { characters: [] as Array<{ name: string; tsid: string }>, locations: [] as Array<{ name: string; tsid: string }> };
+        try {
+          const [characters, locations] = await Promise.all([
+            charactersApi.getAll(workId),
+            locationsApi.getAll(workId),
+          ]);
+          catalogs = { characters, locations };
+        } catch {
+          // Matching is best-effort; persist will rematch/create.
+        }
+
+        const cascade = prepareAcceptStoryWithChildScenes(
+          reviewItems,
+          reviewId,
+          acceptedStoryUnits,
+          catalogs
+        );
+        if (!cascade.ok) {
+          setAcceptError(cascade);
+          return cascade;
+        }
+
+        if (cascade.sceneErrors.length > 0) {
+          setAcceptError({
+            ok: false,
+            code: "SCENE_CASCADE_PARTIAL",
+            message: `故事已确认；有 ${cascade.sceneErrors.length} 个画面未能一并确认，可先编辑画面字段后再确认故事`,
+            fieldErrors: cascade.sceneErrors.flatMap(
+              (err) => err.fieldErrors ?? [err.message]
+            ),
+          });
+        } else {
+          setAcceptError(null);
+        }
+
+        setReviewItems((prev) => {
+          let next = prev;
+          for (const id of cascade.acceptedReviewIds) {
+            next = markReviewAccepted(next, id);
+          }
+          return next;
+        });
+        setAcceptedStoryUnits((prev) => [...prev, cascade.storyStaging]);
+        appendStoryStagingToRolloutQueue(
+          workId,
+          operatorId,
+          cascade.storyStaging
+        );
+        if (cascade.sceneStagings.length > 0) {
+          setAcceptedSceneCandidates((prev) => [
+            ...prev,
+            ...cascade.sceneStagings,
+          ]);
+          for (const staging of cascade.sceneStagings) {
+            appendSceneStagingToRolloutQueue(workId, operatorId, staging);
+          }
+        }
+
+        return {
+          ok: true,
+          kind: "story_staging",
+          staging: cascade.storyStaging,
+        };
+      }
+
       const result = prepareAcceptReview(
         reviewItems,
         reviewId,
@@ -1038,9 +1147,6 @@ export function useDiscoverySession(
 
       if (result.kind === "entity_prefill") {
         storeDiscoveryAcceptPrefill(result.prefill);
-      } else if (result.kind === "story_staging") {
-        setAcceptedStoryUnits((prev) => [...prev, result.staging]);
-        appendStoryStagingToRolloutQueue(workId, operatorId, result.staging);
       } else if (result.kind === "scene_staging") {
         setAcceptedSceneCandidates((prev) => [...prev, result.staging]);
         appendSceneStagingToRolloutQueue(workId, operatorId, result.staging);

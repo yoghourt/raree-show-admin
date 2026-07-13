@@ -8,6 +8,7 @@ import * as React from "react";
 import { ReadingRouteForm } from "@/components/reading-routes/ReadingRouteForm";
 import { Button } from "@/components/ui/button";
 import * as charactersApi from "@/lib/characters";
+import { messages } from "@/lib/locale";
 import * as locationsApi from "@/lib/locations";
 import { getScene } from "@/lib/scenes";
 import { getWork } from "@/lib/works";
@@ -88,7 +89,7 @@ export default function EditReadingRoutePage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={routesHref}>← 返回阅读路线列表</Link>
+          <Link href={routesHref}>← 返回故事列表</Link>
         </Button>
         <p className="text-muted-foreground text-sm" aria-busy="true">
           加载中…
@@ -101,7 +102,7 @@ export default function EditReadingRoutePage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={routesHref}>← 返回阅读路线列表</Link>
+          <Link href={routesHref}>← 返回故事列表</Link>
         </Button>
         <div
           className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
@@ -117,10 +118,10 @@ export default function EditReadingRoutePage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
-          <Link href={routesHref}>← 返回阅读路线列表</Link>
+          <Link href={routesHref}>← 返回故事列表</Link>
         </Button>
         <p className="text-muted-foreground">
-          未找到该阅读路线（tsid：{sceneTsid || "—"}）。
+          未找到该故事（编号：{sceneTsid || "—"}）。
         </p>
       </div>
     );
@@ -148,17 +149,17 @@ export default function EditReadingRoutePage() {
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
         <Link href={routesHref} className="transition-colors hover:text-zinc-800">
-          阅读路线
+          {messages.nav.readingRoutes}
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">编辑阅读路线</span>
+        <span className="font-medium text-zinc-800">编辑故事</span>
       </nav>
 
       <Button variant="ghost" size="sm" className="-ml-2" asChild>
-        <Link href={routesHref}>← 返回阅读路线列表</Link>
+        <Link href={routesHref}>← 返回故事列表</Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">编辑阅读路线</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">编辑故事</h1>
         <p className="text-muted-foreground mt-1 font-mono text-sm">
           {scene.tsid}
         </p>

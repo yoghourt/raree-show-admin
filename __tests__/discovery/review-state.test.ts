@@ -18,6 +18,7 @@ import {
   markReviewAccepted,
   revokeReviewAccept,
   prepareAcceptReview,
+  prepareAcceptStoryWithChildScenes,
   replaceReviewCandidate,
   saveReviewEdit,
   getEffectiveDisplayName,
@@ -222,6 +223,89 @@ describe("Accept handoff guards", () => {
       );
       expect(sceneAccept.staging.parentStoryTitle).toBe("The Arc");
     }
+  });
+
+  it("prepareAcceptStoryWithChildScenes cascades valid child scenes", () => {
+    const story = makeCandidate({
+      candidateId: "story-cand-1",
+      candidateType: "story",
+      displayName: "Arc",
+      fields: { title: "The Arc", summary: "Summary" },
+    });
+    const sceneOk = makeCandidate({
+      candidateId: "scene-cand-1",
+      candidateType: "scene",
+      displayName: "Courtyard",
+      fields: {
+        parentStoryCandidateId: "story-cand-1",
+        chapter_number: 1,
+        title: "Courtyard",
+      },
+    });
+    const sceneBad = makeCandidate({
+      candidateId: "scene-cand-2",
+      candidateType: "scene",
+      displayName: "Broken",
+      fields: {
+        parentStoryCandidateId: "story-cand-1",
+        chapter_number: 0,
+        title: "Broken",
+      },
+    });
+    const char = makeCandidate({
+      candidateId: "char-1",
+      candidateType: "character",
+      displayName: "Arya",
+      fields: { name: "Arya", house: "Stark" },
+    });
+    const items = createReviewItems([story, sceneOk, sceneBad, char]);
+    const cascade = prepareAcceptStoryWithChildScenes(
+      items,
+      items[0]!.reviewId,
+      [],
+      {
+        characters: [{ name: "Arya", tsid: "char_arya" }],
+        locations: [],
+      }
+    );
+    expect(cascade.ok).toBe(true);
+    if (!cascade.ok) throw new Error("expected cascade ok");
+    expect(cascade.sceneStagings).toHaveLength(1);
+    expect(cascade.sceneStagings[0]!.title).toBe("Courtyard");
+    expect(cascade.storyStaging.relatedCharacterRefs).toHaveLength(1);
+    expect(cascade.storyStaging.relatedCharacterRefs![0]!.matchedTsid).toBe(
+      "char_arya"
+    );
+    expect(cascade.storyStaging.characterIds).toEqual(["char_arya"]);
+    expect(cascade.acceptedReviewIds).toContain(items[3]!.reviewId);
+    expect(cascade.sceneErrors).toHaveLength(1);
+    expect(cascade.sceneErrors[0]!.code).toBe("ACCEPT_VALIDATION_FAILED");
+  });
+
+  it("prepareAcceptStoryWithChildScenes skips discarded child scenes", () => {
+    const story = makeCandidate({
+      candidateId: "story-cand-1",
+      candidateType: "story",
+      displayName: "Arc",
+      fields: { title: "The Arc", summary: "Summary" },
+    });
+    const scene = makeCandidate({
+      candidateId: "scene-cand-1",
+      candidateType: "scene",
+      displayName: "Courtyard",
+      fields: {
+        parentStoryCandidateId: "story-cand-1",
+        chapter_number: 1,
+        title: "Courtyard",
+      },
+    });
+    let items = createReviewItems([story, scene]);
+    items = discardReviewItem(items, items[1]!.reviewId);
+    const cascade = prepareAcceptStoryWithChildScenes(items, items[0]!.reviewId);
+    expect(cascade.ok).toBe(true);
+    if (!cascade.ok) throw new Error("expected cascade ok");
+    expect(cascade.sceneStagings).toHaveLength(0);
+    expect(cascade.acceptedReviewIds).toEqual([items[0]!.reviewId]);
   });
 
   it("requires parentStoryCandidateId on scene fields", () => {

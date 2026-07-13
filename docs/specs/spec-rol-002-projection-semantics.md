@@ -1,18 +1,38 @@
 # SPEC-ROL-002 — Editorial Scene Projection Semantics
 
+## Hotfix amendment (2026-07-12) — Product Target Recovery
+
+**Supersedes Sprint #1 endpoint:** Editorial Scene staging → **Reading Frame** on parent **Reading Route** (not Scene → Route association via `approved_scene_units`).
+
+| Construct | Hotfix projection role |
+| --------- | ------------------------ |
+| Story staging | Source for Reading Route materialization |
+| Scene staging | Source for Reading Frame materialization |
+| Reading Route (`scenes`) | Persist target for Story; parent container for Frames |
+| Reading Frame (`story_images_v2[]`) | Persist target for Scene |
+| `approved_scene_units` / `scene_projection_links` | Soft-deprecated (not happy-path authority) |
+
+Projection **ends** when the Frame exists on the parent Route (shared Runtime store). Reader behavior remains SPEC-RDX-001.
+
+Recovery note: `docs/implementation/rollout-hotfix-product-recovery.md`.
+
+Sections below that define Approved Scene → Reading Route association describe the **pre-Hotfix** contract; **Hotfix supersedes** the product endpoint for admin Rollout.
+
+---
+
 ## Metadata
 
 | Field        | Value                                                                 |
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Editorial Scene Projection Semantics                                  |
-| Status       | **Accepted**                                                        |
-| Version      | v1.0                                                                  |
+| Status       | **Accepted** (Hotfix amendment 2026-07-12)                           |
+| Version      | v1.1                                                                  |
 | Owner        | Architect                                                             |
-| Last Updated | 2026-07-11                                                            |
+| Last Updated | 2026-07-12                                                            |
 | Derived From | ADR-007 v1.2 (`docs/adr/007-rollout-architecture.md`)                 |
 | Related      | ADR-004, ADR-005 v2.0, ADR-006 v1.3, SPEC-ROL-001, SPEC-D3-002, SPEC-RDX-001, Runtime Reading Governance RC1 |
 | Supersedes   | SPEC-ROL-002 v0.1 (withdrawn — capability drift; see Architect Review 2026-07-11) |
-| Amendment    | v1.0 — Accepted as part of Runtime Reading Governance RC1 (2026-07-11); promotes v0.2 without semantic change |
+| Amendment    | v1.1 — Hotfix Product Recovery: Scene → Reading Frame endpoint        |
 
 **Architect Review (2026-07-11):** v0.1 incorrectly owned **Runtime Reading Experience** semantics under the Rollout namespace. v0.2 restores **Projection-only** scope. Reader progression, navigation, caption rendering, session, and Assistant consumption belong to **SPEC-RDX-001** (Accepted — separate capability).
 
@@ -238,16 +258,16 @@ ROL-002 **does not** close Scene ↔ Reading Frame mapping. Architecture explici
 
 ---
 
-## 8. Open Questions (Projection-only)
+## 8. Closed Questions (v1 — Sprint #1 / ACA-004)
 
-| ID | Question |
-| -- | -------- |
-| OQ-ROL2-P01 | May one Approved Scene unit project to **multiple** Reading Routes (N:M at container level)? |
-| OQ-ROL2-P02 | May multiple Approved Scene units project to the **same** Reading Route? |
-| OQ-ROL2-P03 | Required minimum fields on Approved Scene unit before Projection Accept is valid? |
-| OQ-ROL2-P04 | Versioning when Approved Scene unit is edited after SceneProjectionLink exists |
-| OQ-ROL2-P05 | Relationship between StoryProjectionLink and SceneProjectionLink when Story and Scene share one Route target |
-| OQ-ROL2-P06 | Whether `SceneProjectionLink` and ROL-001 `StorySceneProjectionLink` converge to one metadata model or remain distinct |
+| ID | Decision (v1) |
+| -- | ------------- |
+| OQ-ROL2-P01 | **Closed:** One Approved Scene unit → **at most one** Reading Route until Unproject. Second Projection Accept rejected (`ALREADY_PROJECTED`). |
+| OQ-ROL2-P02 | **Closed:** Multiple Approved Scene units **may** `link_existing` to the same Reading Route. |
+| OQ-ROL2-P03 | **Closed:** Minimum fields = staging-mapper (`title` non-empty, `chapter_number` ≥ 1) **plus** required `parentStorySourceReviewId` and matching **persisted active** `story_units` row. |
+| OQ-ROL2-P04 | **Closed (deferred versioning):** No version column; Unproject + re-project is the edit path for projection metadata. |
+| OQ-ROL2-P05 | **Closed:** `StoryProjectionLink` and `SceneProjectionLink` remain distinct. Projection Accept auto-creates Story↔Route link to parent Story when missing; Unproject removes companion Story link only when recorded as projection-owned. |
+| OQ-ROL2-P06 | **Closed:** Remain distinct tables/models; do not collapse. |
 
 **Explicitly deferred to SPEC-RDX-001:** frame grouping, progression, caption, navigation, Assistant, session, resume.
 

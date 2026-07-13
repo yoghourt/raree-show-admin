@@ -1,20 +1,18 @@
 /**
  * GET /api/admin/rollout?workId=
- * SPEC-ROL-001 §4.7.5
+ * Hotfix — Reading Routes / Frames from scenes provenance
  */
 
 import { NextResponse } from "next/server";
 
+import { listFrameProjections } from "@/lib/rollout/reading-frame-persist";
 import {
   assertWorkAccessible,
   requireRolloutAuth,
 } from "@/lib/rollout/rollout-route-helpers";
-import {
-  listScenesBrief,
-  listStorySceneLinks,
-} from "@/lib/rollout/story-scene-links";
-import { listStoryUnits } from "@/lib/rollout/story-units";
 import { emptyRolloutQueue } from "@/lib/rollout/rollout-queue-storage";
+import { listScenesBrief } from "@/lib/rollout/story-scene-links";
+import { listStoryUnits } from "@/lib/rollout/story-units";
 
 export async function GET(request: Request) {
   const auth = await requireRolloutAuth();
@@ -42,9 +40,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [storyUnits, links, scenes] = await Promise.all([
+    const [storyUnits, frameProjections, scenes] = await Promise.all([
       listStoryUnits(auth.supabase, workId),
-      listStorySceneLinks(auth.supabase, workId),
+      listFrameProjections(auth.supabase, workId),
       listScenesBrief(auth.supabase, workId),
     ]);
 
@@ -53,7 +51,11 @@ export async function GET(request: Request) {
       workId,
       queue: emptyRolloutQueue(workId, auth.userId),
       storyUnits,
-      links,
+      // Soft-deprecated Sprint #1 tables — empty for new happy path
+      approvedSceneUnits: [],
+      sceneProjectionLinks: [],
+      links: [],
+      frameProjections,
       scenes,
     });
   } catch (e) {
