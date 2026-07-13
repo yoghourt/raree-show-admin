@@ -588,9 +588,9 @@ Inline alias annotations in ADR-004, ADR-007, and SPEC-ROL-001 where bare
 | A-04 | `docs/adr/004-source-of-canonical-truth.md` | L2263 | `Story ↔ Scene orthogonal` → `Story ↔ Reading Route orthogonal` |
 | A-05 | `docs/adr/004-source-of-canonical-truth.md` | L1868 | `imageCaption` → `imageCaption (Deprecated)` |
 | A-06 | `docs/adr/007-rollout-architecture.md` | L42–46 §What diagram | add `(normative: Reading Route / Reading Frame)` annotation |
-| A-07 | `docs/adr/007-rollout-architecture.md` | L340 | `Runtime Scene records` → `Runtime Reading Route records (implementation: Scene)` |
-| A-08 | `docs/adr/007-rollout-architecture.md` | L473 | `Story ↔ Scene orthogonal association model` → annotate `(implementation: Scene)` |
-| A-09 | `docs/adr/007-rollout-architecture.md` | L494 | `Runtime Scene association` → annotate `(implementation: Scene)` |
+| A-07 | `docs/adr/007-rollout-architecture.md` | Phase 2 (v1.2) | `Runtime Scene records` → `Runtime Reading Route records (implementation: Scene)` | **Done** — ADR-007 v1.2 A2 |
+| A-08 | `docs/adr/007-rollout-architecture.md` | Relationship § | `Story ↔ Scene orthogonal association model` → annotate `(implementation: Scene)` | Superseded by v1.2 Story ↔ Reading Route |
+| A-09 | `docs/adr/007-rollout-architecture.md` | Relationship § | `Runtime Scene association` → annotate `(implementation: Scene)` | **Done** — ADR-007 v1.2 A2 |
 | A-10 | `docs/specs/spec-rol-001-governed-projection.md` | §4.3 title | `Story ↔ Scene` → `Story ↔ Reading Route (implementation: Scene)` |
 | A-11 | `docs/specs/spec-rol-001-governed-projection.md` | §4.4 title | `Scene Projection Accept outcomes` → `Reading Route Projection Accept outcomes (implementation: Scene)` |
 | A-12 | `docs/specs/spec-rol-001-governed-projection.md` | §4.7.3 title | `Scene Projection Accept` → `Reading Route Projection Accept (implementation: Scene)` |

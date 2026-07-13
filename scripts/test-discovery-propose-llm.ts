@@ -74,7 +74,7 @@ async function main(): Promise<void> {
     errors.length
   );
 
-  for (const type of ["character", "location", "story", "readingRoute"] as const) {
+  for (const type of ["character", "location", "story", "scene"] as const) {
     const count = candidates.filter((c) => c.candidateType === type).length;
     const err = errors.find((e) => e.candidateType === type);
     console.info(

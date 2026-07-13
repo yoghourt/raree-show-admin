@@ -1,5 +1,8 @@
 /**
  * SPEC-D3-003 §4 — Discovery Proposals data contracts
+ *
+ * Editorial hierarchy (ADR-005): Work → Story → Scene.
+ * Candidate type "scene" is Editorial Scene (not Runtime Reading Route).
  */
 
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
@@ -8,13 +11,14 @@ export type DiscoveryCandidateType =
   | "character"
   | "location"
   | "story"
-  | "readingRoute";
+  | "scene";
 
+/** Story before Scene — Story-first propose order (Sprint #2). */
 export const DISCOVERY_CANDIDATE_TYPES: DiscoveryCandidateType[] = [
   "character",
   "location",
   "story",
-  "readingRoute",
+  "scene",
 ];
 
 export interface DiscoveryEvidenceRef {
@@ -44,6 +48,8 @@ export interface StoryCandidateFields {
 }
 
 export interface SceneCandidateFields {
+  /** Required: Story candidateId this Scene belongs under (same propose batch). */
+  parentStoryCandidateId: string;
   chapter_title?: string | null;
   chapter_number: number | string;
   title: string;

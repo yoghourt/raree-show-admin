@@ -19,6 +19,9 @@ export const rolloutUi = {
   approvedStoryTitle: m.approvedStoryTitle,
   runtimeScenesTitle: m.runtimeTitle,
   noRuntimeScenes: m.noRuntime,
+  projectedOrphanTitle: m.projectedOrphanTitle,
+  projectedOrphanHint: m.projectedOrphanHint,
+  projectedParentStory: m.projectedParentStory,
   goEditScene: m.editItem,
   goScenesList: m.listItems,
   sceneRolloutProjection: m.projectionRecord,
@@ -26,6 +29,7 @@ export const rolloutUi = {
   sceneLinkCount: m.storyLinkCount,
   linksTitle: m.linksTitle,
   noStoryStaging: m.noStoryStaging,
+  writePreviewHint: m.writePreviewHint,
   noSceneStaging: m.noStaging,
   noStoryUnits: m.noStoryUnits,
   noLinks: m.noLinks,
@@ -61,6 +65,8 @@ export const rolloutUi = {
   optionalLinkStory: m.optionalLinkStory,
   confirmCreateScene: m.confirmCreate,
   confirmCreateSceneDesc: m.confirmCreateDesc,
+  projectionValidationTitle: m.projectionValidationTitle,
+  projectionValidationParentMissing: m.projectionValidationParentMissing,
   loading: m.loading,
   actionError: m.actionError,
   fieldErrorsLabel: m.fieldErrorsLabel,
@@ -69,6 +75,7 @@ export const rolloutUi = {
   tabPending: m.tabPending,
   tabDismissed: m.tabDismissed,
   tabStoryUnits: m.tabStoryUnits,
+  tabPersisted: m.tabPersisted,
   tabRuntimeScenes: m.runtimeTab,
   tabLinks: m.tabLinks,
   workspaceTitle: m.workspaceTitle,
@@ -83,6 +90,8 @@ export const rolloutUi = {
   nextStepLinks: m.nextStepLinks,
   nextStepDiscovery: m.nextStepDiscovery,
   pipelineFromDiscovery: m.pipelineFromDiscovery,
+  entitySectionDeferred: m.entitySectionDeferred,
+  openReaderVerify: m.openReaderVerify,
 } as const;
 
 /** Re-export domain label for dynamic tab descriptions in RolloutPanel */

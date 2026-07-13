@@ -192,20 +192,66 @@ describe("proposeAllCandidateTypes (mock)", () => {
     expect(types.has("character")).toBe(true);
     expect(types.has("location")).toBe(true);
     expect(types.has("story")).toBe(true);
-    expect(types.has("readingRoute")).toBe(true);
+    expect(types.has("scene")).toBe(true);
+    const story = candidates.find((c) => c.candidateType === "story");
+    const scene = candidates.find((c) => c.candidateType === "scene");
+    expect(story).toBeTruthy();
+    expect(scene).toBeTruthy();
+    if (scene && "parentStoryCandidateId" in scene.fields) {
+      expect(scene.fields.parentStoryCandidateId).toBe(story!.candidateId);
+    }
+  });
+
+  it("orders story before scene in DISCOVERY_CANDIDATE_TYPES", async () => {
+    const { DISCOVERY_CANDIDATE_TYPES } = await import(
+      "@/lib/discovery/propose-types"
+    );
+    const storyIdx = DISCOVERY_CANDIDATE_TYPES.indexOf("story");
+    const sceneIdx = DISCOVERY_CANDIDATE_TYPES.indexOf("scene");
+    expect(storyIdx).toBeGreaterThanOrEqual(0);
+    expect(sceneIdx).toBeGreaterThan(storyIdx);
   });
 });
 
 describe("proposeCandidateTypes (mock)", () => {
-  it("generates only requested types", async () => {
+  it("generates only requested types when stories are seeded for scene", async () => {
+    const stories = await proposeCandidateTypes({
+      workId: "work-1",
+      workTitle: "Test Work",
+      narrative: validNarrative,
+      candidateTypes: ["story"],
+    });
     const result = await proposeCandidateTypes({
       workId: "work-1",
       workTitle: "Test Work",
       narrative: validNarrative,
-      candidateTypes: ["readingRoute"],
+      candidateTypes: ["scene"],
+      existingStoryCandidates: stories.candidates,
     });
-    expect(result.candidates.every((c) => c.candidateType === "readingRoute")).toBe(true);
+    expect(result.candidates.every((c) => c.candidateType === "scene")).toBe(
+      true
+    );
     expect(result.candidates.length).toBeGreaterThan(0);
+    expect(
+      result.candidates.every(
+        (c) =>
+          "parentStoryCandidateId" in c.fields &&
+          c.fields.parentStoryCandidateId === stories.candidates[0]!.candidateId
+      )
+    ).toBe(true);
+  });
+
+  it("fails scene-only propose without existing stories", async () => {
+    const result = await proposeCandidateTypes({
+      workId: "work-1",
+      workTitle: "Test Work",
+      narrative: validNarrative,
+      candidateTypes: ["scene"],
+    });
+    expect(result.candidates).toHaveLength(0);
+    expect(result.errors.some((e) => e.code === "SCENE_REQUIRES_STORY")).toBe(
+      true
+    );
   });
 });
 

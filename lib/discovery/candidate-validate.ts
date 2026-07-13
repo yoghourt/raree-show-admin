@@ -73,7 +73,7 @@ function normalizeFieldsRecord(
     }
   }
 
-  if (candidateType === "readingRoute") {
+  if (candidateType === "scene") {
     if (!isNonEmptyString(out.title) && isNonEmptyString(out.scene_title)) {
       out.title = out.scene_title;
     }
@@ -82,6 +82,12 @@ function normalizeFieldsRecord(
       out.chapter !== undefined
     ) {
       out.chapter_number = out.chapter;
+    }
+    if (
+      !isNonEmptyString(out.parentStoryCandidateId) &&
+      isNonEmptyString(out.parent_story_candidate_id)
+    ) {
+      out.parentStoryCandidateId = out.parent_story_candidate_id;
     }
   }
 
@@ -167,6 +173,12 @@ function validateSceneFields(
   if (assetErrors.length) {
     return { ok: false, errors: assetErrors };
   }
+  if (!isNonEmptyString(fields.parentStoryCandidateId)) {
+    return {
+      ok: false,
+      errors: ["Scene fields require non-empty parentStoryCandidateId"],
+    };
+  }
   const chapterNumber = fields.chapter_number;
   if (
     !isValidSceneChapterNumber(
@@ -187,6 +199,7 @@ function validateSceneFields(
   return {
     ok: true,
     fields: {
+      parentStoryCandidateId: fields.parentStoryCandidateId.trim(),
       chapter_number:
         typeof chapterNumber === "number"
           ? Math.trunc(chapterNumber)
@@ -215,9 +228,28 @@ function validateFieldsForType(
       return validateLocationFields(normalizeFieldsRecord("location", record));
     case "story":
       return validateStoryFields(normalizeFieldsRecord("story", record));
-    case "readingRoute":
-      return validateSceneFields(normalizeFieldsRecord("readingRoute", record));
+    case "scene":
+      return validateSceneFields(normalizeFieldsRecord("scene", record));
   }
+}
+
+/** Drop scenes whose parentStoryCandidateId is not in the proposed story set. */
+export function filterScenesWithValidParents(
+  candidates: DiscoveryCandidate[]
+): DiscoveryCandidate[] {
+  const storyIds = new Set(
+    candidates
+      .filter((c) => c.candidateType === "story")
+      .map((c) => c.candidateId)
+  );
+  return candidates.filter((c) => {
+    if (c.candidateType !== "scene") return true;
+    const parentId =
+      "parentStoryCandidateId" in c.fields
+        ? c.fields.parentStoryCandidateId
+        : "";
+    return Boolean(parentId && storyIds.has(parentId));
+  });
 }
 
 export function normalizeRawCandidate(

@@ -30,13 +30,22 @@ describe("scene chapter_number", () => {
 
   it("validateSceneAcceptFields aligns with Rollout rules", () => {
     const bad = validateSceneAcceptFields({
+      parentStoryCandidateId: "story-1",
       chapter_number: "Bran I",
       chapter_title: "Bran I",
       title: "Courtyard",
     });
     expect(bad.ok).toBe(false);
 
+    const missingParent = validateSceneAcceptFields({
+      chapter_number: 1,
+      chapter_title: "Bran I",
+      title: "Courtyard",
+    } as never);
+    expect(missingParent.ok).toBe(false);
+
     const good = validateSceneAcceptFields({
+      parentStoryCandidateId: "story-1",
       chapter_number: 1,
       chapter_title: "Bran I",
       title: "Courtyard",

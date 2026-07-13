@@ -1,59 +1,30 @@
 /**
- * SPEC-ROL-001 — Approved Story unit persist (server)
+ * Hotfix — Story persist facade.
+ * Durable target is Reading Route (scenes). Keeps ApprovedStoryUnit-shaped API for callers.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AcceptedStoryUnitStaging } from "@/lib/discovery/review-types";
-import { countLinksForStoryUnit } from "@/lib/rollout/story-scene-links";
-import type { ApprovedStoryUnit, StoryUnitStatus } from "@/lib/rollout/types";
+import {
+  archiveReadingRouteAsStoryUnit,
+  getActiveReadingRouteBySourceReviewId,
+  getReadingRouteAsStoryUnit,
+  listPersistedReadingRoutesAsStoryUnits,
+  persistReadingRouteFromStoryStaging,
+  unpersistReadingRoute,
+  updateReadingRouteAsStoryUnit,
+  type UnpersistReadingRouteResult,
+} from "@/lib/rollout/reading-route-persist";
+import type { ApprovedStoryUnit } from "@/lib/rollout/types";
 
-export type UnpersistStoryUnitResult =
-  | { ok: true; staging: AcceptedStoryUnitStaging }
-  | { ok: false; code: "NOT_FOUND" | "UNPERSIST_BLOCKED" };
-
-const TABLE = "story_units";
-
-type StoryUnitRow = {
-  id: string;
-  work_id: string;
-  source_review_id: string;
-  title: string;
-  summary: string;
-  boundary_hint: string | null;
-  approved_at: string;
-  approved_by: string;
-  status: StoryUnitStatus;
-};
-
-function rowToStoryUnit(row: StoryUnitRow): ApprovedStoryUnit {
-  return {
-    id: row.id,
-    workId: row.work_id,
-    sourceReviewId: row.source_review_id,
-    title: row.title,
-    summary: row.summary,
-    boundaryHint: row.boundary_hint ?? undefined,
-    approvedAt: row.approved_at,
-    status: row.status,
-  };
-}
+export type UnpersistStoryUnitResult = UnpersistReadingRouteResult;
 
 export async function listStoryUnits(
   supabase: SupabaseClient,
   workId: string
 ): Promise<ApprovedStoryUnit[]> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("*")
-    .eq("work_id", workId)
-    .order("approved_at", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return ((data as StoryUnitRow[] | null) ?? []).map(rowToStoryUnit);
+  return listPersistedReadingRoutesAsStoryUnits(supabase, workId);
 }
 
 export async function getStoryUnit(
@@ -61,22 +32,19 @@ export async function getStoryUnit(
   workId: string,
   storyUnitId: string
 ): Promise<ApprovedStoryUnit | null> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("*")
-    .eq("work_id", workId)
-    .eq("id", storyUnitId)
-    .maybeSingle();
+  return getReadingRouteAsStoryUnit(supabase, workId, storyUnitId);
+}
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return rowToStoryUnit(data as StoryUnitRow);
+export async function getActiveStoryUnitBySourceReviewId(
+  supabase: SupabaseClient,
+  workId: string,
+  sourceReviewId: string
+): Promise<ApprovedStoryUnit | null> {
+  return getActiveReadingRouteBySourceReviewId(
+    supabase,
+    workId,
+    sourceReviewId
+  );
 }
 
 export async function persistStoryUnitFromStaging(
@@ -85,52 +53,12 @@ export async function persistStoryUnitFromStaging(
   staging: AcceptedStoryUnitStaging,
   approvedBy: string
 ): Promise<ApprovedStoryUnit> {
-  const insertRow = {
-    work_id: workId,
-    source_review_id: staging.sourceReviewId,
-    title: staging.title.trim(),
-    summary: staging.summary ?? "",
-    boundary_hint: staging.boundaryHint?.trim() || null,
-    approved_by: approvedBy,
-    status: "active" as const,
-  };
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .insert(insertRow)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return rowToStoryUnit(data as StoryUnitRow);
-}
-
-export async function archiveStoryUnit(
-  supabase: SupabaseClient,
-  workId: string,
-  storyUnitId: string
-): Promise<ApprovedStoryUnit | null> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .update({ status: "archived" })
-    .eq("work_id", workId)
-    .eq("id", storyUnitId)
-    .eq("status", "active")
-    .select("*")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return rowToStoryUnit(data as StoryUnitRow);
+  return persistReadingRouteFromStoryStaging(
+    supabase,
+    workId,
+    staging,
+    approvedBy
+  );
 }
 
 export async function updateStoryUnit(
@@ -139,40 +67,15 @@ export async function updateStoryUnit(
   storyUnitId: string,
   patch: { title: string; summary: string; boundaryHint?: string }
 ): Promise<ApprovedStoryUnit | null> {
-  const updateRow = {
-    title: patch.title.trim(),
-    summary: patch.summary ?? "",
-    boundary_hint: patch.boundaryHint?.trim() || null,
-  };
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .update(updateRow)
-    .eq("work_id", workId)
-    .eq("id", storyUnitId)
-    .select("*")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return rowToStoryUnit(data as StoryUnitRow);
+  return updateReadingRouteAsStoryUnit(supabase, workId, storyUnitId, patch);
 }
 
-function storyUnitToStaging(unit: ApprovedStoryUnit): AcceptedStoryUnitStaging {
-  return {
-    workId: unit.workId,
-    sourceReviewId: unit.sourceReviewId,
-    title: unit.title,
-    summary: unit.summary,
-    boundaryHint: unit.boundaryHint,
-    acceptedAt: unit.approvedAt,
-  };
+export async function archiveStoryUnit(
+  supabase: SupabaseClient,
+  workId: string,
+  storyUnitId: string
+): Promise<ApprovedStoryUnit | null> {
+  return archiveReadingRouteAsStoryUnit(supabase, workId, storyUnitId);
 }
 
 export async function unpersistStoryUnit(
@@ -180,31 +83,5 @@ export async function unpersistStoryUnit(
   workId: string,
   storyUnitId: string
 ): Promise<UnpersistStoryUnitResult> {
-  const unit = await getStoryUnit(supabase, workId, storyUnitId);
-  if (!unit) {
-    return { ok: false, code: "NOT_FOUND" };
-  }
-
-  const linkCount = await countLinksForStoryUnit(
-    supabase,
-    workId,
-    storyUnitId
-  );
-  if (linkCount > 0) {
-    return { ok: false, code: "UNPERSIST_BLOCKED" };
-  }
-
-  const staging = storyUnitToStaging(unit);
-
-  const { error } = await supabase
-    .from(TABLE)
-    .delete()
-    .eq("work_id", workId)
-    .eq("id", storyUnitId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return { ok: true, staging };
+  return unpersistReadingRoute(supabase, workId, storyUnitId);
 }

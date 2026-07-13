@@ -28,14 +28,20 @@ describe("parseCandidateArray", () => {
   });
 
   it("parses single scene object under scenes key", () => {
-    const raw = `{"scenes":{"displayName":"Courtyard","summary":"s","fields":{"chapter_number":1,"title":"Courtyard","summary":"x"}}}`;
-    const items = parseCandidateArray(raw, "readingRoute");
+    const raw = `{"scenes":{"displayName":"Courtyard","summary":"s","fields":{"parentStoryCandidateId":"story-1","chapter_number":1,"title":"Courtyard","summary":"x"}}}`;
+    const items = parseCandidateArray(raw, "scene");
     expect(items).toHaveLength(1);
   });
 
   it("parses scene items without fields wrapper", () => {
-    const raw = `{"candidates":[{"displayName":"Feast","summary":"s","chapter_number":2,"chapter_title":"Catelyn I","title":"The Feast","summary":"Banquet scene."}]}`;
-    const items = parseCandidateArray(raw, "readingRoute");
+    const raw = `{"candidates":[{"displayName":"Feast","summary":"s","parentStoryCandidateId":"story-1","chapter_number":2,"chapter_title":"Catelyn I","title":"The Feast","summary":"Banquet scene."}]}`;
+    const items = parseCandidateArray(raw, "scene");
+    expect(items).toHaveLength(1);
+  });
+
+  it("parses legacy readingRoute key as scene alias", () => {
+    const raw = `{"readingRoute":[{"displayName":"Courtyard","summary":"s","fields":{"parentStoryCandidateId":"story-1","chapter_number":1,"title":"Courtyard"}}]}`;
+    const items = parseCandidateArray(raw, "scene");
     expect(items).toHaveLength(1);
   });
 

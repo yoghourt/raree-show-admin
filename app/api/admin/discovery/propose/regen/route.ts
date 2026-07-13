@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     candidateType,
     previousCandidate,
     siblingCandidates,
+    storyCandidates,
     feedback,
   } = parsed.data;
 
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
     candidateType,
     previousCandidate,
     siblingCandidates,
+    storyCandidates,
     feedback,
   });
 

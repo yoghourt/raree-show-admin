@@ -8,6 +8,7 @@ import * as React from "react";
 import { ReadingRouteForm } from "@/components/reading-routes/ReadingRouteForm";
 import { Button } from "@/components/ui/button";
 import * as charactersApi from "@/lib/characters";
+import { messages } from "@/lib/locale";
 import * as locationsApi from "@/lib/locations";
 import { getWork } from "@/lib/works";
 import type { Character, Location, Work } from "@/lib/types";
@@ -145,19 +146,19 @@ export default function NewReadingRoutePage() {
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
         <Link href={routesHref} className="transition-colors hover:text-zinc-800">
-          阅读路线
+          {messages.nav.readingRoutes}
         </Link>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">新增阅读路线</span>
+        <span className="font-medium text-zinc-800">{messages.works.newReadingRoute}</span>
       </nav>
 
       <Button variant="ghost" size="sm" className="-ml-2" asChild>
-        <Link href={routesHref}>← 返回阅读路线列表</Link>
+        <Link href={routesHref}>← 返回故事列表</Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">新增阅读路线</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{messages.works.newReadingRoute}</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          地点、角色从当前作品已维护的数据中选择；若无数据可手动填写 TSID。
+          地点、角色从当前作品已维护的数据中选择；若无数据可手动填写编号。
         </p>
       </div>
       {formReady ? (

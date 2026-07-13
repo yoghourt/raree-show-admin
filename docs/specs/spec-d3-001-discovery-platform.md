@@ -41,7 +41,7 @@ On narrative semantics conflicts, ADR-005 governs. On Discovery boundary conflic
 - Session state machine from `draft` through `review_pending` handoff
 - Narrative Input Bundle data contract and Narrative Gate validation
 - Permitted input modes: cross-chapter **excerpt bundle**; operator **approved summary** with attestation
-- Forbidden sole inputs: keywords alone; Runtime Scene structure alone; Chapter Catalog spine alone
+- Forbidden sole inputs: keywords alone; Reading Route structure alone (implementation: `scenes` table); Chapter Catalog spine alone
 - UI input guidance contract: session gate, persistent hints, good/bad examples (normative copy; not pixel-level UI Spec)
 - Consumer contract: SPEC-D3-002 and SPEC-D3-003 MUST consume **locked** narrative from session handoff
 - Open questions OQ-D3-001-01 through OQ-D3-001-04 resolved in §4.5
@@ -78,7 +78,7 @@ On narrative semantics conflicts, ADR-005 governs. On Discovery boundary conflic
 
 **D3-RC-01 — Work-scoped session**
 
-Discovery Session MUST be scoped to a single `workId`. MUST NOT be entity-scoped like Enrichment (SPEC-D2-002 scope-field model).
+Discovery Session MUST be scoped to a single `workId`. MUST NOT be entity-scoped like Enrichment (SPEC-D2-002 scope-field model). Propose Candidate hierarchy within a session is **Story-scoped for Scenes** (Work → Story → Scene per ADR-005 / SPEC-D3-003); the session itself remains work-scoped.
 
 **D3-RC-02 — Separate from Enrichment**
 
@@ -94,7 +94,7 @@ While session state is `narrative_locked`, `proposing`, or `review_pending`, the
 
 **D3-RC-05 — Forbidden sole inputs**
 
-Narrative input MUST NOT consist solely of: keyword lists; Runtime Scene identifiers or Scene table exports; Chapter Catalog spine metadata alone.
+Narrative input MUST NOT consist solely of: keyword lists; Reading Route identifiers or `scenes` table exports (implementation symbols — not Editorial Scene per ADR-005 v2.0); Chapter Catalog spine metadata alone.
 
 **D3-RC-06 — Provenance is not boundary authority**
 
@@ -182,7 +182,7 @@ Gate PASS required before transition to `narrative_locked`.
 
 **Keyword-list heuristic (NG-05):** An excerpt FAILS if, after trim, it contains no sentence terminators (e.g. `.`, `!`, `?`; implementation MAY treat full-width equivalents as terminators) AND (a) comma-separated tokens only, OR (b) length < 40 AND token count ≤ 5 without verbs (implementation MAY use simple token/length check).
 
-**Catalog/runtime-only flags (NG-06):** Client MUST set `catalogOnly: true` when input is auto-imported solely from Chapter Catalog export with no added prose. MUST set `runtimeExportOnly: true` when input is auto-imported solely from Runtime Scene list/metadata with no added prose. These flags are not persisted in the locked bundle; they gate lock attempts.
+**Catalog/runtime-only flags (NG-06):** Client MUST set `catalogOnly: true` when input is auto-imported solely from Chapter Catalog export with no added prose. MUST set `runtimeExportOnly: true` when input is auto-imported solely from Reading Route list/metadata (implementation: `scenes` table) with no added prose. These flags are not persisted in the locked bundle; they gate lock attempts.
 
 ### 4.4 UI Input Guidance Contract
 

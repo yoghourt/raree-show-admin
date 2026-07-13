@@ -47,3 +47,13 @@ This is NOT the Next.js you know. This version has breaking changes — APIs, co
 - Map coordinates: stored as 0–1 floats (`MapPicker` in `components/locations/MapPicker.tsx`)
 - SQL column: `order_index` (not `order`)
 - Repo specs under `docs/specs/` and ADRs under `docs/adr/` supplement governance for this codebase; on conflict with `/governance/*`, governance wins unless architecture explicitly updates local ADR/Spec
+
+### Runtime Reading Governance (RC1)
+
+Baseline for Reader implementation — authority in this repo only:
+
+```text
+SPEC-ROL-001 → SPEC-ROL-002 → SPEC-RDX-001 → docs/specs/runtime-reading-governance-rc1.md
+```
+
+Web realization: `raree-show-web` W-01 + `runtime-architecture.md` (cite only; do not redefine capability).

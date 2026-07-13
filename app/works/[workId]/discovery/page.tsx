@@ -2,11 +2,12 @@
 
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import * as React from "react";
 
 import { DiscoveryComposer } from "@/components/discovery/DiscoveryComposer";
 import { useDiscoverySession } from "@/hooks/useDiscoverySession";
+import { useRollout } from "@/hooks/useRollout";
 import {
   DISCOVERY_PAGE_SUBTITLE,
   DISCOVERY_PAGE_TITLE,
@@ -24,8 +25,11 @@ function toErrorMessage(e: unknown): string {
 
 export default function WorkDiscoveryPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const raw = params.workId;
   const workId = Array.isArray(raw) ? raw[0] : raw ?? "";
+  const initialStep =
+    searchParams.get("step") === "rollout" ? ("rollout" as const) : undefined;
 
   const [work, setWork] = React.useState<Work | null>(null);
   const [workLoading, setWorkLoading] = React.useState(true);
@@ -94,10 +98,15 @@ export default function WorkDiscoveryPage() {
     operatorId: operatorId ?? "",
   });
 
+  const rollout = useRollout({
+    workId,
+    operatorId: operatorId ?? "",
+  });
+
   const workTitle = workLoading ? "加载中…" : work?.title ?? "未知作品";
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 px-6 py-8">
+    <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
       {workError ? (
         <div
           className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
@@ -142,7 +151,13 @@ export default function WorkDiscoveryPage() {
         <p className="text-muted-foreground text-sm">{DISCOVERY_PAGE_SUBTITLE}</p>
       </header>
 
-      {operatorId ? <DiscoveryComposer discovery={discovery} /> : null}
+      {operatorId ? (
+        <DiscoveryComposer
+          discovery={discovery}
+          rollout={rollout}
+          initialStep={initialStep}
+        />
+      ) : null}
     </div>
   );
 }

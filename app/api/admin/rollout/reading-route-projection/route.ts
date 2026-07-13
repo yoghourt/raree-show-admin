@@ -1,6 +1,6 @@
 /**
  * POST /api/admin/rollout/reading-route-projection
- * SPEC-ROL-001 §4.7.3
+ * SPEC-ROL-001 §4.7.3 — Projection Accept via Projection Engine
  */
 
 import { NextResponse } from "next/server";
@@ -15,7 +15,6 @@ import {
   assertStagingWorkId,
   sceneProjectionBodySchema,
 } from "@/lib/rollout/schemas";
-import { getStoryUnit } from "@/lib/rollout/story-units";
 
 export async function POST(request: Request) {
   const auth = await requireRolloutAuth();
@@ -34,7 +33,8 @@ export async function POST(request: Request) {
       {
         error: {
           code: "STAGING_INVALID",
-          message: "Invalid reading route projection body",
+          message:
+            "Invalid projection body (parent Story refs required on Scene staging)",
           fields: Object.keys(parsed.error.flatten().fieldErrors),
         },
       },
@@ -73,25 +73,6 @@ export async function POST(request: Request) {
     return workResult.response;
   }
 
-  if (linkToStoryUnitId) {
-    const unit = await getStoryUnit(
-      auth.supabase,
-      workId,
-      linkToStoryUnitId
-    );
-    if (!unit || unit.status !== "active") {
-      return NextResponse.json(
-        {
-          error: {
-            code: "STORY_UNIT_NOT_FOUND",
-            message: "Active story unit not found for link",
-          },
-        },
-        { status: 404 }
-      );
-    }
-  }
-
   try {
     const result = await acceptReadingRouteProjection(auth.supabase, {
       workId,
@@ -104,11 +85,18 @@ export async function POST(request: Request) {
 
     if (!result.ok) {
       const status =
-        result.code === "SCENE_WORK_MISMATCH"
+        result.code === "WORK_MISMATCH" || result.code === "SCENE_WORK_MISMATCH"
           ? 403
-          : result.code === "SCENE_VALIDATION_FAILED"
+          : result.code === "SCENE_VALIDATION_FAILED" ||
+              result.code === "STAGING_INVALID" ||
+              result.code === "PARENT_STORY_MISMATCH"
             ? 422
-            : 404;
+            : result.code === "ALREADY_PROJECTED" ||
+                result.code === "LINK_ALREADY_EXISTS"
+              ? 409
+              : result.code === "PARENT_STORY_NOT_PERSISTED"
+                ? 422
+                : 404;
       return NextResponse.json(
         {
           error: {
@@ -124,16 +112,23 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       sceneTsid: result.sceneTsid,
+      frameIndex: result.frameIndex,
+      sourceReviewId: result.sourceReviewId,
+      approvedSceneUnitId: result.approvedSceneUnitId,
+      sceneProjectionLinkId: result.sceneProjectionLinkId,
       ...(result.link ? { link: result.link } : {}),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    if (message === "LINK_ALREADY_EXISTS") {
+    if (message === "LINK_ALREADY_EXISTS" || message === "ALREADY_PROJECTED") {
       return NextResponse.json(
         {
           error: {
-            code: "LINK_ALREADY_EXISTS",
-            message: "Story unit is already linked to this Reading Route",
+            code: message,
+            message:
+              message === "ALREADY_PROJECTED"
+                ? "Scene already projected; Unproject before re-projecting"
+                : "Story unit is already linked to this Reading Route",
           },
         },
         { status: 409 }

@@ -93,18 +93,19 @@ const TYPE_KEY_VARIANTS: Record<DiscoveryCandidateType, string[]> = {
     "narrative_units",
     "narrativeUnits",
   ],
-  readingRoute: [
+  scene: [
+    "scene",
+    "scenes",
+    "scene_candidates",
+    "sceneCandidates",
+    "scene_proposals",
+    // LLM / legacy aliases (compat only — public type is "scene")
     "readingRoute",
     "reading_route",
     "readingRoutes",
     "reading_routes",
     "reading_route_candidates",
     "readingRouteCandidates",
-    "scene",
-    "scenes",
-    "scene_candidates",
-    "sceneCandidates",
-    "scene_proposals",
   ],
 };
 
@@ -132,12 +133,17 @@ function normalizeCandidateItems(
               fields: { title: label, summary: label },
             },
           ];
-        case "readingRoute":
+        case "scene":
           return [
             {
               displayName: label,
               summary: label,
-              fields: { chapter_number: 1, title: label, summary: label },
+              fields: {
+                parentStoryCandidateId: "",
+                chapter_number: 1,
+                title: label,
+                summary: label,
+              },
             },
           ];
       }

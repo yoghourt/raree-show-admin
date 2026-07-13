@@ -1,9 +1,15 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+/**
+ * Hotfix Rollout UI — two surfaces only:
+ * 1) 待处理：故事 → 写入作品；画面 → 画面页
+ * 2) 已写入：故事 + 其下的画面页
+ */
+
 import Link from "next/link";
 import * as React from "react";
 
+import { StoryWritePreviewCard } from "@/components/rollout/StoryWritePreviewCard";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,156 +26,40 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  StepTabsList,
-  StepTabsTrigger,
-  Tabs,
-  TabsContent,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { UseRolloutReturn } from "@/hooks/useRollout";
-import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
+import * as charactersApi from "@/lib/characters";
+import type {
+  AcceptedSceneCandidateStaging,
+  AcceptedStoryUnitStaging,
+} from "@/lib/discovery/review-types";
+import * as locationsApi from "@/lib/locations";
 import { messages } from "@/lib/locale";
 import { rolloutUi } from "@/lib/rollout/ui-copy";
 import type { ApprovedStoryUnit } from "@/lib/rollout/types";
+import type { Character, Location } from "@/lib/types";
 
 export interface RolloutPanelProps {
   workId: string;
   rollout: UseRolloutReturn;
-  /** When rendered inside a drawer, call this to close it instead of navigating away. */
   onClose?: () => void;
+  /** When true, nest inside Discovery workbench (no back-link / lighter chrome). */
+  embedded?: boolean;
 }
 
-/** Filled circle with step number; fills primary when tab is active via group/step. */
-function StepBadge({ step }: { step: number }) {
-  return (
-    <span
-      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold
-        border-border bg-muted text-muted-foreground
-        group-data-[state=active]/step:border-transparent group-data-[state=active]/step:bg-primary group-data-[state=active]/step:text-primary-foreground"
-    >
-      {step}
-    </span>
-  );
-}
-
-/** Item count badge — only renders when count > 0. */
 function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="bg-primary/10 text-primary inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-normal tabular-nums">
+    <span className="bg-primary/10 text-primary ml-1 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-normal tabular-nums">
       {count}
     </span>
   );
 }
 
-/** Arrow connector rendered between step triggers. */
-function StepConnector() {
-  return (
-    <ChevronRight
-      className="mx-0.5 size-4 shrink-0 text-muted-foreground"
-      aria-hidden="true"
-    />
-  );
-}
-
-/** "Next step" footer hint with an optional action link. */
-function FlowHint({
-  text,
-  nextLabel,
-  onNext,
-  href,
-}: {
-  text: string;
-  nextLabel?: string;
-  onNext?: () => void;
-  href?: string;
-}) {
-  return (
-    <div className="mt-5 flex items-center justify-between border-t pt-3">
-      <p className="text-muted-foreground text-xs">{text}</p>
-      {nextLabel && onNext ? (
-        <button
-          type="button"
-          onClick={onNext}
-          className="flex items-center gap-0.5 text-sm font-medium text-primary hover:underline"
-        >
-          {nextLabel}
-          <ChevronRight className="size-3.5" />
-        </button>
-      ) : nextLabel && href ? (
-        <Link
-          href={href}
-          className="flex items-center gap-0.5 text-sm font-medium text-primary hover:underline"
-        >
-          {nextLabel}
-          <ChevronRight className="size-3.5" />
-        </Link>
-      ) : null}
-    </div>
-  );
-}
-
-/** Thin pipeline breadcrumb — shows the full flow across Discovery + Rollout. */
-function PipelineBreadcrumb({ activeStep }: { activeStep: string }) {
-  const steps = [
-    { id: "discovery", label: rolloutUi.pipelineFromDiscovery, external: true },
-    { id: "pending", label: "① 待处理" },
-    { id: "story-units", label: `② ${rolloutUi.tabStoryUnits}` },
-    { id: "runtime-scenes", label: `③ ${messages.domain.readingRoute}` },
-    { id: "links", label: "④ 关联" },
-  ];
-
-  return (
-    <div className="flex flex-wrap items-center gap-1 text-xs" aria-hidden="true">
-      {steps.map((step, i) => (
-        <React.Fragment key={step.id}>
-          {i > 0 && (
-            <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
-          )}
-          <span
-            className={
-              step.id === activeStep
-                ? "rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary"
-                : step.external
-                  ? "rounded border px-1.5 py-0.5 text-muted-foreground"
-                  : "text-muted-foreground"
-            }
-          >
-            {step.label}
-          </span>
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
-/** Section header inside a tab. */
-function TabSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <div>
-        <h3 className="text-sm font-medium">{title}</h3>
-        {description ? (
-          <p className="text-muted-foreground text-xs">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function StoryUnitEditDialog({
+function RouteEditDialog({
   unit,
   open,
   onOpenChange,
@@ -188,15 +78,13 @@ function StoryUnitEditDialog({
 }) {
   const [title, setTitle] = React.useState("");
   const [summary, setSummary] = React.useState("");
-  const [boundaryHint, setBoundaryHint] = React.useState("");
 
   React.useEffect(() => {
     if (open && unit) {
       setTitle(unit.title);
       setSummary(unit.summary);
-      setBoundaryHint(unit.boundaryHint ?? "");
     }
-  }, [open, unit?.id, unit?.title, unit?.summary, unit?.boundaryHint]);
+  }, [open, unit?.id, unit?.title, unit?.summary]);
 
   if (!unit) return null;
 
@@ -209,55 +97,35 @@ function StoryUnitEditDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label htmlFor="story-unit-title">
-              {rolloutUi.editStoryUnitTitleLabel}
-            </Label>
+            <Label htmlFor="route-title">{rolloutUi.editStoryUnitTitleLabel}</Label>
             <Input
-              id="story-unit-title"
+              id="route-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="story-unit-summary">
+            <Label htmlFor="route-summary">
               {rolloutUi.editStoryUnitSummaryLabel}
             </Label>
             <Textarea
-              id="story-unit-summary"
+              id="route-summary"
               value={summary}
               rows={4}
               onChange={(e) => setSummary(e.target.value)}
             />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="story-unit-boundary">
-              {rolloutUi.editStoryUnitBoundaryLabel}
-            </Label>
-            <Textarea
-              id="story-unit-boundary"
-              value={boundaryHint}
-              rows={2}
-              onChange={(e) => setBoundaryHint(e.target.value)}
-            />
-          </div>
         </div>
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             取消
           </Button>
           <Button
-            type="button"
             disabled={busy || !title.trim()}
             onClick={() =>
-              void onSave({
-                title: title.trim(),
-                summary,
-                boundaryHint: boundaryHint.trim() || undefined,
-              }).then(() => onOpenChange(false))
+              void onSave({ title: title.trim(), summary }).then(() =>
+                onOpenChange(false)
+              )
             }
           >
             {rolloutUi.saveStoryUnit}
@@ -268,112 +136,58 @@ function StoryUnitEditDialog({
   );
 }
 
-function SceneProjectionDialog({
+function WriteFrameDialog({
   staging,
   open,
   onOpenChange,
-  scenes,
-  storyUnitOptions,
-  onCreate,
-  onLinkExisting,
+  canProject,
+  onConfirm,
   busy,
 }: {
   staging: AcceptedSceneCandidateStaging | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  scenes: UseRolloutReturn["scenes"];
-  storyUnitOptions: UseRolloutReturn["storyUnits"];
-  onCreate: (linkToStoryUnitId?: string) => Promise<void>;
-  onLinkExisting: (sceneTsid: string, linkToStoryUnitId?: string) => Promise<void>;
+  canProject: boolean;
+  onConfirm: () => Promise<void>;
   busy: boolean;
 }) {
-  const [sceneTsid, setSceneTsid] = React.useState("");
-  const [linkStoryUnitId, setLinkStoryUnitId] = React.useState("");
-
-  React.useEffect(() => {
-    if (open) {
-      setSceneTsid("");
-      setLinkStoryUnitId("");
-    }
-  }, [open, staging?.sourceReviewId]);
-
   if (!staging) return null;
-
-  const activeUnits = storyUnitOptions.filter((u) => u.status === "active");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{rolloutUi.confirmCreateScene}</DialogTitle>
           <DialogDescription>{rolloutUi.confirmCreateSceneDesc}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 text-sm">
+        <div className="space-y-2 text-sm">
           <p>
             <span className="text-muted-foreground">标题：</span>
             {staging.title}
           </p>
-          <p>
-            <span className="text-muted-foreground">章节：</span>
-            {staging.chapter_number}
-            {staging.chapter_title ? ` — ${staging.chapter_title}` : ""}
-          </p>
-          {activeUnits.length > 0 ? (
-            <div className="space-y-1">
-              <Label htmlFor="link-story-unit">{rolloutUi.optionalLinkStory}</Label>
-              <select
-                id="link-story-unit"
-                className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-                value={linkStoryUnitId}
-                onChange={(e) => setLinkStoryUnitId(e.target.value)}
-              >
-                <option value="">—</option>
-                {activeUnits.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.title}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {staging.parentStoryTitle ? (
+            <p>
+              <span className="text-muted-foreground">所属故事：</span>
+              {staging.parentStoryTitle}
+            </p>
           ) : null}
-          <div className="space-y-1">
-            <Label htmlFor="existing-scene">{rolloutUi.selectScene}</Label>
-            <select
-              id="existing-scene"
-              className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-              value={sceneTsid}
-              onChange={(e) => setSceneTsid(e.target.value)}
-            >
-              <option value="">—</option>
-              {scenes.map((s) => (
-                <option key={s.tsid} value={s.tsid}>
-                  {messages.common.chapterN(s.chapter_number)} {s.title} ({s.tsid})
-                </option>
-              ))}
-            </select>
-          </div>
+          {!canProject ? (
+            <p className="text-destructive text-xs">
+              {rolloutUi.projectionValidationParentMissing}
+            </p>
+          ) : null}
         </div>
-        <DialogFooter className="flex-col gap-2 sm:flex-col sm:items-stretch">
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
           <Button
-            disabled={busy}
+            disabled={busy || !canProject}
             onClick={() =>
-              void onCreate(linkStoryUnitId || undefined).then(() =>
-                onOpenChange(false)
-              )
+              void onConfirm().then(() => onOpenChange(false))
             }
           >
             {rolloutUi.projectCreate}
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={busy || !sceneTsid}
-            onClick={() =>
-              void onLinkExisting(sceneTsid, linkStoryUnitId || undefined).then(
-                () => onOpenChange(false)
-              )
-            }
-          >
-            {rolloutUi.projectLink}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -381,64 +195,111 @@ function SceneProjectionDialog({
   );
 }
 
-export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
+export function RolloutPanel({
+  workId,
+  rollout,
+  onClose,
+  embedded = false,
+}: RolloutPanelProps) {
   const [activeTab, setActiveTab] = React.useState("pending");
   const [importNotice, setImportNotice] = React.useState<string | null>(null);
-  const [projectionStaging, setProjectionStaging] =
+  const [frameStaging, setFrameStaging] =
     React.useState<AcceptedSceneCandidateStaging | null>(null);
-  const [editingStoryUnit, setEditingStoryUnit] =
+  const [editingRoute, setEditingRoute] =
     React.useState<ApprovedStoryUnit | null>(null);
-  const [linkStoryUnitId, setLinkStoryUnitId] = React.useState("");
-  const [linkSceneTsid, setLinkSceneTsid] = React.useState("");
+  const [showDismissed, setShowDismissed] = React.useState(false);
+  const [characters, setCharacters] = React.useState<Character[]>([]);
+  const [locations, setLocations] = React.useState<Location[]>([]);
+  const [defaultChapterNumber, setDefaultChapterNumber] = React.useState(1);
 
-  const activeStoryUnits = rollout.storyUnits.filter((u) => u.status === "active");
+  React.useEffect(() => {
+    if (!workId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [chars, locs] = await Promise.all([
+          charactersApi.getAll(workId),
+          locationsApi.getAll(workId),
+        ]);
+        if (cancelled) return;
+        setCharacters(chars);
+        setLocations(locs);
+        const maxChapter = Math.max(
+          0,
+          ...rollout.scenes.map((s) => s.chapter_number)
+        );
+        setDefaultChapterNumber(maxChapter + 1);
+      } catch {
+        if (!cancelled) {
+          setCharacters([]);
+          setLocations([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workId, rollout.scenes]);
 
-  const storyTitleById = React.useMemo(() => {
-    const map = new Map<string, string>();
-    for (const u of rollout.storyUnits) map.set(u.id, u.title);
-    return map;
-  }, [rollout.storyUnits]);
-
-  const sceneTitleByTsid = React.useMemo(() => {
-    const map = new Map<string, string>();
-    for (const s of rollout.scenes) map.set(s.tsid, s.title);
-    return map;
-  }, [rollout.scenes]);
-
-  const linkCountByStoryUnitId = React.useMemo(() => {
-    const map = new Map<string, number>();
-    for (const link of rollout.links)
-      map.set(link.storyUnitId, (map.get(link.storyUnitId) ?? 0) + 1);
-    return map;
-  }, [rollout.links]);
-
-  const linksBySceneTsid = React.useMemo(() => {
-    const map = new Map<string, typeof rollout.links>();
-    for (const link of rollout.links) {
-      const existing = map.get(link.sceneTsid) ?? [];
-      existing.push(link);
-      map.set(link.sceneTsid, existing);
+  const framesByRouteTsid = React.useMemo(() => {
+    const map = new Map<string, typeof rollout.frameProjections>();
+    for (const frame of rollout.frameProjections) {
+      const list = map.get(frame.readingRouteTsid) ?? [];
+      list.push(frame);
+      map.set(frame.readingRouteTsid, list);
     }
     return map;
-  }, [rollout.links]);
-
-  const projectedBySceneTsid = React.useMemo(() => {
-    const map = new Map<
-      string,
-      NonNullable<typeof rollout.queue.projectedReadingRoutes>[number]
-    >();
-    for (const record of rollout.queue.projectedReadingRoutes ?? [])
-      map.set(record.sceneTsid, record);
-    return map;
-  }, [rollout.queue.projectedReadingRoutes]);
+  }, [rollout.frameProjections]);
 
   const pendingCount =
     rollout.queue.storyStaging.length + rollout.queue.readingRouteStaging.length;
   const dismissedCount =
     (rollout.queue.dismissedStoryStaging?.length ?? 0) +
     (rollout.queue.dismissedReadingRouteStaging?.length ?? 0);
+  const persistedCount = rollout.storyUnits.length;
 
-  const goTo = (tab: string) => setActiveTab(tab);
+  const pendingStoryIds = React.useMemo(
+    () => new Set(rollout.queue.storyStaging.map((s) => s.sourceReviewId)),
+    [rollout.queue.storyStaging]
+  );
+
+  const orphanFrameStaging = React.useMemo(
+    () =>
+      rollout.queue.readingRouteStaging.filter(
+        (s) =>
+          !s.parentStorySourceReviewId ||
+          !pendingStoryIds.has(s.parentStorySourceReviewId)
+      ),
+    [rollout.queue.readingRouteStaging, pendingStoryIds]
+  );
+
+  const handleWriteStory = React.useCallback(
+    async (staging: AcceptedStoryUnitStaging) => {
+      const childFrames = rollout.queue.readingRouteStaging.filter(
+        (s) => s.parentStorySourceReviewId === staging.sourceReviewId
+      );
+      const storyUnitId = await rollout.persistStoryUnit(staging);
+      if (!storyUnitId) return;
+
+      let framesOk = 0;
+      for (const frame of childFrames) {
+        const ok = await rollout.projectSceneCreate(frame, storyUnitId);
+        if (ok) framesOk += 1;
+      }
+
+      if (childFrames.length > 0 && framesOk < childFrames.length) {
+        // Incomplete: do not claim write success (Constitution: Evidence Before Completion)
+        return;
+      }
+
+      const evidenceOk = await rollout.verifyReaderEvidence(
+        storyUnitId,
+        childFrames.length
+      );
+      if (!evidenceOk) return;
+    },
+    [rollout]
+  );
 
   return (
     <div className="space-y-6">
@@ -460,18 +321,6 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
             {rolloutUi.actionError}: {rollout.actionError.message} (
             {rollout.actionError.code})
           </p>
-          {rollout.actionError.fieldErrors ? (
-            <ul className="mt-2 list-disc pl-5 text-xs">
-              {Object.entries(rollout.actionError.fieldErrors).map(
-                ([field, messages]) =>
-                  messages.map((msg) => (
-                    <li key={`${field}-${msg}`}>
-                      {rolloutUi.fieldErrorsLabel} {field}: {msg}
-                    </li>
-                  ))
-              )}
-            </ul>
-          ) : null}
         </div>
       ) : null}
 
@@ -481,7 +330,6 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
         </div>
       ) : null}
 
-      {/* Toolbar */}
       <div className="flex flex-wrap gap-2">
         <Button
           variant="secondary"
@@ -500,185 +348,204 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
         >
           {rolloutUi.refresh}
         </Button>
-        <Button variant="outline" asChild>
-          <Link href={`/works/${encodeURIComponent(workId)}/discovery`}>
-            {rolloutUi.goDiscovery}
-          </Link>
-        </Button>
+        {!embedded ? (
+          <Button variant="outline" asChild>
+            <Link href={`/works/${encodeURIComponent(workId)}/discovery`}>
+              {rolloutUi.goDiscovery}
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{rolloutUi.workspaceTitle}</CardTitle>
-          <CardDescription>{rolloutUi.workspaceDescription}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Pipeline breadcrumb */}
-          <PipelineBreadcrumb activeStep={activeTab} />
-
+      <Card className={embedded ? "border-0 shadow-none" : undefined}>
+        {!embedded ? (
+          <CardHeader>
+            <CardTitle>{rolloutUi.workspaceTitle}</CardTitle>
+            <CardDescription>{rolloutUi.workspaceDescription}</CardDescription>
+          </CardHeader>
+        ) : null}
+        <CardContent className={embedded ? "p-0" : undefined}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {/* ── Step tab bar ── */}
-            <StepTabsList className="mb-2 gap-0">
-              {/* Main flow steps */}
-              <StepTabsTrigger value="pending">
-                <StepBadge step={1} />
+            <TabsList className="mb-4">
+              <TabsTrigger value="pending">
                 {rolloutUi.tabPending}
                 <CountBadge count={pendingCount} />
-              </StepTabsTrigger>
-              <StepConnector />
-              <StepTabsTrigger value="story-units">
-                <StepBadge step={2} />
-                {rolloutUi.tabStoryUnits}
-                <CountBadge count={rollout.storyUnits.length} />
-              </StepTabsTrigger>
-              <StepConnector />
-              <StepTabsTrigger value="runtime-scenes">
-                <StepBadge step={3} />
-                {rolloutUi.tabRuntimeScenes}
-                <CountBadge count={rollout.scenes.length} />
-              </StepTabsTrigger>
-              <StepConnector />
-              <StepTabsTrigger value="links">
-                <StepBadge step={4} />
-                {rolloutUi.tabLinks}
-                <CountBadge count={rollout.links.length} />
-              </StepTabsTrigger>
+              </TabsTrigger>
+              <TabsTrigger value="persisted">
+                {rolloutUi.tabPersisted}
+                <CountBadge count={persistedCount} />
+              </TabsTrigger>
+            </TabsList>
 
-              {/* Aux separator + dismissed */}
-              <div
-                className="mx-3 h-6 w-px shrink-0 bg-border"
-                aria-hidden="true"
-              />
-              <StepTabsTrigger value="dismissed">
-                {rolloutUi.tabDismissed}
-                <CountBadge count={dismissedCount} />
-              </StepTabsTrigger>
-            </StepTabsList>
-
-            {/* ── Tab 1: 待处理 ── */}
-            <TabsContent value="pending" className="min-h-72 space-y-6">
-              <TabSection
-                title={rolloutUi.storyStagingTitle}
-                description={messages.rollout.tabDescriptionPending}
-              >
+            {/* ── 待处理 ── */}
+            <TabsContent value="pending" className="min-h-72 space-y-8">
+              <section className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-medium">
+                    {rolloutUi.storyStagingTitle}
+                  </h3>
+                  <p className="text-muted-foreground text-xs">
+                    {rolloutUi.writePreviewHint}
+                  </p>
+                </div>
                 {rollout.queue.storyStaging.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
                     {rolloutUi.noStoryStaging}
                   </p>
                 ) : (
-                  <div className="space-y-3">
-                    {rollout.queue.storyStaging.map((staging) => (
-                      <div
-                        key={staging.sourceReviewId}
-                        className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0 text-sm">
-                          <p className="font-medium">{staging.title}</p>
-                          <p className="text-muted-foreground line-clamp-2">
-                            {staging.summary}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 gap-2">
-                          <Button
-                            size="sm"
-                            disabled={rollout.busy}
-                            onClick={() => void rollout.persistStoryUnit(staging)}
-                          >
-                            {rolloutUi.persistStory}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={rollout.busy}
-                            onClick={() =>
-                              rollout.dismissStoryStaging(staging.sourceReviewId)
-                            }
-                          >
-                            {rolloutUi.dismissStaging}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="space-y-4">
+                    {rollout.queue.storyStaging.map((staging, index) => {
+                      const childFrames =
+                        rollout.queue.readingRouteStaging.filter(
+                          (s) =>
+                            s.parentStorySourceReviewId ===
+                            staging.sourceReviewId
+                        );
+                      return (
+                        <StoryWritePreviewCard
+                          key={staging.sourceReviewId}
+                          staging={staging}
+                          frames={childFrames}
+                          characters={characters}
+                          locations={locations}
+                          defaultChapterNumber={defaultChapterNumber + index}
+                          busy={rollout.busy}
+                          onChange={(next) => rollout.updateStoryStaging(next)}
+                          onFrameChange={(sourceReviewId, patch) => {
+                            const frame =
+                              rollout.queue.readingRouteStaging.find(
+                                (s) => s.sourceReviewId === sourceReviewId
+                              );
+                            if (!frame) return;
+                            rollout.updateSceneStaging({
+                              ...frame,
+                              title: patch.title.trim() || frame.title,
+                              summary: patch.summary.trim() || undefined,
+                            });
+                          }}
+                          onWrite={handleWriteStory}
+                          onDismiss={() =>
+                            rollout.dismissStoryStaging(staging.sourceReviewId)
+                          }
+                        />
+                      );
+                    })}
                   </div>
                 )}
-              </TabSection>
+              </section>
 
-              <TabSection
-                title={rolloutUi.sceneStagingTitle}
-                description={messages.rollout.tabDescriptionReadingRoutes(
-                  messages.domain.readingRoute
-                )}
-              >
-                {rollout.queue.readingRouteStaging.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    {rolloutUi.noSceneStaging}
+              {orphanFrameStaging.length > 0 ? (
+              <section className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-medium">
+                    {rolloutUi.sceneStagingTitle}
+                  </h3>
+                  <p className="text-muted-foreground text-xs">
+                    所属故事已写入或不在待写入列表中的画面，可单独添加。
                   </p>
-                ) : (
+                </div>
                   <div className="space-y-3">
-                    {rollout.queue.readingRouteStaging.map((staging) => (
-                      <div
-                        key={staging.sourceReviewId}
-                        className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0 text-sm">
-                          <p className="font-medium">{staging.title}</p>
-                          <p className="text-muted-foreground">
-                            {messages.common.chapterN(staging.chapter_number)}
-                            {staging.chapter_title
-                              ? ` — ${staging.chapter_title}`
-                              : ""}
-                          </p>
+                    {orphanFrameStaging.map((staging) => {
+                      const canWrite = rollout.canProjectScene(staging);
+                      return (
+                        <div
+                          key={staging.sourceReviewId}
+                          className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0 text-sm">
+                            <p className="font-medium">{staging.title}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {staging.parentStoryTitle
+                                ? `所属故事：${staging.parentStoryTitle}`
+                                : "缺少所属故事"}
+                              {!canWrite && staging.parentStorySourceReviewId
+                                ? " · 所属故事尚未保存"
+                                : ""}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              size="sm"
+                              disabled={rollout.busy || !canWrite}
+                              onClick={() => setFrameStaging(staging)}
+                            >
+                              {rolloutUi.projectCreate}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={rollout.busy}
+                              onClick={() =>
+                                rollout.dismissSceneStaging(
+                                  staging.sourceReviewId
+                                )
+                              }
+                            >
+                              {rolloutUi.dismissStaging}
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex shrink-0 gap-2">
-                          <Button
-                            size="sm"
-                            disabled={rollout.busy}
-                            onClick={() => setProjectionStaging(staging)}
-                          >
-                            {rolloutUi.projectCreate}
-                          </Button>
+                      );
+                    })}
+                  </div>
+              </section>
+              ) : null}
+
+              {dismissedCount > 0 ? (
+                <div className="border-t pt-4">
+                  <button
+                    type="button"
+                    className="text-muted-foreground text-xs hover:underline"
+                    onClick={() => setShowDismissed((v) => !v)}
+                  >
+                    {showDismissed ? "收起" : "显示"}
+                    {rolloutUi.tabDismissed}
+                    <CountBadge count={dismissedCount} />
+                  </button>
+                  {showDismissed ? (
+                    <div className="mt-3 space-y-2">
+                      {rollout.queue.dismissedStoryStaging?.map((s) => (
+                        <div
+                          key={s.sourceReviewId}
+                          className="flex items-center justify-between rounded border border-dashed p-2 text-sm"
+                        >
+                          <span>{s.title}</span>
                           <Button
                             size="sm"
                             variant="ghost"
-                            disabled={rollout.busy}
                             onClick={() =>
-                              rollout.dismissSceneStaging(staging.sourceReviewId)
+                              rollout.restoreStoryStaging(s.sourceReviewId)
                             }
                           >
-                            {rolloutUi.dismissStaging}
+                            {rolloutUi.restoreStaging}
                           </Button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabSection>
-
-              <FlowHint
-                text={
-                  pendingCount > 0
-                    ? rolloutUi.flowHintPending
-                    : rolloutUi.flowHintPendingEmpty
-                }
-                nextLabel={
-                  rollout.storyUnits.length > 0
-                    ? rolloutUi.nextStepStoryUnits
-                    : rollout.scenes.length > 0
-                      ? rolloutUi.nextStepRuntimeScenes
-                      : undefined
-                }
-                onNext={
-                  rollout.storyUnits.length > 0
-                    ? () => goTo("story-units")
-                    : rollout.scenes.length > 0
-                      ? () => goTo("runtime-scenes")
-                      : undefined
-                }
-              />
+                      ))}
+                      {rollout.queue.dismissedReadingRouteStaging?.map((s) => (
+                        <div
+                          key={s.sourceReviewId}
+                          className="flex items-center justify-between rounded border border-dashed p-2 text-sm"
+                        >
+                          <span>{s.title}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              rollout.restoreSceneStaging(s.sourceReviewId)
+                            }
+                          >
+                            {rolloutUi.restoreStaging}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </TabsContent>
 
-            {/* ── Tab 2: Story 单元 ── */}
-            <TabsContent value="story-units" className="min-h-72">
+            {/* ── 已写入作品 ── */}
+            <TabsContent value="persisted" className="min-h-72 space-y-3">
               {rollout.storyUnits.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
                   {rolloutUi.noStoryUnits}
@@ -686,59 +553,58 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
               ) : (
                 <div className="space-y-3">
                   {rollout.storyUnits.map((unit) => {
-                    const linkCount = linkCountByStoryUnitId.get(unit.id) ?? 0;
-                    const canUnpersist = linkCount === 0;
+                    const frames = framesByRouteTsid.get(unit.id) ?? [];
+                    const canUnpersist = frames.length === 0;
 
                     return (
                       <div
                         key={unit.id}
-                        className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="space-y-2 rounded-lg border p-3"
                       >
-                        <div className="min-w-0 text-sm">
-                          <p className="font-medium">
-                            {unit.title}{" "}
-                            <span className="text-muted-foreground font-normal">
-                              (
-                              {unit.status === "active"
-                                ? messages.common.statusActive
-                                : messages.common.statusArchived}
-                              )
-                            </span>
-                          </p>
-                          <p className="text-muted-foreground text-xs">
-                            {unit.sourceReviewId}
-                            {linkCount > 0
-                              ? ` · ${linkCount} 个 ${messages.domain.readingRoute} 关联`
-                              : null}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={rollout.busy}
-                            onClick={() => setEditingStoryUnit(unit)}
-                          >
-                            {rolloutUi.editStoryUnit}
-                          </Button>
-                          {unit.status === "active" ? (
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 text-sm">
+                            <p className="font-medium">{unit.title}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {unit.id}
+                              {frames.length > 0
+                                ? ` · ${frames.length} 段画面页`
+                                : " · 还没有画面页"}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              disabled={rollout.busy}
-                              onClick={() => void rollout.archiveStoryUnit(unit.id)}
+                              asChild
                             >
-                              {rolloutUi.archive}
+                              <Link
+                                href={`/works/${encodeURIComponent(workId)}/reading-routes/${encodeURIComponent(unit.id)}/edit`}
+                              >
+                                {rolloutUi.goEditScene}
+                              </Link>
                             </Button>
-                          ) : null}
-                          {canUnpersist ? (
                             <Button
                               size="sm"
                               variant="outline"
                               disabled={rollout.busy}
+                              onClick={() => setEditingRoute(unit)}
+                            >
+                              {rolloutUi.editStoryUnit}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={rollout.busy || !canUnpersist}
+                              title={
+                                canUnpersist
+                                  ? undefined
+                                  : messages.rollout.unpersistBlockedByProjection
+                              }
                               onClick={() => {
                                 if (
-                                  !window.confirm(rolloutUi.confirmUnpersistStory)
+                                  !window.confirm(
+                                    rolloutUi.confirmUnpersistStory
+                                  )
                                 ) {
                                   return;
                                 }
@@ -747,318 +613,105 @@ export function RolloutPanel({ workId, rollout, onClose }: RolloutPanelProps) {
                             >
                               {rolloutUi.unpersistStory}
                             </Button>
-                          ) : null}
+                          </div>
                         </div>
+
+                        {frames.length > 0 ? (
+                          <ul className="space-y-2 border-t pt-2">
+                            {frames.map((frame) => (
+                              <li
+                                key={`${frame.readingRouteTsid}:${frame.frameIndex}`}
+                                className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <span className="text-muted-foreground text-xs">
+                                  画面 #{frame.frameIndex + 1}：
+                                  {frame.caption || frame.sourceReviewId}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={rollout.busy}
+                                  onClick={() => {
+                                    if (
+                                      !window.confirm(
+                                        rolloutUi.confirmUnprojectScene
+                                      )
+                                    ) {
+                                      return;
+                                    }
+                                    void rollout.unprojectScene(
+                                      frame.sourceReviewId
+                                    );
+                                  }}
+                                >
+                                  {rolloutUi.unprojectScene}
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </div>
                     );
                   })}
                 </div>
               )}
 
-              <FlowHint
-                text={rolloutUi.flowHintStoryUnits}
-                nextLabel={rolloutUi.nextStepRuntimeScenes}
-                onNext={() => goTo("runtime-scenes")}
-              />
-            </TabsContent>
-
-            {/* ── Tab 3: Reading Routes ── */}
-            <TabsContent value="runtime-scenes" className="min-h-72 space-y-3">
-              {rollout.scenes.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  {rolloutUi.noRuntimeScenes}
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {rollout.scenes.map((scene) => {
-                    const projected = projectedBySceneTsid.get(scene.tsid);
-                    const sceneLinks = linksBySceneTsid.get(scene.tsid) ?? [];
-
-                    return (
-                      <div
-                        key={scene.tsid}
-                        className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0 text-sm">
-                          <p className="font-medium">
-                            {messages.common.chapterN(scene.chapter_number)} {scene.title}
-                          </p>
-                          <p className="text-muted-foreground text-xs">
-                            {scene.tsid}
-                            {" · "}
-                            {projected
-                              ? `${rolloutUi.sceneRolloutProjection}（${
-                                  projected.mode === "create" ? "新建" : "关联已有"
-                                }）`
-                              : rolloutUi.sceneCatalogOrigin}
-                            {" · "}
-                            {rolloutUi.sceneLinkCount(sceneLinks.length)}
-                          </p>
-                          {sceneLinks.length > 0 ? (
-                            <p className="text-muted-foreground mt-1 text-xs">
-                              {sceneLinks
-                                .map(
-                                  (link) =>
-                                    storyTitleById.get(link.storyUnitId) ??
-                                    link.storyUnitId
-                                )
-                                .join("、")}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="flex shrink-0 flex-wrap gap-2">
-                          <Button asChild size="sm" variant="outline">
-                            <Link
-                              href={`/works/${encodeURIComponent(workId)}/reading-routes/${encodeURIComponent(scene.tsid)}/edit`}
-                            >
-                              {rolloutUi.goEditScene}
-                            </Link>
-                          </Button>
-                          {projected ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={rollout.busy}
-                              onClick={() => {
-                                if (
-                                  !window.confirm(rolloutUi.confirmUnprojectScene)
-                                ) {
-                                  return;
-                                }
-                                void rollout.unprojectScene(
-                                  projected.sourceReviewId
-                                );
-                              }}
-                            >
-                              {rolloutUi.unprojectScene}
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {onClose ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-1"
-                  onClick={onClose}
-                >
-                  {rolloutUi.goScenesList}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button variant="outline" size="sm" asChild>
+                  <a
+                    href={`${(process.env.NEXT_PUBLIC_READER_ORIGIN ?? "http://localhost:3001").replace(/\/$/, "")}/works/${encodeURIComponent(workId)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {rolloutUi.openReaderVerify}
+                  </a>
                 </Button>
-              ) : (
-                <Button variant="ghost" size="sm" asChild className="mt-1">
-                  <Link href={`/works/${encodeURIComponent(workId)}/reading-routes`}>
+                {onClose ? (
+                  <Button variant="ghost" size="sm" onClick={onClose}>
                     {rolloutUi.goScenesList}
-                  </Link>
-                </Button>
-              )}
-
-              <FlowHint
-                text={rolloutUi.flowHintRuntimeScenes}
-                nextLabel={rolloutUi.nextStepLinks}
-                onNext={() => goTo("links")}
-              />
-            </TabsContent>
-
-            {/* ── Tab 4: 关联 ── */}
-            <TabsContent value="links" className="min-h-72 space-y-4">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <Label>{rolloutUi.linkStoryUnit}</Label>
-                  <select
-                    className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-                    value={linkStoryUnitId}
-                    onChange={(e) => setLinkStoryUnitId(e.target.value)}
-                  >
-                    <option value="">—</option>
-                    {activeStoryUnits.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label>{rolloutUi.linkScene}</Label>
-                  <select
-                    className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-                    value={linkSceneTsid}
-                    onChange={(e) => setLinkSceneTsid(e.target.value)}
-                  >
-                    <option value="">—</option>
-                    {rollout.scenes.map((s) => (
-                      <option key={s.tsid} value={s.tsid}>
-                        {s.title} ({s.tsid})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <Button
-                disabled={rollout.busy || !linkStoryUnitId || !linkSceneTsid}
-                onClick={() =>
-                  void rollout
-                    .createLink(linkStoryUnitId, linkSceneTsid)
-                    .then((ok) => {
-                      if (ok) {
-                        setLinkStoryUnitId("");
-                        setLinkSceneTsid("");
-                      }
-                    })
-                }
-              >
-                {rolloutUi.createLink}
-              </Button>
-
-              {rollout.links.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{rolloutUi.noLinks}</p>
-              ) : (
-                <ul className="space-y-2">
-                  {rollout.links.map((link) => (
-                    <li
-                      key={link.id}
-                      className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link
+                      href={`/works/${encodeURIComponent(workId)}/reading-routes`}
                     >
-                      <span className="text-sm">
-                        {storyTitleById.get(link.storyUnitId) ?? link.storyUnitId}{" "}
-                        ↔ {sceneTitleByTsid.get(link.sceneTsid) ?? link.sceneTsid}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={rollout.busy}
-                        onClick={() => void rollout.unlink(link.id)}
-                      >
-                        {rolloutUi.unlink}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <FlowHint text={rolloutUi.flowHintLinks} />
-            </TabsContent>
-
-            {/* ── Aux: 已移出 ── */}
-            <TabsContent value="dismissed" className="min-h-72 space-y-6">
-              <TabSection title={rolloutUi.dismissedStoryTitle}>
-                {(rollout.queue.dismissedStoryStaging?.length ?? 0) === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    {rolloutUi.noDismissedStoryStaging}
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {rollout.queue.dismissedStoryStaging?.map((staging) => (
-                      <div
-                        key={staging.sourceReviewId}
-                        className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0 text-sm">
-                          <p className="font-medium">{staging.title}</p>
-                          <p className="text-muted-foreground line-clamp-2">
-                            {staging.summary}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={rollout.busy}
-                          onClick={() =>
-                            rollout.restoreStoryStaging(staging.sourceReviewId)
-                          }
-                        >
-                          {rolloutUi.restoreStaging}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                      {rolloutUi.goScenesList}
+                    </Link>
+                  </Button>
                 )}
-              </TabSection>
-
-              <TabSection title={rolloutUi.dismissedSceneTitle}>
-                {(rollout.queue.dismissedReadingRouteStaging?.length ?? 0) === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    {rolloutUi.noDismissedSceneStaging}
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {rollout.queue.dismissedReadingRouteStaging?.map((staging) => (
-                      <div
-                        key={staging.sourceReviewId}
-                        className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0 text-sm">
-                          <p className="font-medium">{staging.title}</p>
-                          <p className="text-muted-foreground">
-                            {messages.common.chapterN(staging.chapter_number)}
-                            {staging.chapter_title
-                              ? ` — ${staging.chapter_title}`
-                              : ""}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={rollout.busy}
-                          onClick={() =>
-                            rollout.restoreSceneStaging(staging.sourceReviewId)
-                          }
-                        >
-                          {rolloutUi.restoreStaging}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabSection>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
-      <StoryUnitEditDialog
-        unit={editingStoryUnit}
-        open={editingStoryUnit != null}
+      <RouteEditDialog
+        unit={editingRoute}
+        open={editingRoute != null}
         onOpenChange={(open) => {
-          if (!open) setEditingStoryUnit(null);
+          if (!open) setEditingRoute(null);
         }}
         busy={rollout.busy}
         onSave={async (patch) => {
-          if (!editingStoryUnit) return;
-          await rollout.updateStoryUnit(editingStoryUnit.id, patch);
+          if (!editingRoute) return;
+          await rollout.updateStoryUnit(editingRoute.id, patch);
         }}
       />
 
-      <SceneProjectionDialog
-        staging={projectionStaging}
-        open={projectionStaging != null}
+      <WriteFrameDialog
+        staging={frameStaging}
+        open={frameStaging != null}
         onOpenChange={(open) => {
-          if (!open) setProjectionStaging(null);
+          if (!open) setFrameStaging(null);
         }}
-        scenes={rollout.scenes}
-        storyUnitOptions={rollout.storyUnits}
+        canProject={
+          frameStaging ? rollout.canProjectScene(frameStaging) : false
+        }
         busy={rollout.busy}
-        onCreate={(linkToStoryUnitId) =>
-          projectionStaging
-            ? rollout
-                .projectSceneCreate(projectionStaging, linkToStoryUnitId)
-                .then(() => undefined)
-            : Promise.resolve()
-        }
-        onLinkExisting={(sceneTsid, linkToStoryUnitId) =>
-          projectionStaging
-            ? rollout
-                .projectSceneLinkExisting(
-                  projectionStaging,
-                  sceneTsid,
-                  linkToStoryUnitId
-                )
-                .then(() => undefined)
-            : Promise.resolve()
-        }
+        onConfirm={async () => {
+          if (!frameStaging) return;
+          await rollout.projectSceneCreate(frameStaging);
+        }}
       />
     </div>
   );

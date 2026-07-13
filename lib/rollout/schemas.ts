@@ -9,20 +9,57 @@ const stagingWorkId = z.string().min(1);
 export const acceptedStoryUnitStagingSchema = z.object({
   workId: stagingWorkId,
   sourceReviewId: z.string().min(1),
+  sourceCandidateId: z.string().min(1).optional(),
   title: z.string().trim().min(1),
   summary: z.string(),
   boundaryHint: z.string().optional(),
   acceptedAt: z.string().min(1),
+  chapter_number: z.number().int().min(1).optional(),
+  chapter_title: z.string().nullable().optional(),
+  relatedCharacterRefs: z
+    .array(
+      z.object({
+        sourceReviewId: z.string().min(1),
+        name: z.string().min(1),
+        matchedTsid: z.string().optional(),
+        house: z.string().optional(),
+        description: z.string().optional(),
+        signatureQuote: z.string().nullable().optional(),
+      })
+    )
+    .optional(),
+  relatedLocationRefs: z
+    .array(
+      z.object({
+        sourceReviewId: z.string().min(1),
+        name: z.string().min(1),
+        matchedTsid: z.string().optional(),
+        region: z.string().optional(),
+        description: z.string().optional(),
+      })
+    )
+    .optional(),
+  characterIds: z.array(z.string()).optional(),
+  locationId: z.string().nullable().optional(),
 });
 
+/** Queue / import staging — parent fields preferred; legacy may omit. */
 export const acceptedSceneCandidateStagingSchema = z.object({
   workId: stagingWorkId,
   sourceReviewId: z.string().min(1),
+  parentStorySourceReviewId: z.string().min(1).optional(),
+  parentStoryTitle: z.string().optional(),
   chapter_title: z.string().nullable().optional(),
   chapter_number: z.union([z.number(), z.string()]),
   title: z.string().trim().min(1),
   summary: z.string().optional(),
   acceptedAt: z.string().min(1),
+});
+
+/** Projection Accept staging — parent Story refs required (Sprint #1). */
+export const projectionSceneStagingSchema = acceptedSceneCandidateStagingSchema.extend({
+  parentStorySourceReviewId: z.string().min(1),
+  parentStoryTitle: z.string().min(1),
 });
 
 export const importStagingBodySchema = z.object({
@@ -38,21 +75,32 @@ export const persistStoryUnitBodySchema = z.object({
 
 export const sceneProjectionBodySchema = z.object({
   workId: stagingWorkId,
-  staging: acceptedSceneCandidateStagingSchema,
+  staging: projectionSceneStagingSchema,
   mode: z.enum(["create", "link_existing"]),
   sceneTsid: z.string().optional(),
-  linkToStoryUnitId: z.string().uuid().optional(),
+  /** Hotfix: parent Reading Route tsid (scene_*), not story_units uuid */
+  linkToStoryUnitId: z.string().min(1).optional(),
+});
+
+export const unprojectBodySchema = z.object({
+  workId: stagingWorkId,
+  sourceReviewId: z.string().min(1).optional(),
+  /** Soft-compat; Hotfix Frame unpersist keys off sourceReviewId */
+  sceneProjectionLinkId: z.string().min(1).optional(),
+  sceneTsid: z.string().min(1).optional(),
+  mode: z.enum(["create", "link_existing"]).optional(),
 });
 
 export const createLinkBodySchema = z.object({
   workId: stagingWorkId,
-  storyUnitId: z.string().uuid(),
+  /** Hotfix: Reading Route tsid when using Route-as-Story-unit facade */
+  storyUnitId: z.string().min(1),
   sceneTsid: z.string().min(1),
 });
 
 export const archiveStoryUnitBodySchema = z.object({
   workId: stagingWorkId,
-  storyUnitId: z.string().uuid(),
+  storyUnitId: z.string().min(1),
 });
 
 export const updateStoryUnitBodySchema = z.object({

@@ -18,7 +18,10 @@ import type {
   DiscoveryAcceptPrefill,
   DiscoveryReviewItem,
   ReviewItemStatus,
+  StoryRelatedCharacterRef,
+  StoryRelatedLocationRef,
 } from "@/lib/discovery/review-types";
+import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
 import { buildEntityCreateHandoffPath } from "@/lib/discovery/accept-prefill";
 import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
 
@@ -224,7 +227,9 @@ export function isStoryOrSceneAcceptedInStaging(
   return (
     item.status === "accepted" &&
     (item.candidate.candidateType === "story" ||
-      item.candidate.candidateType === "readingRoute")
+      item.candidate.candidateType === "scene" ||
+      item.candidate.candidateType === "character" ||
+      item.candidate.candidateType === "location")
   );
 }
 
@@ -288,6 +293,9 @@ export function validateSceneAcceptFields(
 ): { ok: true } | { ok: false; fieldErrors: string[] } {
   const scene = fields as SceneCandidateFields;
   const errors: string[] = [];
+  if (!isNonEmptyString(scene.parentStoryCandidateId)) {
+    errors.push("parentStoryCandidateId is required");
+  }
   if (!isValidSceneChapterNumber(scene.chapter_number)) {
     errors.push(
       "chapter_number must be a numeric chapter index (integer ≥ 1); use chapter_title for POV labels like \"Bran I\""
@@ -328,6 +336,7 @@ export function buildStoryStaging(
   return {
     workId: item.candidate.workId,
     sourceReviewId: item.reviewId,
+    sourceCandidateId: item.candidate.candidateId,
     title: fields.title.trim(),
     summary: fields.summary.trim(),
     ...(isNonEmptyString(fields.boundaryHint)
@@ -338,12 +347,15 @@ export function buildStoryStaging(
 }
 
 export function buildSceneStaging(
-  item: DiscoveryReviewItem
+  item: DiscoveryReviewItem,
+  parentStory: AcceptedStoryUnitStaging
 ): AcceptedSceneCandidateStaging {
   const fields = getEffectiveFields(item) as SceneCandidateFields;
   return {
     workId: item.candidate.workId,
     sourceReviewId: item.reviewId,
+    parentStorySourceReviewId: parentStory.sourceReviewId,
+    parentStoryTitle: parentStory.title,
     chapter_title: fields.chapter_title ?? null,
     chapter_number: fields.chapter_number,
     title: fields.title.trim(),
@@ -354,9 +366,33 @@ export function buildSceneStaging(
   };
 }
 
+export function findAcceptedParentStory(
+  items: DiscoveryReviewItem[],
+  acceptedStories: AcceptedStoryUnitStaging[],
+  parentStoryCandidateId: string
+): AcceptedStoryUnitStaging | undefined {
+  const bySourceCandidate = acceptedStories.find(
+    (s) =>
+      s.sourceCandidateId &&
+      s.sourceCandidateId === parentStoryCandidateId
+  );
+  if (bySourceCandidate) return bySourceCandidate;
+
+  // Fallback: match via accepted review item's candidateId
+  const parentItem = items.find(
+    (item) =>
+      item.status === "accepted" &&
+      item.candidate.candidateType === "story" &&
+      item.candidate.candidateId === parentStoryCandidateId
+  );
+  if (!parentItem) return undefined;
+  return acceptedStories.find((s) => s.sourceReviewId === parentItem.reviewId);
+}
+
 export function prepareAcceptReview(
   items: DiscoveryReviewItem[],
-  reviewId: string
+  reviewId: string,
+  acceptedStories: AcceptedStoryUnitStaging[] = []
 ): AcceptReviewResult | AcceptReviewError {
   const item = findReviewItem(items, reviewId);
   if (!item) {
@@ -424,7 +460,7 @@ export function prepareAcceptReview(
         staging: buildStoryStaging(item),
       };
     }
-    case "readingRoute": {
+    case "scene": {
       const validation = validateSceneAcceptFields(fields);
       if (!validation.ok) {
         return {
@@ -434,13 +470,202 @@ export function prepareAcceptReview(
           fieldErrors: validation.fieldErrors,
         };
       }
+      const sceneFields = fields as SceneCandidateFields;
+      const parentStory = findAcceptedParentStory(
+        items,
+        acceptedStories,
+        sceneFields.parentStoryCandidateId
+      );
+      if (!parentStory) {
+        return {
+          ok: false,
+          code: "PARENT_STORY_NOT_ACCEPTED",
+          message:
+            "Accept the parent Story Candidate before accepting this Scene",
+        };
+      }
       return {
         ok: true,
         kind: "scene_staging",
-        staging: buildSceneStaging(item),
+        staging: buildSceneStaging(item, parentStory),
       };
     }
   }
+}
+
+/** Child scene review ids whose parent story review is being revoked. */
+export function getChildSceneReviewIdsForStory(
+  items: DiscoveryReviewItem[],
+  storyReviewId: string
+): string[] {
+  const storyItem = findReviewItem(items, storyReviewId);
+  if (!storyItem || storyItem.candidate.candidateType !== "story") {
+    return [];
+  }
+  const storyCandidateId = storyItem.candidate.candidateId;
+  return items
+    .filter((item) => {
+      if (item.candidate.candidateType !== "scene") return false;
+      const fields = getEffectiveFields(item) as SceneCandidateFields;
+      return fields.parentStoryCandidateId === storyCandidateId;
+    })
+    .map((item) => item.reviewId);
+}
+
+/**
+ * Collect work-batch character/location candidates as story-related attributes.
+ * Existing catalog hits carry matchedTsid ("已存在").
+ */
+export function buildStoryRelatedEntityRefs(
+  items: DiscoveryReviewItem[],
+  catalogs: {
+    characters: Array<{ name: string; tsid: string }>;
+    locations: Array<{ name: string; tsid: string }>;
+  }
+): {
+  relatedCharacterRefs: StoryRelatedCharacterRef[];
+  relatedLocationRefs: StoryRelatedLocationRef[];
+  entityReviewIds: string[];
+} {
+  const relatedCharacterRefs: StoryRelatedCharacterRef[] = [];
+  const relatedLocationRefs: StoryRelatedLocationRef[] = [];
+  const entityReviewIds: string[] = [];
+
+  for (const item of items) {
+    if (item.status === "discarded") continue;
+    const type = item.candidate.candidateType;
+    if (type !== "character" && type !== "location") continue;
+    if (item.status !== "accepted" && !canReviewAction(item.status)) continue;
+
+    const name = getEffectiveDisplayName(item).trim();
+    if (!name) continue;
+    entityReviewIds.push(item.reviewId);
+
+    if (type === "character") {
+      const fields = getEffectiveFields(item) as CharacterCandidateFields;
+      const matched = findExistingByName(name, catalogs.characters);
+      relatedCharacterRefs.push({
+        sourceReviewId: item.reviewId,
+        name,
+        ...(matched ? { matchedTsid: matched.tsid } : {}),
+        ...(isNonEmptyString(fields.house) ? { house: fields.house.trim() } : {}),
+        ...(isNonEmptyString(fields.description)
+          ? { description: fields.description.trim() }
+          : {}),
+        signatureQuote:
+          typeof fields.signatureQuote === "string"
+            ? fields.signatureQuote.trim() || null
+            : null,
+      });
+    } else {
+      const fields = getEffectiveFields(item) as LocationCandidateFields;
+      const matched = findExistingByName(name, catalogs.locations);
+      relatedLocationRefs.push({
+        sourceReviewId: item.reviewId,
+        name,
+        ...(matched ? { matchedTsid: matched.tsid } : {}),
+        ...(isNonEmptyString(fields.region)
+          ? { region: fields.region.trim() }
+          : {}),
+        ...(isNonEmptyString(fields.description)
+          ? { description: fields.description.trim() }
+          : {}),
+      });
+    }
+  }
+
+  return { relatedCharacterRefs, relatedLocationRefs, entityReviewIds };
+}
+
+/**
+ * Accept a Story and cascade-accept its child Scenes (+ related char/loc attrs).
+ * Invalid / discarded child scenes are skipped (story still succeeds).
+ */
+export function prepareAcceptStoryWithChildScenes(
+  items: DiscoveryReviewItem[],
+  storyReviewId: string,
+  acceptedStories: AcceptedStoryUnitStaging[] = [],
+  catalogs: {
+    characters: Array<{ name: string; tsid: string }>;
+    locations: Array<{ name: string; tsid: string }>;
+  } = { characters: [], locations: [] }
+):
+  | {
+      ok: true;
+      storyStaging: AcceptedStoryUnitStaging;
+      sceneStagings: AcceptedSceneCandidateStaging[];
+      acceptedReviewIds: string[];
+      sceneErrors: AcceptReviewError[];
+    }
+  | AcceptReviewError {
+  const storyResult = prepareAcceptReview(
+    items,
+    storyReviewId,
+    acceptedStories
+  );
+  if (!storyResult.ok) {
+    return storyResult;
+  }
+  if (storyResult.kind !== "story_staging") {
+    return {
+      ok: false,
+      code: "EXPECTED_STORY_ACCEPT",
+      message: "Expected a Story Candidate accept result",
+    };
+  }
+
+  const related = buildStoryRelatedEntityRefs(items, catalogs);
+  const storyStaging: AcceptedStoryUnitStaging = {
+    ...storyResult.staging,
+    relatedCharacterRefs: related.relatedCharacterRefs,
+    relatedLocationRefs: related.relatedLocationRefs,
+    characterIds: related.relatedCharacterRefs
+      .map((r) => r.matchedTsid)
+      .filter((id): id is string => Boolean(id)),
+    locationId:
+      related.relatedLocationRefs.find((r) => r.matchedTsid)?.matchedTsid ??
+      null,
+  };
+
+  let workingItems = markReviewAccepted(items, storyReviewId);
+  const storiesForChildren = [...acceptedStories, storyStaging];
+  const acceptedReviewIds = [storyReviewId, ...related.entityReviewIds];
+  for (const entityId of related.entityReviewIds) {
+    workingItems = markReviewAccepted(workingItems, entityId);
+  }
+
+  const sceneStagings: AcceptedSceneCandidateStaging[] = [];
+  const sceneErrors: AcceptReviewError[] = [];
+
+  for (const childId of getChildSceneReviewIdsForStory(items, storyReviewId)) {
+    const child = findReviewItem(workingItems, childId);
+    if (!child || !canReviewAction(child.status)) {
+      continue;
+    }
+    const childResult = prepareAcceptReview(
+      workingItems,
+      childId,
+      storiesForChildren
+    );
+    if (!childResult.ok) {
+      sceneErrors.push(childResult);
+      continue;
+    }
+    if (childResult.kind !== "scene_staging") {
+      continue;
+    }
+    workingItems = markReviewAccepted(workingItems, childId);
+    acceptedReviewIds.push(childId);
+    sceneStagings.push(childResult.staging);
+  }
+
+  return {
+    ok: true,
+    storyStaging,
+    sceneStagings,
+    acceptedReviewIds,
+    sceneErrors,
+  };
 }
 
 export function characterPrefillToFormValues(

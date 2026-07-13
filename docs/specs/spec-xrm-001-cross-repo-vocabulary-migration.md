@@ -202,9 +202,9 @@ Legend for **Risk**:
 | A-04 | `docs/adr/004`: L2263 | `Story ↔ Scene orthogonal` | `Story ↔ Reading Route orthogonal` | Inline alias | LOW | Architect |
 | A-05 | `docs/adr/004`: L1868 | `imageCaption` (no Deprecated marker) | `imageCaption (Deprecated)` | Add `(Deprecated)` annotation | LOW | Architect |
 | A-06 | `docs/adr/007`: L42-46 | `Scene / Story Images` in §What diagram | Add `(normative: Reading Route / Reading Frame)` annotation | `VOCAB-NOTICE` | LOW | Architect |
-| A-07 | `docs/adr/007`: L340 | `Runtime Scene records` | `Runtime Reading Route records (implementation: Scene)` | Inline alias | LOW | Architect |
-| A-08 | `docs/adr/007`: L473 | `Story ↔ Scene orthogonal association model` | `Story ↔ Reading Route orthogonal association model (implementation: Scene)` | Inline alias | LOW | Architect |
-| A-09 | `docs/adr/007`: L494 | `Runtime Scene association` | `Runtime Reading Route (implementation: Scene) association` | Inline alias | LOW | Architect |
+| A-07 | `docs/adr/007`: L340 | `Runtime Scene records` | `Runtime Reading Route records (implementation: Scene)` | **Done** — ADR-007 v1.2 A2 | LOW | Architect |
+| A-08 | `docs/adr/007`: L473 | `Story ↔ Scene orthogonal association model` | `Story ↔ Reading Route orthogonal association model (implementation: Scene)` | Superseded by v1.2 | LOW | Architect |
+| A-09 | `docs/adr/007`: L494 | `Runtime Scene association` | `Runtime Reading Route (implementation: Scene) association` | **Done** — ADR-007 v1.2 A2 | LOW | Architect |
 | A-10 | `docs/specs/spec-rol-001`: §4.3 title | `Story ↔ Scene governed link` | `Story ↔ Reading Route (implementation: Scene) governed link` | Section title update | LOW | Architect |
 | A-11 | `docs/specs/spec-rol-001`: §4.4 title | `Scene Projection Accept outcomes` | `Reading Route Projection Accept outcomes (implementation: Scene)` | Section title update | LOW | Architect |
 | A-12 | `docs/specs/spec-rol-001`: §4.7.3 title | `Scene Projection Accept` | `Reading Route Projection Accept (implementation: Scene)` | Section title update | LOW | Architect |
@@ -393,10 +393,10 @@ The following checklist must pass before ADR-EAR-XRM-001 is triggered.
 - [ ] **A-03** — ADR-004 L2086: `Runtime Scene association` annotated
 - [ ] **A-04** — ADR-004 L2263: `Story ↔ Scene` → `Story ↔ Reading Route (implementation: Scene)`
 - [ ] **A-05** — ADR-004 L1868: `imageCaption` marked `(Deprecated)`
-- [ ] **A-06** — ADR-007 §What diagram (L42-46): alias annotation added
-- [ ] **A-07** — ADR-007 L340: `Runtime Scene records` annotated
-- [ ] **A-08** — ADR-007 L473: `Story ↔ Scene` annotated
-- [ ] **A-09** — ADR-007 L494: `Runtime Scene association` annotated
+- [x] **A-06** — ADR-007 v1.2 A2: §What / Rollout diagrams use Reading Route normative vocabulary
+- [x] **A-07** — ADR-007 v1.2 A2: Phase 2 / domain transition terminology aligned (supersedes L340 anchor)
+- [ ] **A-08** — ADR-007 L473: `Story ↔ Scene` annotated *(superseded by v1.2 Story ↔ Reading Route — verify line anchor)*
+- [x] **A-09** — ADR-007 v1.2 A2: Relationship / glossary uses Reading Route (supersedes L494 anchor)
 - [ ] **A-10** — SPEC-ROL-001 §4.3 title updated
 - [ ] **A-11** — SPEC-ROL-001 §4.4 title updated
 - [ ] **A-12** — SPEC-ROL-001 §4.7.3 title updated

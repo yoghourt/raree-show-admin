@@ -1,11 +1,10 @@
 "use client";
 
-import { ChevronRight, FlaskConical, Plus as PlusIcon, Sparkles } from "lucide-react";
+import { ChevronRight, Plus as PlusIcon, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as React from "react";
 
-import { RolloutDrawer } from "@/components/rollout/RolloutDrawer";
 import { ReadingRouteTable } from "@/components/reading-routes/ReadingRouteTable";
 import { RagBackfillPanel } from "@/components/works/RagBackfillPanel";
 import { Button } from "@/components/ui/button";
@@ -62,7 +61,6 @@ export default function WorkReadingRoutesPage() {
   const [workLoading, setWorkLoading] = React.useState(true);
   const [workError, setWorkError] = React.useState<string | null>(null);
   const [operatorId, setOperatorId] = React.useState<string | null>(null);
-  const [rolloutOpen, setRolloutOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!workId) {
@@ -108,6 +106,10 @@ export default function WorkReadingRoutesPage() {
 
   const workTitle = workLoading ? "加载中…" : (work?.title ?? "未知作品");
   const routesBase = `/works/${encodeURIComponent(workId)}/reading-routes`;
+  const discoveryHref =
+    pendingCount > 0
+      ? `/works/${encodeURIComponent(workId)}/discovery?step=rollout`
+      : `/works/${encodeURIComponent(workId)}/discovery`;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
@@ -136,7 +138,7 @@ export default function WorkReadingRoutesPage() {
           {workTitle}
         </span>
         <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">阅读路线</span>
+        <span className="font-medium text-zinc-800">{messages.nav.readingRoutes}</span>
       </nav>
 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -148,31 +150,26 @@ export default function WorkReadingRoutesPage() {
         </div>
 
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-row sm:items-center">
-          <Button variant="outline" asChild className="w-full shrink-0 sm:w-auto">
-            <Link href={`/works/${encodeURIComponent(workId)}/discovery`}>
-              <Sparkles className="size-4" aria-hidden />
-              {messages.nav.discovery}
-            </Link>
-          </Button>
-
           <Button
             variant="outline"
+            asChild
             className="relative w-full shrink-0 sm:w-auto"
-            onClick={() => setRolloutOpen(true)}
           >
-            <FlaskConical className="size-4" aria-hidden />
-            {messages.rollout.pageTitle}
-            {pendingCount > 0 ? (
-              <span className="absolute -top-1.5 -right-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground tabular-nums">
-                {pendingCount}
-              </span>
-            ) : null}
+            <Link href={discoveryHref}>
+              <Sparkles className="size-4" aria-hidden />
+              {messages.nav.discovery}
+              {pendingCount > 0 ? (
+                <span className="absolute -top-1.5 -right-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground tabular-nums">
+                  {pendingCount}
+                </span>
+              ) : null}
+            </Link>
           </Button>
 
           <Button asChild className="w-full shrink-0 sm:w-auto">
             <Link href={`${routesBase}/new`}>
               <PlusIcon className="size-4" aria-hidden />
-              新增阅读路线
+              {messages.works.newReadingRoute}
             </Link>
           </Button>
         </div>
@@ -187,14 +184,6 @@ export default function WorkReadingRoutesPage() {
         error={error}
         onDelete={deleteScene}
       />
-
-      {rolloutOpen ? (
-        <RolloutDrawer
-          workId={workId}
-          open={rolloutOpen}
-          onOpenChange={setRolloutOpen}
-        />
-      ) : null}
     </div>
   );
 }

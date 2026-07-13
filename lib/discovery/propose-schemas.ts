@@ -19,15 +19,6 @@ export const narrativeInputBundleSchema = z.object({
   summaryAttested: z.boolean().optional(),
 });
 
-export const proposeDiscoveryBodySchema = z.object({
-  workId: z.string().min(1),
-  sessionId: z.string().min(1),
-  narrative: narrativeInputBundleSchema,
-  lockedAt: z.string().min(1),
-  candidateTypes: z.array(z.enum(DISCOVERY_CANDIDATE_TYPES)).min(1).optional(),
-  feedback: z.string().nullable().optional(),
-});
-
 const evidenceRefSchema = z.object({
   sourceLabel: z.string(),
   excerpt: z.string().optional(),
@@ -55,6 +46,7 @@ const storyFieldsSchema = z.object({
 });
 
 const sceneFieldsSchema = z.object({
+  parentStoryCandidateId: z.string().min(1),
   chapter_title: z.string().nullable().optional(),
   chapter_number: z.union([z.number(), z.string()]),
   title: z.string(),
@@ -63,7 +55,7 @@ const sceneFieldsSchema = z.object({
 
 export const discoveryCandidateSchema = z.object({
   candidateId: z.string().min(1),
-  candidateType: z.enum(["character", "location", "story", "readingRoute"]),
+  candidateType: z.enum(["character", "location", "story", "scene"]),
   workId: z.string().min(1),
   displayName: z.string(),
   summary: z.string(),
@@ -77,6 +69,17 @@ export const discoveryCandidateSchema = z.object({
   ]),
 });
 
+export const proposeDiscoveryBodySchema = z.object({
+  workId: z.string().min(1),
+  sessionId: z.string().min(1),
+  narrative: narrativeInputBundleSchema,
+  lockedAt: z.string().min(1),
+  candidateTypes: z.array(z.enum(DISCOVERY_CANDIDATE_TYPES)).min(1).optional(),
+  /** Required when retrying scene alone — Story candidates from the open session. */
+  existingStoryCandidates: z.array(discoveryCandidateSchema).optional(),
+  feedback: z.string().nullable().optional(),
+});
+
 export const regenDiscoveryBodySchema = z.object({
   workId: z.string().min(1),
   sessionId: z.string().min(1),
@@ -85,5 +88,6 @@ export const regenDiscoveryBodySchema = z.object({
   candidateType: z.enum(DISCOVERY_CANDIDATE_TYPES),
   previousCandidate: discoveryCandidateSchema,
   siblingCandidates: z.array(discoveryCandidateSchema).optional(),
+  storyCandidates: z.array(discoveryCandidateSchema).optional(),
   feedback: z.string().nullable().optional(),
 });

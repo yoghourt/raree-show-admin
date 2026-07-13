@@ -166,7 +166,7 @@ export function ReadingRouteTable({
                           标题
                         </TableHead>
                         <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 md:table-cell">
-                          章节
+                          章节序号
                         </TableHead>
                         <TableHead className="hidden h-10 max-w-[240px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
                           摘要
