@@ -18,6 +18,9 @@ These files are the authoritative governance source. Load from the local filesys
 
 - `/governance/specs/CHANGE_TELEMETRY_SPEC.md` — PR/commit narration contract
 - `/governance/specs/AUTHORITY_BOUNDARY_AND_PRECEDENCE_SPEC.md` — authority layers and conflict semantics
+- `/governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md` — Mission → Policy → Runtime Contract → Deployment; **defaults are recommendations**
+
+> After `raree-governance` merges the SPEC above, sync the admin `governance` submodule (`npm run bootstrap` / sync path). Do not edit `governance/` as the source of truth.
 
 ### PR templates (transport only; authority = telemetry spec)
 
@@ -47,6 +50,7 @@ This is NOT the Next.js you know. This version has breaking changes — APIs, co
 - Map coordinates: stored as 0–1 floats (`MapPicker` in `components/locations/MapPicker.tsx`)
 - SQL column: `order_index` (not `order`)
 - Repo specs under `docs/specs/` and ADRs under `docs/adr/` supplement governance for this codebase; on conflict with `/governance/*`, governance wins unless architecture explicitly updates local ADR/Spec
+- Image Runtime (docs): ADR-010 · `docs/specs/spec-img-001-image-generation-port.md` · replaceable stack in `docs/deployment/deployment-defaults.md` (providers/models/USD/showcase titles are **Deployment**, not Runtime constants)
 
 ### Runtime Reading Governance (RC1)
 
