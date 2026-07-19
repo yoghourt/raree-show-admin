@@ -51,6 +51,7 @@ This is NOT the Next.js you know. This version has breaking changes — APIs, co
 - SQL column: `order_index` (not `order`)
 - Repo specs under `docs/specs/` and ADRs under `docs/adr/` supplement governance for this codebase; on conflict with `/governance/*`, governance wins unless architecture explicitly updates local ADR/Spec
 - Image Runtime (docs): ADR-010 · `docs/specs/spec-img-001-image-generation-port.md` · replaceable stack in `docs/deployment/deployment-defaults.md` (providers/models/USD/showcase titles are **Deployment**, not Runtime constants)
+- Image Runtime Spike: **Spike Authorized** / **Production Not Authorized** — `docs/spikes/spike-img-001-image-runtime-port.md` (allowlist: `lib/ai/image/**`, `scripts/**` spike runners only)
 
 ### Runtime Reading Governance (RC1)
 

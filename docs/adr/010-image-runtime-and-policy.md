@@ -2,10 +2,11 @@
 
 **Status:** Accepted  
 **Type:** Architecture ADR  
-**Version:** 1.0  
+**Version:** 1.1  
 **Last Updated:** 2026-07-17  
 **Owner:** Architect  
-**Authority:** `Constitution.md` · `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md`
+**Authority:** `Constitution.md` · `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md`  
+**Amendment A1 (2026-07-17):** Grant **Spike Implementation Authorization** only (`docs/spikes/spike-img-001-image-runtime-port.md`). **Production Authorization remains Not Granted.** Clarifies three-state model: Contract Freeze ≠ Spike Authorization ≠ Production Authorization.
 
 ---
 
@@ -30,6 +31,10 @@ This ADR records architectural decisions for:
 4. Image consistency as a Runtime capability expressed via contract knobs—not vendor mechanisms.
 
 It does **not** authorize production implementation in this change set.
+
+**A1:** Spike Implementation Authorization is granted separately via
+`docs/spikes/spike-img-001-image-runtime-port.md`. Production Authorization is
+still **Not Granted**.
 
 ---
 
@@ -105,8 +110,9 @@ Those belong in Deployment Configuration (may *derive* limits from a `usd_cap`, 
 * Normative port fields: `docs/specs/spec-img-001-image-generation-port.md`
 * Replaceable stack / showcase / budget examples: `docs/deployment/deployment-defaults.md`
 * Shared governance law: `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md` (submodule source: `raree-governance`)
+* Spike Authorization (allowlist / denylist / Exit Criteria / Findings): `docs/spikes/spike-img-001-image-runtime-port.md`
 
-Production Image Runtime code is **out of scope** for this ADR acceptance; Spike / implementation require separate authorization.
+**Production** Image Runtime wiring remains **out of scope** until a separate Production Authorization grant.
 
 ---
 
@@ -145,5 +151,6 @@ Executed commands: none (docs-only).
 * Constitution: `governance/Constitution.md`
 * Governance: `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md`
 * SPEC: `docs/specs/spec-img-001-image-generation-port.md`
+* Spike: `docs/spikes/spike-img-001-image-runtime-port.md`
 * Deployment: `docs/deployment/deployment-defaults.md`
 * Related: ADR-004 (Human-owned truth; Asset fields); ADR-D2-001 (source / storage legal posture)

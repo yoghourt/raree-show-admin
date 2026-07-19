@@ -77,3 +77,15 @@ None of the above are Runtime Contract constants.
 1. Edit this file (and env/config) for provider/model/showcase/`usd_cap` changes.
 2. Do **not** amend Constitution, ADR-010 Policy sections, or SPEC-IMG-001 contracts unless the **shape** of Policy/Contract must change.
 3. After `raree-governance` updates, bump the admin `governance` submodule via the repo’s governance sync/bootstrap path—do not hand-edit the submodule working tree as source of truth.
+
+---
+
+## 6. Spike vs Production (authorization)
+
+| State | Status |
+| ----- | ------ |
+| Contract Freeze | Yes (ADR-010 / SPEC-IMG-001) |
+| Spike Implementation Authorization | **Granted** — `docs/spikes/spike-img-001-image-runtime-port.md` |
+| Production Authorization | **Not granted** |
+
+Spike may use temporary `IMAGE_SPIKE_*` (or equivalent) configuration. Production Admin/Rollout/Copilot paths MUST NOT be modified under Spike Authorization.
