@@ -5,11 +5,27 @@
 | Field | Value |
 | ----- | ----- |
 | Title | Image Generation Port |
-| Status | Approved (contract freeze; implementation not authorized by this SPEC alone) |
-| Version | v0.1 |
+| Status | Approved — **Contract Freeze** |
+| Spike Implementation Authorization | **GRANTED** — see `docs/spikes/spike-img-001-image-runtime-port.md` (2026-07-17) |
+| Production Authorization | **NOT GRANTED** |
+| Version | v0.2 |
 | Owner | Architect |
 | Last Updated | 2026-07-17 |
 | Derived From | ADR-010 · `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC` |
+
+---
+
+## 0. Authorization states (normative)
+
+Per `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC` §6, these states are separate:
+
+| State | SPEC-IMG-001 |
+| ----- | ------------ |
+| Contract Freeze | **Yes** (this SPEC Accepted) |
+| Spike Implementation Authorization | **Granted** → allowlist in SPIKE-IMG-001 only |
+| Production Authorization | **Not granted** |
+
+Spike Authorization does **not** imply Production Authorization.
 
 ---
 
@@ -88,6 +104,8 @@ Runtime MAY enforce:
 
 Deployment MAY map a `usd_cap` into the knobs above; Runtime reads the knobs.
 
+**Spike note:** Budget knobs MAY be observed/simulated inside spike scripts. Production Budget enforcement remains **Not Authorized**.
+
 ---
 
 ## 6. Consistency capability (Runtime Contract)
@@ -121,11 +139,26 @@ Character `portraitUrl` and Reading Route `story_images_v2` remain **Asset** fie
 * LoRA training pipelines
 * Multi-provider fallback graphs
 * Video generation
+* Production Budget enforcement
+* Database schema changes
 
 ---
 
-## 9. Refs
+## 9. Spike Implementation Authorization (granted)
+
+**Authorized artifact:** `docs/spikes/spike-img-001-image-runtime-port.md`
+
+**Allowlist:** `lib/ai/image/**`, `scripts/**` (spike runners), temporary spike adapters/config, spike Findings updates, gitignored spike outputs.
+
+**Denylist:** production avatar action, Rollout, Discovery, production Copilot, Reader runtime, DB schema, production Cloudinary contracts, any Runtime Truth path outside the allowlist.
+
+**Exit Criteria & Findings:** defined only in SPIKE-IMG-001. Passing the Spike does **not** auto-grant Production Authorization.
+
+---
+
+## 10. Refs
 
 * ADR-010
+* SPIKE-IMG-001: `docs/spikes/spike-img-001-image-runtime-port.md`
 * `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md`
 * `docs/deployment/deployment-defaults.md`
