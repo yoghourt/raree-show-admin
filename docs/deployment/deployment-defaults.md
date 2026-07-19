@@ -1,7 +1,7 @@
 # Deployment Defaults — Image Runtime & Content Showcase
 
 **Status:** Current recommendations (replaceable)  
-**Last Updated:** 2026-07-17  
+**Last Updated:** 2026-07-19  
 **Layer:** **Deployment only**  
 **Authority:** MUST remain compatible with ADR-010 · SPEC-IMG-001 · `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC`
 
@@ -43,18 +43,20 @@ Runtime reads **Budget Policy knobs** only. Currency is Deployment Configuration
 
 Content Policy tracks are frozen in ADR-010. **Titles below are current showcase defaults only.**
 
-| Locale | Current default showcase | Track |
-| ------ | ------------------------ | ----- |
-| Chinese | Romance of the Three Kingdoms（《三国演义》） | Track 1 (public domain original text posture; verify edition/translation rights) |
-| English | Les Misérables | Track 1 (public domain original; pin a verified PD English text source) |
+Recommendation package (matrix + canon subsets): `docs/deployment/pd-showcase-recommendation-v1.md` (ROI Decision Package v1).
+
+| Role | Current default showcase | Track | v1 scope |
+| ---- | ------------------------ | ----- | -------- |
+| International primary | Les Misérables | Track 1 (pin verified PD English translation) | **Canon subset only** — not full-text ingest |
+| Visual / Chinese co-track | Romance of the Three Kingdoms（《三国演义》） | Track 1 (pin edition) | **Canon subset only** |
 
 ### Replaceable
 
-《西游记》、War and Peace、other PD ensemble novels, user-owned works—swap via Deployment / ops without amending ADR-010.
+《西游记》、War and Peace、Pride and Prejudice (text-first MVP), other PD ensemble novels, user-owned works—swap via Deployment / ops without amending ADR-010.
 
 ### Not a public default
 
-Protected franchise IP (e.g. contemporary TV/novel franchises without license) → Content Policy **Track 2** (internal validation only).
+Protected franchise IP (e.g. Game of Thrones / ASOIAF, contemporary TV/novel franchises without license) → Content Policy **Track 2** (internal validation only). **GoT is not a public showcase dataset.**
 
 ---
 
@@ -85,7 +87,9 @@ None of the above are Runtime Contract constants.
 | State | Status |
 | ----- | ------ |
 | Contract Freeze | Yes (ADR-010 / SPEC-IMG-001) |
-| Spike Implementation Authorization | **Granted** — `docs/spikes/spike-img-001-image-runtime-port.md` |
+| Spike Implementation Authorization | **Granted** — `docs/spikes/spike-img-001-image-runtime-port.md` · `docs/spikes/spike-img-002-local-image-generation.md` |
 | Production Authorization | **Not granted** |
+| Image Production Default | **Cloud** draft/accept (section 1) |
+| Local generation | Research / optional adapter only — **not** Production Default |
 
 Spike may use temporary `IMAGE_SPIKE_*` (or equivalent) configuration. Production Admin/Rollout/Copilot paths MUST NOT be modified under Spike Authorization.

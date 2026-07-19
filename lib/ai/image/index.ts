@@ -1,5 +1,6 @@
 import { createFalFluxProvider } from "./adapters/falFlux"
 import { createGeminiPortraitProvider } from "./adapters/gemini"
+import { createLocalHttpProvider } from "./adapters/localHttp"
 import { createPollinationsProvider } from "./adapters/pollinations"
 import { createSiliconFlowProvider } from "./adapters/siliconflow"
 import { loadSpikeImageConfig } from "./config"
@@ -95,9 +96,16 @@ export function createImagePortraitProvider(
         skipNetwork: config.skipNetwork,
         costUsdEstPerImage: 0.03,
       })
+    case "local":
+      return createLocalHttpProvider({
+        baseUrl: config.localBaseUrl,
+        modelId: config.acceptModelId,
+        skipNetwork: config.skipNetwork,
+        costUsdEstPerImage: 0,
+      })
     default:
       throw new Error(
-        `Unknown IMAGE_SPIKE provider id "${providerId}". Known: pollinations, fal, gemini, siliconflow`
+        `Unknown IMAGE_SPIKE provider id "${providerId}". Known: pollinations, fal, gemini, siliconflow, local`
       )
   }
 }

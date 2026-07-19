@@ -46,6 +46,11 @@ export type SpikeImageConfig = {
   siliconflowKey?: string
   /** e.g. https://api.siliconflow.com/v1 or https://api.siliconflow.cn/v1 */
   siliconflowApiBase?: string
+  /**
+   * SPIKE-IMG-002: local HTTP base (Diffusers-serve / Comfy wrapper).
+   * Example: http://127.0.0.1:8191
+   */
+  localBaseUrl?: string
   /** When true, adapters return a tiny PNG without network (architecture dry-run). */
   skipNetwork: boolean
 }

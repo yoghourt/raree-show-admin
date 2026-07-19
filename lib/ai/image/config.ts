@@ -37,6 +37,7 @@ export function loadSpikeImageConfig(
       env.IMAGE_SPIKE_SILICONFLOW_BASE?.trim() ||
       env.SILICONFLOW_API_BASE?.trim() ||
       undefined,
+    localBaseUrl: env.IMAGE_SPIKE_LOCAL_BASE?.trim() || undefined,
     skipNetwork,
   }
 }
