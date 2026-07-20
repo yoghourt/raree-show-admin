@@ -1,6 +1,6 @@
 # SPIKE-IMG-002 — Local Image Generation (Optional Deployment Adapter)
 
-**Status:** Spike Implementation **Authorized** · Desk Findings **Partial** · Hardware Benchmarks **Operator-run within timebox**  
+**Status:** Spike Implementation **Authorized** · Desk + hardware + vs-Production pairwise **Recorded** (2026-07-20)  
 **Production Authorization:** **Not Authorized** (cloud remains Production Default)  
 **Contract Freeze:** ADR-010 · SPEC-IMG-001 (Accepted)  
 **Authority:** Architect · ROI Decision Package v1 · `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC` §6  
@@ -150,10 +150,29 @@ IMAGE_SPIKE_SKIP_NETWORK=0 \
   npx tsx scripts/spike-img-002-local-breakeven.ts --bench
 ```
 
+### Replay Production cases on local only (no cloud re-run)
+
+Same C1–C3 prompts/seeds as SPIKE-IMG-001; left side uses existing
+`spike-output/spike-img-001/**` (cloud not re-run).
+
+```bash
+cd /Users/yuefuchen/Documents/GitHub/raree-show-admin
+
+IMAGE_SPIKE_ACCEPT_PROVIDER=local \
+IMAGE_SPIKE_LOCAL_BASE=http://127.0.0.1:8191 \
+IMAGE_SPIKE_ACCEPT_MODEL=sdxl-turbo \
+IMAGE_SPIKE_SKIP_NETWORK=0 \
+IMAGE_SPIKE_REPLAY_SIZE=512 \
+  npx tsx scripts/spike-img-002-replay-production-cases.ts
+```
+
+Open: `spike-output/spike-img-002/vs-production/compare.html`
+
 Evidence paths (gitignored):
 
 * `spike-output/spike-img-002/report.json`  
 * `spike-output/spike-img-002/images/` (bench only)
+* `spike-output/spike-img-002/vs-production/` (replay + compare.html)
 
 ---
 
@@ -170,9 +189,9 @@ Evidence paths (gitignored):
 
 ## Findings
 
-> **Status:** Analytical + prototype **complete** (2026-07-19).  
-> Hardware quality/throughput cells: **awaiting operator bench within timebox**.  
-> Production Authorization for local default: **NOT GRANTED**.
+> **Status:** Analytical + prototype **complete**; hardware bench + vs-Production replay **recorded** (2026-07-20).  
+> Operator pairwise preference (showcase-relevant dimensions): **local preferred**.  
+> Production Authorization for local **as default**: still **NOT GRANTED** (throughput / Deployment freeze).
 
 ### Cloud baseline (from SPIKE-IMG-001)
 
@@ -189,7 +208,7 @@ Evidence paths (gitignored):
 | --------- | -----------:| ----- |
 | Port `local` adapter + factory + dry-run | 0.5–1 | Done in this change set (scaffold) |
 | Local runtime bring-up (Diffusers/MLX or Comfy HTTP) | 1–2 | Outside Node; weights download + MPS quirks |
-| Quality pack + scoring vs cloud | 0.5–1 | Reuse IMG-001 prompts |
+| Quality pack + scoring vs cloud | 0.5–1 | Replay script + operator pairwise compare |
 | Break-even + Findings write-up | 0.5 | This report |
 | **Total in timebox** | **3–5** | Stop at Findings; no production wiring |
 
@@ -231,57 +250,72 @@ Sensitivity:
 | Failure modes | Endpoint down, OOM, thermal stall, style drift vs cloud accept | Demo reliability risk |
 | Monthly ceiling (suggested) | ≤ 0.5 person-day | Else keep cloud-only |
 
-### EC-1 / EC-2 — Quality & throughput
+### EC-1 / EC-2 — Quality & throughput (operator evidence 2026-07-20)
 
-| Cell | Status | Notes |
-| ---- | ------ | ----- |
-| Image quality vs Kontext | **Pending operator bench** | Do not invent scores |
-| Throughput P50/P95 | **Pending operator bench** | Record cold/warm + thermal |
-| Reference / identity | **High risk on 16GB** | May lack Kontext-class reference; score with and without |
+**Hardware / bench**
 
-Operator checklist (copy into `report.json` when done):
+| Item | Observed |
+| ---- | -------- |
+| Machine | MacBook Pro M2 Pro, 16GB |
+| Local stack | Diffusers `sdxl-turbo` via `scripts/local_portrait_server.py` + Port `local` |
+| Throughput (`--bench`, n=10, ~768) | Cold ≈ **55s**; Warm **P50 ≈ 35.5s**; **P95 ≈ 44.5s** |
+| Replay | `scripts/spike-img-002-replay-production-cases.ts` → `vs-production/compare.html` (same IMG-001 prompts/seeds; size 512) |
+| Reference | `referenceImages` passed to adapter; **server ignores `reference_url`** (text-only local path) |
 
-1. Model id + quantization  
-2. Resolution  
-3. N images, cold/warm latency  
-4. Peak memory  
-5. Blind or rubric scores vs cloud canonicals  
-6. Whether `referenceImages` worked  
+**Pairwise vs Production (operator, showcase-weighted)**
+
+Evidence UI: `spike-output/spike-img-002/vs-production/compare.html`  
+Production side: existing SPIKE-IMG-001 SiliconFlow Kontext (+ reference). Local side: replay only (no cloud re-run).
+
+| Dimension | Winner | Operator note |
+| --------- | ------ | ------------- |
+| Expression / pose vs prompt | **Production** | Better match to expression & facing cues |
+| Fine detail / “photoreal” finish | **Production** | More refined; also stronger “AI photoreal” look |
+| Background color vs prompt | **Local** | Better background adherence |
+| Cross-image identity consistency | **Local** | Stronger same-character feel across variants (despite no local reference impl) |
+| Character look (style preference) | **Tie** | Production more lifelike but AI-photoreal; local more illustration-like (preferred for product tone by operator) |
+| **Overall (operator priorities)** | **Local** | Weighted toward consistency + illustration tone over photoreal detail |
+
+**Interpretation:** On **portfolio / showcase taste + cross-variant consistency**, local can beat current cloud accept for this pack. That satisfies a **quality-preference** reading of EC-1 for optional local use. It does **not** by itself satisfy switch-condition #3 (throughput: warm P50 ≈ 35s &gt; ~30s UX hint) or Architecture authorization to flip Production Default.
 
 ### EC-6 — Production isolation
 
-Prototype confined to `lib/ai/image/**` + `scripts/spike-img-002-*.ts` + this doc. Deployment Defaults continue to list **cloud** draft/accept.
+Prototype confined to `lib/ai/image/**` + `scripts/spike-img-002-*.ts` + `scripts/local_portrait_server.py` + this doc. Deployment Defaults continue to list **cloud** draft/accept.
 
 ### EC-7 — Switch conditions (answer to the Spike question)
 
 **Prefer / enable local as optional accept when ALL hold:**
 
 1. **Scale or price:** cumulative accept images ≳ Scenario B \(N^*\) **or** cloud accept \(c\) rises enough that recomputed \(N^*\) ≤ planned lifetime volume.  
-2. **Quality floor:** measured identity/prompt/quality not materially below cloud accept for the showcase pack (document threshold, e.g. mean identity ≥ 4/5 on same rubric).  
-3. **Throughput floor:** warm P50 acceptable for authoring UX (suggest ≤ 30s @ showcase resolution on target hardware) without blocking demo reliability.  
+2. **Quality floor:** measured identity/prompt/quality not materially below cloud accept for the showcase pack — **operator pairwise (2026-07-20): local preferred on weighted dimensions** (see EC-1).  
+3. **Throughput floor:** warm P50 acceptable for authoring UX (suggest ≤ 30s @ showcase resolution on target hardware) — **not met** (≈ 35.5s P50 on sdxl-turbo bench).  
 4. **Ops budget:** maintenance ≤ agreed monthly ceiling.  
 5. **Explicit Deployment switch:** config-only; no Architecture change required beyond adapter registration — but **default** flip needs Architecture Review.
 
-**Otherwise:** keep cloud Production Default; retain local as Research / optional adapter only.
+**Updated answer:** Local is a **credible optional / research accept** for illustration-led showcase when the operator accepts ~35s/image and self-hosted ops. **Keep cloud as Production Default** until throughput improves **and** Architect grants a default flip. Quality preference alone is not a full switch.
 
 ---
 
 ## Risks
 
 1. 16GB unified memory + Admin/dev contention → OOM before model “fits on paper”.  
-2. Local reference consistency may fail EC-style identity bar that Kontext already passed.  
+2. Local `reference_url` still unimplemented — today’s consistency win is **style/prompt luck**, not Kontext-class reference locking; may not hold on harder packs.  
 3. Comfy-first workflows resist Port automation — prefer HTTP + Diffusers/MLX.  
-4. Scope creep into “productionize local” — **out of authorization**.
+4. Scope creep into “productionize local” — **out of authorization**.  
+5. Operator “local wins” on taste ≠ license to change Deployment Default without Review.
 
 ---
 
 ## Recommendation
 
-- [x] **Continue Research (bounded)** — complete operator hardware benches inside timebox; keep cloud default  
-- [ ] **Optional Deployment binding** — only after EC-1/EC-2 filled **and** switch conditions approaching  
-- [ ] **Production Default → local** — **Not recommended**; requires new Architecture Review  
+- [x] **Continue Research (bounded)** — evidence pack complete for timebox  
+- [x] **Optional local accept (research / offline / illustration-led Creator batches)** — justified by operator pairwise preference on consistency + illustration tone  
+- [x] **Architecture Alignment (2026-07-20)** — Creator Runtime ⊥ Reader Runtime frozen in ADR-010 **A2**; provider choice remains Deployment  
+- [ ] **Creator Local as Deployment Default** — **Not authorized yet**; MAY be granted separately when ops evidence supports (MUST NOT freeze `Creator = Local` in Architecture)  
+- [ ] **Reader / global Production Default → local** — **Rejected**; Reader MUST NOT depend on author-local generation  
 
-**Why:** Break-even and maintenance analysis already show local is a **high-scale / high-cloud-price / offline** option. Portfolio ROI justifies finishing the Spike evidence pack; it does not justify changing Production Default now.
+**Why:** Operator comparison shows local can **win on Creator-weighted quality** for this pack. Architecture now separates surfaces so that verdict informs **Creator Deployment recommendations**, not a single global Production Default. Throughput (~35s) is acceptable for Creator batch; Cloud fallback and unified published assets remain required. Next work is **Deployment Authorization / implementation**, not further Architecture debate.
 
-Decision owner / date: Architect authorization 2026-07-19 · Desk Findings 2026-07-19  
-**Production Authorization (local default):** still **NOT GRANTED**
+Decision owner / date: Architect authorization 2026-07-19 · Operator compare 2026-07-20 · Architecture Alignment A2 2026-07-20  
+**Production Authorization (Creator Local default):** still **NOT GRANTED**  
+**Architecture (Creator ⊥ Reader):** **FROZEN** (ADR-010 v1.2 / A2)
