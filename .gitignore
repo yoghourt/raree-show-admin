@@ -48,3 +48,12 @@ next-env.d.ts
 
 # Image Runtime Spike local artifacts (SPIKE-IMG-001)
 /spike-output/
+
+# Python virtualenvs (local image spike / Diffusers)
+.venv/
+**/.venv/
+venv/
+**/venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
