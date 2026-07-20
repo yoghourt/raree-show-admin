@@ -1,11 +1,11 @@
 # SPIKE-IMG-002 — Local Image Generation (Optional Deployment Adapter)
 
 **Status:** Spike Implementation **Authorized** · Desk + hardware + vs-Production pairwise **Recorded** (2026-07-20)  
-**Production Authorization:** **Not Authorized** (cloud remains Production Default)  
+**Production Authorization:** **Granted (scoped)** — ADR-010 **A3** · Constraint F sets Creator Deployment Default = **Local** with Cloud fallback (not Architecture freeze)  
 **Contract Freeze:** ADR-010 · SPEC-IMG-001 (Accepted)  
 **Authority:** Architect · ROI Decision Package v1 · `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC` §6  
 **Timebox:** 3–5 person-days  
-**Last Updated:** 2026-07-19
+**Last Updated:** 2026-07-20
 
 ---
 
@@ -42,7 +42,7 @@ Personal portfolio ROI may justify a bounded Spike as capability investment; com
 | ----- | ---------- |
 | Contract Freeze | Already granted via ADR-010 / SPEC-IMG-001 |
 | **Spike Implementation Authorization** | **GRANTED** by this document + ROI Decision Package v1 |
-| Production Authorization (local as default) | **NOT GRANTED** |
+| Production Authorization (Creator Local Deployment Default) | **GRANTED** via ADR-010 **A3 Constraint F** (Deployment only; Cloud fallback required) |
 
 ---
 
@@ -191,7 +191,7 @@ Evidence paths (gitignored):
 
 > **Status:** Analytical + prototype **complete**; hardware bench + vs-Production replay **recorded** (2026-07-20).  
 > Operator pairwise preference (showcase-relevant dimensions): **local preferred**.  
-> Production Authorization for local **as default**: still **NOT GRANTED** (throughput / Deployment freeze).
+> Architect later granted Creator Local as **Deployment Default** under ADR-010 **A3 Constraint F** (2026-07-20), with Cloud fallback; Architecture remains unfrozen.
 
 ### Cloud baseline (from SPIKE-IMG-001)
 
@@ -311,11 +311,11 @@ Prototype confined to `lib/ai/image/**` + `scripts/spike-img-002-*.ts` + `script
 - [x] **Continue Research (bounded)** — evidence pack complete for timebox  
 - [x] **Optional local accept (research / offline / illustration-led Creator batches)** — justified by operator pairwise preference on consistency + illustration tone  
 - [x] **Architecture Alignment (2026-07-20)** — Creator Runtime ⊥ Reader Runtime frozen in ADR-010 **A2**; provider choice remains Deployment  
-- [ ] **Creator Local as Deployment Default** — **Not authorized yet**; MAY be granted separately when ops evidence supports (MUST NOT freeze `Creator = Local` in Architecture)  
+- [x] **Creator Local as Deployment Default** — **Granted** via ADR-010 **A3 Constraint F** (Deployment only; Cloud fallback required; MUST NOT freeze `Creator = Local` in Architecture)  
 - [ ] **Reader / global Production Default → local** — **Rejected**; Reader MUST NOT depend on author-local generation  
 
-**Why:** Operator comparison shows local can **win on Creator-weighted quality** for this pack. Architecture now separates surfaces so that verdict informs **Creator Deployment recommendations**, not a single global Production Default. Throughput (~35s) is acceptable for Creator batch; Cloud fallback and unified published assets remain required. Next work is **Deployment Authorization / implementation**, not further Architecture debate.
+**Why:** Operator comparison shows local can **win on Creator-weighted quality** for this pack. Architecture separates surfaces so that verdict informs **Creator Deployment**, not a single global Production Default. Throughput (~35s) is acceptable for Creator batch; Cloud fallback and unified published assets remain required. A3 authorizes scoped production wiring + Local Default; implementation follows SPEC-IMG-001 §9a.
 
-Decision owner / date: Architect authorization 2026-07-19 · Operator compare 2026-07-20 · Architecture Alignment A2 2026-07-20  
-**Production Authorization (Creator Local default):** still **NOT GRANTED**  
-**Architecture (Creator ⊥ Reader):** **FROZEN** (ADR-010 v1.2 / A2)
+Decision owner / date: Architect authorization 2026-07-19 · Operator compare 2026-07-20 · Architecture Alignment A2 2026-07-20 · Production A3 2026-07-20  
+**Production Authorization (Creator Local Deployment Default):** **GRANTED** — ADR-010 A3 Constraint F  
+**Architecture (Creator ⊥ Reader):** **FROZEN** (ADR-010 / A2); Local remains Deployment-only
