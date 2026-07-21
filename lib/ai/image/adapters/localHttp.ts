@@ -1,6 +1,7 @@
 import type { ImagePortraitProvider, PortraitRequest, PortraitResult } from "../types"
+import { AVATAR_NEGATIVE_PROMPT } from "@/lib/prompts/avatar"
 
-const DEFAULT_SIZE = { width: 768, height: 768 }
+const DEFAULT_SIZE = { width: 768, height: 1024 }
 
 function tinyPng(): Buffer {
   return Buffer.from(
@@ -10,14 +11,14 @@ function tinyPng(): Buffer {
 }
 
 /**
- * Spike-only local adapter.
+ * Local HTTP portrait adapter (Creator Deployment Default / SPIKE-IMG-002).
  *
  * Talks to an operator-provided HTTP endpoint (Diffusers-serve / Comfy wrapper /
  * OpenAI-compatible image API). Weights and MPS/MLX runtime stay outside the
- * Next.js process — keeps engineering surface small for SPIKE-IMG-002.
+ * Next.js process.
  *
  * Expected simple contract (POST `${base}/v1/portraits`):
- *   body: { prompt, seed?, width?, height?, reference_url?, model? }
+ *   body: { prompt, seed?, width?, height?, reference_url?, model?, negative_prompt? }
  *   response: image bytes (image/*) OR JSON { b64_json | url }
  */
 export function createLocalHttpProvider(options?: {
@@ -58,7 +59,7 @@ export function createLocalHttpProvider(options?: {
 
       if (!baseUrl) {
         throw new Error(
-          'local adapter requires IMAGE_SPIKE_LOCAL_BASE (e.g. http://127.0.0.1:8191) or IMAGE_SPIKE_SKIP_NETWORK=1'
+          "local adapter requires IMAGE_CREATOR_LOCAL_BASE or IMAGE_SPIKE_LOCAL_BASE (e.g. http://127.0.0.1:8191); spike dry-run: IMAGE_SPIKE_SKIP_NETWORK=1"
         )
       }
 
@@ -73,6 +74,7 @@ export function createLocalHttpProvider(options?: {
           height,
           model: modelId,
           reference_url: ref,
+          negative_prompt: AVATAR_NEGATIVE_PROMPT,
         }),
       })
 

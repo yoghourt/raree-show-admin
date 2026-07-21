@@ -31,9 +31,10 @@ Deployment Adapter
 | Knob / binding | Current recommendation | Notes |
 | -------------- | ---------------------- | ----- |
 | `creator_draft_provider` | Local **or** free-tier draft (e.g. Pollinations) | Replaceable |
-| `creator_accept_provider` | **Local** (Production Default) | A3 Constraint F; **not** an Architecture freeze; exact Local stack is env/config |
-| `creator_accept_fallback` | **Cloud** hosted accept (fal / SiliconFlow / …) | Required; config-switchable when Local unavailable |
-| `accept_model` | Local model id **or** Cloud model id (deployment-selected) | Exact id is env/config |
+| `creator_accept_provider` | **Local** (Production Default) | A3 Constraint F; env `IMAGE_CREATOR_ACCEPT_PROVIDER` (default `local`) |
+| `creator_accept_fallback` | **Cloud** hosted accept (SiliconFlow by default) | env `IMAGE_CREATOR_ACCEPT_FALLBACK` (default `siliconflow`) |
+| `accept_model` | Local model id **or** Cloud T2I model (deployment-selected) | `IMAGE_CREATOR_ACCEPT_MODEL` / `IMAGE_CREATOR_FALLBACK_MODEL` (default Cloud T2I: `FLUX.1-dev`; Kontext only when reference image is present) |
+| Local endpoint | Operator HTTP portrait server | `IMAGE_CREATOR_LOCAL_BASE` (e.g. `http://127.0.0.1:8191`) |
 
 **A3 Constraint F:** Creator Production Default = Local via Deployment Adapter; Cloud remains Fallback / Accept Baseline. MUST NOT freeze Local vendor/model. MUST remain replaceable without amending ADR-010 Contract / SPEC-IMG-001 Port shape. Reader Runtime is unaffected.
 

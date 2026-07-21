@@ -1,6 +1,6 @@
 /**
- * SPEC-IMG-001 Image Generation Port — spike types only.
- * Do not import from production avatar / Copilot paths.
+ * SPEC-IMG-001 Image Generation Port types.
+ * Spike scripts and Creator production (ADR-010 A3) share this Port shape.
  */
 
 export type PortraitRequest = {
@@ -17,7 +17,7 @@ export type PortraitResult = {
     providerId: string
     modelId: string
     seed?: number
-    /** Observational estimate for spike cost reports only */
+    /** Observational estimate for cost reports only — not Budget enforcement */
     costUsdEst?: number
     /**
      * Public URL of the generated image when the provider serves one.
@@ -33,24 +33,33 @@ export type ImagePortraitProvider = {
   generatePortrait(req: PortraitRequest): Promise<PortraitResult>
 }
 
-export type SpikeChannel = "draft" | "accept"
-
-export type SpikeImageConfig = {
-  draftProviderId: string
-  acceptProviderId: string
+/** Shared adapter credentials / endpoints (Deployment). */
+export type ImageAdapterEnv = {
   acceptModelId: string
   falKey?: string
-  /** enter.pollinations.ai / gen.pollinations.ai Bearer key (spike). */
   pollinationsKey?: string
   geminiKey?: string
   siliconflowKey?: string
-  /** e.g. https://api.siliconflow.com/v1 or https://api.siliconflow.cn/v1 */
   siliconflowApiBase?: string
-  /**
-   * SPIKE-IMG-002: local HTTP base (Diffusers-serve / Comfy wrapper).
-   * Example: http://127.0.0.1:8191
-   */
   localBaseUrl?: string
-  /** When true, adapters return a tiny PNG without network (architecture dry-run). */
+  /** When true, adapters return a tiny PNG without network (spike dry-run). */
   skipNetwork: boolean
+}
+
+export type SpikeChannel = "draft" | "accept"
+
+export type SpikeImageConfig = ImageAdapterEnv & {
+  draftProviderId: string
+  acceptProviderId: string
+}
+
+/**
+ * Creator Runtime Deployment bindings (ADR-010 A3 Constraint F).
+ * Defaults: Local primary · Cloud fallback. Replaceable via env.
+ */
+export type CreatorImageDeploymentConfig = ImageAdapterEnv & {
+  acceptProviderId: string
+  acceptFallbackProviderId: string
+  /** Model id for the fallback (Cloud) channel when distinct from acceptModelId */
+  fallbackModelId: string
 }

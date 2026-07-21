@@ -3,7 +3,28 @@ import { spawnSync } from "node:child_process"
 import type { ImagePortraitProvider, PortraitRequest, PortraitResult } from "../types"
 
 const DEFAULT_API_BASE = "https://api.siliconflow.com/v1"
-const DEFAULT_MODEL = "black-forest-labs/FLUX.1-Kontext-dev"
+/** Text-to-image default (Kontext requires `image` and is for reference passes). */
+const DEFAULT_MODEL = "black-forest-labs/FLUX.1-dev"
+const DEFAULT_KONTEXT_MODEL = "black-forest-labs/FLUX.1-Kontext-dev"
+const DEFAULT_INFERENCE_STEPS = 20
+
+/** SiliconFlow FLUX recommended sizes (768x768 is rejected / 500s on some models). */
+const FLUX_IMAGE_SIZES = [
+  "1024x1024",
+  "960x1280",
+  "768x1024",
+  "720x1440",
+  "720x1280",
+] as const
+
+function normalizeFluxImageSize(width: number, height: number): string {
+  const key = `${width}x${height}`
+  if ((FLUX_IMAGE_SIZES as readonly string[]).includes(key)) return key
+  // Portrait bust → prefer 3:4; otherwise square.
+  if (height > width) return "768x1024"
+  if (width > height) return "960x1280"
+  return "1024x1024"
+}
 
 function tinyPng(): Buffer {
   return Buffer.from(
@@ -139,8 +160,8 @@ export function createSiliconFlowProvider(options: {
     name: "siliconflow",
     capabilities: { referenceImage: true },
     async generatePortrait(req: PortraitRequest): Promise<PortraitResult> {
-      const width = req.size?.width ?? 512
-      const height = req.size?.height ?? 512
+      const width = req.size?.width ?? 1024
+      const height = req.size?.height ?? 1024
       const seed = req.seed
 
       if (skipNetwork) {
@@ -164,20 +185,41 @@ export function createSiliconFlowProvider(options: {
       }
 
       const ref = req.referenceImages?.[0]?.url
-      const body: Record<string, unknown> = {
-        model: modelId,
-        prompt: req.prompt,
-        batch_size: 1,
+      // Kontext is image-conditioned; without a reference, SiliconFlow returns
+      // 400 code 20015 "Missing required key: image". Use T2I for first portraits.
+      let effectiveModelId = modelId
+      if (isKontextModel(modelId) && !ref) {
+        effectiveModelId = DEFAULT_MODEL
+        console.warn(
+          `[siliconflow] Kontext requires image; using ${effectiveModelId} for text-only portrait`
+        )
+      } else if (!isKontextModel(modelId) && ref && /flux\.1-dev$/i.test(modelId)) {
+        effectiveModelId = DEFAULT_KONTEXT_MODEL
       }
 
-      if (!/qwen-image-edit/i.test(modelId)) {
-        body.image_size = `${width}x${height}`
+      const imageSize = normalizeFluxImageSize(width, height)
+      const body: Record<string, unknown> = {
+        model: effectiveModelId,
+        prompt: req.prompt,
+        batch_size: 1,
+        // Required by SiliconFlow FLUX.1-dev OpenAPI schema
+        num_inference_steps: DEFAULT_INFERENCE_STEPS,
+      }
+
+      if (!/qwen-image-edit/i.test(effectiveModelId)) {
+        body.image_size = imageSize
       }
       if (seed != null) body.seed = seed
       if (ref) {
         body.image = ref
-        if (isKontextModel(modelId)) body.input_image = ref
+        if (isKontextModel(effectiveModelId)) body.input_image = ref
       }
+
+      console.info("[siliconflow] generate", {
+        model: effectiveModelId,
+        image_size: body.image_size ?? null,
+        hasReference: Boolean(ref),
+      })
 
       const json = await withRetries("generate", async () => {
         const res = await fetch(apiUrl, {
@@ -217,7 +259,7 @@ export function createSiliconFlowProvider(options: {
         mimeType,
         meta: {
           providerId: "siliconflow",
-          modelId,
+          modelId: effectiveModelId,
           seed: json.seed ?? seed,
           costUsdEst: costUsdEstPerImage,
           publicUrl: first,
