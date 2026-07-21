@@ -61,31 +61,53 @@ const sceneFormSchema = z.object({
   chapter_number: z.preprocess(
     (v) => {
       if (typeof v === "number" && !Number.isNaN(v)) return v;
-      if (typeof v === "string" && v.trim() !== "") return Number(v);
+      if (typeof v === "string" && v.trim() !== "") {
+        const n = Number(v);
+        return Number.isNaN(n) ? undefined : n;
+      }
       return undefined;
     },
-    z.number().int().min(1, "章节序号至少为 1")
+    z.number({ error: "请填写章节序号" }).int().min(1, "章节序号至少为 1")
   ),
-  chapter_title: z
-    .string()
-    .transform((s) => {
+  chapter_title: z.preprocess(
+    (v) => (v == null ? "" : String(v)),
+    z.string().transform((s) => {
       const t = s.trim();
       return t === "" ? null : t;
     })
-    .nullable(),
-  summary: z.string().optional().default(""),
-  tags: z.string(),
-  story_images_v2: z
-    .array(
-      z.object({
-        url: z.string().min(1),
-        caption: z.string(),
-      })
-    )
-    .default([]),
-  locationId: z.string(),
-  characterIdsTsids: z.array(z.string()),
-  characterIdsFallback: z.string(),
+  ),
+  summary: z.preprocess(
+    (v) => (v == null ? "" : String(v)),
+    z.string().optional().default("")
+  ),
+  tags: z.preprocess((v) => (v == null ? "" : String(v)), z.string()),
+  // Drop blank segments (added but never uploaded) so character-only edits can save.
+  story_images_v2: z.preprocess(
+    (v) => {
+      if (!Array.isArray(v)) return [];
+      return v.filter(
+        (item) =>
+          item &&
+          typeof item === "object" &&
+          typeof (item as { url?: unknown }).url === "string" &&
+          (item as { url: string }).url.trim() !== ""
+      );
+    },
+    z
+      .array(
+        z.object({
+          url: z.string().min(1, "请为该片段上传图片"),
+          caption: z.string(),
+        })
+      )
+      .default([])
+  ),
+  locationId: z.preprocess((v) => (v == null ? "" : String(v)), z.string()),
+  characterIdsTsids: z.array(z.string()).default([]),
+  characterIdsFallback: z.preprocess(
+    (v) => (v == null ? "" : String(v)),
+    z.string()
+  ),
 });
 
 export type ReadingRouteFormValues = {
@@ -247,20 +269,44 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
 
   // ── Form submission ────────────────────────────────────────────────────────
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    setSubmitError(null);
-    try {
-      const payload = formValuesToPayload(values, hasCharacterPicker);
-      if (props.mode === "create") {
-        await createScene(workId, payload);
-      } else {
-        await updateScene(workId, props.defaultValues.tsid, payload);
+  const onSubmit = form.handleSubmit(
+    async (values) => {
+      setSubmitError(null);
+      try {
+        const payload = formValuesToPayload(values, hasCharacterPicker);
+        if (props.mode === "create") {
+          await createScene(workId, payload);
+        } else {
+          await updateScene(workId, props.defaultValues.tsid, payload);
+        }
+        router.push(listHref);
+      } catch (e) {
+        setSubmitError(toSubmitError(e));
       }
-      router.push(listHref);
-    } catch (e) {
-      setSubmitError(toSubmitError(e));
+    },
+    (errors) => {
+      const first =
+        errors.title?.message ||
+        errors.chapter_number?.message ||
+        errors.summary?.message ||
+        errors.story_images_v2?.message ||
+        errors.story_images_v2?.root?.message ||
+        (Array.isArray(errors.story_images_v2)
+          ? errors.story_images_v2.find((e) => e?.url?.message || e?.caption?.message)
+              ?.url?.message ||
+            errors.story_images_v2.find((e) => e?.caption?.message)?.caption
+              ?.message
+          : undefined) ||
+        errors.locationId?.message ||
+        errors.characterIdsTsids?.message ||
+        errors.characterIdsFallback?.message;
+      setSubmitError(
+        typeof first === "string" && first.trim()
+          ? first
+          : "表单校验未通过，请检查标红或未完成的字段（例如未上传图片的阅读帧片段）。"
+      );
     }
-  });
+  );
 
   // ── Copilot helpers ────────────────────────────────────────────────────────
 
@@ -444,6 +490,13 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
             />
           )}
         />
+        {form.formState.errors.story_images_v2 ? (
+          <p className="text-destructive text-sm">
+            {form.formState.errors.story_images_v2.message ||
+              form.formState.errors.story_images_v2.root?.message ||
+              "请为每个阅读帧片段上传图片，或删除未完成的片段后再保存。"}
+          </p>
+        ) : null}
       </div>
 
       {/* ── Location (reference — excluded in v1, OQ-03) ── */}
