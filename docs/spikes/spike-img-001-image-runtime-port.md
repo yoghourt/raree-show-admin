@@ -1,7 +1,7 @@
 # SPIKE-IMG-001 — Image Runtime Port Spike
 
 **Status:** Spike Implementation **Authorized** · EC-3 **PASS** via SiliconFlow Kontext (2026-07-17)  
-**Production Authorization:** **Not Authorized** (requires separate grant)  
+**Production Authorization:** **Granted (scoped)** — ADR-010 **A3** · Constraints A–F (2026-07-20); see SPEC-IMG-001 §9a  
 **Contract Freeze:** ADR-010 · SPEC-IMG-001 (Accepted)  
 **Authority:** Architect · `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC` §6 (three-state model)
 
@@ -17,7 +17,7 @@ This document is the Spike Authorization record and the Findings container.
 
 ## Why
 
-SPEC-IMG-001 froze contracts without authorizing code. Production wiring is still forbidden. A Spike is required to gather evidence before any Production Authorization.
+SPEC-IMG-001 froze contracts without authorizing production code. A Spike was required to gather evidence before Production Authorization. Production Authorization was later granted scoped via ADR-010 **A3** (Constraints A–F).
 
 ---
 
@@ -27,7 +27,7 @@ SPEC-IMG-001 froze contracts without authorizing code. Production wiring is stil
 | ----- | ---------- |
 | Contract Freeze | Already granted via ADR-010 / SPEC-IMG-001 |
 | **Spike Implementation Authorization** | **GRANTED** by this document |
-| Production Authorization | **NOT GRANTED** |
+| Production Authorization | **GRANTED (scoped)** via ADR-010 **A3** (separate from this Spike; Constraints A–F) |
 
 ---
 
@@ -124,7 +124,7 @@ Invariant checks:
 
 - [x] EC-1 … EC-5 recorded with evidence paths
 - [x] Findings Recommendation filled
-- [x] Production Authorization still Not Authorized
+- [x] Production Authorization later granted via ADR-010 A3 (Spike itself did not grant)
 
 ---
 
@@ -141,7 +141,7 @@ Invariant checks:
 ## Findings
 
 > **Status:** EC-3 completed 2026-07-17 via SiliconFlow  
-> Production Authorization remains **Not Authorized** (Spike Success ≠ Production Authorization).
+> Production Authorization later **Granted (scoped)** via ADR-010 **A3** (2026-07-20) — Spike Success still did not auto-grant; Architect grant required.
 
 ### Architecture validation
 
@@ -188,14 +188,16 @@ Note: intl host required for this key (`.cn` → 401). Download flakiness mitiga
 1. SiliconFlow intl vs CN endpoint mismatch can look like “invalid key”.
 2. Large image downloads via undici can fail behind local proxies — curl fallback recommended.
 3. Draft (Pollinations painterly) vs Accept (Kontext) style shift is acceptable for identity but should be documented for production draft→accept policy.
-4. **Production Authorization still not granted** by this Spike alone.
+4. Spike Success alone does not grant Production Authorization (Three-State rule).
 
 ### Recommendation
 
-- [x] **Proceed to Production Review** (separate Production Authorization still required)
+- [x] **Proceed to Production Review** (completed 2026-07-20)
 - [ ] **Continue Research**
 
-**Why Proceed to Production Review:** EC-1…EC-5 met with SiliconFlow Kontext reference path; identity threshold passed at 100% on full 3×6 sample. Next step is Architect Production Authorization — not automatic wiring into avatar/Rollout/Copilot.
+**Why Proceed to Production Review:** EC-1…EC-5 met with SiliconFlow Kontext reference path; identity threshold passed at 100% on full 3×6 sample.
 
-Decision owner / date: Spike executor / 2026-07-17  
-**Production Authorization:** still **NOT GRANTED**
+**Architect Decision (2026-07-20):** **GRANT WITH CONSTRAINTS (A–F)** — ADR-010 **A3**. Scoped Creator portrait via Port + Deployment Adapter; Constraint F sets Creator Deployment Default = Local with Cloud fallback. Not automatic wiring into Rollout/Copilot/Reader.
+
+Decision owner / date: Spike executor / 2026-07-17 · Architect A3 / 2026-07-20  
+**Production Authorization:** **GRANTED (scoped)** — ADR-010 A3 · SPEC-IMG-001 §9a

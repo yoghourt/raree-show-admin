@@ -350,6 +350,14 @@ export function CharacterForm(props: CharacterFormProps) {
                   if (props.mode === "edit") {
                     fd.append("characterTsid", props.defaultValues.tsid);
                   }
+                  const existingPortrait = form.getValues("portraitUrl")?.trim();
+                  if (
+                    existingPortrait &&
+                    (existingPortrait.startsWith("http://") ||
+                      existingPortrait.startsWith("https://"))
+                  ) {
+                    fd.append("referencePortraitUrl", existingPortrait);
+                  }
                   startTransition(() => {
                     avatarGenAction(fd);
                   });

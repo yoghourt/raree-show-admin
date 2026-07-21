@@ -1,38 +1,43 @@
-import { v2 as cloudinary } from "cloudinary"
-
-cloudinary.config({
-  cloud_name: "dnuxz94n5",
-})
-
 /**
- * Upload image bytes with unsigned preset (no API secret, no temp files).
+ * Server-side unsigned upload (same preset as browser `lib/cloudinary.ts`).
+ * Avoids cloudinary Node SDK, which requires api_key even for unsigned presets.
  */
-export function uploadImageBufferToCloudinary(
+export async function uploadImageBufferToCloudinary(
   buffer: Buffer,
   mimeType: string
 ): Promise<string> {
-  // Implementing A-02: Server-side Buffer Upload to Cloudinary
-  const dataUri = `data:${mimeType};base64,${buffer.toString("base64")}`
+  const ext = mimeType.includes("png")
+    ? "png"
+    : mimeType.includes("webp")
+      ? "webp"
+      : "jpg"
+  const formData = new FormData()
+  formData.append(
+    "file",
+    new Blob([new Uint8Array(buffer)], { type: mimeType }),
+    `portrait.${ext}`
+  )
+  formData.append("upload_preset", "raree-show-admin")
 
-  return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload(
-      dataUri,
-      {
-        upload_preset: "raree-show-admin",
-        resource_type: "image",
-      },
-      (err, result) => {
-        if (err) {
-          reject(err)
-          return
-        }
-        const url = result?.secure_url
-        if (!url) {
-          reject(new Error("Cloudinary response missing secure_url"))
-          return
-        }
-        resolve(url)
-      }
+  const res = await fetch(
+    "https://api.cloudinary.com/v1_1/dnuxz94n5/image/upload",
+    { method: "POST", body: formData }
+  )
+
+  const data = (await res.json()) as {
+    secure_url?: string
+    error?: { message?: string }
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      data.error?.message ?? `Cloudinary upload failed (HTTP ${res.status})`
     )
-  })
+  }
+
+  if (!data.secure_url) {
+    throw new Error("Cloudinary response missing secure_url")
+  }
+
+  return data.secure_url
 }

@@ -2,7 +2,7 @@ import type { SpikeImageConfig } from "./types"
 
 /**
  * Spike-only deployment config (IMAGE_SPIKE_*).
- * Production Runtime MUST NOT read these keys.
+ * Creator production MUST use loadCreatorImageDeploymentConfig (IMAGE_CREATOR_*).
  */
 export function loadSpikeImageConfig(
   env: NodeJS.ProcessEnv = process.env
