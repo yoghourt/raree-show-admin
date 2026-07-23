@@ -213,6 +213,48 @@ export async function updateScene(
   }
 }
 
+/**
+ * Patch frame URLs by index without dropping empty-url sibling frames.
+ * Business transition: caller must only invoke after human confirms write (Gate E).
+ * Execution (Cloudinary upload) stays outside this function.
+ */
+export async function patchSceneFrameUrls(
+  workId: string,
+  tsid: string,
+  patches: Array<{ frameIndex: number; url: string }>
+): Promise<void> {
+  const scene = await getScene(workId, tsid);
+  if (!scene) {
+    throw new Error(`故事不存在：${tsid}`);
+  }
+  const frames = [...(scene.story_images_v2 ?? [])];
+  for (const patch of patches) {
+    const url = patch.url.trim();
+    if (!url) {
+      throw new Error("frame url 不能为空");
+    }
+    if (patch.frameIndex < 0 || patch.frameIndex >= frames.length) {
+      throw new Error(
+        `帧索引越界：${tsid}[${patch.frameIndex}]（共 ${frames.length} 帧）`
+      );
+    }
+    frames[patch.frameIndex] = {
+      ...frames[patch.frameIndex],
+      url,
+    };
+  }
+  await updateScene(workId, tsid, {
+    title: scene.title,
+    chapter_number: scene.chapter_number,
+    chapter_title: scene.chapter_title,
+    summary: scene.summary,
+    tags: scene.tags,
+    story_images_v2: frames,
+    locationId: scene.locationId,
+    characterIds: scene.characterIds,
+  });
+}
+
 export async function deleteScene(workId: string, tsid: string): Promise<void> {
   try {
     const { error } = await supabase

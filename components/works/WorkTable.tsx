@@ -149,7 +149,12 @@ export function WorkTable({
                       )}
                     </TableCell>
                     <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
-                      {work.title}
+                      <Link
+                        href={`/works/${encodeURIComponent(work.id)}/edit`}
+                        className="hover:underline"
+                      >
+                        {work.title}
+                      </Link>
                     </TableCell>
                     <TableCell className="hidden py-3 sm:table-cell">
                       <span
@@ -166,6 +171,21 @@ export function WorkTable({
                     </TableCell>
                     <TableCell className="py-3 text-right">
                       <div className="flex flex-wrap justify-end gap-1">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link
+                            href={`/works/${encodeURIComponent(work.id)}/edit`}
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                            编辑
+                          </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link
+                            href={`/works/${encodeURIComponent(work.id)}/production`}
+                          >
+                            制作
+                          </Link>
+                        </Button>
                         <Button variant="outline" size="sm" asChild>
                           <Link
                             href={`/works/${encodeURIComponent(work.id)}/reading-routes`}
@@ -192,14 +212,6 @@ export function WorkTable({
                             href={`/works/${encodeURIComponent(work.id)}/discovery`}
                           >
                             {DISCOVERY_PAGE_TITLE}
-                          </Link>
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/edit`}
-                          >
-                            <Pencil className="size-3.5" aria-hidden />
-                            编辑
                           </Link>
                         </Button>
                         <Button
