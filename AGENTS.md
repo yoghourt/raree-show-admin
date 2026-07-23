@@ -50,10 +50,12 @@ This is NOT the Next.js you know. This version has breaking changes — APIs, co
 - Map coordinates: stored as 0–1 floats (`MapPicker` in `components/locations/MapPicker.tsx`)
 - SQL column: `order_index` (not `order`)
 - Repo specs under `docs/specs/` and ADRs under `docs/adr/` supplement governance for this codebase; on conflict with `/governance/*`, governance wins unless architecture explicitly updates local ADR/Spec
-- Image Runtime (docs): ADR-010 · `docs/specs/spec-img-001-image-generation-port.md` · replaceable stack in `docs/deployment/deployment-defaults.md` (providers/models/USD/showcase titles are **Deployment**, not Runtime constants)
+- Image Runtime (docs): ADR-010 · `docs/specs/spec-img-001-image-generation-port.md` · replaceable stack in `config/infra/deployment-defaults.md` (providers/models/USD/showcase titles are **Deployment**, not Runtime constants)
 - Runtime surfaces (ADR-010 **A2**): **Creator Runtime ⊥ Reader Runtime** (orthogonal to Text ⊥ Image). Provider Local/Cloud is Deployment per surface — do **not** freeze `Creator = Local` in Architecture. A3 Constraint F sets Creator **Deployment** Default = Local with Cloud fallback (replaceable).
-- Image Runtime: **Spike Authorized** · **Production Authorized (scoped, ADR-010 A3 Constraints A–F)** — Creator portrait via Port + Deployment Adapter; Creator Deployment Default = Local with Cloud fallback (`docs/deployment/deployment-defaults.md`); Spikes: `docs/spikes/spike-img-001-image-runtime-port.md` · `docs/spikes/spike-img-002-local-image-generation.md`
-- Public showcase (Deployment): `docs/deployment/pd-showcase-recommendation-v1.md` — Les Misérables (primary) + Three Kingdoms (visual co-track), canon subset only; GoT not public default
+- Image Runtime: **Spike Authorized** · **Production Authorized (scoped, ADR-010 A3 Constraints A–F)** — Creator portrait via Port + Deployment Adapter; Creator Deployment Default = Local with Cloud fallback (`config/infra/deployment-defaults.md`); Spikes: `docs/spikes/spike-img-001-image-runtime-port.md` · `docs/spikes/spike-img-002-local-image-generation.md`
+- Public showcase (Deployment): `config/infra/pd-showcase-recommendation-v1.md` — Les Misérables (primary) + Three Kingdoms (visual co-track), canon subset only; GoT not public default
+- Retained local docs trees: `docs/adr/` · `docs/specs/` · `docs/spikes/` · `docs/supabase/` only
+- Deployment / infra narration: `config/infra/` (not under `docs/`)
 
 ### Runtime Reading Governance (RC1)
 

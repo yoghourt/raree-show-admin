@@ -19,7 +19,7 @@
 | **Architecture** | Text Runtime ⊥ Image Runtime; **Creator Runtime ⊥ Reader Runtime**; Image Generation Port / Adapter | Vendor SDKs; Local vs Cloud as architecture constants |
 | **Policy** | Content tracks (1/2/3); Budget Policy shape under Mission | Showcase work titles; USD |
 | **Runtime Contract** | Port shape; `portrait_limit`, `scene_frame_limit`, `draft_policy`, `accept_policy`; `reference_strategy`, `consistency_policy`; surface-scoped generation posture (D1a) | Provider/model IDs; LoRA; named vendor “character reference”; “Creator = Local” |
-| **Deployment** | — (see `docs/deployment/deployment-defaults.md`) | All provider defaults live there (incl. Creator Local Default + Cloud fallback per A3 Constraint F) |
+| **Deployment** | — (see `config/infra/deployment-defaults.md`) | All provider defaults live there (incl. Creator Local Default + Cloud fallback per A3 Constraint F) |
 
 ---
 
@@ -177,7 +177,7 @@ Those belong in Deployment Configuration (may *derive* limits from a `usd_cap`, 
 ## How
 
 * Normative port fields: `docs/specs/spec-img-001-image-generation-port.md`
-* Replaceable stack / showcase / budget examples: `docs/deployment/deployment-defaults.md`
+* Replaceable stack / showcase / budget examples: `config/infra/deployment-defaults.md`
 * Shared governance law: `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md` (submodule source: `raree-governance`)
 * Spike Authorization (allowlist / denylist / Exit Criteria / Findings): `docs/spikes/spike-img-001-image-runtime-port.md` · `docs/spikes/spike-img-002-local-image-generation.md`
 
@@ -227,7 +227,7 @@ Executed commands: none (docs-only).
 * Governance: `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md` §6 (Three-State Authorization)
 * SPEC: `docs/specs/spec-img-001-image-generation-port.md`
 * Spike: `docs/spikes/spike-img-001-image-runtime-port.md` · `docs/spikes/spike-img-002-local-image-generation.md`
-* Deployment: `docs/deployment/deployment-defaults.md`
+* Deployment: `config/infra/deployment-defaults.md` (Creator Local Default + Cloud fallback per A3 Constraint F)
 * Related: ADR-004 (Human-owned truth; Asset fields); ADR-D2-001 (source / storage legal posture)
 * Alignment: Architecture Follow-up Review + Alignment (2026-07-20) — Creator ⊥ Reader
 * Production Review: Architect Decision 2026-07-20 — GRANT WITH CONSTRAINTS (A–F)

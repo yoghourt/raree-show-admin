@@ -1,7 +1,8 @@
 # Deployment Defaults — Image Runtime & Content Showcase
 
 **Status:** Current recommendations (replaceable)  
-**Last Updated:** 2026-07-20  
+**Last Updated:** 2026-07-23  
+**Path:** `config/infra/deployment-defaults.md`  
 **Layer:** **Deployment only**  
 **Authority:** MUST remain compatible with ADR-010 (incl. **A3**) · SPEC-IMG-001 · `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC`
 
@@ -77,7 +78,7 @@ Runtime reads **Budget Policy knobs** only. Currency is Deployment Configuration
 
 Content Policy tracks are frozen in ADR-010. **Titles below are current showcase defaults only.**
 
-Recommendation package (matrix + canon subsets): `docs/deployment/pd-showcase-recommendation-v1.md` (ROI Decision Package v1).
+Recommendation package (matrix + canon subsets): [`pd-showcase-recommendation-v1.md`](./pd-showcase-recommendation-v1.md) (ROI Decision Package v1).
 
 | Role | Current default showcase | Track | v1 scope |
 | ---- | ------------------------ | ----- | -------- |
@@ -111,8 +112,9 @@ None of the above are Runtime Contract constants.
 
 ## 5. Change procedure
 
-1. Edit this file (and env/config) for provider/model/showcase/`usd_cap` / per-surface binding changes — including switching Creator Default Local ↔ Cloud.
-2. Do **not** amend Constitution, ADR-010 Architecture/Policy/Contract sections, or SPEC-IMG-001 Port contracts unless the **shape** of Policy/Contract must change (A2 surface freeze and A3 scoped Production Authorization already landed in ADR-010).
+1. Edit this file (and env/config) for provider/model/showcase/`usd_cap` / per-surface binding changes — including switching Creator Default Local ↔ Cloud.  
+   Location: **`config/infra/`** (not under `docs/`).  
+2. Do **not** amend Constitution, ADR-010 Architecture/Policy/Contract sections, or SPEC-IMG-001 Port contracts unless the **shape** of Policy/Contract must change (A2 surface freeze and A3 scoped Production Authorization already landed in ADR-010).  
 3. After `raree-governance` updates, bump the admin `governance` submodule via the repo’s governance sync/bootstrap path—do not hand-edit the submodule working tree as source of truth.
 
 ---

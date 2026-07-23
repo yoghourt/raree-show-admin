@@ -15,8 +15,6 @@ Normative Hotfix rules:
 - Rollout MUST NOT write `story_units` / `approved_scene_units` / `scene_projection_links` as editorial authority on the happy path (soft-deprecated).
 - Parent gate for Scene → Frame: parent Story staging MUST already be persisted as a Reading Route.
 - Reader / SPEC-RDX-001 / Runtime topology unchanged (`Work → Reading Route → Reading Frame`).
-- Full recovery note: `docs/implementation/rollout-hotfix-product-recovery.md`.
-
 Sections below that still say “Approved Story unit” / “Scene → Reading Route” describe the **pre-Hotfix** Sprint #1 contract; **Hotfix supersedes** those storage targets for implementation.
 
 ---

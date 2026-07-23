@@ -6,14 +6,14 @@
 | ----- | ----- |
 | Title | Creator Production Pipeline — Responsibility Boundaries |
 | Status | **Accepted** — Contract Freeze (responsibility boundaries only) |
-| Spike Implementation Authorization | **Conditionally Granted** — MVP only · Gates A–F · `docs/authorization/auth-cpp-mvp-conditional.md` |
+| Spike Implementation Authorization | **Conditionally Granted** — MVP only · Gates A–F (this SPEC §0a) |
 | Production Authorization | **Not granted** (MVP is scoped Creator tooling; not a broad Production Authorization expansion) |
 | Version | v0.2 |
 | Owner | Architect |
 | Last Updated | 2026-07-23 |
 | Accepted | Architect · 2026-07-21 |
 | MVP Grant | Architect · 2026-07-23 · Conditional |
-| Derived From | SPIKE-CPP-001 (Architect Accepted · Direction **B+**) · `docs/findings/production-workflow-audit.md` · ADR-010 (Creator ⊥ Reader; Assets / Accept posture) |
+| Derived From | SPIKE-CPP-001 (Architect Accepted · Direction **B+**) · operational production-workflow evidence (2026-07-21) · ADR-010 (Creator ⊥ Reader; Assets / Accept posture) |
 | Does not amend | ADR-010 Port shape · Discovery SPECs · Rollout SPECs · Deployment Defaults |
 
 ---
@@ -23,12 +23,28 @@
 | State | SPEC-CPP-001 |
 | ----- | ------------ |
 | Contract Freeze | **Yes** — responsibility boundaries only (this SPEC Accepted) |
-| Spike Implementation Authorization | **Conditionally Granted** — MVP scope + Gates A–F (see authorization doc) |
+| Spike Implementation Authorization | **Conditionally Granted** — MVP scope + Gates A–F (see §0a) |
 | Production Authorization | **Not granted** |
 
 Contract Freeze alone does not authorize implementation. The Conditional MVP grant
-authorizes only the scoped surfaces listed in `docs/authorization/auth-cpp-mvp-conditional.md`.
-Gate violation suspends implementation.
+authorizes only the scoped surfaces listed in §0a. Gate violation suspends implementation.
+
+### 0a. Conditional MVP grant (Gates A–F)
+
+Architect Decision 2026-07-23. Violation of any gate suspends implementation.
+
+| Gate | Rule |
+| ---- | ---- |
+| **A** | Execution is never Authority — Jobs never become Runtime Truth |
+| **B** | Execution never owns Lifecycle — Job success must not auto-complete Task/Work |
+| **C** | Assets only Runtime Truth — Tasks derived; no editable Task authority |
+| **D** | Infrastructure replaceable — no queue/engine as Runtime |
+| **E** | Human Acceptance remains business boundary into Assets |
+| **F** | No irreversible architecture — no Workflow Engine / Task Graph / Queue Framework in MVP |
+
+MVP scope only: Work Production Board (UI) · Production Context · Batch Frame Completion · Accept→Save portrait simplification · Derived Production Tasks.
+
+Bootstrap regression pre-merge checks (all must be **No**): Execution owns Authority? Execution owns Lifecycle? Infrastructure becomes Runtime? Second Runtime Truth appeared?
 
 ---
 

@@ -182,7 +182,7 @@ Evidence paths (gitignored):
 * ADR: `docs/adr/010-image-runtime-and-policy.md`  
 * SPEC: `docs/specs/spec-img-001-image-generation-port.md`  
 * Prior spike: `docs/spikes/spike-img-001-image-runtime-port.md`  
-* Deployment: `docs/deployment/deployment-defaults.md`  
+* Deployment: `config/infra/deployment-defaults.md`  
 * Authority: ROI Decision Package v1 (Architect, 2026-07-19)
 
 ---

@@ -1,6 +1,7 @@
 # Public Domain Showcase Recommendation v1
 
 **Status:** Authorized recommendation (Deployment / Content)  
+**Path:** `config/infra/pd-showcase-recommendation-v1.md`  
 **Authority:** Architect · ROI Decision Package v1  
 **Date:** 2026-07-19  
 **Constraint:** Canon **subset** only — **no full-text ingest** in this phase  

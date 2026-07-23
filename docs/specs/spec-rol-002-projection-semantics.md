@@ -14,8 +14,6 @@
 
 Projection **ends** when the Frame exists on the parent Route (shared Runtime store). Reader behavior remains SPEC-RDX-001.
 
-Recovery note: `docs/implementation/rollout-hotfix-product-recovery.md`.
-
 Sections below that define Approved Scene → Reading Route association describe the **pre-Hotfix** contract; **Hotfix supersedes** the product endpoint for admin Rollout.
 
 ---

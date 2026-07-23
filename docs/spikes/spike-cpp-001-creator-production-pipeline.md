@@ -4,7 +4,7 @@
 **Production Authorization:** **Not granted** (discovery only; implementation not authorized)  
 **Contract Freeze:** Responsibility boundaries → `docs/specs/spec-cpp-001-creator-production-pipeline.md` (**Accepted** 2026-07-21)  
 **Authority:** Architect · evidence package for CPP scope decision  
-**Depends on:** `docs/findings/production-workflow-audit.md` (2026-07-21)  
+**Depends on:** operational production-workflow evidence (2026-07-21; not retained as a separate `docs/` tree) · SPEC-CPP-001  
 **Last Updated:** 2026-07-21
 
 ---
@@ -86,7 +86,7 @@ Additionally: research how mature **content production systems** (not AI-image t
 
 ## Evidence baseline (Runtime observations)
 
-Source: `docs/findings/production-workflow-audit.md` unless noted.
+Source: operational production-workflow evidence (2026-07-21) unless noted.
 
 | Observation | Evidence |
 | ----------- | -------- |
@@ -97,7 +97,7 @@ Source: `docs/findings/production-workflow-audit.md` unless noted.
 | Local portrait warm P50 ≈ 35.5s | SPIKE-IMG-002 |
 | Lean showcase wall-clock ≈ 5 h; stretch 8–12 h | Audit §§5–6 |
 | Top bottlenecks: frame fill, serial portraits, Accept→Save, missing work cockpit, unbounded retry | Audit §7 |
-| Showcase complete shape | 8 chars · 6 locs · 8–10 routes · 16–20 frames (`pd-showcase-recommendation-v1`) |
+| Showcase complete shape | 8 chars · 6 locs · 8–10 routes · 16–20 frames (`config/infra/pd-showcase-recommendation-v1.md`) |
 
 ---
 
@@ -561,10 +561,9 @@ Queue all generations; UI is job monitor.
 
 | Doc | Role |
 | --- | ---- |
-| `docs/findings/production-workflow-audit.md` | Cost evidence |
 | `docs/specs/spec-cpp-001-creator-production-pipeline.md` | Responsibility boundary SPEC (B+) |
 | `docs/adr/010-image-runtime-and-policy.md` | Creator ⊥ Reader; A3 portrait scope |
 | `docs/specs/story-structure-exit-criteria.md` | Write-complete vs visual-complete |
-| `docs/deployment/pd-showcase-recommendation-v1.md` | Complete-work shape |
+| `config/infra/pd-showcase-recommendation-v1.md` | Complete-work shape |
 | `docs/spikes/spike-img-002-local-image-generation.md` | Portrait latency |
 | Linear / GH Projects / Figma / Firefly / Midjourney / ComfyUI | External abstraction research (this Spike §Research) |

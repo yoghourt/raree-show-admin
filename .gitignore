@@ -40,6 +40,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# docs retention: only adr / specs / spikes / supabase are tracked
+/docs/authorization/
+/docs/deployment/
+/docs/findings/
+/docs/implementation/
+/docs/reviews/
+
 .cursorrules
 .cursor
 
