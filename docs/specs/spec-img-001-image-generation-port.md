@@ -35,7 +35,7 @@ Production Authorization under A3 does **not** expand beyond the scoped allowlis
 
 Defines the **Runtime Contract** for Image Runtime: a provider-agnostic Image Generation Port so Text Runtime and Image Runtime remain independently evolvable, and so **Creator Runtime** and **Reader Runtime** may bind providers differently without changing this contract.
 
-This SPEC freezes **contracts, surface posture knobs, and policy knobs**. It does not freeze providers, models, pricing, showcase works, or `Creator = Local` as Architecture. Creator Local as **Deployment Default** is authorized only via ADR-010 **A3 Constraint F** and lives in Deployment Defaults.
+This SPEC freezes **contracts, surface posture knobs, and policy knobs**. It does not freeze providers, models, pricing, showcase works, or `Creator = Local` as Architecture. Creator Local as **Deployment Default** is authorized only via ADR-010 **A3 Constraint F** and lives in `config/infra/deployment-defaults.md`.
 
 ---
 
@@ -48,7 +48,7 @@ This SPEC freezes **contracts, surface posture knobs, and policy knobs**. It doe
 | Scoped Production Authorization (portrait / Port / Adapter / Human Accept) | Production Authorization (ADR-010 **A3**) — not a Port-shape change |
 | `portrait_limit`, `scene_frame_limit`, `draft_policy`, `accept_policy` | Runtime Contract (Budget Policy knobs) |
 | `reference_strategy`, `consistency_policy` | Runtime Contract (consistency capability) |
-| Named providers / models / USD / Local vs Cloud defaults | **Forbidden here** → `docs/deployment/deployment-defaults.md` |
+| Named providers / models / USD / Local vs Cloud defaults | **Forbidden here** → `config/infra/deployment-defaults.md` |
 
 ---
 
@@ -236,7 +236,7 @@ Deployment Adapter
         └── Cloud  (Fallback / Accept Baseline)
 ```
 
-Narrated in `docs/deployment/deployment-defaults.md`. Replaceable. Not a Contract constant.
+Narrated in `config/infra/deployment-defaults.md`. Replaceable. Not a Contract constant.
 
 ---
 
@@ -246,4 +246,4 @@ Narrated in `docs/deployment/deployment-defaults.md`. Replaceable. Not a Contrac
 * SPIKE-IMG-001: `docs/spikes/spike-img-001-image-runtime-port.md`
 * SPIKE-IMG-002: `docs/spikes/spike-img-002-local-image-generation.md`
 * `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md` §6 (Three-State Authorization)
-* `docs/deployment/deployment-defaults.md` (Creator Local Default + Cloud fallback)
+* `config/infra/deployment-defaults.md` (Creator Local Default + Cloud fallback)

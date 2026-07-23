@@ -158,6 +158,11 @@ export function CharacterForm(props: CharacterFormProps) {
   }, []);
 
   // ── Avatar generation ──────────────────────────────────────────────────────
+  // Gate A/E: generation only fills the form (candidate). Asset write requires
+  // human Accept via form Save or「接受肖像并保存」(edit only).
+
+  const [portraitAcceptPending, setPortraitAcceptPending] = React.useState(false);
+  const [acceptSavePending, setAcceptSavePending] = React.useState(false);
 
   useEffect(() => {
     if (avatarGenState?.ok) {
@@ -165,6 +170,7 @@ export function CharacterForm(props: CharacterFormProps) {
         shouldDirty: true,
         shouldValidate: true,
       });
+      setPortraitAcceptPending(true);
     } else if (avatarGenState && !avatarGenState.ok) {
       // C: AI generation failed — auto-fill placeholder so character creation is not blocked
       const current = form.getValues("portraitUrl");
@@ -174,8 +180,30 @@ export function CharacterForm(props: CharacterFormProps) {
           shouldValidate: true,
         });
       }
+      setPortraitAcceptPending(false);
     }
   }, [avatarGenState, form]);
+
+  const acceptPortraitAndSave = async () => {
+    if (props.mode !== "edit") return;
+    setSubmitError(null);
+    setAcceptSavePending(true);
+    try {
+      const values = form.getValues();
+      await charactersApi.update(
+        props.workId,
+        props.defaultValues.tsid,
+        toPayload(values)
+      );
+      setPortraitAcceptPending(false);
+      form.reset(values);
+      router.push(successHref);
+    } catch (e) {
+      setSubmitError(toSubmitError(e));
+    } finally {
+      setAcceptSavePending(false);
+    }
+  };
 
   // ── Form submission ────────────────────────────────────────────────────────
 
@@ -191,6 +219,7 @@ export function CharacterForm(props: CharacterFormProps) {
           toPayload(values)
         );
       }
+      setPortraitAcceptPending(false);
       router.push(successHref);
     } catch (e) {
       setSubmitError(toSubmitError(e));
@@ -365,9 +394,30 @@ export function CharacterForm(props: CharacterFormProps) {
               >
                 {avatarGenPending ? messages.forms.generating : messages.forms.aiGenerateAvatar}
               </Button>
+              {props.mode === "edit" && portraitAcceptPending ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={
+                    acceptSavePending ||
+                    avatarGenPending ||
+                    imageUploading ||
+                    form.formState.isSubmitting
+                  }
+                  onClick={() => void acceptPortraitAndSave()}
+                >
+                  {acceptSavePending ? "写入中…" : "接受肖像并保存"}
+                </Button>
+              ) : null}
               {avatarGenState && !avatarGenState.ok ? (
                 <p className="text-destructive max-w-md text-sm">
                   {avatarGenState.message}
+                </p>
+              ) : null}
+              {props.mode === "edit" && portraitAcceptPending ? (
+                <p className="w-full text-xs text-zinc-500">
+                  生成成功仅为候选。须点「接受肖像并保存」或「保存」才写入
+                  Assets（Gate E）。不会自动完成制作进度。
                 </p>
               ) : null}
             </div>

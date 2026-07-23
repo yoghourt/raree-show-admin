@@ -81,7 +81,7 @@ Validate:
 
 Suggested Deployment bindings for the Spike (replaceable; not frozen):
 
-* `draft_policy` → free-tier channel (see `docs/deployment/deployment-defaults.md`)
+* `draft_policy` → free-tier channel (see `config/infra/deployment-defaults.md`)
 * `accept_policy` → cheap/quality accept channel
 * Limits used only inside spike scripts (not production enforcement)
 
@@ -133,7 +133,7 @@ Invariant checks:
 * Governance: `governance/specs/POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC.md` §6
 * ADR: `docs/adr/010-image-runtime-and-policy.md`
 * SPEC: `docs/specs/spec-img-001-image-generation-port.md`
-* Deployment: `docs/deployment/deployment-defaults.md`
+* Deployment: `config/infra/deployment-defaults.md`
 * Template: `governance/templates/SPIKE_TEMPLATE.md`
 
 ---
