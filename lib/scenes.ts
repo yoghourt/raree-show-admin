@@ -33,16 +33,13 @@ function parseStoryImagesV2(raw: unknown): ReadingFrame[] | null {
   if (!Array.isArray(raw)) return null;
   const out: ReadingFrame[] = [];
   for (const item of raw) {
-    if (
-      item &&
-      typeof item === "object" &&
-      "url" in item &&
-      typeof (item as { url: unknown }).url === "string"
-    ) {
-      const rec = item as { url: string; caption?: unknown };
-      const caption =
-        typeof rec.caption === "string" ? rec.caption : "";
-      out.push({ url: rec.url, caption });
+    if (!item || typeof item !== "object") continue;
+    const rec = item as { url?: unknown; caption?: unknown };
+    const url = typeof rec.url === "string" ? rec.url : "";
+    const caption = typeof rec.caption === "string" ? rec.caption : "";
+    // Keep caption-only frames (Discovery / Rollout write url:"")
+    if (url.trim() || caption.trim()) {
+      out.push({ url, caption });
     }
   }
   return out;

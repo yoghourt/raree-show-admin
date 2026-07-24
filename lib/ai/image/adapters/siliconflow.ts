@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process"
 
-import type { ImagePortraitProvider, PortraitRequest, PortraitResult } from "../types"
+import type { ImageGenerationProvider, ImageGenerationRequest, ImageGenerationResult } from "../types"
 
 const DEFAULT_API_BASE = "https://api.siliconflow.com/v1"
 /** Text-to-image default (Kontext requires `image` and is for reference passes). */
@@ -146,7 +146,7 @@ export function createSiliconFlowProvider(options: {
   apiBase?: string
   skipNetwork?: boolean
   costUsdEstPerImage?: number
-}): ImagePortraitProvider {
+}): ImageGenerationProvider {
   const modelId = options.modelId?.trim() || DEFAULT_MODEL
   const apiBase = (options.apiBase?.trim() || DEFAULT_API_BASE).replace(
     /\/$/,
@@ -159,7 +159,7 @@ export function createSiliconFlowProvider(options: {
   return {
     name: "siliconflow",
     capabilities: { referenceImage: true },
-    async generatePortrait(req: PortraitRequest): Promise<PortraitResult> {
+    async generate(req: ImageGenerationRequest): Promise<ImageGenerationResult> {
       const width = req.size?.width ?? 1024
       const height = req.size?.height ?? 1024
       const seed = req.seed

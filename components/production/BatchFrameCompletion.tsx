@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,7 +19,7 @@ type PendingFill = {
   caption: string;
   routeTitle: string;
   providerId: MediaAdmissionProviderId;
-  /** Candidate URL after provider — not Asset truth until Write */
+  /** Candidate URL after obtain/generate — not Asset truth until Write */
   candidateUrl: string | null;
   candidateLabel: string | null;
   busy: boolean;
@@ -39,9 +40,9 @@ function rowKey(routeTsid: string, frameIndex: number): string {
 }
 
 /**
- * Batch frame URL fill via Media Admission providers.
- * Provider success = candidate only. Write = Human Accept into Assets (Gate E).
- * Does not use ReadingRouteForm (which filters empty urls on submit).
+ * Batch frame URL fill via Media Admission.
+ * Channels: upload / paste URL. Slot action: Generate via Image Port (A4).
+ * Provider/Generate success = candidate only. Write = Human Accept (Gate E).
  */
 export function BatchFrameCompletion({
   workId,
@@ -113,6 +114,32 @@ export function BatchFrameCompletion({
     }
   };
 
+  /** A4: Port → Deployment → hosted URL → ephemeral Candidate (zero logistics). */
+  const generateForRow = async (row: PendingFill) => {
+    const key = rowKey(row.routeTsid, row.frameIndex);
+    patchRow(key, { busy: true });
+    setWriteError(null);
+    try {
+      const result = await generateFrameDraft({
+        caption: row.caption,
+        routeTitle: row.routeTitle,
+      });
+      if (!result.ok) {
+        patchRow(key, { busy: false });
+        setWriteError(result.message);
+        return;
+      }
+      patchRow(key, {
+        busy: false,
+        candidateUrl: result.url,
+        candidateLabel: "生成草稿",
+      });
+    } catch (e) {
+      patchRow(key, { busy: false });
+      setWriteError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const writeToAssets = async () => {
     const ready = rows.filter((r) => r.candidateUrl);
     if (ready.length === 0) return;
@@ -157,8 +184,9 @@ export function BatchFrameCompletion({
           批量补齐画面图
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          上传 / 粘贴 URL 仅产生候选（candidate ≠ Asset）。点击「写入作品」才进入
-          Assets（Human Accept）。Job/候选成功 ≠ Production Plan 完成。
+          上传 / 粘贴 URL / 生成草稿仅产生候选（candidate ≠ Asset）。生成走
+          Image Port → Deployment，不写 Assets。点击「写入作品」才 Human
+          Accept。Generate/Job/候选成功 ≠ Production Plan 完成。
         </p>
       </div>
 
@@ -182,43 +210,64 @@ export function BatchFrameCompletion({
                 key={key}
                 className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-zinc-900">
-                    {row.routeTitle} · 帧 {row.frameIndex + 1}
-                  </p>
-                  <p className="truncate text-xs text-zinc-500">{row.caption}</p>
+                <div className="flex min-w-0 gap-3">
                   {row.candidateUrl ? (
-                    <p className="mt-1 truncate text-[11px] text-emerald-700">
-                      候选已就绪（未写入）
-                      {row.candidateLabel ? ` · ${row.candidateLabel}` : ""}
-                    </p>
-                  ) : row.busy ? (
-                    <p className="mt-1 text-xs text-zinc-500">获取候选中…</p>
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={row.candidateUrl}
+                      alt=""
+                      className="h-16 w-28 shrink-0 rounded object-cover bg-zinc-100"
+                    />
                   ) : null}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-zinc-900">
+                      {row.routeTitle} · 帧 {row.frameIndex + 1}
+                    </p>
+                    <p className="truncate text-xs text-zinc-500">{row.caption}</p>
+                    {row.candidateUrl ? (
+                      <p className="mt-1 truncate text-[11px] text-emerald-700">
+                        候选已就绪（未写入）
+                        {row.candidateLabel ? ` · ${row.candidateLabel}` : ""}
+                      </p>
+                    ) : row.busy ? (
+                      <p className="mt-1 text-xs text-zinc-500">获取候选中…</p>
+                    ) : null}
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2" role="group" aria-label="来源">
-                  {providers.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      disabled={row.busy || writing}
-                      onClick={() =>
-                        patchRow(key, {
-                          providerId: p.id,
-                          candidateUrl: null,
-                          candidateLabel: null,
-                        })
-                      }
-                      className={
-                        row.providerId === p.id
-                          ? "rounded-md border border-zinc-900 bg-zinc-900 px-2.5 py-1 text-xs text-white"
-                          : "rounded-md border border-zinc-200 px-2.5 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
-                      }
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={row.busy || writing}
+                    onClick={() => void generateForRow(row)}
+                  >
+                    {row.busy ? "生成中…" : "生成草稿"}
+                  </Button>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="来源">
+                    {providers.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={row.busy || writing}
+                        onClick={() =>
+                          patchRow(key, {
+                            providerId: p.id,
+                            candidateUrl: null,
+                            candidateLabel: null,
+                          })
+                        }
+                        className={
+                          row.providerId === p.id
+                            ? "rounded-md border border-zinc-900 bg-zinc-900 px-2.5 py-1 text-xs text-white"
+                            : "rounded-md border border-zinc-200 px-2.5 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+                        }
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {row.providerId === "local_upload" ? (
@@ -256,7 +305,9 @@ export function BatchFrameCompletion({
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={row.busy || writing || !row.pasteUrlDraft.trim()}
+                      disabled={
+                        row.busy || writing || !row.pasteUrlDraft.trim()
+                      }
                       onClick={() =>
                         void obtainForRow(row, { url: row.pasteUrlDraft })
                       }

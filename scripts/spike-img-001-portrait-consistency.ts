@@ -196,7 +196,7 @@ async function main() {
       }
     } else {
       const canonicalPrompt = buildCanonicalPrompt(sample)
-      const canonical = await draft.generatePortrait({
+      const canonical = await draft.generate({
         prompt: canonicalPrompt,
         seed: 42,
         size: { width: 768, height: 768 },
@@ -241,7 +241,7 @@ async function main() {
       }
 
       if (!vName) {
-        const result = await accept.generatePortrait({
+        const result = await accept.generate({
           prompt,
           seed: 100 + i,
           size: { width: 512, height: 512 },

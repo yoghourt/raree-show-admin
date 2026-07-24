@@ -1,4 +1,4 @@
-import type { ImagePortraitProvider, PortraitRequest, PortraitResult } from "../types"
+import type { ImageGenerationProvider, ImageGenerationRequest, ImageGenerationResult } from "../types"
 
 const DEFAULT_SIZE = { width: 768, height: 768 }
 const FREE_HOST = "https://image.pollinations.ai/prompt"
@@ -26,7 +26,7 @@ export function createPollinationsProvider(options?: {
   referenceModel?: string
   apiKey?: string
   costUsdEst?: number
-}): ImagePortraitProvider {
+}): ImageGenerationProvider {
   const model = options?.model ?? "flux"
   const referenceModel = options?.referenceModel ?? "kontext"
   const apiKey = options?.apiKey?.trim()
@@ -37,7 +37,7 @@ export function createPollinationsProvider(options?: {
   return {
     name: enterMode ? "pollinations-enter" : "pollinations",
     capabilities: { referenceImage: enterMode },
-    async generatePortrait(req: PortraitRequest): Promise<PortraitResult> {
+    async generate(req: ImageGenerationRequest): Promise<ImageGenerationResult> {
       const width = req.size?.width ?? DEFAULT_SIZE.width
       const height = req.size?.height ?? DEFAULT_SIZE.height
       const seed = req.seed ?? Math.floor(Math.random() * 1_000_000_000)

@@ -3,7 +3,7 @@ import { setDefaultResultOrder } from "node:dns"
 
 import { ensureUndiciProxyDispatcherForGemini } from "@/lib/ai/undici-proxy-bootstrap"
 
-import type { ImagePortraitProvider, PortraitRequest, PortraitResult } from "../types"
+import type { ImageGenerationProvider, ImageGenerationRequest, ImageGenerationResult } from "../types"
 
 function tinyPng(): Buffer {
   return Buffer.from(
@@ -46,12 +46,12 @@ async function loadReferenceBytes(
  * Reference path: multimodal `generateContent` with reference inlineData + prompt
  * (Gemini Developer API; does not use Vertex-only editImage SubjectReference).
  */
-export function createGeminiPortraitProvider(options: {
+export function createGeminiImageProvider(options: {
   apiKey?: string
   modelId?: string
   skipNetwork?: boolean
   costUsdEstPerImage?: number
-}): ImagePortraitProvider {
+}): ImageGenerationProvider {
   const modelId = options.modelId?.trim() || "gemini-2.5-flash-image"
   const skipNetwork = options.skipNetwork === true
   const costUsdEstPerImage = options.costUsdEstPerImage ?? 0.04
@@ -59,7 +59,7 @@ export function createGeminiPortraitProvider(options: {
   return {
     name: "gemini",
     capabilities: { referenceImage: true },
-    async generatePortrait(req: PortraitRequest): Promise<PortraitResult> {
+    async generate(req: ImageGenerationRequest): Promise<ImageGenerationResult> {
       const seed = req.seed
 
       if (skipNetwork) {

@@ -1,16 +1,22 @@
 /**
- * SPEC-IMG-001 Image Generation Port types.
- * Spike scripts and Creator production (ADR-010 A3) share this Port shape.
+ * SPEC-IMG-001 Image Generation Port types (capability-oriented naming).
+ * Historical SPEC sketch used Portrait* names; implementation expresses reusable
+ * image-generation capability. Behavior and Deployment bindings unchanged.
  */
 
-export type PortraitRequest = {
+/** Business context for the generation Job — not separate Port entry points. */
+export type ImageAssetSlot = "portrait" | "scene_frame"
+
+export type ImageGenerationRequest = {
   prompt: string
+  /** Which Asset surface requested the candidate (observational / Job context). */
+  assetSlot?: ImageAssetSlot
   referenceImages?: { url: string }[]
   seed?: number
   size?: { width: number; height: number }
 }
 
-export type PortraitResult = {
+export type ImageGenerationResult = {
   bytes: Buffer
   mimeType: string
   meta: {
@@ -27,10 +33,14 @@ export type PortraitResult = {
   }
 }
 
-export type ImagePortraitProvider = {
+/**
+ * Image Generation Port adapter shape.
+ * Single capability: generate an image candidate — not portrait-/frame-specific APIs.
+ */
+export type ImageGenerationProvider = {
   readonly name: string
   readonly capabilities: { referenceImage: boolean }
-  generatePortrait(req: PortraitRequest): Promise<PortraitResult>
+  generate(req: ImageGenerationRequest): Promise<ImageGenerationResult>
 }
 
 /** Shared adapter credentials / endpoints (Deployment). */

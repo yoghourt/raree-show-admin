@@ -25,7 +25,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import {
-  createImagePortraitProvider,
+  createImageGenerationProvider,
   loadSpikeImageConfig,
 } from "../lib/ai/image"
 
@@ -137,7 +137,7 @@ async function main() {
   )
   await mkdir(outRoot, { recursive: true })
 
-  const provider = createImagePortraitProvider("local", config, "accept")
+  const provider = createImageGenerationProvider("local", config, "accept")
   const pairs: Array<{
     id: string
     variant: string
@@ -173,7 +173,7 @@ async function main() {
     const localCanPath = path.join(localDir, "canonical.png")
     if (!(await fileExists(localCanPath))) {
       const t0 = Date.now()
-      const can = await provider.generatePortrait({
+      const can = await provider.generate({
         prompt: buildCanonicalPrompt(sample),
         seed: 42,
         size: { width: size, height: size },
@@ -207,7 +207,7 @@ async function main() {
         console.log(`[resume] ${sample.id} ${varId}.png`)
       } else {
         const t0 = Date.now()
-        const result = await provider.generatePortrait({
+        const result = await provider.generate({
           prompt,
           seed,
           size: { width: size, height: size },

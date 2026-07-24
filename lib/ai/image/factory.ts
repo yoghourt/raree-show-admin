@@ -1,11 +1,11 @@
 import { createFalFluxProvider } from "./adapters/falFlux"
-import { createGeminiPortraitProvider } from "./adapters/gemini"
+import { createGeminiImageProvider } from "./adapters/gemini"
 import { createLocalHttpProvider } from "./adapters/localHttp"
 import { createPollinationsProvider } from "./adapters/pollinations"
 import { createSiliconFlowProvider } from "./adapters/siliconflow"
 import type {
   ImageAdapterEnv,
-  ImagePortraitProvider,
+  ImageGenerationProvider,
   SpikeChannel,
 } from "./types"
 
@@ -31,11 +31,11 @@ function isSiliconFlowModelId(id: string): boolean {
  * Resolve a provider by opaque deployment id (Port factory).
  * Used by Spike scripts and Creator Deployment Adapter.
  */
-export function createImagePortraitProvider(
+export function createImageGenerationProvider(
   providerId: string,
   config: ImageAdapterEnv,
   channel: SpikeChannel = "accept"
-): ImagePortraitProvider {
+): ImageGenerationProvider {
   const id = providerId.trim().toLowerCase()
 
   switch (id) {
@@ -66,7 +66,7 @@ export function createImagePortraitProvider(
         costUsdEstPerImage: 0.025,
       })
     case "gemini":
-      return createGeminiPortraitProvider({
+      return createGeminiImageProvider({
         apiKey: config.geminiKey,
         modelId:
           isFalModelId(config.acceptModelId) ||

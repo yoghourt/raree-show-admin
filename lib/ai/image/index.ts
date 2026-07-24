@@ -1,7 +1,7 @@
-import { createImagePortraitProvider } from "./factory"
+import { createImageGenerationProvider } from "./factory"
 import { loadSpikeImageConfig } from "./config"
 import type {
-  ImagePortraitProvider,
+  ImageGenerationProvider,
   SpikeChannel,
   SpikeImageConfig,
 } from "./types"
@@ -9,23 +9,24 @@ import type {
 export type {
   CreatorImageDeploymentConfig,
   ImageAdapterEnv,
-  ImagePortraitProvider,
-  PortraitRequest,
-  PortraitResult,
+  ImageAssetSlot,
+  ImageGenerationProvider,
+  ImageGenerationRequest,
+  ImageGenerationResult,
   SpikeChannel,
   SpikeImageConfig,
 } from "./types"
-export type { CreatorPortraitGenerationResult } from "./deploymentAdapter"
+export type { ImageCandidateGenerationResult } from "./deploymentAdapter"
 export { loadSpikeImageConfig } from "./config"
 export { loadCreatorImageDeploymentConfig } from "./deploymentConfig"
-export { generateCreatorPortrait } from "./deploymentAdapter"
-export { createImagePortraitProvider } from "./factory"
+export { generateImageCandidate } from "./deploymentAdapter"
+export { createImageGenerationProvider } from "./factory"
 
 export function resolveSpikeChannelProvider(
   channel: SpikeChannel,
   config: SpikeImageConfig = loadSpikeImageConfig()
-): ImagePortraitProvider {
+): ImageGenerationProvider {
   const providerId =
     channel === "draft" ? config.draftProviderId : config.acceptProviderId
-  return createImagePortraitProvider(providerId, config, channel)
+  return createImageGenerationProvider(providerId, config, channel)
 }

@@ -14,7 +14,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import {
-  createImagePortraitProvider,
+  createImageGenerationProvider,
   loadSpikeImageConfig,
 } from "../lib/ai/image"
 
@@ -88,7 +88,7 @@ async function maybeBench(): Promise<Record<string, unknown> | null> {
     ...process.env,
     IMAGE_SPIKE_ACCEPT_PROVIDER: process.env.IMAGE_SPIKE_ACCEPT_PROVIDER || "local",
   })
-  const provider = createImagePortraitProvider(
+  const provider = createImageGenerationProvider(
     config.acceptProviderId,
     config,
     "accept"
@@ -107,7 +107,7 @@ async function maybeBench(): Promise<Record<string, unknown> | null> {
 
   for (let i = 0; i < n; i++) {
     const t0 = Date.now()
-    const result = await provider.generatePortrait({
+    const result = await provider.generate({
       prompt,
       seed: 1000 + i,
       size: { width: 768, height: 768 },
@@ -177,9 +177,9 @@ async function main() {
       IMAGE_SPIKE_ACCEPT_PROVIDER: "local",
       IMAGE_SPIKE_SKIP_NETWORK: process.env.IMAGE_SPIKE_SKIP_NETWORK || "1",
     })
-    const provider = createImagePortraitProvider("local", config, "accept")
+    const provider = createImageGenerationProvider("local", config, "accept")
     const t0 = Date.now()
-    const result = await provider.generatePortrait({
+    const result = await provider.generate({
       prompt: "dry-run portrait",
       seed: 42,
     })

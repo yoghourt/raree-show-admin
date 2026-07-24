@@ -2,7 +2,7 @@
 
 import { z } from "zod"
 
-import { generateCreatorPortrait } from "@/lib/ai/image"
+import { generateImageCandidate } from "@/lib/ai/image"
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload"
 import { formatRequestError } from "@/lib/format-request-error"
 import { buildAvatarPrompt } from "@/lib/prompts/avatar"
@@ -49,7 +49,8 @@ export async function generateCharacterAvatar(
   const prompt = buildAvatarPrompt(name, description)
 
   try {
-    const portrait = await generateCreatorPortrait({
+    const portrait = await generateImageCandidate({
+      assetSlot: "portrait",
       prompt,
       referenceImages: referencePortraitUrl
         ? [{ url: referencePortraitUrl }]
