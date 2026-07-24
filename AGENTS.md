@@ -56,6 +56,7 @@ This is NOT the Next.js you know. This version has breaking changes — APIs, co
 - Public showcase (Deployment): `config/infra/pd-showcase-recommendation-v1.md` — Les Misérables (primary) + Three Kingdoms (visual co-track), canon subset only; GoT not public default
 - Retained local docs trees: `docs/adr/` · `docs/specs/` · `docs/spikes/` · `docs/supabase/` only
 - Deployment / infra narration: `config/infra/` (not under `docs/`)
+- Media Admission (CPP frame fill): providers in `lib/media-admission/` (upload · paste URL); Deployment knobs in `config/infra/media-admission-defaults.md`; candidate ≠ Asset until Human「写入作品」
 
 ### Runtime Reading Governance (RC1)
 

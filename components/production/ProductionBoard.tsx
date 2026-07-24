@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import * as React from "react";
 
 import { BatchFrameCompletion } from "@/components/production/BatchFrameCompletion";
 import { Button } from "@/components/ui/button";
-import type { ProductionPlanProjection } from "@/lib/production/types";
+import type {
+  DerivedProductionTask,
+  ProductionPlanProjection,
+} from "@/lib/production/types";
 import type { ReadingRoute } from "@/lib/types";
 
 export type ProductionBoardProps = {
@@ -14,6 +18,48 @@ export type ProductionBoardProps = {
   routes: ReadingRoute[];
   onAssetsChanged: () => void;
 };
+
+function splitHref(href: string): { pathname: string; hash: string | null } {
+  const hashIndex = href.indexOf("#");
+  if (hashIndex < 0) return { pathname: href, hash: null };
+  return {
+    pathname: href.slice(0, hashIndex),
+    hash: href.slice(hashIndex + 1),
+  };
+}
+
+function TaskOpenControl({ task }: { task: DerivedProductionTask }) {
+  const pathname = usePathname();
+  const { pathname: targetPath, hash } = splitHref(task.href);
+  const isSamePageHash =
+    Boolean(hash) &&
+    (task.kind === "fill_frame_url" ||
+      targetPath === pathname ||
+      pathname.endsWith(targetPath));
+
+  const scrollToHash = React.useCallback(() => {
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Keep URL hash in sync without relying on Next Link same-route no-op
+    window.history.replaceState(null, "", `#${hash}`);
+  }, [hash]);
+
+  if (isSamePageHash) {
+    return (
+      <Button variant="outline" size="sm" type="button" onClick={scrollToHash}>
+        打开
+      </Button>
+    );
+  }
+
+  return (
+    <Button variant="outline" size="sm" asChild>
+      <Link href={task.href}>打开</Link>
+    </Button>
+  );
+}
 
 export function ProductionBoard({
   workId,
@@ -102,9 +148,7 @@ export function ProductionBoard({
                   <p className="font-medium text-zinc-900">{task.label}</p>
                   <p className="text-xs text-zinc-500">{task.kind}</p>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={task.href}>打开</Link>
-                </Button>
+                <TaskOpenControl task={task} />
               </li>
             ))}
           </ul>
