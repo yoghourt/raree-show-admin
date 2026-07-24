@@ -1,17 +1,18 @@
 # SPIKE-AA-001 — Asset Acquisition Discovery
 
 **Status:** Architecture Discovery **Complete** · Architect **Accepted** (2026-07-23)  
-**Production Authorization:** **Not granted** (scene-frame AI still outside A3 Constraint B)  
-**Spike Implementation Authorization:** **Conditionally Granted (Phase 1)** — Media Admission providers `local_upload` · `paste_url` only; wired via CPP Batch Frame Completion; frame AI **not** included  
+**Production Authorization:** **Conditionally Granted (A4)** — Creator Scene Frame drafts via existing Image Generation Port + Deployment; Candidates only; Human Accept → Assets (2026-07-24)  
+**Spike Implementation Authorization:** **Conditionally Granted** — Phase 1 MA channels `local_upload` · `paste_url`; Phase 2 slot **Generate** via Image Port (no Scene-Frame MA provider)  
 **Contract Freeze:** **None** introduced by this Spike (no new Creator Runtime sibling)  
 **Architect Decision:**  
 - **SPIKE-AA-001** — **Accepted**  
 - **Runtime Expansion** (fourth Creator capability) — **Rejected**  
 - **Media Admission** — **Accepted** as an orthogonal domain capability; MUST integrate with existing CPP acceptance flow (not an independent application or workflow)  
 - **Phase 1 implementation** — **Conditionally Granted** (2026-07-24): upload / paste URL providers only  
+- **A4 Conditional Production Authorization** — **Granted** (2026-07-24) after Runtime Validation; Port-mediated Scene Frame drafts; no Scene-Frame-specific Provider  
 **Authority:** Architect · evidence package for Runtime boundary decision  
-**Depends on:** SPEC-CPP-001 · SPIKE-CPP-001 (B+) · ADR-010 A3 · ADR-004 · goal-alignment evidence (CPP MVP ~5.0h → ~4.2h) · `config/infra/pd-showcase-recommendation-v1.md`  
-**Last Updated:** 2026-07-24
+**Depends on:** SPEC-CPP-001 · SPIKE-CPP-001 (B+) · ADR-010 A3/A4 · ADR-004 · goal-alignment evidence (CPP MVP ~5.0h → ~4.2h) · `config/infra/pd-showcase-recommendation-v1.md`  
+**Last Updated:** 2026-07-24 (A4 Conditional Production Authorization)
 
 ---
 
@@ -66,8 +67,8 @@ It is:
 | ----- | ---------- |
 | Contract Freeze | **None** (no new Creator Runtime sibling; no new SPEC freeze) |
 | Spike Discovery Authorization | **Granted** · Findings **Accepted** by Architect (2026-07-23) |
-| Spike Implementation Authorization | **Conditionally Granted (Phase 1)** — `local_upload` · `paste_url` via CPP only (2026-07-24) |
-| Production Authorization | **Not granted** (incl. no A3 expansion for scene-frame AI) |
+| Spike Implementation Authorization | **Conditionally Granted** — Phase 1 channels + Phase 2 Port Generate (2026-07-24) |
+| Production Authorization | **Conditionally Granted (A4)** — Scene Frame drafts via Image Port; Candidates only (2026-07-24) |
 
 ---
 
@@ -365,6 +366,141 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 
 ---
 
+## Runtime Validation
+
+**Purpose:** Architect A4 Authorization Gate — validate Runtime ownership **before** Scoped Production Authorization for Port-mediated Scene Frame drafts (Local Deployment default).
+
+**Not in scope of this section:** implementation design, provider modules, or image-quality claims.
+
+**Authorization criteria (both required for A4 consideration):**
+
+1. Prompt remains a **derived execution input** and never becomes Runtime Truth.  
+2. Local AI **removes image logistics entirely** while preserving Candidate → Human Accept → Assets authority boundaries.
+
+Architectural success for A4 is **not** “Local AI can generate images.” It is: **Caption does not evolve into a second business truth**, and **the operator no longer performs image logistics**.
+
+---
+
+### Prompt Truth Validation
+
+**Proposed derivation (elegance preserved):**
+
+```text
+Asset Caption  (Runtime Truth field on the frame slot)
+        ↓  derive at Generate time
+Prompt         (Job / execution input only — not Truth)
+```
+
+#### 1. Why Asset Caption is sufficient as the long-term Prompt source
+
+Caption is already the **human-authored narrative intent** for that frame slot inside Assets. It answers “what this still must mean in the reading experience,” which is the only business meaning Media Admission needs to request a draft.
+
+Long-term sustainability rests on **ownership**, not on Prompt richness:
+
+| Concern | Owner | Why this stays stable |
+| ------- | ----- | --------------------- |
+| What the frame is about | **Asset Caption** (Truth) | Edited through normal Creator Asset workflows; one field per slot |
+| How pixels are requested this run | **Prompt** (derived Job input) | Recomputed from Caption (+ optional non-Truth slot context such as route title) at Generate; discarded after the Job |
+| How / where generation runs | **Image Generation Port → Deployment** | Style packs, models, Local vs Cloud are Deployment / Port policy — not Caption clones |
+
+So Caption remains sufficient **as the Prompt source of business meaning** for as long as Raree treats the frame’s story intent as Asset-owned text. Richer *execution* controls do not require Caption to absorb them.
+
+#### 2. Conditions under which Caption alone is insufficient *as Job input*
+
+Caption can remain the **only Truth** while still being **incomplete as a full generation request**. Insufficiency appears at the **Job / Deployment** layer, for example when operators need:
+
+* richer visual style or series look  
+* composition / framing guidance  
+* camera angle or lens language  
+* negative prompts  
+* model-specific or Deployment-profile parameters  
+
+Those needs mean: **the derived Job request must carry more execution fields** — not that Caption failed as Truth, and not that Raree must invent a second maintained Prompt object.
+
+#### 3. If richer prompting becomes necessary — how Raree avoids a second Prompt Truth
+
+**Runtime ownership rule (normative):**
+
+```text
+Runtime Truth     = Accepted Asset fields only (e.g. story_images_v2 caption + url)
+Derived Job input = Prompt (+ optional execution knobs) materialised at Generate
+Deployment        = profiles / defaults / Local|Cloud (replaceable; not business Truth)
+```
+
+Avoidance pattern as the product evolves:
+
+| Temptation (second Truth) | Allowed evolution (keeps Prompt derived) |
+| ------------------------- | ---------------------------------------- |
+| Persist editable “frame prompts” beside captions | Keep editing **Caption** (or other Asset narrative fields); regenerate Prompt on demand |
+| Store per-frame negative prompts as canon | Attach **execution defaults** to Deployment profiles / Port request builders — not Asset rows |
+| “Prompt library” as product authority | Treat libraries as **Deployment packs or templates** that transform Caption → Job input; Accept still writes Assets only |
+| Operator maintains Prompt history as source of truth | Job telemetry / logs may record what was sent; logs are **not** Runtime Truth and MUST NOT gate CPP Progress |
+
+**Invariant:** no durable object whose sole job is “the prompt for this frame” may become admission authority or Plan progress. If humans must refine intent, they refine **Assets** (Caption or later Asset-owned narrative fields), then Generate derives again. Prompt never graduates from Job input to business object.
+
+---
+
+### Zero-Logistics Validation
+
+**Primary business objective:** remove **image logistics**, not merely replace search with generation.
+
+**Target operator journey after Generate:**
+
+```text
+Generate
+        ↓
+Image Generation Port
+        ↓
+Deployment (Local default; Cloud fallback when authorized)
+        ↓
+Generated Image (execution artifact)
+        ↓
+Ephemeral Candidate (Media Admission slot state)
+        ↓
+Human Accept「写入作品」
+        ↓
+Assets.story_images_v2[].url
+```
+
+#### Does the operator ever need logistics steps?
+
+| Logistics step | Required after Generate? |
+| -------------- | ------------------------ |
+| Download a file | **No** |
+| Open Finder / file manager | **No** |
+| Manage PNG / local image files | **No** |
+| Manually upload the generated image | **No** |
+| Copy generated URLs into the form | **No** |
+
+**If any were “yes,” A4 would fail this gate** — that would mean generation only relocated logistics.
+
+#### How the generated image becomes a Candidate without logistics
+
+Media Admission already holds an **ephemeral candidate URL** on the incomplete frame slot (same shape as upload / paste outcomes). Generate is a **slot action** that:
+
+1. Derives Prompt from Asset Caption (Job input).  
+2. Calls Image Generation Port → Deployment.  
+3. Receives an execution result that yields a **referenceable image URL** (hosted as part of the Job path — not an operator desktop file).  
+4. Writes that URL into the slot’s **ephemeral Candidate** state inside the Batch Frame Completion / Media Admission UI.  
+5. Leaves **Assets unchanged** until Human Accept.
+
+No desktop file, no Finder, no re-upload, no URL copy-paste: the Candidate is **bound in-place** to the slot that requested generation. Upload / paste remain available as alternate **source channels**; they are not required after a successful Generate.
+
+**Still required of the operator (judgment, not logistics):** review the Candidate; reject / regenerate or switch channel if needed; **Accept** to admit into Assets. Removing judgment would collapse Authority; removing logistics is the A4 success criterion.
+
+---
+
+### Gate result (documentation)
+
+| Criterion | Spike demonstration |
+| --------- | ------------------- |
+| Prompt = derived Job input; never Runtime Truth | Caption owns meaning; Prompt recomputed; richer controls → Deployment/Port execution fields — not a Prompt Asset |
+| Local AI removes image logistics; Candidate → Accept → Assets preserved | Generate → Port → Deployment → Candidate in-slot; no download/Finder/PNG/upload/URL copy; Accept sole Truth write |
+
+**A4 Scoped Production Authorization:** **Conditionally Granted** (2026-07-24) — see ADR-010 Amendment A4. Scope frozen to Port-mediated Scene Frame drafts → ephemeral Candidates → Human Accept → Assets; no Scene-Frame Provider hierarchy.
+
+---
+
 ## Risks
 
 | Risk | Mitigation |
@@ -388,7 +524,8 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 - [x] Replaceability test answered **Yes** under Option C  
 - [x] **Architect decision:** Accept SPIKE-AA-001 · Reject Runtime Expansion · Accept Media Admission via CPP flow (2026-07-23)  
 - [x] **Phase 1 implementation grant:** upload / paste_url providers (2026-07-24)  
-- [ ] Frame draft AI supply (not granted — A3 Constraint B)  
+- [x] **Runtime Validation (A4 gate):** Prompt Truth + Zero-Logistics (2026-07-24)  
+- [x] **A4 Conditional Production Authorization** (2026-07-24) — Port drafts; Candidates only  
 - [ ] Broader Production Authorization (not granted)
 
 **Decision owner:** Architect  
@@ -407,7 +544,8 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 | Media Admission as orthogonal domain capability | **Accepted** |
 | Integration posture | **Via existing CPP acceptance flow** — not an independent application or workflow |
 | Phase 1 Implementation Authorization | **Conditionally Granted** — providers: `local_upload`, `paste_url` only |
-| Scene-frame AI / A3 expansion | **Not granted** |  
+| A4 Conditional Production Authorization | **Granted** (2026-07-24) — Scene Frame drafts via Image Port → Candidate → Accept |
+| Scene-Frame-specific Provider hierarchy | **Rejected** |  
 
 ---
 
@@ -416,7 +554,7 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 | Doc | Role |
 | --- | ---- |
 | `docs/specs/spec-cpp-001-creator-production-pipeline.md` | CPP siblings; Assets Truth; Gates A–F |
-| `docs/adr/010-image-runtime-and-policy.md` | A3 Constraint B (no scene-frame batch gen) |
+| `docs/adr/010-image-runtime-and-policy.md` | A3 portraits · A4 Scene Frame drafts (Port; Candidates) |
 | `docs/adr/004-source-of-canonical-truth.md` | Human Accept |
 | `config/infra/pd-showcase-recommendation-v1.md` | Frame count shape |
 | `config/infra/media-admission-defaults.md` | Phase 1 provider Deployment knobs |

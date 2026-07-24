@@ -1,4 +1,4 @@
-import type { ImagePortraitProvider, PortraitRequest, PortraitResult } from "../types"
+import type { ImageGenerationProvider, ImageGenerationRequest, ImageGenerationResult } from "../types"
 import { AVATAR_NEGATIVE_PROMPT } from "@/lib/prompts/avatar"
 
 const DEFAULT_SIZE = { width: 768, height: 1024 }
@@ -27,7 +27,7 @@ export function createLocalHttpProvider(options?: {
   skipNetwork?: boolean
   /** Local marginal cost is ~0; keep field for Port meta parity */
   costUsdEstPerImage?: number
-}): ImagePortraitProvider {
+}): ImageGenerationProvider {
   const baseUrl = (options?.baseUrl ?? "").replace(/\/$/, "")
   const modelId = options?.modelId?.trim() || "local"
   const skipNetwork = options?.skipNetwork === true
@@ -38,7 +38,7 @@ export function createLocalHttpProvider(options?: {
     // Reference support depends on the operator endpoint; advertise true so
     // spike scripts can attempt Phase-B style calls and record failures.
     capabilities: { referenceImage: true },
-    async generatePortrait(req: PortraitRequest): Promise<PortraitResult> {
+    async generate(req: ImageGenerationRequest): Promise<ImageGenerationResult> {
       const width = req.size?.width ?? DEFAULT_SIZE.width
       const height = req.size?.height ?? DEFAULT_SIZE.height
       const seed = req.seed ?? Math.floor(Math.random() * 1_000_000_000)

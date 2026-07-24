@@ -3,8 +3,9 @@
 # (If CascadeClassifier is missing: pip uninstall -y cv2 opencv-python opencv-python-headless
 #  then: pip install opencv-python-headless)
 #
-# Start:
-#   cd scripts && python -m uvicorn local_portrait_server:app --host 127.0.0.1 --port 8191
+# Start (use python3, not system python 2.7):
+#   See README-local-image-server.md
+#   cd scripts && python3 -m uvicorn local_portrait_server:app --host 127.0.0.1 --port 8191
 
 from __future__ import annotations
 

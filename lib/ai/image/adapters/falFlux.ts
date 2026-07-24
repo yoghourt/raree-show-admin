@@ -1,4 +1,4 @@
-import type { ImagePortraitProvider, PortraitRequest, PortraitResult } from "../types"
+import type { ImageGenerationProvider, ImageGenerationRequest, ImageGenerationResult } from "../types"
 
 const DEFAULT_SIZE = { width: 768, height: 768 }
 
@@ -28,7 +28,7 @@ export function createFalFluxProvider(options: {
   modelId?: string
   skipNetwork?: boolean
   costUsdEstPerImage?: number
-}): ImagePortraitProvider {
+}): ImageGenerationProvider {
   const modelId = options.modelId ?? "fal-ai/flux/dev"
   const skipNetwork = options.skipNetwork === true
   const costUsdEstPerImage = options.costUsdEstPerImage ?? 0.025
@@ -36,7 +36,7 @@ export function createFalFluxProvider(options: {
   return {
     name: "fal",
     capabilities: { referenceImage: true },
-    async generatePortrait(req: PortraitRequest): Promise<PortraitResult> {
+    async generate(req: ImageGenerationRequest): Promise<ImageGenerationResult> {
       const width = req.size?.width ?? DEFAULT_SIZE.width
       const height = req.size?.height ?? DEFAULT_SIZE.height
       const seed = req.seed

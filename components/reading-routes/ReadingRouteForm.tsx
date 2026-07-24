@@ -81,22 +81,28 @@ const sceneFormSchema = z.object({
     z.string().optional().default("")
   ),
   tags: z.preprocess((v) => (v == null ? "" : String(v)), z.string()),
-  // Drop blank segments (added but never uploaded) so character-only edits can save.
+  // Keep caption-only frames (Discovery→Assets). Drop only fully blank segments
+  // so character-only edits can still save without forcing image upload.
   story_images_v2: z.preprocess(
     (v) => {
       if (!Array.isArray(v)) return [];
-      return v.filter(
-        (item) =>
-          item &&
-          typeof item === "object" &&
-          typeof (item as { url?: unknown }).url === "string" &&
-          (item as { url: string }).url.trim() !== ""
-      );
+      return v
+        .filter((item) => item && typeof item === "object")
+        .map((item) => {
+          const rec = item as { url?: unknown; caption?: unknown };
+          return {
+            url: typeof rec.url === "string" ? rec.url : "",
+            caption: typeof rec.caption === "string" ? rec.caption : "",
+          };
+        })
+        .filter(
+          (item) => item.url.trim() !== "" || item.caption.trim() !== ""
+        );
     },
     z
       .array(
         z.object({
-          url: z.string().min(1, "请为该片段上传图片"),
+          url: z.string(),
           caption: z.string(),
         })
       )
@@ -494,7 +500,7 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
           <p className="text-destructive text-sm">
             {form.formState.errors.story_images_v2.message ||
               form.formState.errors.story_images_v2.root?.message ||
-              "请为每个阅读帧片段上传图片，或删除未完成的片段后再保存。"}
+              "阅读帧校验失败。空白片段会被忽略；有说明无图的帧可先保存，再在制作页补图。"}
           </p>
         ) : null}
       </div>
