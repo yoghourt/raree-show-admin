@@ -1,16 +1,17 @@
 # SPIKE-AA-001 — Asset Acquisition Discovery
 
 **Status:** Architecture Discovery **Complete** · Architect **Accepted** (2026-07-23)  
-**Production Authorization:** **Not granted**  
-**Spike Implementation Authorization:** **Not granted**  
+**Production Authorization:** **Not granted** (scene-frame AI still outside A3 Constraint B)  
+**Spike Implementation Authorization:** **Conditionally Granted (Phase 1)** — Media Admission providers `local_upload` · `paste_url` only; wired via CPP Batch Frame Completion; frame AI **not** included  
 **Contract Freeze:** **None** introduced by this Spike (no new Creator Runtime sibling)  
 **Architect Decision:**  
 - **SPIKE-AA-001** — **Accepted**  
 - **Runtime Expansion** (fourth Creator capability) — **Rejected**  
 - **Media Admission** — **Accepted** as an orthogonal domain capability; MUST integrate with existing CPP acceptance flow (not an independent application or workflow)  
+- **Phase 1 implementation** — **Conditionally Granted** (2026-07-24): upload / paste URL providers only  
 **Authority:** Architect · evidence package for Runtime boundary decision  
 **Depends on:** SPEC-CPP-001 · SPIKE-CPP-001 (B+) · ADR-010 A3 · ADR-004 · goal-alignment evidence (CPP MVP ~5.0h → ~4.2h) · `config/infra/pd-showcase-recommendation-v1.md`  
-**Last Updated:** 2026-07-23
+**Last Updated:** 2026-07-24
 
 ---
 
@@ -65,8 +66,8 @@ It is:
 | ----- | ---------- |
 | Contract Freeze | **None** (no new Creator Runtime sibling; no new SPEC freeze) |
 | Spike Discovery Authorization | **Granted** · Findings **Accepted** by Architect (2026-07-23) |
-| Spike Implementation Authorization | **Not granted** |
-| Production Authorization | **Not granted** (incl. no A3 expansion for scene frames) |
+| Spike Implementation Authorization | **Conditionally Granted (Phase 1)** — `local_upload` · `paste_url` via CPP only (2026-07-24) |
+| Production Authorization | **Not granted** (incl. no A3 expansion for scene-frame AI) |
 
 ---
 
@@ -312,7 +313,7 @@ Creator capabilities (siblings, not a strict waterfall):
 | Strict sibling (like Discovery) | **Not yet justified** |
 | ------------------------------- | --------------------- |
 | Named domain concern + Job/Accept pattern | **Yes — already partially exists** (portrait Port, batch upload) |
-| Missing piece for ROI | **Frame draft supply authorization / Deployment pack** — not a new topology node |
+| Missing piece for ROI | **Frame draft supply authorization** — not a new topology node |
 
 **Challenge outcome (successful either way):**  
 Evidence does **not** support “Asset Acquisition ∈ Discovery.”  
@@ -349,7 +350,7 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 | 2 | Runtime boundary? | Begins at known slot; ends at Accept into Assets. Not narrative Propose; not Plan ownership; Jobs are execution under it. |
 | 3 | Part of Discovery or new capability? | **Not Discovery.** **Not** (yet) a sequential fourth sibling. Freeze **Media Admission** as orthogonal domain concern; realize via existing Jobs+Accept+CPP surfaces. |
 | 4 | Next highest-ROI improvement? | Supply drafts/library into **existing** Batch Frame Completion → Accept path (~16–20 frames). |
-| 5 | Smallest future investment, greatest time cut? | Authorize or provision **frame draft supply** (Deployment pack and/or scoped Image Production Authorization beyond A3 Constraint B) wired to current CPP write path — **not** a new AA app shell. |
+| 5 | Smallest future investment, greatest time cut? | Authorize **frame draft supply** (e.g. scoped Image Production Authorization beyond A3 Constraint B) wired to current CPP write path — **not** a new AA app shell. |
 
 ---
 
@@ -359,7 +360,7 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 2. **Accept** Option C: Media Admission as orthogonal domain capability; sources replaceable. ✅  
 3. **Do not** introduce a fourth Creator Runtime capability / independent AA application or workflow. ✅ Rejected by Architect.  
 4. Media Admission **MUST integrate with the existing CPP acceptance flow** (e.g. Batch Frame Completion → Human Accept → Assets), not a parallel product shell.  
-5. Next authorization question (separate, not granted here): whether to grant **scoped frame draft generation** and/or ship a **Deployment showcase stills pack** — both feed the same CPP admission path.  
+5. Next authorization question (separate, not granted here): whether to grant **scoped frame draft generation** feeding the same CPP admission path.  
 6. Discovery investment remains valid for handoff ROI, but is **not** the answer to the current **frame acquisition** constraint.
 
 ---
@@ -386,12 +387,14 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 - [x] Topology recommendation (Option C) + challenge to “new Runtime” assumption  
 - [x] Replaceability test answered **Yes** under Option C  
 - [x] **Architect decision:** Accept SPIKE-AA-001 · Reject Runtime Expansion · Accept Media Admission via CPP flow (2026-07-23)  
-- [ ] Follow-on authorization for frame draft supply (not granted)  
-- [ ] Follow-on implementation grant (not granted)
+- [x] **Phase 1 implementation grant:** upload / paste_url providers (2026-07-24)  
+- [ ] Frame draft AI supply (not granted — A3 Constraint B)  
+- [ ] Broader Production Authorization (not granted)
 
 **Decision owner:** Architect  
 **Discovery completed:** 2026-07-23  
-**Architect review:** Accepted as recorded above (2026-07-23)
+**Architect review:** Accepted as recorded above (2026-07-23)  
+**Phase 1 implementation grant:** 2026-07-24
 
 ---
 
@@ -403,7 +406,8 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 | Fourth Creator Runtime capability (“Asset Acquisition Runtime”) | **Rejected** |
 | Media Admission as orthogonal domain capability | **Accepted** |
 | Integration posture | **Via existing CPP acceptance flow** — not an independent application or workflow |
-| Implementation / Production Authorization | **Not granted** by this decision |  
+| Phase 1 Implementation Authorization | **Conditionally Granted** — providers: `local_upload`, `paste_url` only |
+| Scene-frame AI / A3 expansion | **Not granted** |  
 
 ---
 
@@ -415,5 +419,7 @@ It supports treating **Media Admission** as the frozen **capability**, with **so
 | `docs/adr/010-image-runtime-and-policy.md` | A3 Constraint B (no scene-frame batch gen) |
 | `docs/adr/004-source-of-canonical-truth.md` | Human Accept |
 | `config/infra/pd-showcase-recommendation-v1.md` | Frame count shape |
+| `config/infra/media-admission-defaults.md` | Phase 1 provider Deployment knobs |
+| `lib/media-admission/` | Provider Port + adapters |
 | `docs/spikes/spike-cpp-001-creator-production-pipeline.md` | Prior pipeline discovery |
 | Goal Alignment (operational evidence) | ~4.2h lean; frame residual ~40+ min |

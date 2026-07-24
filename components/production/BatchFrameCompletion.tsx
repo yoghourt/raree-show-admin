@@ -3,7 +3,11 @@
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { uploadToCloudinary } from "@/lib/cloudinary";
+import { Input } from "@/components/ui/input";
+import {
+  createMediaAdmissionProviders,
+  type MediaAdmissionProviderId,
+} from "@/lib/media-admission";
 import { isEmptyFrameUrl } from "@/lib/production/completion-profile";
 import * as scenesApi from "@/lib/scenes";
 import type { ReadingRoute } from "@/lib/types";
@@ -13,10 +17,12 @@ type PendingFill = {
   frameIndex: number;
   caption: string;
   routeTitle: string;
-  /** Candidate URL after upload — not Asset truth until Write */
+  providerId: MediaAdmissionProviderId;
+  /** Candidate URL after provider — not Asset truth until Write */
   candidateUrl: string | null;
-  uploading: boolean;
-  fileName: string | null;
+  candidateLabel: string | null;
+  busy: boolean;
+  pasteUrlDraft: string;
 };
 
 export type BatchFrameCompletionProps = {
@@ -26,9 +32,15 @@ export type BatchFrameCompletionProps = {
   onWrote: () => void;
 };
 
+const providers = createMediaAdmissionProviders();
+
+function rowKey(routeTsid: string, frameIndex: number): string {
+  return `${routeTsid}:${frameIndex}`;
+}
+
 /**
- * Batch frame URL fill.
- * Upload = Execution (candidate). Write = Human Accept into Assets (Gate E).
+ * Batch frame URL fill via Media Admission providers.
+ * Provider success = candidate only. Write = Human Accept into Assets (Gate E).
  * Does not use ReadingRouteForm (which filters empty urls on submit).
  */
 export function BatchFrameCompletion({
@@ -53,9 +65,11 @@ export function BatchFrameCompletion({
           frameIndex,
           caption: frame.caption,
           routeTitle: route.title || route.tsid,
+          providerId: "local_upload",
           candidateUrl: null,
-          uploading: false,
-          fileName: null,
+          candidateLabel: null,
+          busy: false,
+          pasteUrlDraft: "",
         });
       });
     }
@@ -64,33 +78,37 @@ export function BatchFrameCompletion({
 
   const readyCount = rows.filter((r) => r.candidateUrl).length;
 
-  const onPickFile = async (key: string, file: File | undefined) => {
-    if (!file) return;
+  const patchRow = (key: string, patch: Partial<PendingFill>) => {
     setRows((prev) =>
       prev.map((r) =>
-        `${r.routeTsid}:${r.frameIndex}` === key
-          ? { ...r, uploading: true, fileName: file.name }
-          : r
+        rowKey(r.routeTsid, r.frameIndex) === key ? { ...r, ...patch } : r
       )
     );
+  };
+
+  const obtainForRow = async (
+    row: PendingFill,
+    input: { file?: File; url?: string }
+  ) => {
+    const key = rowKey(row.routeTsid, row.frameIndex);
+    const provider = providers.find((p) => p.id === row.providerId);
+    if (!provider) return;
+
+    patchRow(key, { busy: true });
     setWriteError(null);
     try {
-      const url = await uploadToCloudinary(file);
-      setRows((prev) =>
-        prev.map((r) =>
-          `${r.routeTsid}:${r.frameIndex}` === key
-            ? { ...r, uploading: false, candidateUrl: url }
-            : r
-        )
-      );
+      const candidate = await provider.obtainCandidate({
+        caption: row.caption,
+        routeTitle: row.routeTitle,
+        ...input,
+      });
+      patchRow(key, {
+        busy: false,
+        candidateUrl: candidate.url,
+        candidateLabel: candidate.label ?? null,
+      });
     } catch (e) {
-      setRows((prev) =>
-        prev.map((r) =>
-          `${r.routeTsid}:${r.frameIndex}` === key
-            ? { ...r, uploading: false }
-            : r
-        )
-      );
+      patchRow(key, { busy: false });
       setWriteError(e instanceof Error ? e.message : String(e));
     }
   };
@@ -101,7 +119,10 @@ export function BatchFrameCompletion({
     setWriting(true);
     setWriteError(null);
     try {
-      const byRoute = new Map<string, Array<{ frameIndex: number; url: string }>>();
+      const byRoute = new Map<
+        string,
+        Array<{ frameIndex: number; url: string }>
+      >();
       for (const r of ready) {
         const list = byRoute.get(r.routeTsid) ?? [];
         list.push({ frameIndex: r.frameIndex, url: r.candidateUrl! });
@@ -136,8 +157,8 @@ export function BatchFrameCompletion({
           批量补齐画面图
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          上传仅为执行（候选 URL）。点击「写入作品」才进入 Assets（Human
-          Accept）。不会自动完成 Production Plan。
+          上传 / 粘贴 URL 仅产生候选（candidate ≠ Asset）。点击「写入作品」才进入
+          Assets（Human Accept）。Job/候选成功 ≠ Production Plan 完成。
         </p>
       </div>
 
@@ -153,13 +174,13 @@ export function BatchFrameCompletion({
       {rows.length === 0 ? (
         <p className="text-sm text-zinc-500">没有待补图的帧。</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {rows.map((row) => {
-            const key = `${row.routeTsid}:${row.frameIndex}`;
+            const key = rowKey(row.routeTsid, row.frameIndex);
             return (
               <li
                 key={key}
-                className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-zinc-900">
@@ -167,29 +188,83 @@ export function BatchFrameCompletion({
                   </p>
                   <p className="truncate text-xs text-zinc-500">{row.caption}</p>
                   {row.candidateUrl ? (
-                    <p className="mt-1 truncate font-mono text-[11px] text-emerald-700">
+                    <p className="mt-1 truncate text-[11px] text-emerald-700">
                       候选已就绪（未写入）
+                      {row.candidateLabel ? ` · ${row.candidateLabel}` : ""}
                     </p>
-                  ) : row.uploading ? (
-                    <p className="mt-1 text-xs text-zinc-500">上传中…</p>
+                  ) : row.busy ? (
+                    <p className="mt-1 text-xs text-zinc-500">获取候选中…</p>
                   ) : null}
                 </div>
-                <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-                  <span className="rounded-md border border-zinc-200 px-3 py-1.5 text-zinc-800 hover:bg-zinc-50">
-                    选择图片
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    disabled={row.uploading || writing}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      void onPickFile(key, file);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+
+                <div className="flex flex-wrap gap-2" role="group" aria-label="来源">
+                  {providers.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      disabled={row.busy || writing}
+                      onClick={() =>
+                        patchRow(key, {
+                          providerId: p.id,
+                          candidateUrl: null,
+                          candidateLabel: null,
+                        })
+                      }
+                      className={
+                        row.providerId === p.id
+                          ? "rounded-md border border-zinc-900 bg-zinc-900 px-2.5 py-1 text-xs text-white"
+                          : "rounded-md border border-zinc-200 px-2.5 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+                      }
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                {row.providerId === "local_upload" ? (
+                  <label className="inline-flex w-fit cursor-pointer items-center gap-2 text-sm">
+                    <span className="rounded-md border border-zinc-200 px-3 py-1.5 text-zinc-800 hover:bg-zinc-50">
+                      选择图片
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={row.busy || writing}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void obtainForRow(row, { file });
+                      }}
+                    />
+                  </label>
+                ) : null}
+
+                {row.providerId === "paste_url" ? (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Input
+                      type="url"
+                      placeholder="https://…"
+                      value={row.pasteUrlDraft}
+                      disabled={row.busy || writing}
+                      onChange={(e) =>
+                        patchRow(key, { pasteUrlDraft: e.target.value })
+                      }
+                      className="max-w-md"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={row.busy || writing || !row.pasteUrlDraft.trim()}
+                      onClick={() =>
+                        void obtainForRow(row, { url: row.pasteUrlDraft })
+                      }
+                    >
+                      使用 URL
+                    </Button>
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -205,7 +280,7 @@ export function BatchFrameCompletion({
           {writing ? "写入中…" : `写入作品（${readyCount}）`}
         </Button>
         <p className="text-xs text-zinc-500">
-          Gate E：写入前必须人工确认；Job/上传成功 ≠ 业务完成。
+          Gate E：写入前必须人工确认；候选成功 ≠ 业务完成。
         </p>
       </div>
     </section>
