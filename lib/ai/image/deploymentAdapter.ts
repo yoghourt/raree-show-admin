@@ -21,8 +21,12 @@ function softPrimarySkipReason(
   config: CreatorImageDeploymentConfig
 ): string | null {
   const id = providerId.trim().toLowerCase()
-  if (id === "local" && !config.localBaseUrl && !config.skipNetwork) {
-    return "IMAGE_CREATOR_LOCAL_BASE not set"
+  if (
+    (id === "local" || id === "localai") &&
+    !config.localBaseUrl &&
+    !config.skipNetwork
+  ) {
+    return "IMAGE_CREATOR_LOCAL_BASE / IMAGE_CREATOR_LOCALAI_BASE not set"
   }
   if (id === "siliconflow" && !config.siliconflowKey && !config.skipNetwork) {
     return "SILICONFLOW_API_KEY / IMAGE_CREATOR_SILICONFLOW_KEY not set"
@@ -37,11 +41,10 @@ function softPrimarySkipReason(
 }
 
 /**
- * Creator Runtime Deployment Adapter (ADR-010 A3 Constraint F).
+ * Execution Runtime path for image generation (ADR-010 A3 Constraint F).
  *
- * Public Port entry: generate an image candidate (capability), not a portrait API.
+ * Not a Product Runtime entry — call via Capability Runtime `imageGenerate`.
  * Tries Production Default provider first, then Fallback / Accept Baseline.
- * Business code MUST call this (or the Port factory) — never vendor SDKs directly.
  */
 export async function generateImageCandidate(
   req: ImageGenerationRequest,

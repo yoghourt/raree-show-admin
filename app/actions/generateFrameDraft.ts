@@ -2,7 +2,7 @@
 
 import { z } from "zod"
 
-import { generateImageCandidate } from "@/lib/ai/image"
+import { imageGenerate } from "@/lib/ai/capability"
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload"
 import { formatRequestError } from "@/lib/format-request-error"
 import { buildFrameDraftPrompt } from "@/lib/prompts/frame-draft"
@@ -23,12 +23,9 @@ const inputSchema = z.object({
 })
 
 /**
- * A4: Scene Frame draft via Image Generation Port + Deployment Adapter.
+ * A4: Scene Frame draft via Capability Runtime `image.generate`.
  * Returns a hosted URL for ephemeral Media Admission Candidate only.
  * MUST NOT write Assets / story_images_v2.
- *
- * Uses Port capability `generateImageCandidate` with assetSlot=scene_frame
- * (no Scene-Frame-specific Provider entry point).
  */
 export async function generateFrameDraft(input: {
   caption: string
@@ -44,21 +41,23 @@ export async function generateFrameDraft(input: {
   const prompt = buildFrameDraftPrompt({ caption, routeTitle })
 
   try {
-    const image = await generateImageCandidate({
+    const candidate = await imageGenerate({
+      surface: "creator",
       assetSlot: "scene_frame",
       prompt,
       size: { width: 1280, height: 720 },
     })
     let url: string
     try {
-      url = await uploadImageBufferToCloudinary(image.bytes, image.mimeType)
+      url = await uploadImageBufferToCloudinary(
+        candidate.bytes,
+        candidate.mimeType
+      )
     } catch (uploadErr) {
       const uploadMsg = formatRequestError(uploadErr)
       console.warn("[generateFrameDraft] cloudinary upload failed", {
         uploadMsg,
-        providerId: image.meta.providerId,
-        modelId: image.meta.modelId,
-        usedFallback: image.usedFallback,
+        usedFallback: candidate.usedFallback,
       })
       return {
         ok: false,
@@ -67,9 +66,7 @@ export async function generateFrameDraft(input: {
     }
     console.info("[generateFrameDraft]", {
       durationMs: Date.now() - started,
-      providerId: image.meta.providerId,
-      modelId: image.meta.modelId,
-      usedFallback: image.usedFallback,
+      usedFallback: candidate.usedFallback,
       cloudinaryOk: true,
     })
     return { ok: true, url }

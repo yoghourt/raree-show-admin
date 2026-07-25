@@ -19,7 +19,7 @@ export type {
 export type { ImageCandidateGenerationResult } from "./deploymentAdapter"
 export { loadSpikeImageConfig } from "./config"
 export { loadCreatorImageDeploymentConfig } from "./deploymentConfig"
-export { generateImageCandidate } from "./deploymentAdapter"
+/** Spike / Execution helpers only. Product Runtime: `@/lib/ai/capability`. */
 export { createImageGenerationProvider } from "./factory"
 
 export function resolveSpikeChannelProvider(

@@ -65,3 +65,54 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8191/docs
 - 路径仍叫 `/v1/portraits`（历史命名）；肖像与 Scene Frame 草稿共用此接口。
 - Apple Silicon 脚本默认 `pipe.to("mps")`；无 MPS 需自行改 `local_portrait_server.py` 设备。
 - `.venv/` 勿提交；依赖装在 scripts 本地虚拟环境即可。
+
+---
+
+## LocalAI（provider=`localai`）
+
+Strategic Default 候选：本机 [LocalAI](https://localai.io/) 提供 OpenAI 兼容 `POST /v1/images/generations`。  
+与上方 legacy `local`（`:8191` `/v1/portraits`）**并存**；代码默认仍是 `local`，切 LocalAI 只改 env。
+
+### 操作者准备
+
+1. 启动 LocalAI（默认 `http://127.0.0.1:8080`）。
+2. 安装图像模型（本机常用名：`dreamshaper`；以 LocalAI UI / `GET /v1/models` 为准）。
+3. 自检：
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/v1/models
+curl -sS http://127.0.0.1:8080/v1/models | head
+```
+
+### Admin `.env.local`（可选，日常 UI）
+
+```bash
+IMAGE_CREATOR_ACCEPT_PROVIDER=localai
+IMAGE_CREATOR_LOCALAI_BASE=http://127.0.0.1:8080
+IMAGE_CREATOR_ACCEPT_MODEL=dreamshaper
+IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
+# IMAGE_CREATOR_LOCALAI_KEY=...   # 若 LocalAI 开了鉴权
+```
+
+改完后重启 `npm run dev`。产品路径仍只走 Capability `image.generate`。
+
+### 脚本验证（本切片验收）
+
+Dry-run（不访问本机 LocalAI）：
+
+```bash
+npx tsx scripts/verify-execution-localai.ts
+```
+
+Live（须 LocalAI 已启动 + 模型就绪）：
+
+```bash
+VERIFY_LOCALAI_LIVE=1 \
+IMAGE_CREATOR_ACCEPT_PROVIDER=localai \
+IMAGE_CREATOR_LOCALAI_BASE=http://127.0.0.1:8080 \
+IMAGE_CREATOR_ACCEPT_MODEL=dreamshaper \
+npx tsx scripts/verify-execution-localai.ts
+```
+
+期望 Live：退出码 0；日志含 `probe.ok`、`provider.ok`、`capability.ok`（`usedFallback: false`）、最终 `PASS`。  
+LocalAI 未启动时 Live 须 **FAIL**（不得误报 PASS）。

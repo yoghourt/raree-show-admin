@@ -52,6 +52,8 @@ export type ImageAdapterEnv = {
   siliconflowKey?: string
   siliconflowApiBase?: string
   localBaseUrl?: string
+  /** Optional Bearer for OpenAI-compatible local hosts (e.g. LocalAI). */
+  localAiApiKey?: string
   /** When true, adapters return a tiny PNG without network (spike dry-run). */
   skipNetwork: boolean
 }
