@@ -68,45 +68,60 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8191/docs
 
 ---
 
-## LocalAI（provider=`localai`）
+## LocalAI（provider=`localai`）— Admin 端到端（切片 0）
 
-Strategic Default 候选：本机 [LocalAI](https://localai.io/) 提供 OpenAI 兼容 `POST /v1/images/generations`。  
-与上方 legacy `local`（`:8191` `/v1/portraits`）**并存**；代码默认仍是 `local`，切 LocalAI 只改 env。
+Strategic Default 候选：本机 [LocalAI](https://localai.io/) → OpenAI 兼容 `POST /v1/images/generations`。  
+与上方 legacy `local`（`:8191` `/v1/portraits`）**并存**；**代码默认仍是 `local`**，切 LocalAI **只改 env**。
 
-### 操作者准备
+产品路径：Admin UI → Server Action → Capability `image.generate` → Execution `localai` → LocalAI → Cloudinary Candidate（**不写 Asset**，直至「写入作品」）。
 
-1. 启动 LocalAI（默认 `http://127.0.0.1:8080`）。
-2. 安装图像模型（本机常用名：`dreamshaper`；以 LocalAI UI / `GET /v1/models` 为准）。
-3. 自检：
+**范围：** 本机 `npm run dev` + 本机 LocalAI。Vercel **不会**打到 `127.0.0.1`；线上拓扑见后续「队列 + Local Worker」切片。
 
-```bash
-curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/v1/models
-curl -sS http://127.0.0.1:8080/v1/models | head
-```
+### 操作者步骤（按序）
 
-### Admin `.env.local`（可选，日常 UI）
+1. **启动 LocalAI**（默认 `http://127.0.0.1:8080`）。
+2. **确认图像模型**（常用名：`dreamshaper`；以 UI / API 为准）：
+   ```bash
+   curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/v1/models
+   curl -sS http://127.0.0.1:8080/v1/models
+   ```
+3. **编辑仓库根 `.env.local`**（勿提交；可与其它密钥并存）：
+   ```bash
+   IMAGE_CREATOR_ACCEPT_PROVIDER=localai
+   IMAGE_CREATOR_LOCALAI_BASE=http://127.0.0.1:8080
+   IMAGE_CREATOR_ACCEPT_MODEL=dreamshaper
+   IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
+   # IMAGE_CREATOR_LOCALAI_KEY=...   # 仅当 LocalAI 开了鉴权
+   # SILICONFLOW_API_KEY=...         # 可选；LocalAI 挂了才走云
+   ```
+4. **必须重启** Admin：`npm run dev`（改 env 后不重启仍走旧配置）。
+5. **浏览器**（已登录）：
+   - 角色表单：**生成肖像**
+   - 和/或 CPP 批处理：**生成草稿**
+6. **看终端日志**（期望 LocalAI 正常时）：
+   ```text
+   [capability:image.generate] … providerId: 'localai' … usedFallback: false
+   [generateCharacterAvatar] 或 [generateFrameDraft] … usedFallback: false … cloudinaryOk: true
+   ```
+7. **UI**：得到 Candidate 图 URL；**未**点「写入作品」前不应写入 `story_images_v2` / 肖像 Asset。
 
-```bash
-IMAGE_CREATOR_ACCEPT_PROVIDER=localai
-IMAGE_CREATOR_LOCALAI_BASE=http://127.0.0.1:8080
-IMAGE_CREATOR_ACCEPT_MODEL=dreamshaper
-IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
-# IMAGE_CREATOR_LOCALAI_KEY=...   # 若 LocalAI 开了鉴权
-```
+首次生图若报 `grpc service not ready`：等 LocalAI 图像 backend 加载完再点一次（与 live verify 相同）。
 
-改完后重启 `npm run dev`。产品路径仍只走 Capability `image.generate`。
+### 排查
 
-### 脚本验证（本切片验收）
+| 现象 | 处理 |
+|------|------|
+| 仍像走云 / `usedFallback: true` + siliconflow | LocalAI 未起、BASE 错、或模型名不对；先 `curl /v1/models` |
+| connection refused | LocalAI 未听 8080；检查 `IMAGE_CREATOR_LOCALAI_BASE` |
+| 改了 `.env.local` 无效 | 未重启 `npm run dev` |
+| 模型 4xx/5xx | `IMAGE_CREATOR_ACCEPT_MODEL` 必须与 LocalAI 中 **name** 完全一致 |
+| 误用 8191 portrait server | `ACCEPT_PROVIDER` 应为 `localai` 不是 `local` |
 
-Dry-run（不访问本机 LocalAI）：
+### 脚本回归（可选）
 
 ```bash
 npx tsx scripts/verify-execution-localai.ts
-```
 
-Live（须 LocalAI 已启动 + 模型就绪）：
-
-```bash
 VERIFY_LOCALAI_LIVE=1 \
 IMAGE_CREATOR_ACCEPT_PROVIDER=localai \
 IMAGE_CREATOR_LOCALAI_BASE=http://127.0.0.1:8080 \
@@ -114,5 +129,9 @@ IMAGE_CREATOR_ACCEPT_MODEL=dreamshaper \
 npx tsx scripts/verify-execution-localai.ts
 ```
 
-期望 Live：退出码 0；日志含 `probe.ok`、`provider.ok`、`capability.ok`（`usedFallback: false`）、最终 `PASS`。  
-LocalAI 未启动时 Live 须 **FAIL**（不得误报 PASS）。
+### 验收清单（切片 0）
+
+- [ ] `.env.local` 如上且已重启 dev
+- [ ] 生成肖像或生成草稿得到 Candidate URL
+- [ ] 日志 `providerId: 'localai'` 且 `usedFallback: false`（LocalAI 正常时）
+- [ ] 未 Accept / 写入作品前 Asset 未自动写入
