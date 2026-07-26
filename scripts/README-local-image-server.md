@@ -90,32 +90,51 @@ Strategic Default 候选：本机 [LocalAI](https://localai.io/) → OpenAI 兼�
    IMAGE_CREATOR_ACCEPT_PROVIDER=localai
    IMAGE_CREATOR_LOCALAI_BASE=http://127.0.0.1:8080
    IMAGE_CREATOR_ACCEPT_MODEL=dreamshaper
-   IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
-   # IMAGE_CREATOR_LOCALAI_KEY=...   # 仅当 LocalAI 开了鉴权
-   # SILICONFLOW_API_KEY=...         # 可选；LocalAI 挂了才走云
+   # 专测本机时：fallback 也指回 localai，避免误以为「云端好了」
+   IMAGE_CREATOR_ACCEPT_FALLBACK=localai
+   IMAGE_CREATOR_LOCALAI_MAX_EDGE=768          # 长边上限（默认 768；1280×720 在 CPU 上极易超分钟级）
+   IMAGE_CREATOR_LOCALAI_TIMEOUT_MS=600000     # 默认 10min
+   # IMAGE_CREATOR_LOCALAI_KEY=...
+   # 本机稳定后再开云 fallback：
+   # IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
+   # SILICONFLOW_API_KEY=...
    ```
 4. **必须重启** Admin：`npm run dev`（改 env 后不重启仍走旧配置）。
 5. **浏览器**（已登录）：
    - 角色表单：**生成肖像**
-   - 和/或 CPP 批处理：**生成草稿**
+   - 和/或故事编辑画面页 / CPP：**AI 生图 / 生成草稿**
 6. **看终端日志**（期望 LocalAI 正常时）：
    ```text
+   [localai] clamping size… using: 768x432   # 或 [localai] generate
    [capability:image.generate] … providerId: 'localai' … usedFallback: false
-   [generateCharacterAvatar] 或 [generateFrameDraft] … usedFallback: false … cloudinaryOk: true
+   [generateFrameDraft] … usedFallback: false … cloudinaryOk: true
    ```
-7. **UI**：得到 Candidate 图 URL；**未**点「写入作品」前不应写入 `story_images_v2` / 肖像 Asset。
+7. **UI**：得到 Candidate 图 URL；**未**点「写入作品」/保存前不应写入 Asset。
 
 首次生图若报 `grpc service not ready`：等 LocalAI 图像 backend 加载完再点一次（与 live verify 相同）。
+
+本机冒烟（不经过 Admin；512²）：
+
+```bash
+VERIFY_LOCALAI_LIVE=1 \
+IMAGE_CREATOR_ACCEPT_PROVIDER=localai \
+IMAGE_CREATOR_LOCALAI_BASE=http://127.0.0.1:8080 \
+IMAGE_CREATOR_ACCEPT_MODEL=dreamshaper \
+npx tsx scripts/verify-execution-localai.ts
+```
 
 ### 排查
 
 | 现象 | 处理 |
 |------|------|
-| 仍像走云 / `usedFallback: true` + siliconflow | LocalAI 未起、BASE 错、或模型名不对；先 `curl /v1/models` |
+| `localai timed out` | 多为分辨率过大或首次加载；看 LocalAI 日志；降 `MAX_EDGE`（如 512）或加 `TIMEOUT_MS` |
+| 电脑很卡但最终失败 | LocalAI 仍在本机推理；超时只断客户端等待，后台可能还在跑——必要时重启 LocalAI |
+| 仍像走云 / `usedFallback: true` + siliconflow | 测本机时设 `ACCEPT_FALLBACK=localai`；或修好 primary |
 | connection refused | LocalAI 未听 8080；检查 `IMAGE_CREATOR_LOCALAI_BASE` |
 | 改了 `.env.local` 无效 | 未重启 `npm run dev` |
 | 模型 4xx/5xx | `IMAGE_CREATOR_ACCEPT_MODEL` 必须与 LocalAI 中 **name** 完全一致 |
 | 误用 8191 portrait server | `ACCEPT_PROVIDER` 应为 `localai` 不是 `local` |
+| fallback 报缺 key | 须设 `SILICONFLOW_API_KEY`；仅有 `IMAGE_SPIKE_SILICONFLOW_KEY` 不够 |
 
 ### 脚本回归（可选）
 

@@ -180,7 +180,7 @@ export function createSiliconFlowProvider(options: {
       const apiKey = options.apiKey?.trim()
       if (!apiKey) {
         throw new Error(
-          "siliconflow adapter requires IMAGE_SPIKE_SILICONFLOW_KEY or SILICONFLOW_API_KEY"
+          "siliconflow adapter requires SILICONFLOW_API_KEY or IMAGE_CREATOR_SILICONFLOW_KEY (Creator); IMAGE_SPIKE_SILICONFLOW_KEY is spike-only and is not read by Creator Deployment"
         )
       }
 

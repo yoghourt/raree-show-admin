@@ -6,6 +6,36 @@ import type {
 import { AVATAR_NEGATIVE_PROMPT } from "@/lib/prompts/avatar"
 
 const DEFAULT_SIZE = { width: 1024, height: 1024 }
+/**
+ * Local CPU/GPU image backends are slow at 1280×720+.
+ * Override: IMAGE_CREATOR_LOCALAI_TIMEOUT_MS (default 10 min).
+ */
+const DEFAULT_GENERATE_TIMEOUT_MS = 600_000
+const IMAGE_FETCH_TIMEOUT_MS = 30_000
+/** Cap long edge so LocalAI finishes; override IMAGE_CREATOR_LOCALAI_MAX_EDGE. */
+const DEFAULT_MAX_EDGE = 768
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim()
+  if (!raw) return fallback
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback
+}
+
+function clampSize(
+  width: number,
+  height: number,
+  maxEdge: number
+): { width: number; height: number; clamped: boolean } {
+  const long = Math.max(width, height)
+  if (long <= maxEdge) return { width, height, clamped: false }
+  const scale = maxEdge / long
+  return {
+    width: Math.max(64, Math.round(width * scale)),
+    height: Math.max(64, Math.round(height * scale)),
+    clamped: true,
+  }
+}
 
 function tinyPng(): Buffer {
   return Buffer.from(
@@ -44,8 +74,21 @@ export function createOpenAiCompatibleImageProvider(options?: {
     name: providerId,
     capabilities: { referenceImage: true },
     async generate(req: ImageGenerationRequest): Promise<ImageGenerationResult> {
-      const width = req.size?.width ?? DEFAULT_SIZE.width
-      const height = req.size?.height ?? DEFAULT_SIZE.height
+      const requestedW = req.size?.width ?? DEFAULT_SIZE.width
+      const requestedH = req.size?.height ?? DEFAULT_SIZE.height
+      const maxEdge = readPositiveIntEnv(
+        "IMAGE_CREATOR_LOCALAI_MAX_EDGE",
+        DEFAULT_MAX_EDGE
+      )
+      const { width, height, clamped } = clampSize(
+        requestedW,
+        requestedH,
+        maxEdge
+      )
+      const generateTimeoutMs = readPositiveIntEnv(
+        "IMAGE_CREATOR_LOCALAI_TIMEOUT_MS",
+        DEFAULT_GENERATE_TIMEOUT_MS
+      )
       const seed = req.seed ?? Math.floor(Math.random() * 1_000_000_000)
       const ref = req.referenceImages?.[0]?.url
 
@@ -69,7 +112,11 @@ export function createOpenAiCompatibleImageProvider(options?: {
       }
 
       const endpoint = `${baseUrl}/v1/images/generations`
-      const prompt = `${req.prompt}|${AVATAR_NEGATIVE_PROMPT}`
+      // Avatar negatives are portrait-only; scene frames already state "no text" in prompt.
+      const prompt =
+        req.assetSlot === "portrait"
+          ? `${req.prompt}|${AVATAR_NEGATIVE_PROMPT}`
+          : req.prompt
       const headers: Record<string, string> = {
         "content-type": "application/json",
         accept: "application/json",
@@ -89,11 +136,39 @@ export function createOpenAiCompatibleImageProvider(options?: {
         body.ref_images = [ref]
       }
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      })
+      if (clamped) {
+        console.info(`[${providerId}] clamping size for local throughput`, {
+          requested: `${requestedW}x${requestedH}`,
+          using: `${width}x${height}`,
+          maxEdge,
+          timeoutMs: generateTimeoutMs,
+          assetSlot: req.assetSlot ?? null,
+        })
+      } else {
+        console.info(`[${providerId}] generate`, {
+          size: `${width}x${height}`,
+          timeoutMs: generateTimeoutMs,
+          assetSlot: req.assetSlot ?? null,
+          modelId,
+        })
+      }
+
+      let res: Response
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(generateTimeoutMs),
+        })
+      } catch (err) {
+        if (isAbortError(err)) {
+          throw new Error(
+            `${providerId} timed out after ${generateTimeoutMs}ms (${endpoint}; size ${width}x${height}). LocalAI may still be loading or CPU-bound — check LocalAI logs, or lower IMAGE_CREATOR_LOCALAI_MAX_EDGE.`
+          )
+        }
+        throw err
+      }
 
       if (!res.ok) {
         const text = await res.text().catch(() => "")
@@ -128,9 +203,22 @@ export function createOpenAiCompatibleImageProvider(options?: {
         const absUrl = item.url.startsWith("http")
           ? item.url
           : `${baseUrl}${item.url.startsWith("/") ? "" : "/"}${item.url}`
-        const imgRes = await fetch(absUrl, {
-          headers: apiKey ? { authorization: `Bearer ${apiKey}` } : undefined,
-        })
+        let imgRes: Response
+        try {
+          imgRes = await fetch(absUrl, {
+            headers: apiKey
+              ? { authorization: `Bearer ${apiKey}` }
+              : undefined,
+            signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
+          })
+        } catch (err) {
+          if (isAbortError(err)) {
+            throw new Error(
+              `${providerId} image url fetch timed out after ${IMAGE_FETCH_TIMEOUT_MS}ms`
+            )
+          }
+          throw err
+        }
         if (!imgRes.ok) {
           throw new Error(
             `${providerId} url fetch failed: HTTP ${imgRes.status}`
@@ -153,4 +241,13 @@ export function createOpenAiCompatibleImageProvider(options?: {
       throw new Error(`${providerId} response missing b64_json or url`)
     },
   }
+}
+
+function isAbortError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  return (
+    err.name === "AbortError" ||
+    err.name === "TimeoutError" ||
+    /aborted|timeout/i.test(err.message)
+  )
 }

@@ -31,6 +31,7 @@ export async function imageGenerate(
     assetSlot: input.assetSlot ?? null,
     durationMs: Date.now() - started,
     usedFallback: result.usedFallback,
+    primaryError: result.primaryError?.slice(0, 240) ?? null,
     // Observational only — not a Product Runtime business key
     providerId: result.meta.providerId,
     modelId: result.meta.modelId,

@@ -4,11 +4,13 @@ import {
   ArrowDown,
   ArrowUp,
   Loader2Icon,
+  Sparkles,
   UploadIcon,
   X,
 } from "lucide-react";
 import * as React from "react";
 
+import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { uploadToCloudinary } from "@/lib/cloudinary";
@@ -19,12 +21,15 @@ type MultiImageUploaderProps = {
   value: ReadingFrame[];
   onChange: (next: ReadingFrame[]) => void;
   onUploadingChange?: (uploading: boolean) => void;
+  /** Optional route title for frame-draft prompt context. */
+  routeTitle?: string;
 };
 
 export function MultiImageUploader({
   value,
   onChange,
   onUploadingChange,
+  routeTitle,
 }: MultiImageUploaderProps) {
   const fileInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
   const captionTextareaRefs = React.useRef<(HTMLTextAreaElement | null)[]>([]);
@@ -32,7 +37,28 @@ export function MultiImageUploader({
   const [uploadingIndex, setUploadingIndex] = React.useState<number | null>(
     null
   );
+  const [generatingIndex, setGeneratingIndex] = React.useState<number | null>(
+    null
+  );
+  const [generateElapsedSec, setGenerateElapsedSec] = React.useState(0);
+  const [generateErrorByIndex, setGenerateErrorByIndex] = React.useState<
+    Record<number, string>
+  >({});
   const isUploading = uploadingIndex !== null;
+  const isGenerating = generatingIndex !== null;
+
+  React.useEffect(() => {
+    if (generatingIndex === null) {
+      setGenerateElapsedSec(0);
+      return;
+    }
+    setGenerateElapsedSec(0);
+    const started = Date.now();
+    const id = window.setInterval(() => {
+      setGenerateElapsedSec(Math.floor((Date.now() - started) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [generatingIndex]);
 
   React.useEffect(() => {
     console.log("[MultiImageUploader] value shape check", {
@@ -118,9 +144,47 @@ export function MultiImageUploader({
     }
   };
 
+  const handleGenerateForIndex = async (index: number) => {
+    const caption = value[index]?.caption?.trim() ?? "";
+    if (!caption || generatingIndex !== null || uploadingIndex !== null) return;
+
+    setGeneratingIndex(index);
+    setGenerateErrorByIndex((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+    try {
+      const result = await generateFrameDraft({
+        caption,
+        routeTitle: routeTitle?.trim() || undefined,
+      });
+      if (!result.ok) {
+        setGenerateErrorByIndex((prev) => ({
+          ...prev,
+          [index]: result.message,
+        }));
+        return;
+      }
+      updateUrl(index, result.url);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setGenerateErrorByIndex((prev) => ({ ...prev, [index]: message }));
+    } finally {
+      setGeneratingIndex(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {value.map((item, index) => (
+      {value.map((item, index) => {
+        const frameBusy =
+          (isUploading && uploadingIndex === index) ||
+          (isGenerating && generatingIndex === index);
+        const captionEmpty = item.caption.trim() === "";
+        const generateError = generateErrorByIndex[index];
+
+        return (
         <div
           key={`segment-${index}`}
           className="relative rounded-lg border border-border p-4 pt-12"
@@ -171,8 +235,48 @@ export function MultiImageUploader({
             className="w-full max-w-none resize-y"
             aria-invalid={item.caption === ""}
           />
-          {item.caption === "" ? (
-            <p className="text-destructive mt-1 text-sm">{messages.forms.captionRequired}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {captionEmpty ? (
+              <p className="text-destructive text-sm">
+                {messages.forms.captionRequired}
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+              disabled={captionEmpty || frameBusy || isUploading || isGenerating}
+              onClick={() => void handleGenerateForIndex(index)}
+            >
+              {generatingIndex === index ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" aria-hidden />
+                  {messages.forms.generating}
+                  <span className="tabular-nums text-muted-foreground">
+                    {messages.forms.generatingElapsed(generateElapsedSec)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-4" aria-hidden />
+                  {messages.forms.aiGenerateFrame}
+                </>
+              )}
+            </Button>
+          </div>
+          {generatingIndex === index ? (
+            <p className="text-muted-foreground mt-1 text-xs tabular-nums">
+              {messages.forms.generatingElapsed(generateElapsedSec)}
+              {generateElapsedSec >= 15
+                ? " · 本机 LocalAI 出图中（暖机/CPU 可能需 1–几分钟）"
+                : ""}
+            </p>
+          ) : null}
+          {generateError ? (
+            <p className="text-destructive mt-1 text-sm" role="alert">
+              {generateError}
+            </p>
           ) : null}
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -181,6 +285,16 @@ export function MultiImageUploader({
                 <div className="text-muted-foreground flex items-center gap-2 text-sm">
                   <Loader2Icon className="size-4 shrink-0 animate-spin" />
                   {messages.common.uploading}
+                </div>
+              ) : generatingIndex === index ? (
+                <div className="text-muted-foreground flex flex-col items-center gap-1 text-sm">
+                  <span className="flex items-center gap-2">
+                    <Loader2Icon className="size-4 shrink-0 animate-spin" />
+                    {messages.forms.generating}
+                  </span>
+                  <span className="tabular-nums text-xs">
+                    {messages.forms.generatingElapsed(generateElapsedSec)}
+                  </span>
                 </div>
               ) : item.url ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -212,7 +326,7 @@ export function MultiImageUploader({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={isUploading && uploadingIndex === index}
+                disabled={frameBusy || isUploading || isGenerating}
                 onClick={() => triggerFilePick(index)}
               >
                 {isUploading && uploadingIndex === index ? (
@@ -235,7 +349,8 @@ export function MultiImageUploader({
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
 
       <Button
         type="button"
