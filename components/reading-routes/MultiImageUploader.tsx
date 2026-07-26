@@ -144,6 +144,10 @@ export function MultiImageUploader({
     }
   };
 
+  /**
+   * Migration compatibility: sync Capability generate.
+   * Production batch prefers enqueue (SPIKE-IMG-003); do not extend this path.
+   */
   const handleGenerateForIndex = async (index: number) => {
     const caption = value[index]?.caption?.trim() ?? "";
     if (!caption || generatingIndex !== null || uploadingIndex !== null) return;

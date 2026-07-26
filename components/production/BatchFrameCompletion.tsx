@@ -2,9 +2,14 @@
 
 import * as React from "react";
 
+import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
 import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  listGenerateJobsForWork,
+  type GenerateJobRow,
+} from "@/lib/generate-jobs";
 import {
   createMediaAdmissionProviders,
   type MediaAdmissionProviderId,
@@ -41,8 +46,10 @@ function rowKey(routeTsid: string, frameIndex: number): string {
 
 /**
  * Batch frame URL fill via Media Admission.
- * Channels: upload / paste URL. Slot action: Generate via Image Port (A4).
+ * Channels: upload / paste URL. Preferred generate: enqueue (SPIKE-IMG-003).
+ * Sync「生成草稿」= migration compatibility only.
  * Provider/Generate success = candidate only. Write = Human Accept (Gate E).
+ * Job / result_reference ≠ Candidate ≠ Asset.
  */
 export function BatchFrameCompletion({
   workId,
@@ -53,6 +60,19 @@ export function BatchFrameCompletion({
   const [rows, setRows] = React.useState<PendingFill[]>([]);
   const [writeError, setWriteError] = React.useState<string | null>(null);
   const [writing, setWriting] = React.useState(false);
+  const [jobs, setJobs] = React.useState<GenerateJobRow[]>([]);
+  const [jobsError, setJobsError] = React.useState<string | null>(null);
+  const [enqueueBusy, setEnqueueBusy] = React.useState(false);
+
+  const refreshJobs = React.useCallback(async () => {
+    try {
+      const list = await listGenerateJobsForWork(workId, { limit: 40 });
+      setJobs(list);
+      setJobsError(null);
+    } catch (e) {
+      setJobsError(e instanceof Error ? e.message : String(e));
+    }
+  }, [workId]);
 
   React.useEffect(() => {
     const next: PendingFill[] = [];
@@ -76,6 +96,10 @@ export function BatchFrameCompletion({
     }
     setRows(next);
   }, [routes]);
+
+  React.useEffect(() => {
+    void refreshJobs();
+  }, [refreshJobs]);
 
   const readyCount = rows.filter((r) => r.candidateUrl).length;
 
@@ -114,7 +138,37 @@ export function BatchFrameCompletion({
     }
   };
 
-  /** A4: Port → Deployment → hosted URL → ephemeral Candidate (zero logistics). */
+  /** SPIKE-IMG-003: enqueue only — does not generate or create Candidates. */
+  const enqueueRows = async (targets: PendingFill[]) => {
+    if (targets.length === 0) return;
+    setEnqueueBusy(true);
+    setWriteError(null);
+    try {
+      const result = await enqueueFrameDraftJobs({
+        workId,
+        frames: targets.map((r) => ({
+          sceneTsid: r.routeTsid,
+          frameIndex: r.frameIndex,
+          caption: r.caption,
+          routeTitle: r.routeTitle,
+        })),
+      });
+      if (!result.ok) {
+        setWriteError(result.message);
+        return;
+      }
+      await refreshJobs();
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setEnqueueBusy(false);
+    }
+  };
+
+  /**
+   * Migration compatibility only — sync Capability path.
+   * Prefer「排队生成」+ Local Worker (slice 2).
+   */
   const generateForRow = async (row: PendingFill) => {
     const key = rowKey(row.routeTsid, row.frameIndex);
     patchRow(key, { busy: true });
@@ -132,7 +186,7 @@ export function BatchFrameCompletion({
       patchRow(key, {
         busy: false,
         candidateUrl: result.url,
-        candidateLabel: "生成草稿",
+        candidateLabel: "生成草稿（同步·兼容）",
       });
     } catch (e) {
       patchRow(key, { busy: false });
@@ -184,9 +238,10 @@ export function BatchFrameCompletion({
           批量补齐画面图
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          上传 / 粘贴 URL / 生成草稿仅产生候选（candidate ≠ Asset）。生成走
-          Image Port → Deployment，不写 Assets。点击「写入作品」才 Human
-          Accept。Generate/Job/候选成功 ≠ Production Plan 完成。
+          优先「排队生成」（Execution Job；切片 2 Worker 出
+          result_reference）。上传 / 粘贴 URL / 同步生成草稿仅产生候选（Job ≠
+          Candidate ≠ Asset）。点击「写入作品」才 Human Accept。Job/候选成功 ≠
+          Production Plan 完成。
         </p>
       </div>
 
@@ -238,12 +293,21 @@ export function BatchFrameCompletion({
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
+                    size="sm"
+                    disabled={row.busy || writing || enqueueBusy}
+                    onClick={() => void enqueueRows([row])}
+                  >
+                    排队生成
+                  </Button>
+                  <Button
+                    type="button"
                     variant="outline"
                     size="sm"
-                    disabled={row.busy || writing}
+                    disabled={row.busy || writing || enqueueBusy}
                     onClick={() => void generateForRow(row)}
+                    title="迁移兼容：同步直连 Capability；新功能请用排队生成"
                   >
-                    {row.busy ? "生成中…" : "生成草稿"}
+                    {row.busy ? "生成中…" : "同步生成（兼容）"}
                   </Button>
                   <div className="flex flex-wrap gap-2" role="group" aria-label="来源">
                     {providers.map((p) => (
@@ -322,6 +386,76 @@ export function BatchFrameCompletion({
         </ul>
       )}
 
+      {rows.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={writing || enqueueBusy || rows.length === 0}
+            onClick={() => void enqueueRows(rows)}
+          >
+            {enqueueBusy ? "排队中…" : `全部排队（${rows.length}）`}
+          </Button>
+          <p className="text-xs text-zinc-500">
+            入队后 status=queued；切片 2 Local Worker 才会写 result_reference。
+          </p>
+        </div>
+      ) : null}
+
+      <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium text-zinc-900">Generate Jobs</h3>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={enqueueBusy}
+            onClick={() => void refreshJobs()}
+          >
+            刷新
+          </Button>
+        </div>
+        {jobsError ? (
+          <p className="text-destructive text-xs" role="alert">
+            {jobsError}
+            （若提示表不存在，请先在 Supabase 执行 docs/supabase/migrations/20260726000000_generate_jobs.sql）
+          </p>
+        ) : null}
+        {jobs.length === 0 && !jobsError ? (
+          <p className="text-xs text-zinc-500">暂无任务。排队后出现于此。</p>
+        ) : (
+          <ul className="max-h-48 space-y-1.5 overflow-y-auto text-xs">
+            {jobs.map((job) => {
+              const frameIndex = job.input_json.frame_index;
+              const frameLabel =
+                typeof frameIndex === "number" ? `帧 ${frameIndex + 1}` : "—";
+              return (
+                <li
+                  key={job.id}
+                  className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-zinc-200/80 pb-1.5 last:border-0"
+                >
+                  <span className="font-medium text-zinc-800">{job.status}</span>
+                  <span className="text-zinc-500">
+                    {job.subject_id} · {frameLabel}
+                  </span>
+                  <span className="text-zinc-400">
+                    {new Date(job.created_at).toLocaleString()}
+                  </span>
+                  {job.error ? (
+                    <span className="w-full text-destructive">{job.error}</span>
+                  ) : null}
+                  {job.result_reference ? (
+                    <span className="w-full truncate text-zinc-600">
+                      result_reference（≠ Candidate）: {job.result_reference}
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
@@ -331,7 +465,7 @@ export function BatchFrameCompletion({
           {writing ? "写入中…" : `写入作品（${readyCount}）`}
         </Button>
         <p className="text-xs text-zinc-500">
-          Gate E：写入前必须人工确认；候选成功 ≠ 业务完成。
+          Gate E：写入前必须人工确认；候选成功 ≠ 业务完成。Job 列表不代替写入。
         </p>
       </div>
     </section>

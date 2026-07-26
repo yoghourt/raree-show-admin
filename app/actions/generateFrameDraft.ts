@@ -26,6 +26,9 @@ const inputSchema = z.object({
  * A4: Scene Frame draft via Capability Runtime `image.generate`.
  * Returns a hosted URL for ephemeral Media Admission Candidate only.
  * MUST NOT write Assets / story_images_v2.
+ *
+ * Migration compatibility only (SPIKE-IMG-003): prefer enqueueFrameDraftJobs +
+ * Local Worker. Do not add new product features on this synchronous path.
  */
 export async function generateFrameDraft(input: {
   caption: string

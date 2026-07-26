@@ -75,7 +75,11 @@ Strategic Default 候选：本机 [LocalAI](https://localai.io/) → OpenAI 兼�
 
 产品路径：Admin UI → Server Action → Capability `image.generate` → Execution `localai` → LocalAI → Cloudinary Candidate（**不写 Asset**，直至「写入作品」）。
 
-**范围：** 本机 `npm run dev` + 本机 LocalAI。Vercel **不会**打到 `127.0.0.1`；线上拓扑见后续「队列 + Local Worker」切片。
+**范围：** 本机 `npm run dev` + 本机 LocalAI。Vercel **不会**打到 `127.0.0.1`。
+
+**切片 1（已授权 SPIKE-IMG-003）：** 制作页「排队生成」写入 `generate_jobs`（Execution envelope）。  
+**切片 2：** Local Worker poll → `imageGenerate` → `result_reference`（尚未实现）。  
+同步「生成草稿」仅为迁移兼容，勿在其上加新功能。
 
 ### 操作者步骤（按序）
 
