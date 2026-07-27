@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   listGenerateJobsForWork,
+  parseHostedImageResultReference,
   type GenerateJobRow,
 } from "@/lib/generate-jobs";
 import {
@@ -397,7 +398,7 @@ export function BatchFrameCompletion({
             {enqueueBusy ? "排队中…" : `全部排队（${rows.length}）`}
           </Button>
           <p className="text-xs text-zinc-500">
-            入队后 status=queued；切片 2 Local Worker 才会写 result_reference。
+            入队后 status=queued；跑 Local Worker 后变为 succeeded + result_reference（≠ Candidate）。
           </p>
         </div>
       ) : null}
@@ -424,31 +425,54 @@ export function BatchFrameCompletion({
         {jobs.length === 0 && !jobsError ? (
           <p className="text-xs text-zinc-500">暂无任务。排队后出现于此。</p>
         ) : (
-          <ul className="max-h-48 space-y-1.5 overflow-y-auto text-xs">
+          <ul className="max-h-56 space-y-2 overflow-y-auto text-xs">
             {jobs.map((job) => {
               const frameIndex = job.input_json.frame_index;
               const frameLabel =
                 typeof frameIndex === "number" ? `帧 ${frameIndex + 1}` : "—";
+              const hosted =
+                job.status === "succeeded"
+                  ? parseHostedImageResultReference(job.result_reference)
+                  : null;
               return (
                 <li
                   key={job.id}
-                  className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-zinc-200/80 pb-1.5 last:border-0"
+                  className="flex flex-wrap items-start gap-x-2 gap-y-1 border-b border-zinc-200/80 pb-2 last:border-0"
                 >
-                  <span className="font-medium text-zinc-800">{job.status}</span>
-                  <span className="text-zinc-500">
-                    {job.subject_id} · {frameLabel}
-                  </span>
-                  <span className="text-zinc-400">
-                    {new Date(job.created_at).toLocaleString()}
-                  </span>
-                  {job.error ? (
-                    <span className="w-full text-destructive">{job.error}</span>
+                  {hosted?.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={hosted.url}
+                      alt=""
+                      className="h-12 w-20 shrink-0 rounded object-cover bg-zinc-100"
+                    />
                   ) : null}
-                  {job.result_reference ? (
-                    <span className="w-full truncate text-zinc-600">
-                      result_reference（≠ Candidate）: {job.result_reference}
-                    </span>
-                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="font-medium text-zinc-800">
+                        {job.status}
+                      </span>
+                      <span className="text-zinc-500">
+                        {job.subject_id} · {frameLabel}
+                      </span>
+                      <span className="text-zinc-400">
+                        {new Date(job.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    {job.error ? (
+                      <p className="text-destructive mt-0.5">{job.error}</p>
+                    ) : null}
+                    {hosted?.url ? (
+                      <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                        Execution 结果 ≠ Candidate ≠ Asset
+                        {hosted.usedFallback ? " · usedFallback" : ""}
+                      </p>
+                    ) : job.result_reference ? (
+                      <p className="mt-0.5 truncate text-zinc-600">
+                        result_reference: {job.result_reference}
+                      </p>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}

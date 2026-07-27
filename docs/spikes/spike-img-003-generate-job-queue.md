@@ -1,11 +1,11 @@
 # SPIKE-IMG-003 — Generate Job Queue (Execution Envelope)
 
-**Status:** Spike / Implementation Authorization **Granted** (scoped) · 2026-07-26  
+**Status:** Spike / Implementation Authorization **Granted** (scoped) · Slice 1 + Slice 2 · 2026-07-26 / 2026-07-27  
 **Production Authorization:** **Not** via ADR-010 amendment — this is Execution Runtime implementation, not an architectural decision  
 **Contract Freeze:** ADR-010 · SPEC-IMG-001 · SPEC-CPP-001 (Job queue remains Forbidden as CPP Runtime; allowed here as Execution ops envelope)  
-**Authority:** Architect Plan Review PASS (2026-07-26) · Execution Runtime slice 1  
+**Authority:** Architect Plan Review PASS (2026-07-26) · Execution Runtime slices 1–2  
 **Depends on:** ADR-010 A4 (Candidate ≠ Asset; Job ≠ CPP Progress) · Capability `image.generate` · SPIKE-AA-001 Media Admission  
-**Last Updated:** 2026-07-26
+**Last Updated:** 2026-07-27 (Local Worker slice 2)
 
 ---
 
@@ -62,11 +62,13 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 | Path / artifact | Purpose |
 | --------------- | ------- |
 | `docs/supabase/migrations/*generate_jobs*` | Table DDL (hand-run SQL editor) |
-| `lib/generate-jobs.ts` | Enqueue / list helpers |
+| `lib/generate-jobs/**` | Enqueue / claim / complete / execute helpers |
+| `lib/supabase-service.ts` | Worker-only service role client |
 | `app/actions/enqueueFrameDraftJobs.ts` | Admin enqueue Server Action |
-| `components/production/BatchFrameCompletion.tsx` | Queue UI + job list |
+| `components/production/BatchFrameCompletion.tsx` | Queue UI + job list / preview |
+| `scripts/local-generate-worker.ts` | Local Worker (slice 2) |
 | `docs/spikes/spike-img-003-*.md` | This authorization + Findings |
-| `scripts/README-local-image-server.md` | Point to Worker slice 2 |
+| `scripts/README-local-image-server.md` | Operator steps |
 
 ---
 
@@ -77,7 +79,7 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 * Auto Accept / writing `story_images_v2` / `portrait_url` from enqueue or job success  
 * CPP board treating Job success as Plan complete  
 * Expanding sync `generateFrameDraft` / MultiImageUploader sync path with new product features  
-* Local Worker daemon (slice 2) · Accept-from-job UI (slice 3) in this Spike’s Exit  
+* Accept-from-job UI (slice 3) in this Spike’s Exit for slice 2  
 
 ---
 
@@ -88,25 +90,30 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 3. List recent jobs; leave `result_reference` null until Worker.  
 4. Record Findings below after operator smoke.
 
+## How (slice 2)
+
+1. Worker uses `SUPABASE_SERVICE_ROLE_KEY` (scripts only).  
+2. `claimNextQueuedJob` → `executeImageGenerateJob` → Cloudinary → `completeGenerateJob` with opaque `result_reference` JSON.  
+3. Admin refreshes job list; optional hosted URL preview (Execution pointer ≠ Candidate).  
+4. No Asset write.
+
 ---
 
 ## Exit Criteria
 
-| ID | Criterion | Slice 1 |
-| -- | --------- | ------- |
-| EC-1 | Enqueue writes `queued` row without calling `imageGenerate` | Required |
-| EC-2 | No Asset write on enqueue | Required |
-| EC-3 | Job list visible for work | Required |
-| EC-4 | Sync generate path still works (compat) | Required |
-| EC-5 | Worker poll → `result_reference` | **Slice 2** |
+| ID | Criterion | Status |
+| -- | --------- | ------ |
+| EC-1 | Enqueue writes `queued` row without calling `imageGenerate` | Slice 1 Done |
+| EC-2 | No Asset write on enqueue | Slice 1 Done |
+| EC-3 | Job list visible for work | Slice 1 Done |
+| EC-4 | Sync generate path still works (compat) | Slice 1 Done |
+| EC-5 | Worker poll → `result_reference` | **Slice 2 Implemented** |
 | EC-6 | Accept UI consumes result → Candidate → Asset | **Slice 3** |
 
 ---
 
 ## Findings
 
-_(Fill after smoke.)_
-
 | Date | Note |
 | ---- | ---- |
-| | |
+| 2026-07-27 | Slice 2 implemented: `scripts/local-generate-worker.ts`, claim/complete/fail, `result_reference` = hosted_image JSON. Operator smoke: enqueue → worker drain → Admin refresh preview; Assets unchanged. |

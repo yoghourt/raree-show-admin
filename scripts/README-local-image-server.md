@@ -78,8 +78,40 @@ Strategic Default 候选：本机 [LocalAI](https://localai.io/) → OpenAI 兼�
 **范围：** 本机 `npm run dev` + 本机 LocalAI。Vercel **不会**打到 `127.0.0.1`。
 
 **切片 1（已授权 SPIKE-IMG-003）：** 制作页「排队生成」写入 `generate_jobs`（Execution envelope）。  
-**切片 2：** Local Worker poll → `imageGenerate` → `result_reference`（尚未实现）。  
+**切片 2（Local Worker）：** 本机 poll → `imageGenerate` → Cloudinary → `result_reference`（≠ Candidate ≠ Asset）。  
 同步「生成草稿」仅为迁移兼容，勿在其上加新功能。
+
+### Local Worker（切片 2）
+
+Pull-based：本机拉任务，**不**暴露 LocalAI 给 Vercel。
+
+1. `.env.local` 增加（**仅本机 Worker / scripts；勿提交、勿配到 Vercel**）：
+   ```bash
+   SUPABASE_SERVICE_ROLE_KEY=...   # Supabase project settings → service_role
+   ```
+   并保持 LocalAI / Cloudinary / `IMAGE_CREATOR_*` 与切片 0 一致。
+2. LocalAI 已启动且模型可用。
+3. Admin 制作页对空帧点 **排队生成**（`status=queued`）。
+4. 另开终端跑 Worker：
+   ```bash
+   # 处理当前全部 queued 后退出
+   npx tsx scripts/local-generate-worker.ts
+
+   # 只处理一条
+   npx tsx scripts/local-generate-worker.ts --once
+
+   # 常驻轮询（默认 5s）
+   WORKER_POLL_MS=5000 npx tsx scripts/local-generate-worker.ts --loop
+   ```
+5. Admin Job 列表点 **刷新**：期望 `succeeded` + `result_reference`（可预览图）。  
+   **未**点「写入作品」前 `story_images_v2` 不应变化。
+6. 日志关键字：`[local-generate-worker] claim` → `complete`；失败则为 `fail` + DB `status=failed`。
+
+| 现象 | 处理 |
+|------|------|
+| 缺 `SUPABASE_SERVICE_ROLE_KEY` | 写入 `.env.local` 后重跑脚本（不必重启 Next） |
+| 一直 `queued` | Worker 未跑；或 LocalAI/Cloudinary 失败看终端 |
+| `failed` + LocalAI timeout | 见下方 LocalAI 排查；可降 `IMAGE_CREATOR_LOCALAI_MAX_EDGE` |
 
 ### 操作者步骤（按序）
 
