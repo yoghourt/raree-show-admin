@@ -493,6 +493,7 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
               value={field.value}
               onChange={field.onChange}
               onUploadingChange={setUploadingImages}
+              routeTitle={titleStr}
             />
           )}
         />

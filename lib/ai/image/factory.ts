@@ -1,6 +1,7 @@
 import { createFalFluxProvider } from "./adapters/falFlux"
 import { createGeminiImageProvider } from "./adapters/gemini"
 import { createLocalHttpProvider } from "./adapters/localHttp"
+import { createOpenAiCompatibleImageProvider } from "./adapters/openAiCompatibleImages"
 import { createPollinationsProvider } from "./adapters/pollinations"
 import { createSiliconFlowProvider } from "./adapters/siliconflow"
 import type {
@@ -94,9 +95,18 @@ export function createImageGenerationProvider(
         skipNetwork: config.skipNetwork,
         costUsdEstPerImage: 0,
       })
+    case "localai":
+      return createOpenAiCompatibleImageProvider({
+        providerId: "localai",
+        baseUrl: config.localBaseUrl,
+        apiKey: config.localAiApiKey,
+        modelId: config.acceptModelId,
+        skipNetwork: config.skipNetwork,
+        costUsdEstPerImage: 0,
+      })
     default:
       throw new Error(
-        `Unknown image provider id "${providerId}". Known: pollinations, fal, gemini, siliconflow, local`
+        `Unknown image provider id "${providerId}". Known: pollinations, fal, gemini, siliconflow, local, localai`
       )
   }
 }

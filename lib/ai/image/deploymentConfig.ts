@@ -31,8 +31,12 @@ function sharedAdapterEnv(env: NodeJS.ProcessEnv): Omit<ImageAdapterEnv, "accept
  * - IMAGE_CREATOR_ACCEPT_FALLBACK (default: siliconflow)
  * - IMAGE_CREATOR_ACCEPT_MODEL
  * - IMAGE_CREATOR_FALLBACK_MODEL
- * - IMAGE_CREATOR_LOCAL_BASE (e.g. http://127.0.0.1:8191)
+ * - IMAGE_CREATOR_LOCAL_BASE / IMAGE_CREATOR_LOCALAI_BASE (e.g. http://127.0.0.1:8080)
+ * - IMAGE_CREATOR_LOCALAI_KEY (optional Bearer for LocalAI)
  * - shared keys: SILICONFLOW_API_KEY / FAL_KEY / GEMINI_API_KEY …
+ *
+ * Strategic Default execution host: set IMAGE_CREATOR_ACCEPT_PROVIDER=localai
+ * (keeps provider id `local` for legacy /v1/portraits servers).
  *
  * MUST NOT read IMAGE_SPIKE_* (spike isolation).
  */
@@ -51,9 +55,11 @@ export function loadCreatorImageDeploymentConfig(
       env.IMAGE_CREATOR_FALLBACK_MODEL ?? "black-forest-labs/FLUX.1-dev"
     ).trim(),
     localBaseUrl:
+      env.IMAGE_CREATOR_LOCALAI_BASE?.trim() ||
       env.IMAGE_CREATOR_LOCAL_BASE?.trim() ||
       env.IMAGE_LOCAL_BASE?.trim() ||
       undefined,
+    localAiApiKey: env.IMAGE_CREATOR_LOCALAI_KEY?.trim() || undefined,
     skipNetwork: false,
     ...sharedAdapterEnv(env),
   }

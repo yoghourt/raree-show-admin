@@ -2,7 +2,7 @@
 
 import { z } from "zod"
 
-import { generateImageCandidate } from "@/lib/ai/image"
+import { imageGenerate } from "@/lib/ai/capability"
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload"
 import { formatRequestError } from "@/lib/format-request-error"
 import { buildAvatarPrompt } from "@/lib/prompts/avatar"
@@ -49,7 +49,8 @@ export async function generateCharacterAvatar(
   const prompt = buildAvatarPrompt(name, description)
 
   try {
-    const portrait = await generateImageCandidate({
+    const candidate = await imageGenerate({
+      surface: "creator",
       assetSlot: "portrait",
       prompt,
       referenceImages: referencePortraitUrl
@@ -60,16 +61,14 @@ export async function generateCharacterAvatar(
     let url: string
     try {
       url = await uploadImageBufferToCloudinary(
-        portrait.bytes,
-        portrait.mimeType
+        candidate.bytes,
+        candidate.mimeType
       )
     } catch (uploadErr) {
       const uploadMsg = formatRequestError(uploadErr)
       console.warn("[generateCharacterAvatar] cloudinary upload failed", {
         characterTsid: characterTsid ?? null,
-        providerId: portrait.meta.providerId,
-        modelId: portrait.meta.modelId,
-        usedFallback: portrait.usedFallback,
+        usedFallback: candidate.usedFallback,
         uploadMsg,
       })
       return {
@@ -82,9 +81,7 @@ export async function generateCharacterAvatar(
       characterTsid: characterTsid ?? null,
       durationMs,
       cloudinaryOk: true,
-      providerId: portrait.meta.providerId,
-      modelId: portrait.meta.modelId,
-      usedFallback: portrait.usedFallback,
+      usedFallback: candidate.usedFallback,
     })
     return { ok: true, url }
   } catch (e) {
