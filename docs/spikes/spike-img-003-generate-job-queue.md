@@ -1,11 +1,11 @@
 # SPIKE-IMG-003 — Generate Job Queue (Execution Envelope)
 
-**Status:** Spike / Implementation Authorization **Granted** (scoped) · Slice 1 + Slice 2 · 2026-07-26 / 2026-07-27  
+**Status:** Spike / Implementation Authorization **Granted** (scoped) · Slices 1–3 · 2026-07-26 / 2026-07-27  
 **Production Authorization:** **Not** via ADR-010 amendment — this is Execution Runtime implementation, not an architectural decision  
 **Contract Freeze:** ADR-010 · SPEC-IMG-001 · SPEC-CPP-001 (Job queue remains Forbidden as CPP Runtime; allowed here as Execution ops envelope)  
-**Authority:** Architect Plan Review PASS (2026-07-26) · Execution Runtime slices 1–2  
+**Authority:** Architect Plan Review PASS (2026-07-26) · Execution Runtime slices 1–3  
 **Depends on:** ADR-010 A4 (Candidate ≠ Asset; Job ≠ CPP Progress) · Capability `image.generate` · SPIKE-AA-001 Media Admission  
-**Last Updated:** 2026-07-27 (Local Worker slice 2)
+**Last Updated:** 2026-07-27 (Accept UI slice 3)
 
 ---
 
@@ -76,10 +76,10 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 
 * ADR-010 / Architecture amendments claiming queue as Runtime Truth  
 * Storing `candidate_url` (or Candidate objects) on the job row  
-* Auto Accept / writing `story_images_v2` / `portrait_url` from enqueue or job success  
+* Auto Accept / writing `story_images_v2` / `portrait_url` from enqueue, Worker, or job success alone  
 * CPP board treating Job success as Plan complete  
 * Expanding sync `generateFrameDraft` / MultiImageUploader sync path with new product features  
-* Accept-from-job UI (slice 3) in this Spike’s Exit for slice 2  
+* New Accept-only CPP board / route (slice 3 stays on BatchFrameCompletion) 
 
 ---
 
@@ -99,6 +99,15 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 
 ---
 
+## How (slice 3)
+
+1. Admin admits `succeeded` job `result_reference.url` into ephemeral Candidate (PendingFill).  
+2. Human Accept via existing「写入作品」(`patchSceneFrameUrls`) or one-shot「Accept 并写入」。  
+3. Do **not** mutate Job status for Accept (Execution envelope ≠ Product Accept).  
+4. Re-queue creates a new job; old succeeded retained as history.
+
+---
+
 ## Exit Criteria
 
 | ID | Criterion | Status |
@@ -107,8 +116,8 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 | EC-2 | No Asset write on enqueue | Slice 1 Done |
 | EC-3 | Job list visible for work | Slice 1 Done |
 | EC-4 | Sync generate path still works (compat) | Slice 1 Done |
-| EC-5 | Worker poll → `result_reference` | **Slice 2 Implemented** |
-| EC-6 | Accept UI consumes result → Candidate → Asset | **Slice 3** |
+| EC-5 | Worker poll → `result_reference` | Slice 2 Done |
+| EC-6 | Accept UI consumes result → Candidate → Asset | **Slice 3 Implemented** |
 
 ---
 
@@ -117,3 +126,4 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 | Date | Note |
 | ---- | ---- |
 | 2026-07-27 | Slice 2 implemented: `scripts/local-generate-worker.ts`, claim/complete/fail, `result_reference` = hosted_image JSON. Operator smoke: enqueue → worker drain → Admin refresh preview; Assets unchanged. |
+| 2026-07-27 | Slice 3: BatchFrameCompletion admit-from-job / accept-and-write / requeue; Job table status unchanged on Accept; EC-6 closed. |

@@ -79,6 +79,7 @@ Strategic Default 候选：本机 [LocalAI](https://localai.io/) → OpenAI 兼�
 
 **切片 1（已授权 SPIKE-IMG-003）：** 制作页「排队生成」写入 `generate_jobs`（Execution envelope）。  
 **切片 2（Local Worker）：** 本机 poll → `imageGenerate` → Cloudinary → `result_reference`（≠ Candidate ≠ Asset）。  
+**切片 3（Accept）：** Job 列表「纳入候选」→「写入作品」/「Accept 并写入」→ `story_images_v2`。  
 同步「生成草稿」仅为迁移兼容，勿在其上加新功能。
 
 ### Local Worker（切片 2）
@@ -104,14 +105,25 @@ Pull-based：本机拉任务，**不**暴露 LocalAI 给 Vercel。
    WORKER_POLL_MS=5000 npx tsx scripts/local-generate-worker.ts --loop
    ```
 5. Admin Job 列表点 **刷新**：期望 `succeeded` + `result_reference`（可预览图）。  
-   **未**点「写入作品」前 `story_images_v2` 不应变化。
+   **未** Accept 前 `story_images_v2` 不应变化。
 6. 日志关键字：`[local-generate-worker] claim` → `complete`；失败则为 `fail` + DB `status=failed`。
+
+### Accept（切片 3）
+
+Job succeeded 之后，在制作页同一 Job 列表：
+
+1. **纳入候选**（单条）或 **全部纳入候选**：把 `result_reference.url` 填入待补帧候选（Candidate；DB Asset 仍不变）。
+2. **写入作品**：对已有候选的帧调用 `patchSceneFrameUrls`（Human Accept → Asset）。
+3. 或单条 **Accept 并写入**：纳入 + 立即写该帧。
+4. 不满意可 **重新排队**（新 job；旧 succeeded 保留历史）。
+5. 对应帧已有 Asset 时显示「已写入 Asset」（不改 Job 表 status）。
 
 | 现象 | 处理 |
 |------|------|
 | 缺 `SUPABASE_SERVICE_ROLE_KEY` | 写入 `.env.local` 后重跑脚本（不必重启 Next） |
 | 一直 `queued` | Worker 未跑；或 LocalAI/Cloudinary 失败看终端 |
 | `failed` + LocalAI timeout | 见下方 LocalAI 排查；可降 `IMAGE_CREATOR_LOCALAI_MAX_EDGE` |
+| 纳入候选后列表仍显示空帧 | 尚未点「写入作品」；Candidate ≠ Asset |
 
 ### 操作者步骤（按序）
 

@@ -10,6 +10,7 @@ import {
   listGenerateJobsForWork,
   parseHostedImageResultReference,
   type GenerateJobRow,
+  type HostedImageResultReference,
 } from "@/lib/generate-jobs";
 import {
   createMediaAdmissionProviders,
@@ -45,11 +46,35 @@ function rowKey(routeTsid: string, frameIndex: number): string {
   return `${routeTsid}:${frameIndex}`;
 }
 
+function jobFrameIndex(job: GenerateJobRow): number | null {
+  const raw = job.input_json.frame_index;
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 0
+    ? raw
+    : null;
+}
+
+function jobHosted(
+  job: GenerateJobRow
+): HostedImageResultReference | null {
+  if (job.status !== "succeeded") return null;
+  return parseHostedImageResultReference(job.result_reference);
+}
+
+function frameAssetUrl(
+  routes: ReadingRoute[],
+  sceneTsid: string,
+  frameIndex: number
+): string | null {
+  const route = routes.find((r) => r.tsid === sceneTsid);
+  const url = route?.story_images_v2?.[frameIndex]?.url;
+  return typeof url === "string" && url.trim() ? url.trim() : null;
+}
+
 /**
  * Batch frame URL fill via Media Admission.
  * Channels: upload / paste URL. Preferred generate: enqueue (SPIKE-IMG-003).
  * Sync「生成草稿」= migration compatibility only.
- * Provider/Generate success = candidate only. Write = Human Accept (Gate E).
+ * Slice 3: succeeded job → ephemeral Candidate → Human Accept → Asset.
  * Job / result_reference ≠ Candidate ≠ Asset.
  */
 export function BatchFrameCompletion({
@@ -64,6 +89,7 @@ export function BatchFrameCompletion({
   const [jobs, setJobs] = React.useState<GenerateJobRow[]>([]);
   const [jobsError, setJobsError] = React.useState<string | null>(null);
   const [enqueueBusy, setEnqueueBusy] = React.useState(false);
+  const [admitHint, setAdmitHint] = React.useState<string | null>(null);
 
   const refreshJobs = React.useCallback(async () => {
     try {
@@ -195,6 +221,145 @@ export function BatchFrameCompletion({
     }
   };
 
+  /** Slice 3: Execution result_reference → ephemeral Candidate (UI only). */
+  const admitJobAsCandidate = (
+    job: GenerateJobRow
+  ): { ok: true } | { ok: false; reason: string } => {
+    const hosted = jobHosted(job);
+    if (!hosted) {
+      return { ok: false, reason: "job 无可用 result_reference" };
+    }
+    if (job.subject_type !== "scene") {
+      return { ok: false, reason: "仅支持 subject_type=scene" };
+    }
+    const frameIndex = jobFrameIndex(job);
+    if (frameIndex === null) {
+      return { ok: false, reason: "input_json.frame_index 无效" };
+    }
+    if (frameAssetUrl(routes, job.subject_id, frameIndex)) {
+      return {
+        ok: false,
+        reason: `${job.subject_id} 帧 ${frameIndex + 1} 已有 Asset，已跳过`,
+      };
+    }
+    const key = rowKey(job.subject_id, frameIndex);
+    const pending = rows.find(
+      (r) => rowKey(r.routeTsid, r.frameIndex) === key
+    );
+    if (!pending) {
+      return {
+        ok: false,
+        reason: `找不到待补帧 ${job.subject_id} · 帧 ${frameIndex + 1}`,
+      };
+    }
+    patchRow(key, {
+      candidateUrl: hosted.url,
+      candidateLabel: "来自 Job result_reference",
+    });
+    return { ok: true };
+  };
+
+  const admitAllSucceeded = () => {
+    setWriteError(null);
+    let admitted = 0;
+    const skipped: string[] = [];
+    for (const job of jobs) {
+      if (job.status !== "succeeded" || !jobHosted(job)) continue;
+      const result = admitJobAsCandidate(job);
+      if (result.ok) admitted += 1;
+      else skipped.push(result.reason);
+    }
+    setAdmitHint(
+      admitted > 0
+        ? `已纳入候选 ${admitted} 条${skipped.length ? `；跳过 ${skipped.length}` : ""}。仍须「写入作品」才写 Asset。`
+        : skipped[0] ?? "没有可纳入的 succeeded job"
+    );
+  };
+
+  const acceptAndWriteJob = async (job: GenerateJobRow) => {
+    const hosted = jobHosted(job);
+    if (!hosted || job.subject_type !== "scene") {
+      setWriteError("无法 Accept：缺少 hosted result_reference");
+      return;
+    }
+    const frameIndex = jobFrameIndex(job);
+    if (frameIndex === null) {
+      setWriteError("无法 Accept：frame_index 无效");
+      return;
+    }
+    if (frameAssetUrl(routes, job.subject_id, frameIndex)) {
+      setWriteError("该帧已有 Asset，无需再写");
+      return;
+    }
+
+    setWriting(true);
+    setWriteError(null);
+    setAdmitHint(null);
+    const admit = admitJobAsCandidate(job);
+    if (!admit.ok) {
+      setWriting(false);
+      setWriteError(admit.reason);
+      return;
+    }
+    try {
+      await scenesApi.patchSceneFrameUrls(workId, job.subject_id, [
+        { frameIndex, url: hosted.url },
+      ]);
+      onWrote();
+      await refreshJobs();
+      setAdmitHint(
+        `已 Accept 并写入 ${job.subject_id} · 帧 ${frameIndex + 1}`
+      );
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWriting(false);
+    }
+  };
+
+  const requeueFromJob = async (job: GenerateJobRow) => {
+    if (job.subject_type !== "scene") return;
+    const frameIndex = jobFrameIndex(job);
+    if (frameIndex === null) return;
+    const caption =
+      typeof job.input_json.caption === "string"
+        ? job.input_json.caption.trim()
+        : "";
+    if (!caption) {
+      setWriteError("重新排队失败：job 无 caption");
+      return;
+    }
+    const routeTitle =
+      typeof job.input_json.route_title === "string"
+        ? job.input_json.route_title
+        : undefined;
+    setEnqueueBusy(true);
+    setWriteError(null);
+    try {
+      const result = await enqueueFrameDraftJobs({
+        workId,
+        frames: [
+          {
+            sceneTsid: job.subject_id,
+            frameIndex,
+            caption,
+            routeTitle,
+          },
+        ],
+      });
+      if (!result.ok) {
+        setWriteError(result.message);
+        return;
+      }
+      await refreshJobs();
+      setAdmitHint("已重新排队（新 job）；旧 succeeded 保留作历史");
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setEnqueueBusy(false);
+    }
+  };
+
   const writeToAssets = async () => {
     const ready = rows.filter((r) => r.candidateUrl);
     if (ready.length === 0) return;
@@ -214,6 +379,7 @@ export function BatchFrameCompletion({
         await scenesApi.patchSceneFrameUrls(workId, tsid, patches);
       }
       onWrote();
+      setAdmitHint(null);
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -221,7 +387,19 @@ export function BatchFrameCompletion({
     }
   };
 
-  if (incompleteCount === 0 && rows.length === 0) {
+  const succeededAdmittable = jobs.filter((job) => {
+    const hosted = jobHosted(job);
+    if (!hosted || job.subject_type !== "scene") return false;
+    const frameIndex = jobFrameIndex(job);
+    if (frameIndex === null) return false;
+    if (frameAssetUrl(routes, job.subject_id, frameIndex)) return false;
+    return rows.some(
+      (r) =>
+        r.routeTsid === job.subject_id && r.frameIndex === frameIndex
+    );
+  });
+
+  if (incompleteCount === 0 && rows.length === 0 && jobs.length === 0) {
     return null;
   }
 
@@ -239,10 +417,9 @@ export function BatchFrameCompletion({
           批量补齐画面图
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          优先「排队生成」（Execution Job；切片 2 Worker 出
-          result_reference）。上传 / 粘贴 URL / 同步生成草稿仅产生候选（Job ≠
-          Candidate ≠ Asset）。点击「写入作品」才 Human Accept。Job/候选成功 ≠
-          Production Plan 完成。
+          排队 → Worker → result_reference（Job）→「纳入候选」（Candidate）→
+          「写入作品」（Asset）。Job ≠ Candidate ≠ Asset。未 Accept 前不写
+          story_images_v2。
         </p>
       </div>
 
@@ -253,6 +430,12 @@ export function BatchFrameCompletion({
         >
           {writeError}
         </div>
+      ) : null}
+
+      {admitHint ? (
+        <p className="text-xs text-emerald-800" role="status">
+          {admitHint}
+        </p>
       ) : null}
 
       {rows.length === 0 ? (
@@ -398,7 +581,7 @@ export function BatchFrameCompletion({
             {enqueueBusy ? "排队中…" : `全部排队（${rows.length}）`}
           </Button>
           <p className="text-xs text-zinc-500">
-            入队后 status=queued；跑 Local Worker 后变为 succeeded + result_reference（≠ Candidate）。
+            入队后跑 Local Worker；succeeded 后在下方纳入候选再写入。
           </p>
         </div>
       ) : null}
@@ -406,15 +589,28 @@ export function BatchFrameCompletion({
       <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium text-zinc-900">Generate Jobs</h3>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={enqueueBusy}
-            onClick={() => void refreshJobs()}
-          >
-            刷新
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={
+                writing || enqueueBusy || succeededAdmittable.length === 0
+              }
+              onClick={() => admitAllSucceeded()}
+            >
+              全部纳入候选（{succeededAdmittable.length}）
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={enqueueBusy}
+              onClick={() => void refreshJobs()}
+            >
+              刷新
+            </Button>
+          </div>
         </div>
         {jobsError ? (
           <p className="text-destructive text-xs" role="alert">
@@ -425,15 +621,35 @@ export function BatchFrameCompletion({
         {jobs.length === 0 && !jobsError ? (
           <p className="text-xs text-zinc-500">暂无任务。排队后出现于此。</p>
         ) : (
-          <ul className="max-h-56 space-y-2 overflow-y-auto text-xs">
+          <ul className="max-h-72 space-y-2 overflow-y-auto text-xs">
             {jobs.map((job) => {
-              const frameIndex = job.input_json.frame_index;
+              const frameIndex = jobFrameIndex(job);
               const frameLabel =
-                typeof frameIndex === "number" ? `帧 ${frameIndex + 1}` : "—";
-              const hosted =
-                job.status === "succeeded"
-                  ? parseHostedImageResultReference(job.result_reference)
-                  : null;
+                frameIndex !== null ? `帧 ${frameIndex + 1}` : "—";
+              const hosted = jobHosted(job);
+              const alreadyWritten =
+                frameIndex !== null &&
+                job.subject_type === "scene" &&
+                Boolean(frameAssetUrl(routes, job.subject_id, frameIndex));
+              const canAdmit =
+                Boolean(hosted) &&
+                job.subject_type === "scene" &&
+                frameIndex !== null &&
+                !alreadyWritten &&
+                rows.some(
+                  (r) =>
+                    r.routeTsid === job.subject_id &&
+                    r.frameIndex === frameIndex
+                );
+              const pendingHasCandidate =
+                frameIndex !== null &&
+                rows.some(
+                  (r) =>
+                    r.routeTsid === job.subject_id &&
+                    r.frameIndex === frameIndex &&
+                    Boolean(r.candidateUrl)
+                );
+
               return (
                 <li
                   key={job.id}
@@ -447,7 +663,7 @@ export function BatchFrameCompletion({
                       className="h-12 w-20 shrink-0 rounded object-cover bg-zinc-100"
                     />
                   ) : null}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="font-medium text-zinc-800">
                         {job.status}
@@ -458,20 +674,74 @@ export function BatchFrameCompletion({
                       <span className="text-zinc-400">
                         {new Date(job.created_at).toLocaleString()}
                       </span>
+                      {alreadyWritten ? (
+                        <span className="text-emerald-700">已写入 Asset</span>
+                      ) : pendingHasCandidate && hosted ? (
+                        <span className="text-amber-700">已在候选</span>
+                      ) : null}
                     </div>
                     {job.error ? (
-                      <p className="text-destructive mt-0.5">{job.error}</p>
+                      <p className="text-destructive">{job.error}</p>
                     ) : null}
                     {hosted?.url ? (
-                      <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                      <p className="truncate text-[11px] text-zinc-500">
                         Execution 结果 ≠ Candidate ≠ Asset
                         {hosted.usedFallback ? " · usedFallback" : ""}
                       </p>
                     ) : job.result_reference ? (
-                      <p className="mt-0.5 truncate text-zinc-600">
+                      <p className="truncate text-zinc-600">
                         result_reference: {job.result_reference}
                       </p>
                     ) : null}
+                    <div className="flex flex-wrap gap-1.5">
+                      {canAdmit ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={writing || enqueueBusy}
+                            onClick={() => {
+                              setWriteError(null);
+                              const result = admitJobAsCandidate(job);
+                              if (!result.ok) {
+                                setWriteError(result.reason);
+                                return;
+                              }
+                              setAdmitHint(
+                                "已纳入候选；点下方「写入作品」才写 Asset"
+                              );
+                            }}
+                          >
+                            纳入候选
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={writing || enqueueBusy}
+                            onClick={() => void acceptAndWriteJob(job)}
+                          >
+                            Accept 并写入
+                          </Button>
+                        </>
+                      ) : null}
+                      {(job.status === "succeeded" ||
+                        job.status === "failed") &&
+                      job.subject_type === "scene" ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={writing || enqueueBusy}
+                          onClick={() => void requeueFromJob(job)}
+                        >
+                          重新排队
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </li>
               );
@@ -489,7 +759,8 @@ export function BatchFrameCompletion({
           {writing ? "写入中…" : `写入作品（${readyCount}）`}
         </Button>
         <p className="text-xs text-zinc-500">
-          Gate E：写入前必须人工确认；候选成功 ≠ 业务完成。Job 列表不代替写入。
+          Gate E：写入前必须人工确认。仅写入已纳入候选的帧；Job succeeded
+          本身不写 Asset。
         </p>
       </div>
     </section>
