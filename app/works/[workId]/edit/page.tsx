@@ -59,7 +59,7 @@ export default function EditWorkPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
+      <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
           <Link href="/works">← 返回列表</Link>
         </Button>
@@ -72,7 +72,7 @@ export default function EditWorkPage() {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
+      <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
           <Link href="/works">← 返回列表</Link>
         </Button>
@@ -88,7 +88,7 @@ export default function EditWorkPage() {
 
   if (!work) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
+      <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
         <Button variant="ghost" size="sm" className="-ml-2" asChild>
           <Link href="/works">← 返回列表</Link>
         </Button>
@@ -98,7 +98,7 @@ export default function EditWorkPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
+    <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
       <nav
         className="flex flex-wrap items-center gap-1 text-sm text-zinc-500"
         aria-label="面包屑"

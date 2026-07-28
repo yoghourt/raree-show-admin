@@ -9,6 +9,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { CopilotIcon } from "@/components/copilot/CopilotIcon";
+import { NarrativeRegenButton } from "@/components/copilot/NarrativeRegenButton";
 import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,9 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MapPicker } from "@/components/locations/MapPicker";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
 import { messages } from "@/lib/locale";
-import { getClassification } from "@/lib/ai/field-registry";
 import * as locationsApi from "@/lib/locations";
-import type { SuggestionItem } from "@/lib/ai/copilot-types";
 import type { Location } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -187,11 +186,12 @@ export function LocationForm(props: LocationFormProps) {
     copilot.batchRetry(watchedName);
   };
 
-  const handleRegen = (field: string) => {
-    copilot.narrativeRegen(
+  const handleRegen = (field: string, feedback?: string | null) => {
+    return copilot.narrativeRegen(
       field,
       String(form.getValues(field as keyof LocationFormValues) ?? ""),
-      watchedName
+      watchedName,
+      feedback
     );
   };
 
@@ -243,14 +243,6 @@ export function LocationForm(props: LocationFormProps) {
       <div className="space-y-2">
         <Label htmlFor="loc-region">地区</Label>
         <Input id="loc-region" {...form.register("region")} />
-        <LocationNarrativeRegen
-          field="region"
-          currentValue={String(form.watch("region") ?? "")}
-          pendingItem={copilot.pendingRegen["region"]}
-          onRegen={() => handleRegen("region")}
-          onAcceptRegen={() => handleAcceptRegen("region")}
-          onDismissRegen={() => copilot.dismissRegen("region")}
-        />
       </div>
 
       {/* ── Map coordinates (asset — excluded from Copilot, FC-03) ── */}
@@ -269,11 +261,12 @@ export function LocationForm(props: LocationFormProps) {
       <div className="space-y-2">
         <Label htmlFor="loc-description">描述</Label>
         <Textarea id="loc-description" {...form.register("description")} />
-        <LocationNarrativeRegen
+        <NarrativeRegenButton
           field="description"
           currentValue={String(form.watch("description") ?? "")}
+          entityType="location"
           pendingItem={copilot.pendingRegen["description"]}
-          onRegen={() => handleRegen("description")}
+          onRegen={(feedback) => handleRegen("description", feedback)}
           onAcceptRegen={() => handleAcceptRegen("description")}
           onDismissRegen={() => copilot.dismissRegen("description")}
         />
@@ -306,6 +299,10 @@ export function LocationForm(props: LocationFormProps) {
               onAcceptAll={handleAcceptAll}
               onBatchRetry={handleBatchRetry}
               onClose={copilot.closePanel}
+              isSuggesting={copilot.isSuggesting}
+              onRetryFailed={() => {
+                void copilot.triggerSuggest(form.getValues());
+              }}
             />
           </div>
         </SheetContent>
@@ -325,83 +322,5 @@ export function LocationForm(props: LocationFormProps) {
         </Button>
       </div>
     </form>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// LocationNarrativeRegen — Narrative Regenerate button (§9.5)
-// ---------------------------------------------------------------------------
-
-interface LocationNarrativeRegenProps {
-  field: string;
-  currentValue: string;
-  pendingItem: SuggestionItem | undefined;
-  onRegen: () => void;
-  onAcceptRegen: () => void;
-  onDismissRegen: () => void;
-}
-
-function LocationNarrativeRegen({
-  field,
-  currentValue,
-  pendingItem,
-  onRegen,
-  onAcceptRegen,
-  onDismissRegen,
-}: LocationNarrativeRegenProps) {
-  // AC-26: derived from registry — not from field name literal
-  const classification = getClassification("location", field);
-  if (classification !== "narrative") return null;
-  if (!currentValue?.trim()) return null;
-
-  if (pendingItem) {
-    return (
-      <div className="rounded-md border border-violet-200 bg-violet-50/60 dark:border-violet-800 dark:bg-violet-950/20 p-2.5 space-y-1.5">
-        <p className="text-xs text-muted-foreground font-medium">再生成建议：</p>
-        <p className="text-sm whitespace-pre-wrap">{pendingItem.value}</p>
-        <div className="flex items-center gap-2">
-          <Button type="button" size="sm" className="h-7 text-xs" onClick={onAcceptRegen}>
-            接受并覆写
-          </Button>
-          <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={onDismissRegen}>
-            忽略
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="ghost"
-      className="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
-      onClick={onRegen}
-    >
-      <RegenIcon />
-      再生成
-    </Button>
-  );
-}
-
-function RegenIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="mr-1 h-3 w-3"
-      aria-hidden="true"
-    >
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M8 16H3v5" />
-    </svg>
   );
 }

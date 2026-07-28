@@ -7,6 +7,7 @@ import type {
   EvidenceDiagnostic,
   EvidenceItem,
 } from "@/lib/ai/evidence-types";
+import { ensureUndiciProxyDispatcherForGemini } from "@/lib/ai/undici-proxy-bootstrap";
 
 const CONNECTOR_ID = "awoiaf";
 const TIMEOUT_MS = 12_000;
@@ -16,6 +17,33 @@ const USER_AGENT =
 
 function articleTitle(scopeFieldValue: string): string {
   return scopeFieldValue.trim().replace(/ /g, "_");
+}
+
+/**
+ * Honorifics often appear in form Scope values ("Ser Waymar Royce") but AWOIAF
+ * article titles omit them ("Waymar_Royce").
+ */
+export function wikiTitleCandidates(scopeFieldValue: string): string[] {
+  const raw = scopeFieldValue.trim().replace(/\s+/g, " ");
+  if (!raw) return [];
+
+  const stripped = raw
+    .replace(
+      /^(Ser|Sir|Lord|Lady|King|Queen|Prince|Princess|Maester|Septon|Septa)\s+/i,
+      ""
+    )
+    .trim();
+
+  const ordered = [stripped, raw].filter((t) => t.length > 0);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of ordered) {
+    const key = articleTitle(t);
+    if (seen.has(key.toLowerCase())) continue;
+    seen.add(key.toLowerCase());
+    out.push(key);
+  }
+  return out;
 }
 
 function isCloudflareChallenge(body: string): boolean {
@@ -41,6 +69,17 @@ export function extractInfoboxWikitextExcerpt(wikitext: string): string {
     return wikitext.slice(0, 4000).trim();
   }
   return wikitext.slice(start, start + 8000).trim();
+}
+
+/**
+ * Broader page slice for SC-02 narrative grounding (infobox + lead prose).
+ * Fact extractors still work because they regex the same excerpt.
+ */
+export function extractEntityContextExcerpt(wikitext: string): string {
+  const cleaned = wikitext.replace(/<!--[\s\S]*?-->/g, "");
+  const start = cleaned.search(/\{\{Infobox/i);
+  const from = start === -1 ? 0 : start;
+  return cleaned.slice(from, from + 7000).trim();
 }
 
 type MwRevision = {
@@ -206,62 +245,92 @@ async function resolveAwoiafPage(
 export async function liveAwoiafRetrieve(
   input: ConnectorRetrieveInput
 ): Promise<{ items: EvidenceItem[]; diagnostics: EvidenceDiagnostic[] }> {
+  ensureUndiciProxyDispatcherForGemini();
+
   const diagnostics: EvidenceDiagnostic[] = [];
-  const title = articleTitle(input.scopeFieldValue);
+  const titles = wikiTitleCandidates(input.scopeFieldValue);
   const base = input.baseUrl.replace(/\/$/, "");
-  const pageUrl = `${base}/index.php/${encodeURIComponent(title)}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const resolved = await resolveAwoiafPage(base, title, controller.signal);
-    if ("error" in resolved) {
-      diagnostics.push(resolved.error);
-      if (process.env.SOURCE_CONNECTOR_DEBUG === "1") {
-        console.warn("[awoiaf]", resolved.error.message);
+    let lastError: EvidenceDiagnostic | null = null;
+
+    for (const title of titles) {
+      const pageUrl = `${base}/index.php/${encodeURIComponent(title)}`;
+      const resolved = await resolveAwoiafPage(base, title, controller.signal);
+      if ("error" in resolved) {
+        lastError = resolved.error;
+        // Hard transport failures: do not burn remaining titles
+        if (
+          resolved.error.code === "UNAVAILABLE" ||
+          resolved.error.code === "TIMEOUT" ||
+          resolved.error.code === "RATE_LIMITED"
+        ) {
+          diagnostics.push(resolved.error);
+          if (process.env.SOURCE_CONNECTOR_DEBUG === "1") {
+            console.warn("[awoiaf]", resolved.error.message);
+          }
+          return { items: [], diagnostics };
+        }
+        continue;
       }
-      return { items: [], diagnostics };
+
+      const { page, wikitext } = resolved;
+
+      if (page.title?.toLowerCase().includes("disambiguation")) {
+        lastError = {
+          connectorId: CONNECTOR_ID,
+          code: "NO_MATCH",
+          message: "Disambiguation page rejected",
+        };
+        continue;
+      }
+
+      const excerpt = extractEntityContextExcerpt(wikitext);
+      const url = page.fullurl ?? pageUrl;
+
+      const item: EvidenceItem = {
+        tier: 1,
+        connectorId: CONNECTOR_ID,
+        sourceRef: {
+          tier: 1,
+          label: input.profile.displayName
+            ? `${input.profile.displayName} — AWOIAF`
+            : "A Wiki of Ice and Fire",
+          url,
+          excerpt: excerpt.slice(0, 2000),
+        },
+        excerpt: excerpt.slice(0, 6000),
+        retrievedAt: new Date().toISOString(),
+        matchConfidence: "high",
+      };
+
+      if (process.env.SOURCE_CONNECTOR_DEBUG === "1") {
+        console.info("[awoiaf] matched", {
+          requested: input.scopeFieldValue,
+          title: page.title,
+          excerptLen: excerpt.length,
+        });
+      }
+
+      return { items: [item], diagnostics };
     }
 
-    const { page, wikitext } = resolved;
-
-    if (page.title?.toLowerCase().includes("disambiguation")) {
+    if (lastError) {
+      diagnostics.push(lastError);
+    } else {
       diagnostics.push({
         connectorId: CONNECTOR_ID,
         code: "NO_MATCH",
-        message: "Disambiguation page rejected",
-      });
-      return { items: [], diagnostics };
-    }
-
-    const excerpt = extractInfoboxWikitextExcerpt(wikitext);
-    const url = page.fullurl ?? pageUrl;
-
-    const item: EvidenceItem = {
-      tier: 1,
-      connectorId: CONNECTOR_ID,
-      sourceRef: {
-        tier: 1,
-        label: input.profile.displayName
-          ? `${input.profile.displayName} — AWOIAF`
-          : "A Wiki of Ice and Fire",
-        url,
-        excerpt: excerpt.slice(0, 2000),
-      },
-      excerpt: excerpt.slice(0, 4000),
-      retrievedAt: new Date().toISOString(),
-      matchConfidence: "high",
-    };
-
-    if (process.env.SOURCE_CONNECTOR_DEBUG === "1") {
-      console.info("[awoiaf] matched", {
-        title: page.title,
-        excerptLen: excerpt.length,
+        message: `No AWOIAF article for "${input.scopeFieldValue}"`,
       });
     }
-
-    return { items: [item], diagnostics };
+    if (process.env.SOURCE_CONNECTOR_DEBUG === "1" && lastError) {
+      console.warn("[awoiaf]", lastError.message);
+    }
+    return { items: [], diagnostics };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     diagnostics.push({

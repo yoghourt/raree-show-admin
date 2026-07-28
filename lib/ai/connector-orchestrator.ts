@@ -103,3 +103,90 @@ export async function queryEvidenceBundle(
     diagnostics,
   };
 }
+
+/**
+ * SC-02 narrative grounding — retrieve entity-level evidence without
+ * `applicableFields` filter (bindings are fact-route only; page evidence
+ * still grounds narrative drafts).
+ */
+export async function queryNarrativeContextBundle(input: {
+  workId: string;
+  entityType: EntityType;
+  scopeFieldValue: string;
+  sourceContext: WorkSourceContext | null;
+}): Promise<EvidenceBundle> {
+  const { workId, entityType, scopeFieldValue, sourceContext } = input;
+  const requestId = randomUUID();
+
+  const emptyBundle = (): EvidenceBundle => ({
+    requestId,
+    workId,
+    entityType,
+    scopeFieldValue,
+    field: "_narrative_context",
+    matched: false,
+    tier: 3,
+    evidenceItems: [],
+    diagnostics: [],
+  });
+
+  if (!sourceContext) {
+    return emptyBundle();
+  }
+
+  const evidenceItems: EvidenceBundle["evidenceItems"] = [];
+  const diagnostics: EvidenceBundle["diagnostics"] = [];
+  const seenConnectors = new Set<string>();
+
+  for (const binding of sourceContext.tier1Bindings) {
+    if (binding.status !== "approved") continue;
+    if (seenConnectors.has(binding.connectorId)) continue;
+    seenConnectors.add(binding.connectorId);
+
+    const result = await retrieveConnectorEvidence({
+      entityType,
+      scopeFieldValue,
+      profile: sourceContext.profile,
+      connectorId: binding.connectorId,
+      baseUrl: binding.baseUrl,
+    });
+    evidenceItems.push(...result.items);
+    diagnostics.push(...result.diagnostics);
+  }
+
+  if (sourceContext.profile.tier2Enabled) {
+    for (const connectorId of TIER2_CONNECTOR_IDS) {
+      if (seenConnectors.has(connectorId)) continue;
+      seenConnectors.add(connectorId);
+
+      const result = await retrieveConnectorEvidence({
+        entityType,
+        scopeFieldValue,
+        profile: sourceContext.profile,
+        connectorId,
+        baseUrl: "https://en.wikipedia.org",
+      });
+      evidenceItems.push(...result.items);
+      diagnostics.push(...result.diagnostics);
+    }
+  }
+
+  if (evidenceItems.length === 0) {
+    return {
+      ...emptyBundle(),
+      diagnostics,
+    };
+  }
+
+  return {
+    requestId,
+    workId,
+    entityType,
+    scopeFieldValue,
+    field: "_narrative_context",
+    matched: true,
+    tier: aggregateTier(evidenceItems),
+    evidenceItems,
+    diagnostics,
+  };
+}

@@ -53,7 +53,7 @@ export function mockRetrieveEvidence(
 
   const excerpt =
     input.connectorId === "awoiaf"
-      ? `| House | Stark |\n| Allegiance | House Stark |\n| Title | Lady |\n| Name | ${input.scopeFieldValue} |`
+      ? `| House | Stark |\n| Allegiance | House Stark |\n| Title | Lady |\n| Name | ${input.scopeFieldValue} |\n\n'''${input.scopeFieldValue}''' is documented in the franchise wiki. Use only the facts present in this excerpt when drafting narrative fields; do not invent battles, titles, or allegiances absent here.`
       : `Infobox excerpt for ${input.scopeFieldValue}. House: Stark. Region: The North.`;
 
   const item: EvidenceItem = {

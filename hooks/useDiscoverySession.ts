@@ -45,6 +45,7 @@ import type {
   SceneCandidateFields,
   StoryCandidateFields,
 } from "@/lib/discovery/propose-types";
+import { discoveryComposerUi } from "@/lib/discovery/ui-copy";
 import type {
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
@@ -107,6 +108,15 @@ export type { ProposeError };
 export interface RegenError {
   code: string;
   message: string;
+}
+
+function withOperatorFacingMessage<T extends { code: string; message: string }>(
+  error: T
+): T {
+  if (error.code === "NARRATIVE_NOT_LOCKED") {
+    return { ...error, message: discoveryComposerUi.narrativeLockLost };
+  }
+  return error;
 }
 
 export interface UseDiscoverySessionReturn {
@@ -538,7 +548,7 @@ export function useDiscoverySession(
     if (!session.lockedAt) {
       setProposeError({
         code: "NARRATIVE_NOT_LOCKED",
-        message: "Narrative must be locked before propose",
+        message: discoveryComposerUi.narrativeLockLost,
       });
       return false;
     }
@@ -567,10 +577,12 @@ export function useDiscoverySession(
 
       if (!res.ok) {
         setProposeError(
-          body.error ?? {
-            code: "PROPOSE_FAILED",
-            message: `Propose failed (HTTP ${res.status})`,
-          }
+          withOperatorFacingMessage(
+            body.error ?? {
+              code: "PROPOSE_FAILED",
+              message: `Propose failed (HTTP ${res.status})`,
+            }
+          )
         );
         setSession((prev) => ({
           ...prev,
@@ -872,10 +884,12 @@ export function useDiscoverySession(
 
         if (!res.ok || !body.candidate) {
           setRegenError(
-            body.error ?? {
-              code: "REGEN_FAILED",
-              message: `Regen failed (HTTP ${res.status})`,
-            }
+            withOperatorFacingMessage(
+              body.error ?? {
+                code: "REGEN_FAILED",
+                message: `Regen failed (HTTP ${res.status})`,
+              }
+            )
           );
           return false;
         }
@@ -979,11 +993,13 @@ export function useDiscoverySession(
         };
 
         if (!res.ok) {
-          setRetryTypeError({
-            code: body.error?.code ?? "TYPE_RETRY_FAILED",
-            message:
-              body.error?.message ?? `Type retry failed (HTTP ${res.status})`,
-          });
+          setRetryTypeError(
+            withOperatorFacingMessage({
+              code: body.error?.code ?? "TYPE_RETRY_FAILED",
+              message:
+                body.error?.message ?? `Type retry failed (HTTP ${res.status})`,
+            })
+          );
           return false;
         }
 

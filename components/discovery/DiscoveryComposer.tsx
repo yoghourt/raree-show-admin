@@ -39,7 +39,10 @@ import {
   DISCOVERY_FORBIDDEN_INPUTS,
   DISCOVERY_NARRATIVE_HINT,
 } from "@/lib/discovery/normative-copy";
-import { discoveryComposerUi } from "@/lib/discovery/ui-copy";
+import {
+  discoveryApiErrorText,
+  discoveryComposerUi,
+} from "@/lib/discovery/ui-copy";
 import type { UseDiscoverySessionReturn } from "@/hooks/useDiscoverySession";
 import type { UseRolloutReturn } from "@/hooks/useRollout";
 import { DiscoveryReviewPanel } from "@/components/discovery/DiscoveryReviewPanel";
@@ -393,7 +396,7 @@ export function DiscoveryComposer({
               className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
               role="alert"
             >
-              {proposeError.code}: {proposeError.message}
+              {discoveryApiErrorText(proposeError)}
               {proposeError.errors?.length ? (
                 <ul className="mt-2 list-disc pl-5">
                   {proposeError.errors.map((err) => (

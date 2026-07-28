@@ -7,6 +7,8 @@ import type {
   EvidenceDiagnostic,
   EvidenceItem,
 } from "@/lib/ai/evidence-types";
+import { wikiTitleCandidates } from "@/lib/ai/connectors/awoiaf-connector";
+import { ensureUndiciProxyDispatcherForGemini } from "@/lib/ai/undici-proxy-bootstrap";
 
 const CONNECTOR_ID = "wikipedia-en";
 const API_URL = "https://en.wikipedia.org/w/api.php";
@@ -64,16 +66,23 @@ function titleCandidates(
   searchTerm: string,
   context: string | null | undefined
 ): string[] {
-  const candidates = [searchTerm];
+  const baseTitles = wikiTitleCandidates(searchTerm).map((t) =>
+    t.replace(/_/g, " ")
+  );
+  const candidates = [...baseTitles];
   if (context) {
-    candidates.push(`${searchTerm} ${context}`);
+    for (const t of baseTitles) {
+      candidates.push(`${t} ${context}`);
+    }
   }
-  return candidates;
+  return [...new Set(candidates)];
 }
 
 export async function liveWikipediaRetrieve(
   input: ConnectorRetrieveInput
 ): Promise<{ items: EvidenceItem[]; diagnostics: EvidenceDiagnostic[] }> {
+  ensureUndiciProxyDispatcherForGemini();
+
   const diagnostics: EvidenceDiagnostic[] = [];
   const searchTerm = input.scopeFieldValue.trim();
   const context = input.profile.wikipediaSearchContext?.trim();

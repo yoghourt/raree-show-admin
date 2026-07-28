@@ -67,6 +67,7 @@ import {
   REVIEW_STATUS_LABELS,
   candidateFieldLabel,
   discoveryComposerUi,
+  discoveryApiErrorText,
   discoveryReviewUi,
 } from "@/lib/discovery/ui-copy";
 
@@ -745,19 +746,27 @@ export function DiscoveryReviewPanel({
           {/* Errors */}
           {regenError ? (
             <div
-              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              className={
+                regenError.code === "NARRATIVE_NOT_LOCKED"
+                  ? "rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                  : "rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              }
               role="alert"
             >
-              {regenError.code}: {regenError.message}
+              {discoveryApiErrorText(regenError)}
             </div>
           ) : null}
 
           {retryTypeError ? (
             <div
-              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              className={
+                retryTypeError.code === "NARRATIVE_NOT_LOCKED"
+                  ? "rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                  : "rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              }
               role="alert"
             >
-              {retryTypeError.code}: {retryTypeError.message}
+              {discoveryApiErrorText(retryTypeError)}
             </div>
           ) : null}
 

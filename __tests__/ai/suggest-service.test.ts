@@ -141,6 +141,63 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
 
     expect(items[0].classification).toBe("narrative");
     expect(items[0].confidence).toBe("yellow");
+    expect(items[0].sources).toEqual([]);
+  });
+
+  it("narrative with sourceContext: grounds on connector evidence and attaches sources", async () => {
+    mockFetch.mockResolvedValue(
+      makeFakeGeminiResponse(
+        "A documented character of House Stark per the franchise wiki."
+      )
+    );
+
+    const { items } = await generateSuggestions({
+      workId: "work-1",
+      entityType: "character",
+      entityId: "new",
+      scopeField: "Arya Stark",
+      workTitle: "A Song of Ice and Fire",
+      sourceContext: asoiafContext,
+      emptyFields: [{ field: "description", copilot_route: "narrative" }],
+    });
+
+    expect(items).toHaveLength(1);
+    expect(items[0].classification).toBe("narrative");
+    expect(items[0].confidence).toBe("yellow");
+    expect(items[0].sources.length).toBeGreaterThan(0);
+    expect(items[0].sources.some((s) => s.tier === 1 || s.tier === 2)).toBe(
+      true
+    );
+  });
+
+  it("public franchise without evidence refuses ungrounded narrative (no LLM invent)", async () => {
+    process.env.MOCK_AWOIAF_TIER = "none";
+    process.env.MOCK_WIKIPEDIA_EN_TIER = "none";
+
+    const { items, errors } = await generateRetrySuggestions(
+      [
+        {
+          field: "description",
+          previousSuggestion: "old bio",
+          feedback: null,
+        },
+      ],
+      {
+        entityType: "character",
+        scopeFieldValue: "Ser Waymar Royce",
+        workId: "work-1",
+        workTitle: "A Song of Ice and Fire",
+        sourceContext: asoiafContext,
+      }
+    );
+
+    expect(items).toHaveLength(0);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].code).toBe("SOURCE_UNAVAILABLE");
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    delete process.env.MOCK_AWOIAF_TIER;
+    delete process.env.MOCK_WIKIPEDIA_EN_TIER;
   });
 
   it("Option B batch: fact connector-first, then narrative batch LLM", async () => {
@@ -226,6 +283,9 @@ describe("generateRetrySuggestions — Option B retry", () => {
     const house = items.find((i) => i.field === "house");
     expect(house?.classification).toBe("fact");
     expect(house?.confidence).toBe("green");
+    const description = items.find((i) => i.field === "description");
+    expect(description?.classification).toBe("narrative");
+    expect(description?.sources.length).toBeGreaterThan(0);
   });
 
   it("retry without sourceContext: SC-03 narrative path", async () => {

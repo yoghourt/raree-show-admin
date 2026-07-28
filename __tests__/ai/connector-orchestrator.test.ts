@@ -3,7 +3,10 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { queryEvidenceBundle } from "@/lib/ai/connector-orchestrator";
+import {
+  queryEvidenceBundle,
+  queryNarrativeContextBundle,
+} from "@/lib/ai/connector-orchestrator";
 import type { WorkSourceContext } from "@/lib/ai/evidence-types";
 
 process.env.SOURCE_CONNECTOR_MODE = "mock";
@@ -109,6 +112,40 @@ describe("queryEvidenceBundle", () => {
       scopeFieldValue: "Arya Stark",
       field: "house",
       sourceContext: ctx,
+    });
+
+    expect(bundle.matched).toBe(false);
+    expect(bundle.evidenceItems).toEqual([]);
+  });
+});
+
+describe("queryNarrativeContextBundle", () => {
+  beforeEach(() => {
+    delete process.env.MOCK_AWOIAF_TIER;
+    delete process.env.MOCK_WIKIPEDIA_EN_TIER;
+  });
+
+  it("retrieves Tier-1 page evidence even when field is narrative-only", async () => {
+    const bundle = await queryNarrativeContextBundle({
+      workId: "work-1",
+      entityType: "character",
+      scopeFieldValue: "Waymar Royce",
+      sourceContext: asoiafContext,
+    });
+
+    expect(bundle.matched).toBe(true);
+    expect(bundle.field).toBe("_narrative_context");
+    expect(bundle.evidenceItems.some((i) => i.connectorId === "awoiaf")).toBe(
+      true
+    );
+  });
+
+  it("returns unmatched when no sourceContext", async () => {
+    const bundle = await queryNarrativeContextBundle({
+      workId: "work-1",
+      entityType: "character",
+      scopeFieldValue: "Waymar Royce",
+      sourceContext: null,
     });
 
     expect(bundle.matched).toBe(false);
