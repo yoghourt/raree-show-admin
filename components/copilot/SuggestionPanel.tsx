@@ -65,6 +65,13 @@ interface SuggestionPanelProps {
   onAcceptAll: () => void;
   onBatchRetry: () => void;
   onClose: () => void;
+  /**
+   * Re-run suggest for provider/parse failures when the panel has errors only
+   * (SPEC-D2-002 §13 — PROVIDER_ERROR → operator re-triggers).
+   */
+  onRetryFailed?: () => void;
+  /** True while initial /suggest is in flight (retry-failed button). */
+  isSuggesting?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,9 +237,14 @@ export function SuggestionPanel({
   onAcceptAll,
   onBatchRetry,
   onClose,
+  onRetryFailed,
+  isSuggesting = false,
 }: SuggestionPanelProps) {
   const hasWork =
     suggestions.length > 0 || retryQueue.length > 0 || suggestErrors.length > 0;
+  const canRetryFailed =
+    Boolean(onRetryFailed) &&
+    suggestErrors.some((err) => err.field !== "_session");
 
   if (!hasWork) {
     return (
@@ -270,15 +282,30 @@ export function SuggestionPanel({
             ))}
           </ul>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-7 text-xs"
-          onClick={onClose}
-        >
-          关闭
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {canRetryFailed ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              disabled={isSuggesting}
+              onClick={onRetryFailed}
+            >
+              {isSuggesting ? messages.copilot.loadingSuggest : messages.copilot.retry}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs"
+            disabled={isSuggesting}
+            onClick={onClose}
+          >
+            关闭
+          </Button>
+        </div>
       </div>
     );
   }

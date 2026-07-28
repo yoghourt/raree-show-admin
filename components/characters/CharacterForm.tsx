@@ -13,6 +13,7 @@ import {
   type GenerateCharacterAvatarState,
 } from "@/app/actions/generateCharacterAvatar";
 import { CopilotIcon } from "@/components/copilot/CopilotIcon";
+import { NarrativeRegenButton } from "@/components/copilot/NarrativeRegenButton";
 import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
 import {
   Sheet,
@@ -28,7 +29,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
 import { messages } from "@/lib/locale";
 import * as charactersApi from "@/lib/characters";
-import { getClassification } from "@/lib/ai/field-registry";
 import type { Character } from "@/lib/types";
 
 const PORTRAIT_PLACEHOLDER = "https://placehold.co/400x400/e5e7eb/6b7280?text=No+Portrait";
@@ -250,8 +250,12 @@ export function CharacterForm(props: CharacterFormProps) {
 
   // ── Narrative Regenerate helper (§9.5) ─────────────────────────────────────
 
-  const handleRegen = (field: string, currentValue: string) => {
-    copilot.narrativeRegen(field, currentValue, watchedName);
+  const handleRegen = (
+    field: string,
+    currentValue: string,
+    feedback?: string | null
+  ) => {
+    return copilot.narrativeRegen(field, currentValue, watchedName, feedback);
   };
 
   const handleAcceptRegen = (field: string) => {
@@ -304,15 +308,6 @@ export function CharacterForm(props: CharacterFormProps) {
       <div className="space-y-2">
         <Label htmlFor="char-house">家族</Label>
         <Input id="char-house" {...form.register("house")} />
-        <NarrativeRegenButton
-          field="house"
-          currentValue={watchedDescription}
-          entityType="character"
-          pendingItem={copilot.pendingRegen["house"]}
-          onRegen={() => handleRegen("house", form.getValues("house"))}
-          onAcceptRegen={() => handleAcceptRegen("house")}
-          onDismissRegen={() => copilot.dismissRegen("house")}
-        />
       </div>
 
       {/* ── Description (narrative) ── */}
@@ -324,7 +319,9 @@ export function CharacterForm(props: CharacterFormProps) {
           currentValue={form.watch("description")}
           entityType="character"
           pendingItem={copilot.pendingRegen["description"]}
-          onRegen={() => handleRegen("description", form.getValues("description"))}
+          onRegen={(feedback) =>
+            handleRegen("description", form.getValues("description"), feedback)
+          }
           onAcceptRegen={() => handleAcceptRegen("description")}
           onDismissRegen={() => copilot.dismissRegen("description")}
         />
@@ -346,7 +343,13 @@ export function CharacterForm(props: CharacterFormProps) {
           currentValue={form.watch("signatureQuote") ?? ""}
           entityType="character"
           pendingItem={copilot.pendingRegen["signatureQuote"]}
-          onRegen={() => handleRegen("signatureQuote", form.getValues("signatureQuote") ?? "")}
+          onRegen={(feedback) =>
+            handleRegen(
+              "signatureQuote",
+              form.getValues("signatureQuote") ?? "",
+              feedback
+            )
+          }
           onAcceptRegen={() => handleAcceptRegen("signatureQuote")}
           onDismissRegen={() => copilot.dismissRegen("signatureQuote")}
         />
@@ -457,6 +460,10 @@ export function CharacterForm(props: CharacterFormProps) {
               onAcceptAll={handleAcceptAll}
               onBatchRetry={handleBatchRetry}
               onClose={copilot.closePanel}
+              isSuggesting={copilot.isSuggesting}
+              onRetryFailed={() => {
+                void copilot.triggerSuggest(form.getValues());
+              }}
             />
           </div>
         </SheetContent>
@@ -481,102 +488,5 @@ export function CharacterForm(props: CharacterFormProps) {
         </Button>
       </div>
     </form>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// NarrativeRegenButton — Phase 2 (§9.5)
-//
-// Renders a Regenerate button ONLY if classification === "narrative".
-// Button visibility is derived from FIELD_REGISTRY — no field name literals
-// in the eligibility condition (AC-26, MD-01).
-// ---------------------------------------------------------------------------
-
-interface NarrativeRegenButtonProps {
-  field: string;
-  currentValue: string;
-  entityType: "character" | "location" | "scene";
-  pendingItem: import("@/lib/ai/copilot-types").SuggestionItem | undefined;
-  onRegen: () => void;
-  onAcceptRegen: () => void;
-  onDismissRegen: () => void;
-}
-
-function NarrativeRegenButton({
-  field,
-  currentValue,
-  entityType,
-  pendingItem,
-  onRegen,
-  onAcceptRegen,
-  onDismissRegen,
-}: NarrativeRegenButtonProps) {
-  // AC-26: classification derived from registry — no field name literals in condition
-  const classification = getClassification(entityType, field);
-
-  // Regenerate only available on narrative-classified fields with existing content (§9.5)
-  if (classification !== "narrative") return null;
-  if (!currentValue?.trim()) return null;
-
-  if (pendingItem) {
-    return (
-      <div className="rounded-md border border-violet-200 bg-violet-50/60 dark:border-violet-800 dark:bg-violet-950/20 p-2.5 space-y-1.5">
-        <p className="text-xs text-muted-foreground font-medium">再生成建议：</p>
-        <p className="text-sm whitespace-pre-wrap">{pendingItem.value}</p>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={onAcceptRegen}
-          >
-            接受并覆写
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 text-xs"
-            onClick={onDismissRegen}
-          >
-            忽略
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="ghost"
-      className="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
-      onClick={onRegen}
-    >
-      <RegenIcon />
-      再生成
-    </Button>
-  );
-}
-
-function RegenIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="mr-1 h-3 w-3"
-      aria-hidden="true"
-    >
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M8 16H3v5" />
-    </svg>
   );
 }

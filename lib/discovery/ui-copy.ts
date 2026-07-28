@@ -56,3 +56,14 @@ export const discoveryComposerUi = {
   ...d.composer,
   runtimeExportOnlyFlag: d.runtimeExportOnlyFlag,
 } as const;
+
+/** Operator-facing API error line (lock-lost → re-lock guidance, not raw English). */
+export function discoveryApiErrorText(error: {
+  code: string;
+  message: string;
+}): string {
+  if (error.code === "NARRATIVE_NOT_LOCKED") {
+    return discoveryComposerUi.narrativeLockLost;
+  }
+  return `${error.code}: ${error.message}`;
+}

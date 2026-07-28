@@ -5,6 +5,12 @@ import * as React from "react";
 import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
 import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   listGenerateJobsForWork,
@@ -70,6 +76,21 @@ function frameAssetUrl(
   return typeof url === "string" && url.trim() ? url.trim() : null;
 }
 
+/** In-flight Execution jobs: block duplicate enqueue for the same frame. */
+function activeJobForFrame(
+  jobs: GenerateJobRow[],
+  sceneTsid: string,
+  frameIndex: number
+): GenerateJobRow | null {
+  for (const job of jobs) {
+    if (job.subject_type !== "scene" || job.subject_id !== sceneTsid) continue;
+    if (job.status !== "queued" && job.status !== "running") continue;
+    if (jobFrameIndex(job) !== frameIndex) continue;
+    return job;
+  }
+  return null;
+}
+
 /**
  * Batch frame URL fill via Media Admission.
  * Channels: upload / paste URL. Preferred generate: enqueue (SPIKE-IMG-003).
@@ -90,6 +111,10 @@ export function BatchFrameCompletion({
   const [jobsError, setJobsError] = React.useState<string | null>(null);
   const [enqueueBusy, setEnqueueBusy] = React.useState(false);
   const [admitHint, setAdmitHint] = React.useState<string | null>(null);
+  const [preview, setPreview] = React.useState<{
+    url: string;
+    label: string;
+  } | null>(null);
 
   const refreshJobs = React.useCallback(async () => {
     try {
@@ -130,6 +155,10 @@ export function BatchFrameCompletion({
 
   const readyCount = rows.filter((r) => r.candidateUrl).length;
 
+  const enqueueableRows = rows.filter(
+    (r) => !activeJobForFrame(jobs, r.routeTsid, r.frameIndex)
+  );
+
   const patchRow = (key: string, patch: Partial<PendingFill>) => {
     setRows((prev) =>
       prev.map((r) =>
@@ -167,13 +196,24 @@ export function BatchFrameCompletion({
 
   /** SPIKE-IMG-003: enqueue only — does not generate or create Candidates. */
   const enqueueRows = async (targets: PendingFill[]) => {
-    if (targets.length === 0) return;
+    const fresh = targets.filter(
+      (r) => !activeJobForFrame(jobs, r.routeTsid, r.frameIndex)
+    );
+    const skipped = targets.length - fresh.length;
+    if (fresh.length === 0) {
+      setWriteError(
+        skipped > 0
+          ? "所选帧已在排队或生成中，请勿重复入队。"
+          : "没有可入队的帧。"
+      );
+      return;
+    }
     setEnqueueBusy(true);
     setWriteError(null);
     try {
       const result = await enqueueFrameDraftJobs({
         workId,
-        frames: targets.map((r) => ({
+        frames: fresh.map((r) => ({
           sceneTsid: r.routeTsid,
           frameIndex: r.frameIndex,
           caption: r.caption,
@@ -185,6 +225,13 @@ export function BatchFrameCompletion({
         return;
       }
       await refreshJobs();
+      if (skipped > 0) {
+        setAdmitHint(
+          `已入队 ${fresh.length} 条；跳过 ${skipped} 条（已在 queued/running）`
+        );
+      } else {
+        setAdmitHint(`已入队 ${fresh.length} 条`);
+      }
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -321,6 +368,10 @@ export function BatchFrameCompletion({
     if (job.subject_type !== "scene") return;
     const frameIndex = jobFrameIndex(job);
     if (frameIndex === null) return;
+    if (activeJobForFrame(jobs, job.subject_id, frameIndex)) {
+      setWriteError("该帧已有 queued/running 任务，请勿重复入队。");
+      return;
+    }
     const caption =
       typeof job.input_json.caption === "string"
         ? job.input_json.caption.trim()
@@ -444,6 +495,12 @@ export function BatchFrameCompletion({
         <ul className="space-y-3">
           {rows.map((row) => {
             const key = rowKey(row.routeTsid, row.frameIndex);
+            const activeJob = activeJobForFrame(
+              jobs,
+              row.routeTsid,
+              row.frameIndex
+            );
+            const enqueueBlocked = Boolean(activeJob);
             return (
               <li
                 key={key}
@@ -463,6 +520,13 @@ export function BatchFrameCompletion({
                       {row.routeTitle} · 帧 {row.frameIndex + 1}
                     </p>
                     <p className="truncate text-xs text-zinc-500">{row.caption}</p>
+                    {enqueueBlocked ? (
+                      <p className="mt-1 text-[11px] text-amber-700">
+                        {activeJob?.status === "running"
+                          ? "Job 生成中（不可再排队）"
+                          : "已入队（不可再排队）"}
+                      </p>
+                    ) : null}
                     {row.candidateUrl ? (
                       <p className="mt-1 truncate text-[11px] text-emerald-700">
                         候选已就绪（未写入）
@@ -478,10 +542,16 @@ export function BatchFrameCompletion({
                   <Button
                     type="button"
                     size="sm"
-                    disabled={row.busy || writing || enqueueBusy}
+                    disabled={
+                      row.busy || writing || enqueueBusy || enqueueBlocked
+                    }
                     onClick={() => void enqueueRows([row])}
                   >
-                    排队生成
+                    {enqueueBlocked
+                      ? activeJob?.status === "running"
+                        ? "生成中…"
+                        : "已排队"
+                      : "排队生成"}
                   </Button>
                   <Button
                     type="button"
@@ -575,13 +645,17 @@ export function BatchFrameCompletion({
           <Button
             type="button"
             variant="secondary"
-            disabled={writing || enqueueBusy || rows.length === 0}
+            disabled={
+              writing || enqueueBusy || enqueueableRows.length === 0
+            }
             onClick={() => void enqueueRows(rows)}
           >
-            {enqueueBusy ? "排队中…" : `全部排队（${rows.length}）`}
+            {enqueueBusy
+              ? "排队中…"
+              : `全部排队（${enqueueableRows.length}）`}
           </Button>
           <p className="text-xs text-zinc-500">
-            入队后跑 Local Worker；succeeded 后在下方纳入候选再写入。
+            已 queued/running 的帧不会重复入队；Worker 跑完后再 Accept。
           </p>
         </div>
       ) : null}
@@ -656,12 +730,27 @@ export function BatchFrameCompletion({
                   className="flex flex-wrap items-start gap-x-2 gap-y-1 border-b border-zinc-200/80 pb-2 last:border-0"
                 >
                   {hosted?.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={hosted.url}
-                      alt=""
-                      className="h-12 w-20 shrink-0 rounded object-cover bg-zinc-100"
-                    />
+                    <button
+                      type="button"
+                      className="group relative shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                      onClick={() =>
+                        setPreview({
+                          url: hosted.url,
+                          label: `${job.subject_id} · ${frameLabel}`,
+                        })
+                      }
+                      aria-label={`放大预览 ${job.subject_id} ${frameLabel}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={hosted.url}
+                        alt=""
+                        className="h-16 w-28 rounded object-cover bg-zinc-100 transition group-hover:opacity-90"
+                      />
+                      <span className="absolute inset-x-0 bottom-0 rounded-b bg-black/55 py-0.5 text-center text-[10px] text-white">
+                        点击放大
+                      </span>
+                    </button>
                   ) : null}
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
@@ -735,7 +824,18 @@ export function BatchFrameCompletion({
                           variant="ghost"
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          disabled={writing || enqueueBusy}
+                          disabled={
+                            writing ||
+                            enqueueBusy ||
+                            (frameIndex !== null &&
+                              Boolean(
+                                activeJobForFrame(
+                                  jobs,
+                                  job.subject_id,
+                                  frameIndex
+                                )
+                              ))
+                          }
                           onClick={() => void requeueFromJob(job)}
                         >
                           重新排队
@@ -763,6 +863,35 @@ export function BatchFrameCompletion({
           本身不写 Asset。
         </p>
       </div>
+
+      <Dialog
+        open={preview !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton
+          className="max-h-[90vh] max-w-[min(96vw,56rem)] overflow-auto p-4 sm:p-6"
+        >
+          <DialogHeader>
+            <DialogTitle className="truncate text-base">
+              {preview?.label ?? "画面预览"}
+            </DialogTitle>
+          </DialogHeader>
+          {preview?.url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={preview.url}
+              alt=""
+              className="mx-auto max-h-[75vh] w-auto max-w-full rounded object-contain bg-zinc-100"
+            />
+          ) : null}
+          <p className="text-muted-foreground text-xs">
+            Execution 结果预览（≠ Candidate ≠ Asset）。关闭后可继续 Accept。
+          </p>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

@@ -359,6 +359,8 @@ export const zhCN = {
       lockedDescription: (lockedAt: string) => `已确认 · ${lockedAt}`,
       draftDescription: (min: number, current: number) =>
         `至少需要 ${min} 字 · 当前 ${current} 字`,
+      narrativeLockLost:
+        '服务端正文锁已失效（常见于开发热更新、超时或页面刷新）。请先点「改正文」，再「确认正文」，然后重试。',
       inputModeLabel: '输入方式',
       excerptBundleMode: (min: number) => `正文摘录（≥ ${min} 字）`,
       approvedSummaryMode: (min: number) => `自己写的摘要（≥ ${min} 字）`,

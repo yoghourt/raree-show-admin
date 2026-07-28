@@ -17,6 +17,7 @@ import { EntityMultiFuzzyPicker } from "@/components/entity/EntityMultiFuzzyPick
 import { FuzzyEntityCombobox } from "@/components/entity/FuzzyEntityCombobox";
 import type { EntityOption } from "@/components/entity/types";
 import { CopilotIcon } from "@/components/copilot/CopilotIcon";
+import { NarrativeRegenButton } from "@/components/copilot/NarrativeRegenButton";
 import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
 import { messages } from "@/lib/locale";
 import { MultiImageUploader } from "@/components/reading-routes/MultiImageUploader";
@@ -31,9 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
-import { getClassification } from "@/lib/ai/field-registry";
 import { createScene, updateScene } from "@/lib/scenes";
-import type { SuggestionItem } from "@/lib/ai/copilot-types";
 import type { Character, Location, ReadingFrame, ReadingRoute } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -376,9 +375,11 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
     copilot.batchRetry(titleStr);
   };
 
-  const handleRegen = (field: string) => {
-    const currentValue = String(form.getValues(field as keyof ReadingRouteFormValues) ?? "");
-    copilot.narrativeRegen(field, currentValue, titleStr);
+  const handleRegen = (field: string, feedback?: string | null) => {
+    const currentValue = String(
+      form.getValues(field as keyof ReadingRouteFormValues) ?? ""
+    );
+    return copilot.narrativeRegen(field, currentValue, titleStr, feedback);
   };
 
   const handleAcceptRegen = (field: string) => {
@@ -469,11 +470,12 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
             {form.formState.errors.summary.message}
           </p>
         )}
-        <SceneNarrativeRegen
+        <NarrativeRegenButton
           field="summary"
           currentValue={form.watch("summary") ?? ""}
+          entityType="scene"
           pendingItem={copilot.pendingRegen["summary"]}
-          onRegen={() => handleRegen("summary")}
+          onRegen={(feedback) => handleRegen("summary", feedback)}
           onAcceptRegen={() => handleAcceptRegen("summary")}
           onDismissRegen={() => copilot.dismissRegen("summary")}
         />
@@ -634,6 +636,10 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
               onAcceptAll={handleAcceptAll}
               onBatchRetry={handleBatchRetry}
               onClose={copilot.closePanel}
+              isSuggesting={copilot.isSuggesting}
+              onRetryFailed={() => {
+                void copilot.triggerSuggest(form.getValues());
+              }}
             />
           </div>
         </SheetContent>
@@ -656,83 +662,5 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
         </Button>
       </div>
     </form>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// SceneNarrativeRegen — Narrative Regenerate button for scenes (§9.5)
-// ---------------------------------------------------------------------------
-
-interface SceneNarrativeRegenProps {
-  field: string;
-  currentValue: string;
-  pendingItem: SuggestionItem | undefined;
-  onRegen: () => void;
-  onAcceptRegen: () => void;
-  onDismissRegen: () => void;
-}
-
-function SceneNarrativeRegen({
-  field,
-  currentValue,
-  pendingItem,
-  onRegen,
-  onAcceptRegen,
-  onDismissRegen,
-}: SceneNarrativeRegenProps) {
-  // AC-26: derived from registry — no field name literals in condition
-  const classification = getClassification("scene", field);
-  if (classification !== "narrative") return null;
-  if (!currentValue?.trim()) return null;
-
-  if (pendingItem) {
-    return (
-      <div className="rounded-md border border-violet-200 bg-violet-50/60 dark:border-violet-800 dark:bg-violet-950/20 p-2.5 space-y-1.5">
-        <p className="text-xs text-muted-foreground font-medium">再生成建议：</p>
-        <p className="text-sm whitespace-pre-wrap">{pendingItem.value}</p>
-        <div className="flex items-center gap-2">
-          <Button type="button" size="sm" className="h-7 text-xs" onClick={onAcceptRegen}>
-            接受并覆写
-          </Button>
-          <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={onDismissRegen}>
-            忽略
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="ghost"
-      className="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
-      onClick={onRegen}
-    >
-      <RegenIcon />
-      再生成
-    </Button>
-  );
-}
-
-function RegenIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="mr-1 h-3 w-3"
-      aria-hidden="true"
-    >
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M8 16H3v5" />
-    </svg>
   );
 }
