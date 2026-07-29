@@ -119,7 +119,7 @@ export function BatchFrameCompletion({
   const refreshJobs = React.useCallback(async () => {
     try {
       const list = await listGenerateJobsForWork(workId, { limit: 40 });
-      setJobs(list);
+      setJobs(list.filter((job) => job.subject_type === "scene"));
       setJobsError(null);
     } catch (e) {
       setJobsError(e instanceof Error ? e.message : String(e));
@@ -467,10 +467,8 @@ export function BatchFrameCompletion({
         >
           批量补齐画面图
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          排队 → Worker → result_reference（Job）→「纳入候选」（Candidate）→
-          「写入作品」（Asset）。Job ≠ Candidate ≠ Asset。未 Accept 前不写
-          story_images_v2。
+        <p className="mt-1 text-xs text-zinc-500">
+          排队 → Worker → Candidate → Accept 写 Asset。Job ≠ Candidate ≠ Asset。
         </p>
       </div>
 
@@ -695,7 +693,7 @@ export function BatchFrameCompletion({
         {jobs.length === 0 && !jobsError ? (
           <p className="text-xs text-zinc-500">暂无任务。排队后出现于此。</p>
         ) : (
-          <ul className="max-h-72 space-y-2 overflow-y-auto text-xs">
+          <ul className="space-y-2 text-xs">
             {jobs.map((job) => {
               const frameIndex = jobFrameIndex(job);
               const frameLabel =

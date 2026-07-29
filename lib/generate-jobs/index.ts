@@ -19,6 +19,14 @@ export type SceneFrameJobInput = {
   route_title?: string;
 };
 
+/** Character portrait generate intent (CPP-C). */
+export type CharacterPortraitJobInput = {
+  asset_slot: "portrait";
+  name: string;
+  description?: string;
+  reference_url?: string;
+};
+
 export type GenerateJobRow = {
   id: string;
   work_id: string;
@@ -99,6 +107,37 @@ export function parseSceneFrameJobInput(
   };
 }
 
+export function parseCharacterPortraitJobInput(
+  inputJson: Record<string, unknown>
+): CharacterPortraitJobInput {
+  if (inputJson.asset_slot !== "portrait") {
+    throw new Error(
+      `expected input_json.asset_slot=portrait, got ${String(inputJson.asset_slot)}`
+    );
+  }
+  const name = typeof inputJson.name === "string" ? inputJson.name.trim() : "";
+  if (!name) {
+    throw new Error("input_json.name is required");
+  }
+  const descriptionRaw = inputJson.description;
+  const description =
+    typeof descriptionRaw === "string" && descriptionRaw.trim()
+      ? descriptionRaw.trim()
+      : undefined;
+  const referenceRaw = inputJson.reference_url;
+  const reference_url =
+    typeof referenceRaw === "string" &&
+    (referenceRaw.startsWith("http://") || referenceRaw.startsWith("https://"))
+      ? referenceRaw.trim()
+      : undefined;
+  return {
+    asset_slot: "portrait",
+    name,
+    ...(description ? { description } : {}),
+    ...(reference_url ? { reference_url } : {}),
+  };
+}
+
 export async function enqueueGenerateJob(
   input: EnqueueGenerateJobInput,
   client: SupabaseClient = defaultSupabase
@@ -128,22 +167,34 @@ export async function enqueueGenerateJob(
 
 export async function listGenerateJobsForWork(
   workId: string,
-  options?: { limit?: number; client?: SupabaseClient }
+  options?: {
+    limit?: number;
+    client?: SupabaseClient;
+    /** Default false — cancelled (operator-discarded) jobs stay out of Admin lists */
+    includeCancelled?: boolean;
+  }
 ): Promise<GenerateJobRow[]> {
   const limit = options?.limit ?? 50;
   const client = options?.client ?? defaultSupabase;
-  const { data, error } = await client
+  let query = client
     .from(TABLE)
     .select("*")
     .eq("work_id", workId)
     .order("created_at", { ascending: false })
     .limit(limit);
 
+  if (!options?.includeCancelled) {
+    query = query.neq("status", "cancelled");
+  }
+
+  const { data, error } = await query;
+
   if (error) {
     throw new Error(`list generate_jobs failed: ${error.message}`);
   }
   return (data ?? []).map((row) => mapRow(row as Record<string, unknown>));
 }
+
 
 /**
  * Claim oldest queued job: select then conditional update (single-worker safe).
@@ -234,6 +285,35 @@ export async function failGenerateJob(
 
   if (error) {
     throw new Error(`fail generate_jobs failed: ${error.message}`);
+  }
+  return mapRow(data as Record<string, unknown>);
+}
+
+/**
+ * Operator discard: hide rejected Execution results (e.g. unusable white image).
+ * Allowed from terminal succeeded/failed only — does not touch Assets.
+ */
+export async function cancelGenerateJob(
+  id: string,
+  reason: string,
+  client: SupabaseClient
+): Promise<GenerateJobRow> {
+  const now = new Date().toISOString();
+  const { data, error } = await client
+    .from(TABLE)
+    .update({
+      status: "cancelled",
+      error: reason.slice(0, 2000),
+      finished_at: now,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .in("status", ["succeeded", "failed"])
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`cancel generate_jobs failed: ${error.message}`);
   }
   return mapRow(data as Record<string, unknown>);
 }

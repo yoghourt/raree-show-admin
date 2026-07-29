@@ -182,6 +182,7 @@ npx tsx scripts/verify-execution-localai.ts
 | 改了 `.env.local` 无效 | 未重启 `npm run dev` |
 | 模型 4xx/5xx | `IMAGE_CREATOR_ACCEPT_MODEL` 必须与 LocalAI 中 **name** 完全一致 |
 | 误用 8191 portrait server | `ACCEPT_PROVIDER` 应为 `localai` 不是 `local` |
+| 白屏 / 空白图 Job 变 `failed` | 正常：空白检测拒收后会试 Cloud fallback；两边都白才失败。临时关闭：`IMAGE_CREATOR_SKIP_BLANK_GUARD=1` |
 | fallback 报缺 key | 须设 `SILICONFLOW_API_KEY`；仅有 `IMAGE_SPIKE_SILICONFLOW_KEY` 不够 |
 
 ### 脚本回归（可选）

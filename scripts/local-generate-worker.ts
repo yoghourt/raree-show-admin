@@ -1,5 +1,5 @@
 /**
- * SPIKE-IMG-003 slice 2 — Local Worker for generate_jobs.
+ * SPIKE-IMG-003 + CPP-C — Local Worker for generate_jobs.
  *
  * Drain queued jobs:
  *   npx tsx scripts/local-generate-worker.ts
@@ -22,6 +22,7 @@ import {
   claimNextQueuedJob,
   completeGenerateJob,
   failGenerateJob,
+  parseCharacterPortraitJobInput,
   parseSceneFrameJobInput,
 } from "../lib/generate-jobs";
 import { executeImageGenerateJob } from "../lib/generate-jobs/executeImageGenerate";
@@ -49,15 +50,23 @@ async function processOne(
     if (job.capability_id !== "image.generate") {
       throw new Error(`unsupported capability_id: ${job.capability_id}`);
     }
-    if (job.subject_type !== "scene") {
+
+    let result;
+    if (job.subject_type === "scene") {
+      const sceneFrame = parseSceneFrameJobInput(job.input_json);
+      result = await executeImageGenerateJob({
+        capabilityId: job.capability_id,
+        sceneFrame,
+      });
+    } else if (job.subject_type === "character") {
+      const portrait = parseCharacterPortraitJobInput(job.input_json);
+      result = await executeImageGenerateJob({
+        capabilityId: job.capability_id,
+        portrait,
+      });
+    } else {
       throw new Error(`unsupported subject_type: ${job.subject_type}`);
     }
-
-    const sceneFrame = parseSceneFrameJobInput(job.input_json);
-    const result = await executeImageGenerateJob({
-      capabilityId: job.capability_id,
-      sceneFrame,
-    });
 
     if (!result.ok) {
       console.warn("[local-generate-worker] fail", {

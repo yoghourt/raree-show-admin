@@ -1,5 +1,5 @@
 import type { ImageGenerationProvider, ImageGenerationRequest, ImageGenerationResult } from "../types"
-import { AVATAR_NEGATIVE_PROMPT } from "@/lib/prompts/avatar"
+import { buildAvatarNegativePrompt } from "@/lib/prompts/avatar"
 
 const DEFAULT_SIZE = { width: 768, height: 1024 }
 
@@ -74,7 +74,8 @@ export function createLocalHttpProvider(options?: {
           height,
           model: modelId,
           reference_url: ref,
-          negative_prompt: AVATAR_NEGATIVE_PROMPT,
+          negative_prompt:
+            req.negativePrompt?.trim() || buildAvatarNegativePrompt(),
         }),
       })
 

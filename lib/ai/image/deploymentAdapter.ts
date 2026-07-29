@@ -1,5 +1,6 @@
 import { createImageGenerationProvider } from "./factory"
 import { loadCreatorImageDeploymentConfig } from "./deploymentConfig"
+import { assertNotBlankImage, BlankImageError } from "./blankImageGuard"
 import type {
   CreatorImageDeploymentConfig,
   ImageGenerationRequest,
@@ -40,11 +41,40 @@ function softPrimarySkipReason(
   return null
 }
 
+function blankGuardDisabled(): boolean {
+  return process.env.IMAGE_CREATOR_SKIP_BLANK_GUARD?.trim() === "1"
+}
+
+async function ensureUsableImage(
+  result: ImageGenerationResult,
+  label: string
+): Promise<ImageGenerationResult> {
+  if (blankGuardDisabled() || result.meta.providerId === "skip-network") {
+    return result
+  }
+  try {
+    await assertNotBlankImage(result.bytes)
+    return result
+  } catch (err) {
+    if (err instanceof BlankImageError) {
+      console.warn(`[generateImageCandidate] ${label} blank rejected`, {
+        reason: err.assessment.reason,
+        meanLuma: err.assessment.meanLuma,
+        stdDev: err.assessment.stdDev,
+        providerId: result.meta.providerId,
+        modelId: result.meta.modelId,
+      })
+    }
+    throw err
+  }
+}
+
 /**
  * Execution Runtime path for image generation (ADR-010 A3 Constraint F).
  *
  * Not a Product Runtime entry — call via Capability Runtime `imageGenerate`.
  * Tries Production Default provider first, then Fallback / Accept Baseline.
+ * Near-blank canvases fail the attempt so Local whiteouts can fall through to Cloud.
  */
 export async function generateImageCandidate(
   req: ImageGenerationRequest,
@@ -58,7 +88,10 @@ export async function generateImageCandidate(
       "accept"
     )
     try {
-      const result = await primary.generate(req)
+      const result = await ensureUsableImage(
+        await primary.generate(req),
+        "primary"
+      )
       return { ...result, usedFallback: false }
     } catch (primaryErr) {
       const primaryError =
@@ -115,7 +148,10 @@ async function runFallback(
   )
 
   try {
-    const result = await fallback.generate(req)
+    const result = await ensureUsableImage(
+      await fallback.generate(req),
+      "fallback"
+    )
     console.info("[generateImageCandidate] fallback ok", {
       primary: config.acceptProviderId,
       fallback: config.acceptFallbackProviderId,

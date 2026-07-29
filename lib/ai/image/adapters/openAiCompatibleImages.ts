@@ -3,7 +3,7 @@ import type {
   ImageGenerationRequest,
   ImageGenerationResult,
 } from "../types"
-import { AVATAR_NEGATIVE_PROMPT } from "@/lib/prompts/avatar"
+import { buildAvatarNegativePrompt } from "@/lib/prompts/avatar"
 
 const DEFAULT_SIZE = { width: 1024, height: 1024 }
 /**
@@ -112,11 +112,9 @@ export function createOpenAiCompatibleImageProvider(options?: {
       }
 
       const endpoint = `${baseUrl}/v1/images/generations`
-      // Avatar negatives are portrait-only; scene frames already state "no text" in prompt.
-      const prompt =
-        req.assetSlot === "portrait"
-          ? `${req.prompt}|${AVATAR_NEGATIVE_PROMPT}`
-          : req.prompt
+      // Portrait: keep negatives in dedicated field when supported; never `|`-glue
+      // into prompt (LocalAI / many OpenAI-compat hosts treat `|` as literal junk).
+      const prompt = req.prompt
       const headers: Record<string, string> = {
         "content-type": "application/json",
         accept: "application/json",
@@ -131,6 +129,10 @@ export function createOpenAiCompatibleImageProvider(options?: {
         n: 1,
         size: `${width}x${height}`,
         response_format: "b64_json",
+      }
+      if (req.assetSlot === "portrait") {
+        body.negative_prompt =
+          req.negativePrompt?.trim() || buildAvatarNegativePrompt()
       }
       if (ref) {
         body.ref_images = [ref]

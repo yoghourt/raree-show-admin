@@ -1,11 +1,17 @@
 "use server"
 
+/**
+ * migration-compat only (SPIKE-IMG-003 / CPP-C).
+ * Prefer enqueueCharacterPortraitJobs → Local Worker → Human Accept.
+ * Do not expand product features on this sync path.
+ */
+
 import { z } from "zod"
 
 import { imageGenerate } from "@/lib/ai/capability"
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload"
 import { formatRequestError } from "@/lib/format-request-error"
-import { buildAvatarPrompt } from "@/lib/prompts/avatar"
+import { buildAvatarPrompt, buildAvatarNegativePrompt } from "@/lib/prompts/avatar"
 
 export type GenerateCharacterAvatarState =
   | { ok: true; url: string }
@@ -53,6 +59,7 @@ export async function generateCharacterAvatar(
       surface: "creator",
       assetSlot: "portrait",
       prompt,
+      negativePrompt: buildAvatarNegativePrompt(description),
       referenceImages: referencePortraitUrl
         ? [{ url: referencePortraitUrl }]
         : undefined,

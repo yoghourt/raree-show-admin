@@ -12,6 +12,8 @@ import {
   generateCharacterAvatar,
   type GenerateCharacterAvatarState,
 } from "@/app/actions/generateCharacterAvatar";
+import { enqueueCharacterPortraitJobs } from "@/app/actions/enqueueCharacterPortraitJobs";
+import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
 import { CopilotIcon } from "@/components/copilot/CopilotIcon";
 import { NarrativeRegenButton } from "@/components/copilot/NarrativeRegenButton";
 import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
@@ -26,9 +28,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PortraitJobResultDialog } from "@/components/generate-jobs/PortraitJobResultDialog";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
 import { messages } from "@/lib/locale";
 import * as charactersApi from "@/lib/characters";
+import {
+  listGenerateJobsForWork,
+  parseHostedImageResultReference,
+  type GenerateJobRow,
+} from "@/lib/generate-jobs";
 import type { Character } from "@/lib/types";
 
 const PORTRAIT_PLACEHOLDER = "https://placehold.co/400x400/e5e7eb/6b7280?text=No+Portrait";
@@ -157,12 +165,174 @@ export function CharacterForm(props: CharacterFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  React.useEffect(() => {
+    if (!avatarGenPending) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [avatarGenPending]);
+
   // ── Avatar generation ──────────────────────────────────────────────────────
   // Gate A/E: generation only fills the form (candidate). Asset write requires
   // human Accept via form Save or「接受肖像并保存」(edit only).
 
   const [portraitAcceptPending, setPortraitAcceptPending] = React.useState(false);
   const [acceptSavePending, setAcceptSavePending] = React.useState(false);
+  const [portraitJobs, setPortraitJobs] = React.useState<GenerateJobRow[]>([]);
+  const [portraitEnqueueBusy, setPortraitEnqueueBusy] = React.useState(false);
+  const [portraitJobHint, setPortraitJobHint] = React.useState<string | null>(
+    null
+  );
+  const [jobPreviewOpen, setJobPreviewOpen] = React.useState(false);
+  const [portraitRevisionNote, setPortraitRevisionNote] = React.useState("");
+
+  const characterTsid =
+    props.mode === "edit" ? props.defaultValues.tsid : null;
+
+  const refreshPortraitJobs = React.useCallback(async () => {
+    if (!characterTsid) {
+      setPortraitJobs([]);
+      return;
+    }
+    try {
+      const list = await listGenerateJobsForWork(props.workId, { limit: 40 });
+      setPortraitJobs(
+        list.filter(
+          (job) =>
+            job.subject_type === "character" &&
+            job.subject_id === characterTsid
+        )
+      );
+    } catch {
+      // soft-fail — form still usable without job list
+    }
+  }, [characterTsid, props.workId]);
+
+  React.useEffect(() => {
+    void refreshPortraitJobs();
+  }, [refreshPortraitJobs]);
+
+  const activePortraitJob = React.useMemo(() => {
+    const inFlight = portraitJobs.find(
+      (j) => j.status === "queued" || j.status === "running"
+    );
+    if (inFlight) return inFlight;
+    return portraitJobs.find((j) => j.status === "succeeded") ?? null;
+  }, [portraitJobs]);
+
+  const succeededPortraitJob = React.useMemo(
+    () => portraitJobs.find((j) => j.status === "succeeded") ?? null,
+    [portraitJobs]
+  );
+
+  const succeededPortraitUrl = React.useMemo(() => {
+    if (!succeededPortraitJob) return null;
+    return (
+      parseHostedImageResultReference(succeededPortraitJob.result_reference)
+        ?.url ?? null
+    );
+  }, [succeededPortraitJob]);
+
+  const watchedPortraitUrl = useWatch({
+    control: form.control,
+    name: "portraitUrl",
+  });
+  const jobAlreadyInForm =
+    Boolean(succeededPortraitUrl) &&
+    watchedPortraitUrl === succeededPortraitUrl;
+
+  const enqueuePortraitJob = async (opts?: { withRevision?: boolean }) => {
+    if (!characterTsid) return;
+    setPortraitEnqueueBusy(true);
+    setPortraitJobHint(null);
+    try {
+      const existingPortrait = form.getValues("portraitUrl")?.trim();
+      const baseDescription = form.getValues("description")?.trim() ?? "";
+      const note = portraitRevisionNote.trim();
+      const description =
+        opts?.withRevision && note
+          ? baseDescription
+            ? `${baseDescription}\n\n[操作员修改意见] ${note}`
+            : `[操作员修改意见] ${note}`
+          : baseDescription || undefined;
+      const result = await enqueueCharacterPortraitJobs({
+        workId: props.workId,
+        characters: [
+          {
+            characterTsid,
+            name: form.getValues("name"),
+            description,
+            referenceUrl:
+              existingPortrait &&
+              (existingPortrait.startsWith("http://") ||
+                existingPortrait.startsWith("https://")) &&
+              existingPortrait !== succeededPortraitUrl
+                ? existingPortrait
+                : undefined,
+          },
+        ],
+      });
+      if (!result.ok) {
+        setPortraitJobHint(result.message);
+        return;
+      }
+      const newIds = new Set(result.jobs.map((j) => j.id));
+      const toDiscard = portraitJobs.filter(
+        (j) =>
+          (j.status === "succeeded" || j.status === "failed") &&
+          !newIds.has(j.id)
+      );
+      for (const old of toDiscard) {
+        const discarded = await discardGenerateJob({
+          workId: props.workId,
+          jobId: old.id,
+          reason:
+            opts?.withRevision && note
+              ? `operator_superseded_with_revision: ${note.slice(0, 200)}`
+              : "operator_superseded_requeue",
+        });
+        if (!discarded.ok) {
+          setPortraitJobHint(
+            `已重新排队，但丢弃旧任务失败：${discarded.message}`
+          );
+          await refreshPortraitJobs();
+          return;
+        }
+      }
+      if (opts?.withRevision && note) {
+        setPortraitRevisionNote("");
+      }
+      setPortraitJobHint(
+        result.skipped.length
+          ? "已有 queued/running 任务，未重复入队。请等 Worker 或点刷新。"
+          : toDiscard.length > 0
+            ? opts?.withRevision && note
+              ? "已按修改意见重新排队；不满意的旧结果已移除。"
+              : "已重新排队；不满意的旧结果已移除。"
+            : "已排队。Worker 完成后可预览 Job 结果；纳入表单后保存才写 Asset。"
+      );
+      await refreshPortraitJobs();
+    } catch (e) {
+      setPortraitJobHint(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPortraitEnqueueBusy(false);
+    }
+  };
+
+  const acceptJobPortraitToForm = () => {
+    if (!succeededPortraitUrl) return;
+    form.setValue("portraitUrl", succeededPortraitUrl, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setPortraitAcceptPending(true);
+    setPortraitJobHint(
+      "已纳入表单候选。须「接受肖像并保存」或「保存」才写入 Assets。"
+    );
+  };
 
   useEffect(() => {
     if (avatarGenState?.ok) {
@@ -369,12 +539,58 @@ export function CharacterForm(props: CharacterFormProps) {
               onUploadingChange={setImageUploading}
             />
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+              {props.mode === "edit" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={
+                    portraitEnqueueBusy ||
+                    activePortraitJob?.status === "queued" ||
+                    activePortraitJob?.status === "running"
+                  }
+                  onClick={() => void enqueuePortraitJob()}
+                >
+                  {portraitEnqueueBusy
+                    ? "排队中…"
+                    : activePortraitJob?.status === "queued"
+                      ? "已排队"
+                      : activePortraitJob?.status === "running"
+                        ? "生成中…"
+                        : succeededPortraitUrl ||
+                            activePortraitJob?.status === "failed"
+                          ? "重新排队"
+                          : "排队生成肖像"}
+                </Button>
+              ) : null}
+              {props.mode === "edit" && succeededPortraitUrl ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={acceptJobPortraitToForm}
+                  disabled={jobAlreadyInForm}
+                >
+                  {jobAlreadyInForm ? "已纳入表单" : "纳入表单"}
+                </Button>
+              ) : null}
+              {props.mode === "edit" ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={portraitEnqueueBusy}
+                  onClick={() => void refreshPortraitJobs()}
+                >
+                  刷新任务
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
                 disabled={avatarGenPending}
                 className="min-w-[9.5rem]"
+                title="同步生成须留在本页；离开会丢失结果。可离开时请用「排队生成肖像」。"
                 onClick={() => {
                   const fd = new FormData();
                   fd.append("name", watchedName);
@@ -395,7 +611,9 @@ export function CharacterForm(props: CharacterFormProps) {
                   });
                 }}
               >
-                {avatarGenPending ? messages.forms.generating : messages.forms.aiGenerateAvatar}
+                {avatarGenPending
+                  ? messages.forms.generating
+                  : `${messages.forms.aiGenerateAvatar}（同步·兼容）`}
               </Button>
               {props.mode === "edit" && portraitAcceptPending ? (
                 <Button
@@ -412,15 +630,144 @@ export function CharacterForm(props: CharacterFormProps) {
                   {acceptSavePending ? "写入中…" : "接受肖像并保存"}
                 </Button>
               ) : null}
+              {avatarGenPending ? (
+                <p
+                  className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                  role="status"
+                >
+                  同步生成中，请留在本页。跳转或关闭后结果无法写回表单。
+                  {props.mode === "edit"
+                    ? "若要离开去做别的，请改用「排队生成肖像」。"
+                    : "新建角色需先保存后再用排队生成。"}
+                </p>
+              ) : (
+                <p className="w-full text-xs text-zinc-500">
+                  「同步·兼容」须等本页出结果；离开会丢。
+                  {props.mode === "edit"
+                    ? "可离开时用上方「排队生成肖像」。"
+                    : "保存角色后可在编辑页排队生成。"}
+                </p>
+              )}
               {avatarGenState && !avatarGenState.ok ? (
                 <p className="text-destructive max-w-md text-sm">
                   {avatarGenState.message}
                 </p>
               ) : null}
+              {portraitJobHint ? (
+                <p className="w-full text-xs text-zinc-500">{portraitJobHint}</p>
+              ) : null}
+              {props.mode === "edit" && activePortraitJob ? (
+                <p className="w-full font-mono text-[11px] text-zinc-400">
+                  job {activePortraitJob.status}
+                  {activePortraitJob.error
+                    ? ` · ${activePortraitJob.error}`
+                    : ""}
+                </p>
+              ) : null}
+              {props.mode === "edit" && succeededPortraitUrl ? (
+                <div className="flex w-full flex-wrap items-start gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-2">
+                  <button
+                    type="button"
+                    className="group relative shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                    onClick={() => setJobPreviewOpen(true)}
+                    aria-label="放大预览 Job 生成结果"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={succeededPortraitUrl}
+                      alt=""
+                      className="h-20 w-20 rounded object-cover bg-zinc-100 transition group-hover:opacity-90"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 rounded-b bg-black/55 py-0.5 text-center text-[10px] text-white">
+                      放大
+                    </span>
+                  </button>
+                  <div className="min-w-0 flex-1 space-y-2 text-xs text-zinc-600">
+                    <p className="font-medium text-zinc-800">
+                      Job 结果预览（尚未写入表单 / Asset）
+                    </p>
+                    <p>
+                      白图或不可用：勿「纳入表单」。可改下方意见后「带意见重新排队」，或点「重新排队」。
+                    </p>
+                    <Textarea
+                      rows={2}
+                      value={portraitRevisionNote}
+                      onChange={(e) => setPortraitRevisionNote(e.target.value)}
+                      placeholder="修改意见（可选）：例如不要白屏、需清晰脸部…"
+                      className="min-h-[3.5rem] text-xs"
+                      disabled={
+                        portraitEnqueueBusy ||
+                        activePortraitJob?.status === "queued" ||
+                        activePortraitJob?.status === "running"
+                      }
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      disabled={
+                        !portraitRevisionNote.trim() ||
+                        portraitEnqueueBusy ||
+                        activePortraitJob?.status === "queued" ||
+                        activePortraitJob?.status === "running"
+                      }
+                      onClick={() =>
+                        void enqueuePortraitJob({ withRevision: true })
+                      }
+                    >
+                      带意见重新排队
+                    </Button>
+                    {succeededPortraitJob &&
+                    (succeededPortraitJob.status === "succeeded" ||
+                      succeededPortraitJob.status === "failed") ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-zinc-500"
+                        disabled={portraitEnqueueBusy}
+                        onClick={() => {
+                          void (async () => {
+                            setPortraitEnqueueBusy(true);
+                            setPortraitJobHint(null);
+                            try {
+                              const result = await discardGenerateJob({
+                                workId: props.workId,
+                                jobId: succeededPortraitJob.id,
+                                reason: "operator_discarded",
+                              });
+                              if (!result.ok) {
+                                setPortraitJobHint(result.message);
+                                return;
+                              }
+                              setPortraitJobHint("已丢弃该 Job 结果。");
+                              await refreshPortraitJobs();
+                            } catch (e) {
+                              setPortraitJobHint(
+                                e instanceof Error ? e.message : String(e)
+                              );
+                            } finally {
+                              setPortraitEnqueueBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        丢弃此结果
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
               {props.mode === "edit" && portraitAcceptPending ? (
                 <p className="w-full text-xs text-zinc-500">
-                  生成成功仅为候选。须点「接受肖像并保存」或「保存」才写入
+                  表单内为候选。须点「接受肖像并保存」或「保存」才写入
                   Assets（Gate E）。不会自动完成制作进度。
+                </p>
+              ) : null}
+              {props.mode === "create" ? (
+                <p className="w-full text-xs text-zinc-500">
+                  排队生成需先保存角色（有 tsid）。创建后可在编辑页或制作页入队。
                 </p>
               ) : null}
             </div>
@@ -429,6 +776,19 @@ export function CharacterForm(props: CharacterFormProps) {
                 {form.formState.errors.portraitUrl.message}
               </p>
             )}
+            <PortraitJobResultDialog
+              open={jobPreviewOpen}
+              onOpenChange={setJobPreviewOpen}
+              imageUrl={succeededPortraitUrl}
+              inputJson={succeededPortraitJob?.input_json ?? null}
+              currentName={watchedName}
+              currentDescription={watchedDescription}
+              editHref={
+                props.mode === "edit"
+                  ? `/works/${encodeURIComponent(props.workId)}/characters/${encodeURIComponent(props.defaultValues.tsid)}/edit#char-description`
+                  : null
+              }
+            />
           </div>
         )}
       />

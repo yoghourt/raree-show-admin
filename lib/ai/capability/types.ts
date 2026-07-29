@@ -14,6 +14,8 @@ export type ImageGenerateInput = {
   surface: CapabilitySurface
   assetSlot?: ImageGenerateAssetSlot
   prompt: string
+  /** Optional negatives forwarded to Execution adapters that support them. */
+  negativePrompt?: string
   referenceImages?: { url: string }[]
   seed?: number
   size?: { width: number; height: number }

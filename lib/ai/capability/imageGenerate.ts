@@ -20,6 +20,7 @@ export async function imageGenerate(
   const result = await generateImageCandidate({
     assetSlot: input.assetSlot,
     prompt: input.prompt,
+    negativePrompt: input.negativePrompt,
     referenceImages: input.referenceImages,
     seed: input.seed,
     size: input.size,
