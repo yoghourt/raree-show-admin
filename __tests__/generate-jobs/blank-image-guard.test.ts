@@ -1,0 +1,152 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  assessBlankFromLumaSamples,
+  assessBlankImageBuffer,
+} from "@/lib/ai/image/blankImageGuard";
+import {
+  buildAvatarNegativePrompt,
+  buildAvatarPrompt,
+  detectGenderCue,
+  scrubConflictingGenderTokens,
+  AVATAR_NEGATIVE_PROMPT,
+} from "@/lib/prompts/avatar";
+
+describe("buildAvatarPrompt", () => {
+  it("avoids empty/plain empty wording that collapses turbo to blank", () => {
+    const prompt = buildAvatarPrompt("Jean", "tall soldier");
+    expect(prompt).toMatch(/Jean/);
+    expect(prompt).toMatch(/tall soldier/);
+    expect(prompt.toLowerCase()).not.toMatch(/plain empty/);
+    expect(prompt.toLowerCase()).not.toMatch(/seamless backdrop/);
+    expect(prompt).toMatch(/not a blank canvas/i);
+  });
+
+  it("promotes operator revision and scrubs Lady from subject when male", () => {
+    const prompt = buildAvatarPrompt(
+      "Gared",
+      "Gared holds the title of Lady and is a member of House Stark.\n\n[操作员修改意见] 性别不对，他是个男的。"
+    );
+    const overrideIdx = prompt.indexOf("OPERATOR OVERRIDE");
+    expect(overrideIdx).toBeGreaterThanOrEqual(0);
+    expect(prompt).toMatch(/Male character portrait of Gared/i);
+    expect(prompt).toMatch(/adult male man/i);
+    expect(prompt.toLowerCase()).not.toMatch(/\blady\b/);
+    expect(prompt).toMatch(/House Stark/);
+  });
+});
+
+describe("scrubConflictingGenderTokens", () => {
+  it("removes Lady when cue is male", () => {
+    expect(
+      scrubConflictingGenderTokens("Lady of House Stark", "male")
+    ).not.toMatch(/lady/i);
+  });
+});
+
+describe("detectGenderCue", () => {
+  it("reads Chinese male correction", () => {
+    expect(detectGenderCue("性别不对，他是个男的。")).toBe("male");
+  });
+});
+
+describe("buildAvatarNegativePrompt", () => {
+  it("adds female rejects when revision asserts male", () => {
+    const neg = buildAvatarNegativePrompt(
+      "Lady of House Stark\n\n[操作员修改意见] 他是个男的"
+    );
+    expect(neg).toMatch(/woman/);
+    expect(neg).toMatch(/lady/);
+  });
+});
+
+describe("AVATAR_NEGATIVE_PROMPT", () => {
+  it("includes blank-canvas rejects", () => {
+    expect(AVATAR_NEGATIVE_PROMPT).toMatch(/blank canvas/);
+    expect(AVATAR_NEGATIVE_PROMPT).toMatch(/solid white/);
+  });
+});
+
+describe("assessBlankFromLumaSamples", () => {
+  it("flags near-white flat canvases", () => {
+    const samples = Uint8Array.from({ length: 64 * 64 }, () => 250);
+    const a = assessBlankFromLumaSamples(samples, 64, 64);
+    expect(a.blank).toBe(true);
+    expect(a.reason).toBe("near_white_flat");
+  });
+
+  it("flags near-black flat canvases", () => {
+    const samples = Uint8Array.from({ length: 64 * 64 }, () => 5);
+    const a = assessBlankFromLumaSamples(samples, 64, 64);
+    expect(a.blank).toBe(true);
+    expect(a.reason).toBe("near_black_flat");
+  });
+
+  it("passes varied content", () => {
+    const samples = Uint8Array.from({ length: 64 * 64 }, (_, i) =>
+      i % 2 === 0 ? 40 : 200
+    );
+    const a = assessBlankFromLumaSamples(samples, 64, 64);
+    expect(a.blank).toBe(false);
+  });
+
+  it("skips tiny stubs", () => {
+    const samples = Uint8Array.from([255]);
+    const a = assessBlankFromLumaSamples(samples, 1, 1);
+    expect(a.blank).toBe(false);
+    expect(a.reason).toBe("skipped_tiny");
+  });
+});
+
+describe("assessBlankImageBuffer", () => {
+  it("rejects a solid white png", async () => {
+    const sharp = (await import("sharp")).default;
+    const bytes = await sharp({
+      create: {
+        width: 128,
+        height: 128,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const a = await assessBlankImageBuffer(bytes);
+    expect(a.blank).toBe(true);
+    expect(a.reason).toBe("near_white_flat");
+  });
+
+  it("accepts a high-contrast png", async () => {
+    const sharp = (await import("sharp")).default;
+    const bytes = await sharp({
+      create: {
+        width: 128,
+        height: 128,
+        channels: 3,
+        background: { r: 30, g: 30, b: 30 },
+      },
+    })
+      .composite([
+        {
+          input: await sharp({
+            create: {
+              width: 64,
+              height: 64,
+              channels: 3,
+              background: { r: 220, g: 180, b: 140 },
+            },
+          })
+            .png()
+            .toBuffer(),
+          left: 32,
+          top: 32,
+        },
+      ])
+      .png()
+      .toBuffer();
+
+    const a = await assessBlankImageBuffer(bytes);
+    expect(a.blank).toBe(false);
+  });
+});

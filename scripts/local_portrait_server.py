@@ -21,6 +21,9 @@ from pydantic import BaseModel
 
 # Keep in sync with lib/prompts/avatar.ts AVATAR_NEGATIVE_PROMPT intent.
 AVATAR_NEGATIVE_PROMPT = (
+    "blank, blank image, blank canvas, empty image, empty canvas, "
+    "solid white, solid white background only, all white, pure white, "
+    "whiteout, overexposed wash, featureless, no subject, "
     "twins, two people, two faces, two heads, double head, extra head, "
     "duplicate, cloned, mirror double, conjoined, siamese, split screen, "
     "side by side, couple, group, crowd, multiple characters, extra person, "

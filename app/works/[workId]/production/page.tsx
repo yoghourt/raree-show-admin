@@ -29,6 +29,9 @@ export default function WorkProductionPage() {
 
   const [work, setWork] = React.useState<Work | null>(null);
   const [routes, setRoutes] = React.useState<ReadingRoute[]>([]);
+  const [characters, setCharacters] = React.useState<
+    import("@/lib/types").Character[]
+  >([]);
   const [plan, setPlan] = React.useState<ProductionPlanProjection | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -60,6 +63,7 @@ export default function WorkProductionPage() {
         }
         setWork(w);
         setRoutes(scenes);
+        setCharacters(chars);
         setPlan(
           deriveProductionPlan({
             work: w,
@@ -88,71 +92,76 @@ export default function WorkProductionPage() {
   const base = `/works/${encodeURIComponent(workId)}`;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
+    <div className="flex h-screen flex-col overflow-hidden px-4 pb-3 pt-3">
       {error ? (
         <div
-          className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          className="mb-2 shrink-0 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive"
           role="alert"
         >
           {error}
         </div>
       ) : null}
 
-      <nav className="text-muted-foreground flex flex-wrap items-center gap-1 text-sm">
-        <Link href="/" className="hover:text-foreground">
-          首页
-        </Link>
-        <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <Link href="/works" className="hover:text-foreground">
-          {messages.nav.works}
-        </Link>
-        <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <Link
-          href={`/works/${encodeURIComponent(workId)}/edit`}
-          className="text-foreground font-medium hover:underline"
-        >
-          {workTitle}
-        </Link>
-        <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="text-foreground font-medium">制作</span>
-      </nav>
-
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            制作看板
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-zinc-500">
-            可视化 Production Plan（Runtime）。看板是 UI，不是第二套 Runtime
-            Truth。派生任务随 Assets 重算。
-          </p>
+      <header className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 pb-3">
+        <div className="min-w-0 space-y-1">
+          <nav className="text-muted-foreground flex flex-wrap items-center gap-1 text-xs">
+            <Link href="/" className="hover:text-foreground">
+              首页
+            </Link>
+            <ChevronRight className="size-3 shrink-0 opacity-60" aria-hidden />
+            <Link href="/works" className="hover:text-foreground">
+              {messages.nav.works}
+            </Link>
+            <ChevronRight className="size-3 shrink-0 opacity-60" aria-hidden />
+            <Link
+              href={`/works/${encodeURIComponent(workId)}/edit`}
+              className="text-foreground truncate font-medium hover:underline"
+            >
+              {workTitle}
+            </Link>
+            <ChevronRight className="size-3 shrink-0 opacity-60" aria-hidden />
+            <span className="text-foreground font-medium">制作</span>
+          </nav>
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
+              制作看板
+            </h1>
+            <p className="text-xs text-zinc-500">
+              Plan 在左 · 帧 / 肖像 Job 在右。看板是 UI，非第二套 Runtime Truth。
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" asChild>
+        <div className="flex flex-wrap gap-1.5">
+          <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
             <Link href={`${base}/edit`}>编辑作品</Link>
           </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`${base}/reading-routes`}>{messages.domain.readingRoute}</Link>
+          <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+            <Link href={`${base}/reading-routes`}>
+              {messages.domain.readingRoute}
+            </Link>
           </Button>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
             <Link href={`${base}/characters`}>角色</Link>
           </Button>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
             <Link href={`${base}/discovery`}>Discovery</Link>
           </Button>
         </div>
-      </div>
+      </header>
 
-      {loading ? (
-        <p className="text-sm text-zinc-500">加载 Production Context…</p>
-      ) : plan && work ? (
-        <ProductionBoard
-          workId={workId}
-          plan={plan}
-          routes={routes}
-          onAssetsChanged={() => setReloadToken((n) => n + 1)}
-        />
-      ) : null}
+      <div className="min-h-0 flex-1">
+        {loading ? (
+          <p className="text-sm text-zinc-500">加载 Production Context…</p>
+        ) : plan && work ? (
+          <ProductionBoard
+            workId={workId}
+            plan={plan}
+            routes={routes}
+            characters={characters}
+            onAssetsChanged={() => setReloadToken((n) => n + 1)}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

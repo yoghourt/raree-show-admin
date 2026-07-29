@@ -1,11 +1,11 @@
 # SPIKE-IMG-003 — Generate Job Queue (Execution Envelope)
 
-**Status:** Spike / Implementation Authorization **Granted** (scoped) · Slices 1–3 · 2026-07-26 / 2026-07-27  
+**Status:** Spike / Implementation Authorization **Granted** (scoped) · Slices 1–3 · **CPP-C portrait** · 2026-07-26 / 2026-07-27 / 2026-07-29  
 **Production Authorization:** **Not** via ADR-010 amendment — this is Execution Runtime implementation, not an architectural decision  
 **Contract Freeze:** ADR-010 · SPEC-IMG-001 · SPEC-CPP-001 (Job queue remains Forbidden as CPP Runtime; allowed here as Execution ops envelope)  
-**Authority:** Architect Plan Review PASS (2026-07-26) · Execution Runtime slices 1–3  
+**Authority:** Architect Plan Review PASS (2026-07-26) · Execution Runtime slices 1–3 · CPP-C portrait enqueue  
 **Depends on:** ADR-010 A4 (Candidate ≠ Asset; Job ≠ CPP Progress) · Capability `image.generate` · SPIKE-AA-001 Media Admission  
-**Last Updated:** 2026-07-27 (Accept UI slice 3)
+**Last Updated:** 2026-07-29 (CPP-C character portrait jobs)
 
 ---
 
@@ -64,9 +64,12 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 | `docs/supabase/migrations/*generate_jobs*` | Table DDL (hand-run SQL editor) |
 | `lib/generate-jobs/**` | Enqueue / claim / complete / execute helpers |
 | `lib/supabase-service.ts` | Worker-only service role client |
-| `app/actions/enqueueFrameDraftJobs.ts` | Admin enqueue Server Action |
-| `components/production/BatchFrameCompletion.tsx` | Queue UI + job list / preview |
-| `scripts/local-generate-worker.ts` | Local Worker (slice 2) |
+| `app/actions/enqueueFrameDraftJobs.ts` | Admin scene-frame enqueue Server Action |
+| `app/actions/enqueueCharacterPortraitJobs.ts` | Admin character portrait enqueue (CPP-C) |
+| `components/production/BatchFrameCompletion.tsx` | Scene-frame queue UI + job list / preview |
+| `components/production/BatchPortraitCompletion.tsx` | Character portrait queue UI + Accept (CPP-C) |
+| `components/characters/CharacterForm.tsx` | Portrait enqueue / Accept-to-form (CPP-C) |
+| `scripts/local-generate-worker.ts` | Local Worker (slice 2 + CPP-C) |
 | `docs/spikes/spike-img-003-*.md` | This authorization + Findings |
 | `scripts/README-local-image-server.md` | Operator steps |
 
@@ -79,7 +82,8 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 * Auto Accept / writing `story_images_v2` / `portrait_url` from enqueue, Worker, or job success alone  
 * CPP board treating Job success as Plan complete  
 * Expanding sync `generateFrameDraft` / MultiImageUploader sync path with new product features  
-* New Accept-only CPP board / route (slice 3 stays on BatchFrameCompletion) 
+* Expanding sync `generateCharacterAvatar` beyond migration-compat  
+* New Accept-only CPP board / route (slice 3 stays on BatchFrameCompletion; CPP-C Accept on BatchPortraitCompletion / CharacterForm)
 
 ---
 
@@ -108,6 +112,16 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 
 ---
 
+## How (CPP-C — character portrait)
+
+1. Enqueue `subject_type=character`, `subject_id=char_*`, `input_json.asset_slot=portrait` (+ name / description / optional reference_url).  
+2. Worker parses portrait input → `imageGenerate({ assetSlot: "portrait" })` → Cloudinary → `result_reference`.  
+3. Human Accept: CharacterForm「Accept 到表单」+ Save, or Production `BatchPortraitCompletion`「Accept 并写入肖像」(`characters.update`).  
+4. Sync `generateCharacterAvatar` remains migration-compat only.  
+5. In-flight dedupe: refuse second `queued`/`running` for same character.
+
+---
+
 ## Exit Criteria
 
 | ID | Criterion | Status |
@@ -118,6 +132,7 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 | EC-4 | Sync generate path still works (compat) | Slice 1 Done |
 | EC-5 | Worker poll → `result_reference` | Slice 2 Done |
 | EC-6 | Accept UI consumes result → Candidate → Asset | **Slice 3 Implemented** |
+| EC-7 | Character portrait enqueue + Worker + Human Accept → `portrait_url` | **CPP-C Implemented** |
 
 ---
 
@@ -127,3 +142,4 @@ Synchronous Admin → LocalAI blocks the operator and cannot run on Vercel again
 | ---- | ---- |
 | 2026-07-27 | Slice 2 implemented: `scripts/local-generate-worker.ts`, claim/complete/fail, `result_reference` = hosted_image JSON. Operator smoke: enqueue → worker drain → Admin refresh preview; Assets unchanged. |
 | 2026-07-27 | Slice 3: BatchFrameCompletion admit-from-job / accept-and-write / requeue; Job table status unchanged on Accept; EC-6 closed. |
+| 2026-07-29 | CPP-C: `CharacterPortraitJobInput`, `enqueueCharacterPortraitJobs`, Worker `subject_type=character`, CharacterForm queue/Accept-to-form, BatchPortraitCompletion Accept→portrait_url; sync avatar = migration-compat; EC-7 closed. |

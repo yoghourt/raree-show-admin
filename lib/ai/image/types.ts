@@ -11,6 +11,8 @@ export type ImageGenerationRequest = {
   prompt: string
   /** Which Asset surface requested the candidate (observational / Job context). */
   assetSlot?: ImageAssetSlot
+  /** Optional negatives (portrait adapters); Deployment may ignore if unsupported. */
+  negativePrompt?: string
   referenceImages?: { url: string }[]
   seed?: number
   size?: { width: number; height: number }
