@@ -123,6 +123,94 @@ describe("dedupeCandidates", () => {
     ];
     expect(dedupeCandidates(duped)).toHaveLength(1);
   });
+
+  it("keeps same label across different candidate types", async () => {
+    const { dedupeCandidates } = await import("@/lib/discovery/candidate-validate");
+    const mixed = [
+      {
+        candidateId: "s1",
+        candidateType: "story" as const,
+        workId: "w",
+        displayName: "Wight Encounter",
+        summary: "story",
+        fields: { title: "Wight Encounter", summary: "arc" },
+      },
+      {
+        candidateId: "sc1",
+        candidateType: "scene" as const,
+        workId: "w",
+        displayName: "Wight Encounter",
+        summary: "scene",
+        fields: {
+          parentStoryCandidateId: "s1",
+          chapter_number: 1,
+          title: "Wight Encounter",
+          summary: "beat",
+        },
+      },
+    ];
+    const out = dedupeCandidates(mixed);
+    expect(out).toHaveLength(2);
+    expect(out.map((c) => c.candidateType).sort()).toEqual(["scene", "story"]);
+  });
+
+  it("pipeline keeps four types when story and scene share a title", async () => {
+    const {
+      capCandidatesByType,
+      dedupeCandidates,
+      filterScenesWithValidParents,
+    } = await import("@/lib/discovery/candidate-validate");
+
+    const storyId = "story-shared";
+    const pipeline = [
+      {
+        candidateId: "c1",
+        candidateType: "character" as const,
+        workId: "w",
+        displayName: "Will",
+        summary: "ranger",
+        fields: { name: "Will" },
+      },
+      {
+        candidateId: "l1",
+        candidateType: "location" as const,
+        workId: "w",
+        displayName: "The Wall",
+        summary: "ice",
+        fields: { name: "The Wall" },
+      },
+      {
+        candidateId: storyId,
+        candidateType: "story" as const,
+        workId: "w",
+        displayName: "Wight Encounter",
+        summary: "arc",
+        fields: { title: "Wight Encounter", summary: "patrol" },
+      },
+      {
+        candidateId: "sc1",
+        candidateType: "scene" as const,
+        workId: "w",
+        displayName: "Wight Encounter",
+        summary: "beat",
+        fields: {
+          parentStoryCandidateId: storyId,
+          chapter_number: 1,
+          title: "Wight Encounter",
+          summary: "duel",
+        },
+      },
+    ];
+
+    const out = filterScenesWithValidParents(
+      capCandidatesByType(dedupeCandidates(pipeline))
+    );
+    const types = new Set(out.map((c) => c.candidateType));
+    expect(types.has("character")).toBe(true);
+    expect(types.has("location")).toBe(true);
+    expect(types.has("story")).toBe(true);
+    expect(types.has("scene")).toBe(true);
+  });
 });
 
 describe("normalizeRawCandidate optional fields", () => {
