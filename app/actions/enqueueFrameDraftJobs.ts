@@ -24,6 +24,13 @@ const frameSchema = z.object({
       const t = s?.trim()
       return t ? t : undefined
     }),
+  operatorRevision: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const t = s?.trim()
+      return t ? t : undefined
+    }),
 })
 
 const inputSchema = z.object({
@@ -42,6 +49,7 @@ export async function enqueueFrameDraftJobs(input: {
     frameIndex: number
     caption: string
     routeTitle?: string
+    operatorRevision?: string
   }>
 }): Promise<EnqueueFrameDraftJobsResult> {
   const parsed = inputSchema.safeParse(input)
@@ -65,6 +73,9 @@ export async function enqueueFrameDraftJobs(input: {
         frame_index: frame.frameIndex,
         caption: frame.caption,
         ...(frame.routeTitle ? { route_title: frame.routeTitle } : {}),
+        ...(frame.operatorRevision
+          ? { operator_revision: frame.operatorRevision }
+          : {}),
       }
       const job = await enqueueGenerateJob(
         {

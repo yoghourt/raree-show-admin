@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PortraitJobResultDialog } from "@/components/generate-jobs/PortraitJobResultDialog";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
+import { formatGenerateJobErrorForOperator } from "@/lib/ai/image/operatorErrorCopy";
 import { messages } from "@/lib/locale";
 import * as charactersApi from "@/lib/characters";
 import {
@@ -657,10 +658,10 @@ export function CharacterForm(props: CharacterFormProps) {
                 <p className="w-full text-xs text-zinc-500">{portraitJobHint}</p>
               ) : null}
               {props.mode === "edit" && activePortraitJob ? (
-                <p className="w-full font-mono text-[11px] text-zinc-400">
+                <p className="w-full text-[11px] text-zinc-500">
                   job {activePortraitJob.status}
                   {activePortraitJob.error
-                    ? ` · ${activePortraitJob.error}`
+                    ? ` · ${formatGenerateJobErrorForOperator(activePortraitJob.error) ?? activePortraitJob.error}`
                     : ""}
                 </p>
               ) : null}

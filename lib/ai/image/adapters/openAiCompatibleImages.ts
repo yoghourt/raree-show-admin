@@ -4,6 +4,7 @@ import type {
   ImageGenerationResult,
 } from "../types"
 import { buildAvatarNegativePrompt } from "@/lib/prompts/avatar"
+import { buildFrameNegativePrompt } from "@/lib/prompts/frame-draft"
 
 const DEFAULT_SIZE = { width: 1024, height: 1024 }
 /**
@@ -133,6 +134,9 @@ export function createOpenAiCompatibleImageProvider(options?: {
       if (req.assetSlot === "portrait") {
         body.negative_prompt =
           req.negativePrompt?.trim() || buildAvatarNegativePrompt()
+      } else if (req.assetSlot === "scene_frame") {
+        body.negative_prompt =
+          req.negativePrompt?.trim() || buildFrameNegativePrompt()
       }
       if (ref) {
         body.ref_images = [ref]

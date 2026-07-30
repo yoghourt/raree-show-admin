@@ -7,7 +7,10 @@ import type {
 } from "@/lib/generate-jobs";
 import { buildHostedImageResultReference } from "@/lib/generate-jobs/resultReference";
 import { buildAvatarPrompt, buildAvatarNegativePrompt } from "@/lib/prompts/avatar";
-import { buildFrameDraftPrompt } from "@/lib/prompts/frame-draft";
+import {
+  buildFrameDraftPrompt,
+  buildFrameNegativePrompt,
+} from "@/lib/prompts/frame-draft";
 
 export type ExecuteImageGenerateOk = {
   ok: true;
@@ -55,6 +58,7 @@ export async function executeSceneFrameImageGenerate(input: {
       surface: "creator",
       assetSlot: "scene_frame",
       prompt,
+      negativePrompt: buildFrameNegativePrompt(caption),
       size: { width: 1280, height: 720 },
     });
     let url: string;

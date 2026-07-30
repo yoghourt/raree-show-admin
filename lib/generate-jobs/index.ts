@@ -17,6 +17,8 @@ export type SceneFrameJobInput = {
   frame_index: number;
   caption: string;
   route_title?: string;
+  /** Operator revision note at enqueue (display); also embedded in caption for prompt. */
+  operator_revision?: string;
 };
 
 /** Character portrait generate intent (CPP-C). */
@@ -25,6 +27,8 @@ export type CharacterPortraitJobInput = {
   name: string;
   description?: string;
   reference_url?: string;
+  /** Operator revision note at enqueue (display); also embedded in description for prompt. */
+  operator_revision?: string;
 };
 
 export type GenerateJobRow = {
@@ -99,11 +103,17 @@ export function parseSceneFrameJobInput(
     typeof routeTitleRaw === "string" && routeTitleRaw.trim()
       ? routeTitleRaw.trim()
       : undefined;
+  const revisionRaw = inputJson.operator_revision;
+  const operator_revision =
+    typeof revisionRaw === "string" && revisionRaw.trim()
+      ? revisionRaw.trim()
+      : undefined;
   return {
     asset_slot: "scene_frame",
     frame_index: frameIndex,
     caption,
     ...(route_title ? { route_title } : {}),
+    ...(operator_revision ? { operator_revision } : {}),
   };
 }
 
@@ -130,11 +140,17 @@ export function parseCharacterPortraitJobInput(
     (referenceRaw.startsWith("http://") || referenceRaw.startsWith("https://"))
       ? referenceRaw.trim()
       : undefined;
+  const revisionRaw = inputJson.operator_revision;
+  const operator_revision =
+    typeof revisionRaw === "string" && revisionRaw.trim()
+      ? revisionRaw.trim()
+      : undefined;
   return {
     asset_slot: "portrait",
     name,
     ...(description ? { description } : {}),
     ...(reference_url ? { reference_url } : {}),
+    ...(operator_revision ? { operator_revision } : {}),
   };
 }
 

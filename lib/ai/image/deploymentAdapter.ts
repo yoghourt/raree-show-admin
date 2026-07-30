@@ -1,6 +1,11 @@
 import { createImageGenerationProvider } from "./factory"
 import { loadCreatorImageDeploymentConfig } from "./deploymentConfig"
 import { assertNotBlankImage, BlankImageError } from "./blankImageGuard"
+import {
+  formatCreatorImageFailure,
+  formatCreatorImagePrimaryAndFallbackFailure,
+  formatImageAttemptError,
+} from "./operatorErrorCopy"
 import type {
   CreatorImageDeploymentConfig,
   ImageGenerationRequest,
@@ -94,13 +99,12 @@ export async function generateImageCandidate(
       )
       return { ...result, usedFallback: false }
     } catch (primaryErr) {
-      const primaryError =
-        primaryErr instanceof Error ? primaryErr.message : String(primaryErr)
+      const primaryError = formatImageAttemptError(primaryErr)
       return runFallback(req, config, primaryError)
     }
   }
 
-  return runFallback(req, config, primarySkip)
+  return runFallback(req, config, formatImageAttemptError(primarySkip))
 }
 
 async function runFallback(
@@ -117,7 +121,10 @@ async function runFallback(
 
   if (isSameProvider(config.acceptProviderId, config.acceptFallbackProviderId)) {
     throw new Error(
-      `Creator image generation failed (provider=${config.acceptProviderId}: ${primaryError.slice(0, 240)})`
+      formatCreatorImageFailure({
+        providerId: config.acceptProviderId,
+        error: primaryError,
+      })
     )
   }
 
@@ -133,7 +140,12 @@ async function runFallback(
       fallbackSkip,
     })
     throw new Error(
-      `Creator image generation failed (primary=${config.acceptProviderId}: ${primaryError.slice(0, 180)}; fallback=${config.acceptFallbackProviderId}: ${fallbackSkip})`
+      formatCreatorImagePrimaryAndFallbackFailure({
+        primaryProviderId: config.acceptProviderId,
+        primaryError,
+        fallbackProviderId: config.acceptFallbackProviderId,
+        fallbackError: fallbackSkip,
+      })
     )
   }
 
@@ -161,8 +173,7 @@ async function runFallback(
     })
     return { ...result, usedFallback: true, primaryError }
   } catch (fallbackErr) {
-    const fallbackMsg =
-      fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+    const fallbackMsg = formatImageAttemptError(fallbackErr)
     console.warn("[generateImageCandidate] fallback failed", {
       primary: config.acceptProviderId,
       fallback: config.acceptFallbackProviderId,
@@ -170,7 +181,12 @@ async function runFallback(
       fallbackError: fallbackMsg.slice(0, 240),
     })
     throw new Error(
-      `Creator image generation failed (primary=${config.acceptProviderId}: ${primaryError.slice(0, 180)}; fallback=${config.acceptFallbackProviderId}: ${fallbackMsg.slice(0, 180)})`
+      formatCreatorImagePrimaryAndFallbackFailure({
+        primaryProviderId: config.acceptProviderId,
+        primaryError,
+        fallbackProviderId: config.acceptFallbackProviderId,
+        fallbackError: fallbackMsg,
+      })
     )
   }
 }
