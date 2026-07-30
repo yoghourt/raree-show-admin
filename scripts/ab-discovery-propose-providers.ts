@@ -10,6 +10,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import type { NarrativeInputBundle } from "@/lib/discovery/types";
+
 function loadEnvLocal(): void {
   const envPath = path.resolve(".env.local");
   try {
@@ -90,12 +92,7 @@ type ArmResult = {
 
 async function runArm(
   arm: Arm,
-  narrative: {
-    excerpts: { text: string; orderIndex: number }[];
-    operatorSummary: null;
-    inputMode: "excerpt_bundle";
-    summaryAttested: false;
-  },
+  narrative: NarrativeInputBundle,
   proposeAllCandidateTypes: typeof import("@/lib/discovery/propose-service").proposeAllCandidateTypes
 ): Promise<ArmResult> {
   process.env.COPILOT_TEXT_PROVIDER = arm.provider;
@@ -179,10 +176,10 @@ async function main(): Promise<void> {
   );
 
   const prose = chinesePrologueFixture(EXCERPT_BUNDLE_MIN_PROSE);
-  const narrative = {
+  const narrative: NarrativeInputBundle = {
     excerpts: [{ text: prose, orderIndex: 0 }],
     operatorSummary: null,
-    inputMode: "excerpt_bundle" as const,
+    inputMode: "excerpt_bundle",
     summaryAttested: false,
   };
 
