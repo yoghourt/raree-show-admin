@@ -21,6 +21,10 @@ export type CopilotTextProvider = "openrouter" | "gemini";
 export interface CopilotTextLlmOptions {
   /** Gemini only: request json_object response format. Default true (Enrichment). */
   geminiJsonObject?: boolean;
+  /** Override provider (Discovery / eval). Default: resolveCopilotTextProvider(). */
+  provider?: CopilotTextProvider;
+  /** Override model id for the chosen provider. */
+  model?: string;
 }
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -140,14 +144,19 @@ function parseOpenRouterRetryAfterMs(rawBody: string): number {
   return FALLBACK_MS;
 }
 
-async function callOpenRouter(prompt: string): Promise<string> {
+async function callOpenRouter(
+  prompt: string,
+  modelOverride?: string
+): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is not configured");
   }
 
   const model =
-    process.env.OPENROUTER_SUGGEST_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
+    modelOverride?.trim() ||
+    process.env.OPENROUTER_SUGGEST_MODEL?.trim() ||
+    OPENROUTER_DEFAULT_MODEL;
 
   // Free models often break with response_format — rely on prompt + robust parser.
   const requestBody = JSON.stringify({
@@ -206,7 +215,10 @@ async function callGemini(
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const model = process.env.GEMINI_SUGGEST_MODEL?.trim() || GEMINI_DEFAULT_MODEL;
+  const model =
+    options?.model?.trim() ||
+    process.env.GEMINI_SUGGEST_MODEL?.trim() ||
+    GEMINI_DEFAULT_MODEL;
   const useJsonObject = options?.geminiJsonObject !== false;
 
   return withTransientRetry("Gemini", async () => {
@@ -252,7 +264,7 @@ async function callGemini(
   });
 }
 
-let loggedProvider: CopilotTextProvider | null = null;
+let loggedRoute: string | null = null;
 
 /** Invoke the configured Copilot text model with a single user prompt. */
 export async function callCopilotTextLlm(
@@ -262,18 +274,20 @@ export async function callCopilotTextLlm(
   // Same undici proxy bootstrap as Gemini image path (HTTPS_PROXY / GEMINI_*_PROXY).
   ensureUndiciProxyDispatcherForGemini();
 
-  const provider = resolveCopilotTextProvider();
+  const provider = options?.provider ?? resolveCopilotTextProvider();
+  const model =
+    options?.model?.trim() ||
+    (provider === "openrouter"
+      ? process.env.OPENROUTER_SUGGEST_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL
+      : process.env.GEMINI_SUGGEST_MODEL?.trim() || GEMINI_DEFAULT_MODEL);
 
-  if (loggedProvider !== provider) {
-    loggedProvider = provider;
-    const model =
-      provider === "openrouter"
-        ? process.env.OPENROUTER_SUGGEST_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL
-        : process.env.GEMINI_SUGGEST_MODEL?.trim() || GEMINI_DEFAULT_MODEL;
+  const routeKey = `${provider}:${model}`;
+  if (loggedRoute !== routeKey) {
+    loggedRoute = routeKey;
     console.info("[copilot-llm] provider=%s model=%s", provider, model);
   }
 
   return provider === "openrouter"
-    ? callOpenRouter(prompt)
-    : callGemini(prompt, options);
+    ? callOpenRouter(prompt, model)
+    : callGemini(prompt, { ...options, model });
 }

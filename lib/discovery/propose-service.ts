@@ -7,7 +7,7 @@
 
 import { randomUUID } from "crypto";
 
-import { callCopilotTextLlm } from "@/lib/ai/copilot-text-llm";
+import { callDiscoveryTextLlm } from "@/lib/discovery/discovery-text-llm";
 import { MAX_CANDIDATES_PER_TYPE } from "@/lib/discovery/constants";
 import {
   capCandidatesByType,
@@ -29,6 +29,10 @@ import {
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
 
 export function isDiscoveryProposeMockMode(): boolean {
+  // Allow opting into real LLM path under Vitest for taxonomy / integration tests.
+  if (process.env.DISCOVERY_PROPOSE_MODE === "live") {
+    return false;
+  }
   return (
     process.env.DISCOVERY_PROPOSE_MODE === "mock" ||
     process.env.VITEST === "true"
@@ -148,7 +152,8 @@ function formatStoryListForPrompt(
     .join("\n");
 }
 
-function buildProposePrompt(params: {
+/** Exported for provider-eval harness only — production path unchanged. */
+export function buildProposePrompt(params: {
   workTitle: string;
   narrative: NarrativeInputBundle;
   candidateType: DiscoveryCandidateType;
@@ -257,9 +262,13 @@ async function generateForType(params: {
     };
   }
 
+  const timingOn = process.env.DISCOVERY_PROPOSE_TIMING === "1";
+  const t0 = timingOn ? Date.now() : 0;
+
   try {
     const prompt = buildProposePrompt(params);
-    const raw = await callCopilotTextLlm(prompt, { geminiJsonObject: true });
+    const raw = await callDiscoveryTextLlm(prompt, { geminiJsonObject: true });
+    const llmMs = timingOn ? Date.now() - t0 : 0;
     if (process.env.DISCOVERY_PROPOSE_DEBUG === "1") {
       console.info(
         "[discovery-propose] type=%s raw_len=%d preview=%s",
@@ -271,6 +280,13 @@ async function generateForType(params: {
     const items = parseCandidateArray(raw, candidateType);
 
     if (items.length === 0) {
+      if (timingOn) {
+        console.info(
+          "[discovery-propose] type=%s timing_ms=%d candidates=0 (empty)",
+          candidateType,
+          Date.now() - t0
+        );
+      }
       return { candidates: [] };
     }
 
@@ -318,6 +334,14 @@ async function generateForType(params: {
           validationErrors
         );
       }
+      if (timingOn) {
+        console.info(
+          "[discovery-propose] type=%s timing_ms=%d llm_ms≈%d PARSE_FAILED",
+          candidateType,
+          Date.now() - t0,
+          llmMs
+        );
+      }
       return {
         candidates: [],
         error: {
@@ -328,19 +352,42 @@ async function generateForType(params: {
       };
     }
 
+    if (timingOn) {
+      console.info(
+        "[discovery-propose] type=%s timing_ms=%d llm_ms≈%d candidates=%d",
+        candidateType,
+        Date.now() - t0,
+        llmMs,
+        capped.length
+      );
+    }
     return { candidates: capped };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Generation failed";
+    // parseCandidateArray throw — not provider envelope / network errors
+    const isParseThrow =
+      /not a JSON array of candidates|LLM output is not a JSON array/i.test(
+        message
+      );
     console.error(
-      "[discovery-propose] type=%s GENERATION_FAILED: %s",
+      "[discovery-propose] type=%s %s: %s",
       candidateType,
+      isParseThrow ? "PARSE_FAILED" : "GENERATION_FAILED",
       message
     );
+    if (timingOn) {
+      console.info(
+        "[discovery-propose] type=%s timing_ms=%d %s",
+        candidateType,
+        Date.now() - t0,
+        isParseThrow ? "PARSE_THROW" : "PROVIDER_OR_OTHER"
+      );
+    }
     return {
       candidates: [],
       error: {
         candidateType,
-        code: "GENERATION_FAILED",
+        code: isParseThrow ? "GENERATION_PARSE_FAILED" : "GENERATION_FAILED",
         message,
       },
     };

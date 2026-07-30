@@ -334,8 +334,12 @@ export function dedupeCandidates(candidates: DiscoveryCandidate[]): DiscoveryCan
   const deduped: DiscoveryCandidate[] = [];
 
   for (const candidate of candidates) {
-    const key = getCandidateLabelKey(candidate);
-    if (!key || seen.has(key)) {
+    const label = getCandidateLabelKey(candidate);
+    if (!label) {
+      continue;
+    }
+    const key = getCandidateDedupeKey(candidate);
+    if (seen.has(key)) {
       continue;
     }
     seen.add(key);
