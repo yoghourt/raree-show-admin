@@ -1,14 +1,11 @@
 "use client";
 
 /**
- * Job result preview: image + enqueue input text so operators can compare.
+ * Scene-frame job result preview: image + enqueue caption so operators can compare.
  * Does not admit Candidate or write Asset.
- * input_json is a snapshot at enqueue — later form/DB edits do not rewrite it.
+ * input_json is a snapshot at enqueue — later route edits do not rewrite it.
  */
 
-import Link from "next/link";
-
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -16,36 +13,31 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  parseCharacterPortraitJobInput,
-  type CharacterPortraitJobInput,
+  parseSceneFrameJobInput,
+  type SceneFrameJobInput,
 } from "@/lib/generate-jobs";
-import { AVATAR_REVISION_MARKER } from "@/lib/prompts/avatar";
+import { splitFrameCaption } from "@/lib/prompts/frame-draft";
 
-export type PortraitJobResultDialogProps = {
+export type FrameJobResultDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   imageUrl: string | null;
   /** Raw job.input_json; parse failures → empty fields */
   inputJson?: Record<string, unknown> | null;
   title?: string;
-  /** Live character/form fields for对照（不参与已跑完的生成） */
-  currentName?: string | null;
-  currentDescription?: string | null;
-  /**
-   * When enqueue-time description is empty, link to character edit
-   * (e.g. `/works/{id}/characters/{tsid}/edit`).
-   */
-  editHref?: string | null;
+  /** Live route/frame fields for对照（不参与已跑完的生成） */
+  currentCaption?: string | null;
+  currentRouteTitle?: string | null;
   /** In-progress textarea draft for the next requeue (not yet enqueued) */
   draftRevisionNote?: string | null;
 };
 
-function tryParsePortraitInput(
+function tryParseFrameInput(
   inputJson: Record<string, unknown> | null | undefined
-): CharacterPortraitJobInput | null {
+): SceneFrameJobInput | null {
   if (!inputJson) return null;
   try {
-    return parseCharacterPortraitJobInput(inputJson);
+    return parseSceneFrameJobInput(inputJson);
   } catch {
     return null;
   }
@@ -67,22 +59,8 @@ function FieldBlock({
   );
 }
 
-/** Strip enqueue-only operator revision so live character fields can be compared fairly. */
-export function splitPortraitEnqueueDescription(description: string | undefined | null): {
-  base: string;
-  revisionNote: string;
-} {
-  const raw = description?.trim() ?? "";
-  if (!raw) return { base: "", revisionNote: "" };
-  const idx = raw.indexOf(AVATAR_REVISION_MARKER);
-  if (idx < 0) return { base: raw, revisionNote: "" };
-  const base = raw.slice(0, idx).trim();
-  const revisionNote = raw.slice(idx + AVATAR_REVISION_MARKER.length).trim();
-  return { base, revisionNote };
-}
-
 function resolveEnqueueRevision(
-  input: CharacterPortraitJobInput | null,
+  input: SceneFrameJobInput | null,
   inputJson: Record<string, unknown> | null | undefined
 ): string {
   const fromField =
@@ -92,34 +70,31 @@ function resolveEnqueueRevision(
       inputJson.operator_revision.trim()) ||
     "";
   if (fromField) return fromField;
-  return splitPortraitEnqueueDescription(input?.description).revisionNote;
+  return splitFrameCaption(input?.caption ?? "").revisionNote;
 }
 
-export function PortraitJobResultDialog({
+export function FrameJobResultDialog({
   open,
   onOpenChange,
   imageUrl,
   inputJson,
-  title = "Job 肖像预览",
-  currentName,
-  currentDescription,
-  editHref,
+  title = "Job 画面预览",
+  currentCaption,
+  currentRouteTitle,
   draftRevisionNote,
-}: PortraitJobResultDialogProps) {
-  const input = tryParsePortraitInput(inputJson);
-  const { base: jobBaseDesc } = splitPortraitEnqueueDescription(
-    input?.description
-  );
+}: FrameJobResultDialogProps) {
+  const input = tryParseFrameInput(inputJson);
+  const { base: jobBaseCaption } = splitFrameCaption(input?.caption ?? "");
   const revisionNote = resolveEnqueueRevision(input, inputJson);
   const draft = draftRevisionNote?.trim() ?? "";
-  const liveDesc = currentDescription?.trim() ?? "";
-  const jobName = input?.name?.trim() ?? "";
-  const liveName = currentName?.trim() ?? "";
-  // Revision notes are enqueue-only — not a character-field drift.
+  const jobRouteTitle = input?.route_title?.trim() ?? "";
+  const liveCaption = currentCaption?.trim() ?? "";
+  const liveRouteTitle = currentRouteTitle?.trim() ?? "";
+  // Revision notes are enqueue-only — not a route-field drift.
   const showLive =
-    Boolean(liveName || liveDesc) &&
-    (liveName !== jobName || liveDesc !== jobBaseDesc);
-  const showEditDescriptionCta = !jobBaseDesc && Boolean(editHref?.trim());
+    Boolean(liveCaption || liveRouteTitle) &&
+    (liveCaption !== jobBaseCaption ||
+      (Boolean(liveRouteTitle) && liveRouteTitle !== jobRouteTitle));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -167,56 +142,42 @@ export function PortraitJobResultDialog({
               入队时字段（生成实际用的快照）
             </p>
             <p className="text-[11px] leading-snug text-zinc-500">
-              之后在编辑页改的描述不会改写本 Job。要用新描述请「重新排队」或「附修改意见重试」。
+              之后在路线编辑页改的 caption 不会改写本 Job。要用新描述请「重新排队」或「附修改意见重试」。
             </p>
-            <FieldBlock label="姓名" value={input?.name} />
-            <div>
-              <p className="text-xs text-zinc-500">描述</p>
-              <p className="mt-0.5 whitespace-pre-wrap text-zinc-900">
-                {jobBaseDesc || "—"}
-              </p>
-              {showEditDescriptionCta ? (
-                <Button
-                  asChild
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 h-7 text-xs"
-                >
-                  <Link
-                    href={editHref!}
-                    onClick={() => onOpenChange(false)}
-                  >
-                    去角色编辑页补描述
-                  </Link>
-                </Button>
-              ) : null}
-            </div>
-            {input?.reference_url ? (
-              <div>
-                <p className="text-xs text-zinc-500">参考图 URL</p>
-                <p className="mt-0.5 break-all font-mono text-[11px] text-zinc-600">
-                  {input.reference_url}
-                </p>
-              </div>
+            <FieldBlock label="路线标题" value={jobRouteTitle || undefined} />
+            {input ? (
+              <FieldBlock
+                label="帧序号"
+                value={`第 ${input.frame_index + 1} 帧`}
+              />
             ) : null}
+            <FieldBlock
+              label="画面描述（caption）"
+              value={jobBaseCaption || undefined}
+            />
             {showLive ? (
               <div className="space-y-3 border-t border-zinc-200 pt-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-amber-800">
-                  当前角色（姓名/描述与入队快照不同）
+                  当前路线（标题/描述与入队快照不同）
                 </p>
-                <FieldBlock label="当前姓名" value={liveName || undefined} />
                 <FieldBlock
-                  label="当前描述"
-                  value={liveDesc || undefined}
+                  label="当前路线标题"
+                  value={liveRouteTitle || undefined}
+                />
+                <FieldBlock
+                  label="当前画面描述"
+                  value={liveCaption || undefined}
                 />
               </div>
             ) : null}
             {!input ? (
               <p className="text-xs text-zinc-500">
-                无法解析 input_json（可能不是 portrait job）。
+                无法解析 input_json（可能不是 scene_frame job）。
               </p>
             ) : null}
+            <p className="text-[11px] text-zinc-500">
+              Execution 结果预览（≠ Candidate ≠ Asset）。关闭后可继续 Accept。
+            </p>
           </div>
         </div>
       </DialogContent>

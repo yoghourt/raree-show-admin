@@ -2,16 +2,14 @@
 
 import * as React from "react";
 
+import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
 import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
 import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
+import { FrameJobResultDialog } from "@/components/generate-jobs/FrameJobResultDialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { formatGenerateJobErrorForOperator } from "@/lib/ai/image/operatorErrorCopy";
 import {
   listGenerateJobsForWork,
   parseHostedImageResultReference,
@@ -23,6 +21,7 @@ import {
   type MediaAdmissionProviderId,
 } from "@/lib/media-admission";
 import { isEmptyFrameUrl } from "@/lib/production/completion-profile";
+import { FRAME_REVISION_MARKER, splitFrameCaption } from "@/lib/prompts/frame-draft";
 import * as scenesApi from "@/lib/scenes";
 import type { ReadingRoute } from "@/lib/types";
 
@@ -50,6 +49,43 @@ const providers = createMediaAdmissionProviders();
 
 function rowKey(routeTsid: string, frameIndex: number): string {
   return `${routeTsid}:${frameIndex}`;
+}
+
+function mergeRevisionNote(
+  baseCaption: string,
+  revisionNote: string
+): string {
+  const base = splitFrameCaption(baseCaption).base;
+  const note = revisionNote.trim();
+  if (!note) return base;
+  if (!base) return `${FRAME_REVISION_MARKER} ${note}`;
+  return `${base}\n\n${FRAME_REVISION_MARKER} ${note}`;
+}
+
+function frameEnqueueCaptionFromJob(
+  job: GenerateJobRow,
+  routes: ReadingRoute[],
+  frameIndex: number,
+  revisionNote: string
+): { caption: string; routeTitle?: string } | null {
+  const route = routes.find((r) => r.tsid === job.subject_id);
+  const liveCaption = route?.story_images_v2?.[frameIndex]?.caption?.trim() ?? "";
+  const jobCaption =
+    typeof job.input_json.caption === "string"
+      ? job.input_json.caption.trim()
+      : "";
+  const captionBase = liveCaption || splitFrameCaption(jobCaption).base;
+  if (!captionBase && !revisionNote.trim()) return null;
+  const routeTitle =
+    route?.title?.trim() ||
+    (typeof job.input_json.route_title === "string"
+      ? job.input_json.route_title.trim()
+      : "") ||
+    undefined;
+  return {
+    caption: mergeRevisionNote(captionBase, revisionNote),
+    ...(routeTitle ? { routeTitle } : {}),
+  };
 }
 
 function jobFrameIndex(job: GenerateJobRow): number | null {
@@ -111,9 +147,20 @@ export function BatchFrameCompletion({
   const [jobsError, setJobsError] = React.useState<string | null>(null);
   const [enqueueBusy, setEnqueueBusy] = React.useState(false);
   const [admitHint, setAdmitHint] = React.useState<string | null>(null);
+  const [requeueingId, setRequeueingId] = React.useState<string | null>(null);
+  const [retryPanelJobId, setRetryPanelJobId] = React.useState<string | null>(
+    null
+  );
+  const [revisionNotes, setRevisionNotes] = React.useState<
+    Record<string, string>
+  >({});
   const [preview, setPreview] = React.useState<{
     url: string;
     label: string;
+    inputJson: Record<string, unknown>;
+    currentCaption?: string | null;
+    currentRouteTitle?: string | null;
+    draftRevisionNote?: string | null;
   } | null>(null);
 
   const refreshJobs = React.useCallback(async () => {
@@ -372,18 +419,18 @@ export function BatchFrameCompletion({
       setWriteError("该帧已有 queued/running 任务，请勿重复入队。");
       return;
     }
-    const caption =
-      typeof job.input_json.caption === "string"
-        ? job.input_json.caption.trim()
-        : "";
-    if (!caption) {
+    const note = revisionNotes[job.id] ?? "";
+    const payload = frameEnqueueCaptionFromJob(
+      job,
+      routes,
+      frameIndex,
+      note
+    );
+    if (!payload?.caption.trim()) {
       setWriteError("重新排队失败：job 无 caption");
       return;
     }
-    const routeTitle =
-      typeof job.input_json.route_title === "string"
-        ? job.input_json.route_title
-        : undefined;
+    setRequeueingId(job.id);
     setEnqueueBusy(true);
     setWriteError(null);
     try {
@@ -393,8 +440,9 @@ export function BatchFrameCompletion({
           {
             sceneTsid: job.subject_id,
             frameIndex,
-            caption,
-            routeTitle,
+            caption: payload.caption,
+            routeTitle: payload.routeTitle,
+            ...(note.trim() ? { operatorRevision: note.trim() } : {}),
           },
         ],
       });
@@ -402,11 +450,34 @@ export function BatchFrameCompletion({
         setWriteError(result.message);
         return;
       }
+      const discarded = await discardGenerateJob({
+        workId,
+        jobId: job.id,
+        reason: note.trim()
+          ? `operator_superseded_with_revision: ${note.trim().slice(0, 200)}`
+          : "operator_superseded_requeue",
+      });
+      if (!discarded.ok) {
+        setWriteError(
+          `已重新排队，但丢弃旧任务失败：${discarded.message}（可再点「重新排队」后处理）`
+        );
+      }
+      setRetryPanelJobId(null);
+      setRevisionNotes((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
       await refreshJobs();
-      setAdmitHint("已重新排队（新 job）；旧 succeeded 保留作历史");
+      setAdmitHint(
+        note.trim()
+          ? "已按修改意见重新排队；不满意的旧结果已从列表移除。"
+          : "已重新排队；不满意的旧结果已从列表移除。"
+      );
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
+      setRequeueingId(null);
       setEnqueueBusy(false);
     }
   };
@@ -731,12 +802,24 @@ export function BatchFrameCompletion({
                     <button
                       type="button"
                       className="group relative shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
-                      onClick={() =>
+                      onClick={() => {
+                        const route = routes.find(
+                          (r) => r.tsid === job.subject_id
+                        );
+                        const liveFrame =
+                          frameIndex !== null
+                            ? route?.story_images_v2?.[frameIndex]
+                            : undefined;
                         setPreview({
                           url: hosted.url,
                           label: `${job.subject_id} · ${frameLabel}`,
-                        })
-                      }
+                          inputJson: job.input_json,
+                          currentCaption: liveFrame?.caption ?? null,
+                          currentRouteTitle:
+                            route?.title || route?.tsid || null,
+                          draftRevisionNote: revisionNotes[job.id] ?? null,
+                        });
+                      }}
                       aria-label={`放大预览 ${job.subject_id} ${frameLabel}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -768,7 +851,10 @@ export function BatchFrameCompletion({
                       ) : null}
                     </div>
                     {job.error ? (
-                      <p className="text-destructive">{job.error}</p>
+                      <p className="text-destructive">
+                        {formatGenerateJobErrorForOperator(job.error) ??
+                          job.error}
+                      </p>
                     ) : null}
                     {hosted?.url ? (
                       <p className="truncate text-[11px] text-zinc-500">
@@ -788,7 +874,11 @@ export function BatchFrameCompletion({
                             variant="outline"
                             size="sm"
                             className="h-7 px-2 text-xs"
-                            disabled={writing || enqueueBusy}
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id
+                            }
                             onClick={() => {
                               setWriteError(null);
                               const result = admitJobAsCandidate(job);
@@ -807,7 +897,11 @@ export function BatchFrameCompletion({
                             type="button"
                             size="sm"
                             className="h-7 px-2 text-xs"
-                            disabled={writing || enqueueBusy}
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id
+                            }
                             onClick={() => void acceptAndWriteJob(job)}
                           >
                             Accept 并写入
@@ -817,12 +911,90 @@ export function BatchFrameCompletion({
                       {(job.status === "succeeded" ||
                         job.status === "failed") &&
                       job.subject_type === "scene" ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id ||
+                              (frameIndex !== null &&
+                                Boolean(
+                                  activeJobForFrame(
+                                    jobs,
+                                    job.subject_id,
+                                    frameIndex
+                                  )
+                                ))
+                            }
+                            onClick={() => void requeueFromJob(job)}
+                          >
+                            {requeueingId === job.id
+                              ? "处理中…"
+                              : "重新排队"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id ||
+                              (frameIndex !== null &&
+                                Boolean(
+                                  activeJobForFrame(
+                                    jobs,
+                                    job.subject_id,
+                                    frameIndex
+                                  )
+                                ))
+                            }
+                            onClick={() =>
+                              setRetryPanelJobId(
+                                retryPanelJobId === job.id ? null : job.id
+                              )
+                            }
+                          >
+                            {retryPanelJobId === job.id
+                              ? "收起修改意见"
+                              : "附修改意见重试"}
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
+                    {retryPanelJobId === job.id ? (
+                      <div className="mt-1 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
+                        <label
+                          className="block text-[11px] text-zinc-600"
+                          htmlFor={`frame-revision-${job.id}`}
+                        >
+                          修改意见（会并入下次生成 caption；不改库里的画面描述）
+                        </label>
+                        <Textarea
+                          id={`frame-revision-${job.id}`}
+                          rows={3}
+                          value={revisionNotes[job.id] ?? ""}
+                          onChange={(e) =>
+                            setRevisionNotes((prev) => ({
+                              ...prev,
+                              [job.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="例如：更暗的夜景；少一点人物；构图偏左；雨夜火光更强…"
+                          className="min-h-[4.5rem] text-xs"
+                        />
                         <Button
                           type="button"
-                          variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-xs"
+                          className="h-7 text-xs"
                           disabled={
+                            !(revisionNotes[job.id] ?? "").trim() ||
+                            requeueingId === job.id ||
                             writing ||
                             enqueueBusy ||
                             (frameIndex !== null &&
@@ -836,10 +1008,12 @@ export function BatchFrameCompletion({
                           }
                           onClick={() => void requeueFromJob(job)}
                         >
-                          重新排队
+                          {requeueingId === job.id
+                            ? "排队中…"
+                            : "带意见重新排队"}
                         </Button>
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               );
@@ -862,34 +1036,18 @@ export function BatchFrameCompletion({
         </p>
       </div>
 
-      <Dialog
+      <FrameJobResultDialog
         open={preview !== null}
         onOpenChange={(open) => {
           if (!open) setPreview(null);
         }}
-      >
-        <DialogContent
-          showCloseButton
-          className="max-h-[90vh] max-w-[min(96vw,56rem)] overflow-auto p-4 sm:p-6"
-        >
-          <DialogHeader>
-            <DialogTitle className="truncate text-base">
-              {preview?.label ?? "画面预览"}
-            </DialogTitle>
-          </DialogHeader>
-          {preview?.url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview.url}
-              alt=""
-              className="mx-auto max-h-[75vh] w-auto max-w-full rounded object-contain bg-zinc-100"
-            />
-          ) : null}
-          <p className="text-muted-foreground text-xs">
-            Execution 结果预览（≠ Candidate ≠ Asset）。关闭后可继续 Accept。
-          </p>
-        </DialogContent>
-      </Dialog>
+        imageUrl={preview?.url ?? null}
+        inputJson={preview?.inputJson ?? null}
+        currentCaption={preview?.currentCaption}
+        currentRouteTitle={preview?.currentRouteTitle}
+        draftRevisionNote={preview?.draftRevisionNote}
+        title={preview?.label ? `${preview.label} · Job 预览` : "Job 画面预览"}
+      />
     </section>
   );
 }

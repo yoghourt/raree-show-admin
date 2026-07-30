@@ -33,6 +33,13 @@ const characterSchema = z.object({
       if (t.startsWith("http://") || t.startsWith("https://")) return t
       return undefined
     }),
+  operatorRevision: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const t = s?.trim()
+      return t ? t : undefined
+    }),
 })
 
 const inputSchema = z.object({
@@ -63,6 +70,7 @@ export async function enqueueCharacterPortraitJobs(input: {
     name: string
     description?: string
     referenceUrl?: string
+    operatorRevision?: string
   }>
 }): Promise<EnqueueCharacterPortraitJobsResult> {
   const parsed = inputSchema.safeParse(input)
@@ -110,6 +118,9 @@ export async function enqueueCharacterPortraitJobs(input: {
           : {}),
         ...(character.referenceUrl
           ? { reference_url: character.referenceUrl }
+          : {}),
+        ...(character.operatorRevision
+          ? { operator_revision: character.operatorRevision }
           : {}),
       }
 

@@ -12,10 +12,14 @@ import Link from "next/link";
 
 import { enqueueCharacterPortraitJobs } from "@/app/actions/enqueueCharacterPortraitJobs";
 import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
-import { PortraitJobResultDialog } from "@/components/generate-jobs/PortraitJobResultDialog";
+import {
+  PortraitJobResultDialog,
+  splitPortraitEnqueueDescription,
+} from "@/components/generate-jobs/PortraitJobResultDialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import * as charactersApi from "@/lib/characters";
+import { formatGenerateJobErrorForOperator } from "@/lib/ai/image/operatorErrorCopy";
 import {
   listGenerateJobsForWork,
   parseCharacterPortraitJobInput,
@@ -55,7 +59,7 @@ function mergeRevisionNote(
   baseDescription: string | undefined,
   revisionNote: string
 ): string | undefined {
-  const base = baseDescription?.trim() ?? "";
+  const base = splitPortraitEnqueueDescription(baseDescription).base;
   const note = revisionNote.trim();
   if (!note) return base || undefined;
   if (!base) return `[操作员修改意见] ${note}`;
@@ -71,6 +75,7 @@ function portraitEnqueuePayloadFromJob(
   name: string;
   description?: string;
   referenceUrl?: string;
+  operatorRevision?: string;
 } | null {
   if (job.subject_type !== "character") return null;
   let name = character?.name?.trim() || "";
@@ -79,7 +84,9 @@ function portraitEnqueuePayloadFromJob(
   try {
     const parsed = parseCharacterPortraitJobInput(job.input_json);
     if (!name) name = parsed.name;
-    if (!description) description = parsed.description;
+    if (!description) {
+      description = splitPortraitEnqueueDescription(parsed.description).base || undefined;
+    }
     referenceUrl = parsed.reference_url;
   } catch {
     // fall through with character / empty
@@ -95,11 +102,13 @@ function portraitEnqueuePayloadFromJob(
   ) {
     referenceUrl = character.portraitUrl;
   }
+  const note = revisionNote.trim();
   return {
     characterTsid: job.subject_id,
     name,
-    description: mergeRevisionNote(description, revisionNote),
+    description: mergeRevisionNote(description, note),
     ...(referenceUrl ? { referenceUrl } : {}),
+    ...(note ? { operatorRevision: note } : {}),
   };
 }
 
@@ -126,6 +135,7 @@ export function BatchPortraitCompletion({
     currentName?: string;
     currentDescription?: string;
     editHref?: string;
+    draftRevisionNote?: string | null;
   } | null>(null);
   const [retryPanelJobId, setRetryPanelJobId] = React.useState<string | null>(
     null
@@ -587,6 +597,7 @@ export function BatchPortraitCompletion({
                         currentName: character?.name,
                         currentDescription: character?.description,
                         editHref: `/works/${encodeURIComponent(workId)}/characters/${encodeURIComponent(job.subject_id)}/edit`,
+                        draftRevisionNote: revisionNotes[job.id] ?? null,
                       })
                     }
                     aria-label={`放大预览 ${name}`}
@@ -613,7 +624,10 @@ export function BatchPortraitCompletion({
                     </span>
                   </div>
                   {job.error ? (
-                    <p className="text-destructive">{job.error}</p>
+                    <p className="text-destructive">
+                      {formatGenerateJobErrorForOperator(job.error) ??
+                        job.error}
+                    </p>
                   ) : null}
                   <div className="flex flex-wrap items-center gap-2">
                     {canAccept ? (
@@ -746,6 +760,7 @@ export function BatchPortraitCompletion({
         currentName={preview?.currentName}
         currentDescription={preview?.currentDescription}
         editHref={preview?.editHref}
+        draftRevisionNote={preview?.draftRevisionNote}
         title={preview?.label ? `${preview.label} · Job 预览` : "Job 肖像预览"}
       />
     </section>

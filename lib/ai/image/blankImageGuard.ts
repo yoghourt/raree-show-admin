@@ -26,6 +26,24 @@ export type AssessBlankImageOptions = {
   minEdgeForCheck?: number;
 };
 
+/** Operator-facing copy (stored on Job.error / shown in Admin). */
+export function blankImageOperatorMessage(
+  assessment: BlankImageAssessment
+): string {
+  switch (assessment.reason) {
+    case "near_white_flat":
+      return "生成出了空白白图（几乎没有画面内容），已自动拒绝。可「附修改意见重试」。";
+    case "near_black_flat":
+      return "生成出了全黑图（几乎没有画面内容），已自动拒绝。可「附修改意见重试」。";
+    case "empty_buffer":
+    case "empty_pixels":
+    case "tiny_file":
+      return "生成结果无效（空文件或损坏），已自动拒绝。可重新排队重试。";
+    default:
+      return "生成结果不可用（空白或无效画面），已自动拒绝。可「附修改意见重试」。";
+  }
+}
+
 function lumaStdDev(samples: Uint8Array | Uint8ClampedArray): {
   mean: number;
   stdDev: number;
@@ -178,9 +196,7 @@ export class BlankImageError extends Error {
   readonly assessment: BlankImageAssessment;
 
   constructor(assessment: BlankImageAssessment) {
-    super(
-      `blank_image_rejected (${assessment.reason ?? "blank"}; mean=${assessment.meanLuma.toFixed(1)} std=${assessment.stdDev.toFixed(1)})`
-    );
+    super(blankImageOperatorMessage(assessment));
     this.name = "BlankImageError";
     this.assessment = assessment;
   }

@@ -5,7 +5,7 @@ import {
   assertHttpUrl,
   pasteUrlProvider,
 } from "@/lib/media-admission/providers/pasteUrl";
-import { buildFrameDraftPrompt } from "@/lib/prompts/frame-draft";
+import { buildFrameDraftPrompt, buildFrameNegativePrompt } from "@/lib/prompts/frame-draft";
 
 describe("pasteUrl provider", () => {
   it("accepts https URLs", async () => {
@@ -47,11 +47,42 @@ describe("frame draft prompt (derived Job input)", () => {
     });
     expect(prompt).toContain("街垒夜战");
     expect(prompt).toContain("巴黎起义");
-    expect(prompt.toLowerCase()).toContain("reading still");
+    expect(prompt.toLowerCase()).toContain("narrative reading still");
+    expect(prompt).toContain("Scene content (authoritative):");
+    expect(prompt).toContain("Must match scene:");
   });
 
   it("requires caption meaning via non-empty caption string", () => {
     const prompt = buildFrameDraftPrompt({ caption: "  alone  " });
     expect(prompt).toContain("alone");
+  });
+
+  it("promotes operator revision ahead of scene caption", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "街垒夜战\n\n[操作员修改意见] 雨夜、火光更强、少一点人",
+      routeTitle: "巴黎起义",
+    });
+    expect(prompt.indexOf("OPERATOR OVERRIDE")).toBeLessThan(
+      prompt.indexOf("街垒夜战")
+    );
+    expect(prompt).toContain("雨夜、火光更强、少一点人");
+    expect(prompt).toContain("巴黎起义");
+    expect(prompt.indexOf("Remember operator override")).toBeGreaterThan(
+      prompt.indexOf("Must match scene:")
+    );
+  });
+
+  it("repeats scene caption for weak local models", () => {
+    const prompt = buildFrameDraftPrompt({ caption: "桥上诀别" });
+    const hits = prompt.split("桥上诀别").length - 1;
+    expect(hits).toBeGreaterThanOrEqual(3);
+  });
+
+  it("frame negatives allow groups unlike avatar", () => {
+    const neg = buildFrameNegativePrompt("街垒夜战多人");
+    expect(neg).toContain("blank");
+    expect(neg).toContain("caption overlay");
+    expect(neg).not.toMatch(/\bcrowd\b/);
+    expect(neg).not.toMatch(/\bmultiple characters\b/);
   });
 });

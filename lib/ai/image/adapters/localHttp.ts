@@ -1,5 +1,6 @@
 import type { ImageGenerationProvider, ImageGenerationRequest, ImageGenerationResult } from "../types"
 import { buildAvatarNegativePrompt } from "@/lib/prompts/avatar"
+import { buildFrameNegativePrompt } from "@/lib/prompts/frame-draft"
 
 const DEFAULT_SIZE = { width: 768, height: 1024 }
 
@@ -75,7 +76,10 @@ export function createLocalHttpProvider(options?: {
           model: modelId,
           reference_url: ref,
           negative_prompt:
-            req.negativePrompt?.trim() || buildAvatarNegativePrompt(),
+            req.negativePrompt?.trim() ||
+            (req.assetSlot === "scene_frame"
+              ? buildFrameNegativePrompt()
+              : buildAvatarNegativePrompt()),
         }),
       })
 
