@@ -56,6 +56,27 @@ next-env.d.ts
 # Image Runtime Spike local artifacts (SPIKE-IMG-001)
 /spike-output/
 
+# Image generation architecture spike outputs (PNGs + per-run meta)
+/scripts/image-generation-spike/results/
+
+# Discovery Visual Intent spike outputs
+/scripts/discovery-visual-intent-spike/results/
+
+# Renderer boundary spike outputs
+/scripts/renderer-boundary-spike/results/
+
+# Capability adaptation spike outputs
+/scripts/capability-adaptation-spike/results/
+
+# Visual consistency spike outputs
+/scripts/visual-consistency-spike/results/
+
+# Discovery expression ownership spike outputs
+/scripts/discovery-expression-ownership-spike/results/
+
+# Discovery contract spike outputs
+/scripts/discovery-contract-spike/results/
+
 # Python virtualenvs (local image spike / Diffusers)
 .venv/
 **/.venv/

@@ -1,0 +1,25 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "discoveryModel": "gemini-3.5-flash-lite",
+  "cases": [
+    {
+      "id": "case-1",
+      "label": "Protection",
+      "source": "A young knight protecting an old king in a castle hall",
+      "intentFocus": "knight protects old king"
+    },
+    {
+      "id": "case-2",
+      "label": "Comfort",
+      "source": "A mother comforting a child after a battle",
+      "intentFocus": "mother comforts child after battle"
+    },
+    {
+      "id": "case-3",
+      "label": "Event",
+      "source": "Two warriors fighting beside a burning battlefield",
+      "intentFocus": "two warriors fighting on battlefield"
+    }
+  ]
+}

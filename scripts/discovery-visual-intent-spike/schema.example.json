@@ -1,0 +1,26 @@
+{
+  "_comment": "Temporary spike schema only. Not frozen. Not for production migration.",
+  "scene": {
+    "title": "Courtyard Protection",
+    "summary": "A young knight stands guard while an old king waits in a castle hall."
+  },
+  "visualIntent": {
+    "characters": [
+      {
+        "name": "young knight",
+        "role": "protector",
+        "position": "foreground, between threat and king"
+      },
+      {
+        "name": "old king",
+        "role": "protected",
+        "position": "behind knight, midground"
+      }
+    ],
+    "relationship": "knight protects king",
+    "event": "defensive stand against an off-frame threat",
+    "environment": "stone castle hall with arches and banners",
+    "composition": "medium shot, knight centered as shield for the king",
+    "emotion": "urgent loyalty"
+  }
+}
