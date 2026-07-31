@@ -24,6 +24,7 @@ import type {
 import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
 import { buildEntityCreateHandoffPath } from "@/lib/discovery/accept-prefill";
 import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
+import { parseRendererExpression } from "@/lib/discovery/visual-contract";
 
 export function createReviewId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -304,6 +305,10 @@ export function validateSceneAcceptFields(
   if (!isNonEmptyString(scene.title)) {
     errors.push("title is required");
   }
+  const expression = parseRendererExpression(scene.rendererExpression);
+  if (!expression.ok) {
+    errors.push(...expression.errors);
+  }
   if (errors.length > 0) {
     return { ok: false, fieldErrors: errors };
   }
@@ -362,6 +367,8 @@ export function buildSceneStaging(
     ...(isNonEmptyString(fields.summary)
       ? { summary: fields.summary.trim() }
       : {}),
+    ...(fields.visualIntent ? { visualIntent: fields.visualIntent } : {}),
+    rendererExpression: fields.rendererExpression,
     acceptedAt: new Date().toISOString(),
   };
 }

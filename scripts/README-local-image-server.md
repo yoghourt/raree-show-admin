@@ -140,22 +140,22 @@ Job succeeded 之后，在制作页同一 Job 列表：
    IMAGE_CREATOR_ACCEPT_MODEL=dreamshaper
    # 专测本机时：fallback 也指回 localai，避免误以为「云端好了」
    IMAGE_CREATOR_ACCEPT_FALLBACK=localai
-   IMAGE_CREATOR_LOCALAI_MAX_EDGE=768          # 长边上限（默认 768；1280×720 在 CPU 上极易超分钟级）
+   IMAGE_CREATOR_LOCALAI_MAX_EDGE=768          # 长边上限（默认 768）。scene_frame 现请求 512×512（不 clamp）
    IMAGE_CREATOR_LOCALAI_TIMEOUT_MS=600000     # 默认 10min
    # IMAGE_CREATOR_LOCALAI_KEY=...
    # 本机稳定后再开云 fallback：
    # IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
    # SILICONFLOW_API_KEY=...
    ```
-4. **必须重启** Admin：`npm run dev`（改 env 后不重启仍走旧配置）。
+4. **必须重启** Admin：`npm run dev`（改 env 后不重启仍走旧配置）；**Local Worker 也需重启**才会吃到新 size。
 5. **浏览器**（已登录）：
    - 角色表单：**生成肖像**
    - 和/或故事编辑画面页 / CPP：**AI 生图 / 生成草稿**
 6. **看终端日志**（期望 LocalAI 正常时）：
    ```text
-   [localai] clamping size… using: 768x432   # 或 [localai] generate
+   [executeSceneFrameImageGenerate] prompt { hasExpr, promptLen, size: '512x512' }
+   [localai] generate … size: '512x512'   # 或无 clamping（512 ≤ maxEdge）
    [capability:image.generate] … providerId: 'localai' … usedFallback: false
-   [generateFrameDraft] … usedFallback: false … cloudinaryOk: true
    ```
 7. **UI**：得到 Candidate 图 URL；**未**点「写入作品」/保存前不应写入 Asset。
 

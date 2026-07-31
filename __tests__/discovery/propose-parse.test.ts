@@ -28,19 +28,19 @@ describe("parseCandidateArray", () => {
   });
 
   it("parses single scene object under scenes key", () => {
-    const raw = `{"scenes":{"displayName":"Courtyard","summary":"s","fields":{"parentStoryCandidateId":"story-1","chapter_number":1,"title":"Courtyard","summary":"x"}}}`;
+    const raw = `{"scenes":{"displayName":"Courtyard","summary":"s","fields":{"parentStoryCandidateId":"story-1","chapter_number":1,"title":"Courtyard","summary":"x","rendererExpression":{"environment":"winter courtyard","characters":[],"action":"household stands facing gate","composition":"wide courtyard view"}}}}`;
     const items = parseCandidateArray(raw, "scene");
     expect(items).toHaveLength(1);
   });
 
   it("parses scene items without fields wrapper", () => {
-    const raw = `{"candidates":[{"displayName":"Feast","summary":"s","parentStoryCandidateId":"story-1","chapter_number":2,"chapter_title":"Catelyn I","title":"The Feast","summary":"Banquet scene."}]}`;
+    const raw = `{"candidates":[{"displayName":"Feast","summary":"s","parentStoryCandidateId":"story-1","chapter_number":2,"chapter_title":"Catelyn I","title":"The Feast","summary":"Banquet scene.","rendererExpression":{"environment":"winter courtyard","characters":[],"action":"household stands facing gate","composition":"wide courtyard view"}}]}`;
     const items = parseCandidateArray(raw, "scene");
     expect(items).toHaveLength(1);
   });
 
   it("parses legacy readingRoute key as scene alias", () => {
-    const raw = `{"readingRoute":[{"displayName":"Courtyard","summary":"s","fields":{"parentStoryCandidateId":"story-1","chapter_number":1,"title":"Courtyard"}}]}`;
+    const raw = `{"readingRoute":[{"displayName":"Courtyard","summary":"s","fields":{"parentStoryCandidateId":"story-1","chapter_number":1,"title":"Courtyard","rendererExpression":{"environment":"winter courtyard","characters":[],"action":"household stands facing gate","composition":"wide courtyard view"}}}]}`;
     const items = parseCandidateArray(raw, "scene");
     expect(items).toHaveLength(1);
   });
@@ -146,6 +146,12 @@ describe("dedupeCandidates", () => {
           chapter_number: 1,
           title: "Wight Encounter",
           summary: "beat",
+          rendererExpression: {
+            environment: "winter courtyard",
+            characters: [],
+            action: "household stands facing gate",
+            composition: "wide courtyard view",
+          },
         },
       },
     ];
@@ -198,6 +204,12 @@ describe("dedupeCandidates", () => {
           chapter_number: 1,
           title: "Wight Encounter",
           summary: "duel",
+          rendererExpression: {
+            environment: "winter courtyard",
+            characters: [],
+            action: "household stands facing gate",
+            composition: "wide courtyard view",
+          },
         },
       },
     ];

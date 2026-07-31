@@ -1,0 +1,20 @@
+{
+  "styleSuffix": "Cinematic narrative illustration for a story frame, clear readable scene, coherent composition, no text, no watermark, no logo.",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "label": "Character relationship",
+      "prompt": "A young knight protecting an old king in a castle hall"
+    },
+    {
+      "id": "scene-2",
+      "label": "Location understanding",
+      "prompt": "A village hidden in a snowy mountain valley at night"
+    },
+    {
+      "id": "scene-3",
+      "label": "Event/action understanding",
+      "prompt": "Two warriors fighting beside a burning battlefield"
+    }
+  ]
+}

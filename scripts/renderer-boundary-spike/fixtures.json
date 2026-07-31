@@ -1,0 +1,64 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "scenes": [
+    {
+      "id": "scene-1",
+      "label": "Relationship",
+      "source": "A young knight protecting an old king in a castle hall",
+      "required": {
+        "characters": ["young knight", "old king"],
+        "relationship": "knight protects king",
+        "composition": "knight as protector in front of king"
+      },
+      "visualIntent": {
+        "characters": [
+          {
+            "name": "Young Knight",
+            "role": "Defender",
+            "position": "Forefront, standing guard with a weapon drawn"
+          },
+          {
+            "name": "Old King",
+            "role": "Protected Sovereign",
+            "position": "Behind the knight, vulnerable yet dignified"
+          }
+        ],
+        "relationship": "Vigilant guardianship; absolute duty and loyalty under imminent peril",
+        "event": "A protective stand in the final moments before an assault",
+        "environment": "A solemn, imposing castle hall with stone architecture",
+        "composition": "Tension-focused framing with the knight shielding the king, creating depth and a clear barrier against the foreground",
+        "emotion": "Grim determination, quiet dread, and steadfast courage"
+      }
+    },
+    {
+      "id": "scene-2",
+      "label": "Event",
+      "source": "Two warriors fighting beside a burning battlefield",
+      "required": {
+        "characters": ["warrior one", "warrior two"],
+        "relationship": "fighting / combat",
+        "composition": "two fighters with fire battlefield"
+      },
+      "visualIntent": {
+        "characters": [
+          {
+            "name": "Warrior One",
+            "role": "Combatant",
+            "position": "Foreground left, actively engaged in melee"
+          },
+          {
+            "name": "Warrior Two",
+            "role": "Combatant",
+            "position": "Foreground right, locked in combat"
+          }
+        ],
+        "relationship": "Hostile opponents locked in direct, physical confrontation",
+        "event": "A fierce duel taking place on an active warzone",
+        "environment": "A desolate battlefield engulfed in flames and smoke",
+        "composition": "Dynamic medium shot focusing tightly on the two fighters, framed by the chaos of the burning background",
+        "emotion": "Intense, gritty, and desperate"
+      }
+    }
+  ]
+}

@@ -11,6 +11,7 @@ const d = messages.discovery;
 
 export const DISCOVERY_PAGE_TITLE = d.pageTitle;
 export const DISCOVERY_PAGE_SUBTITLE = d.pageSubtitle;
+export const DISCOVERY_GO_PRODUCTION = d.goProduction;
 
 export const DISCOVERY_CANDIDATE_TYPE_LABELS: Record<
   DiscoveryCandidateType,

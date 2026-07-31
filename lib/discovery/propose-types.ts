@@ -6,6 +6,10 @@
  */
 
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
+import type {
+  RendererExpression,
+  VisualIntent,
+} from "@/lib/discovery/visual-contract";
 
 export type DiscoveryCandidateType =
   | "character"
@@ -54,6 +58,16 @@ export interface SceneCandidateFields {
   chapter_number: number | string;
   title: string;
   summary?: string;
+  /**
+   * Narrative meaning (audit). Optional by scene; not Renderer input.
+   * ADR-011 A3 / SPEC-DVE-001.
+   */
+  visualIntent?: VisualIntent | null;
+  /**
+   * Renderer-executable form — required for scene propose (PA-F).
+   * Sole generation input after Accept → provenance.
+   */
+  rendererExpression: RendererExpression;
 }
 
 export type DiscoveryCandidateFields =

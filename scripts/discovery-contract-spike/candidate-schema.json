@@ -1,0 +1,44 @@
+{
+  "_comment": "Spike candidate only — not production schema, not SPEC freeze.",
+  "discoveryVisualContract": {
+    "visualIntent": {
+      "required": ["characters", "relationship"],
+      "optional": ["purpose", "emotion"],
+      "forbidden": ["camera", "composition", "promptWording", "styleHints"]
+    },
+    "rendererExpression": {
+      "required": ["environment", "characters", "action", "composition"],
+      "optional": ["lighting"],
+      "forbidden": ["relationshipInterpretation", "storyPurpose", "emotionAsSoleCue"],
+      "charactersItem": {
+        "required": ["role", "visual"]
+      }
+    }
+  },
+  "example": {
+    "visualIntent": {
+      "characters": [
+        { "role": "knight", "name": "Young Knight" },
+        { "role": "king", "name": "Old King" }
+      ],
+      "relationship": "knight protects king",
+      "emotion": "tension",
+      "purpose": "show loyalty under threat"
+    },
+    "rendererExpression": {
+      "environment": "stone castle hall",
+      "characters": [
+        {
+          "role": "knight",
+          "visual": "standing in foreground holding a raised sword"
+        },
+        {
+          "role": "king",
+          "visual": "standing behind the knight"
+        }
+      ],
+      "action": "knight in defensive posture facing outward",
+      "composition": "foreground knight, background king"
+    }
+  }
+}

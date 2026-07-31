@@ -1,0 +1,151 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "size": 512,
+  "cases": [
+    {
+      "id": "case-duel",
+      "label": "Two-character duel",
+      "intentSummary": "knight fights white walker",
+      "levels": {
+        "full": {
+          "environment": "snow-covered clearing illuminated by pale blue moonlight reflecting off ice",
+          "characters": [
+            {
+              "role": "knight",
+              "visual": "young noble in steel armor, holding a raised steel sword in defensive stance"
+            },
+            {
+              "role": "white_walker",
+              "visual": "tall gaunt ice warrior with pale skin, holding a glowing translucent ice sword"
+            }
+          ],
+          "action": "knight on the left and white walker on the right face each other with swords raised toward the center",
+          "composition": "both full bodies visible in a medium shot; steel sword and ice sword meeting near frame center",
+          "lighting": "cold moonlight",
+          "styleHints": "dark fantasy illustration"
+        },
+        "minimal": {
+          "environment": "snow clearing",
+          "characters": [
+            {
+              "role": "knight",
+              "visual": "armored knight holding sword"
+            },
+            {
+              "role": "white_walker",
+              "visual": "ice warrior holding sword"
+            }
+          ],
+          "action": "two warriors facing each other with swords crossed",
+          "composition": "two characters facing each other"
+        },
+        "compressed": {
+          "environment": "snow battlefield",
+          "characters": [
+            { "role": "knight", "visual": "knight" },
+            { "role": "white_walker", "visual": "white walker" }
+          ],
+          "action": "fight",
+          "composition": "battle scene"
+        }
+      }
+    },
+    {
+      "id": "case-throat",
+      "label": "Power / threat relationship",
+      "intentSummary": "wight overwhelms ranger",
+      "levels": {
+        "full": {
+          "environment": "dark snowy forest at night, cold blue moonlight filtering through bare trees",
+          "characters": [
+            {
+              "role": "wight",
+              "visual": "tall undead corpse with glowing icy blue eyes, hands gripping the other character collar"
+            },
+            {
+              "role": "ranger",
+              "visual": "ranger lying on snow, looking upward in terror, hands reaching toward the attacker"
+            }
+          ],
+          "action": "undead towering over fallen ranger, hands gripping ranger collar on snow, both figures fully visible",
+          "composition": "undead standing in foreground looking down, ranger on snow below, both full bodies visible in wide shot",
+          "lighting": "cold blue moonlight",
+          "styleHints": "dark fantasy illustration"
+        },
+        "minimal": {
+          "environment": "dark snowy forest",
+          "characters": [
+            {
+              "role": "wight",
+              "visual": "undead standing over fallen ranger"
+            },
+            {
+              "role": "ranger",
+              "visual": "fallen ranger on snow"
+            }
+          ],
+          "action": "undead standing above fallen ranger",
+          "composition": "two figures, one standing one fallen"
+        },
+        "compressed": {
+          "environment": "snow forest",
+          "characters": [
+            { "role": "wight", "visual": "wight" },
+            { "role": "ranger", "visual": "ranger" }
+          ],
+          "action": "threat",
+          "composition": "confrontation"
+        }
+      }
+    },
+    {
+      "id": "case-camp",
+      "label": "Camp discussion",
+      "intentSummary": "commander and ranger discuss at corpse camp",
+      "levels": {
+        "full": {
+          "environment": "haunted forest at night with snow-covered ground and dark towering pine trees",
+          "characters": [
+            {
+              "role": "commander",
+              "visual": "young noble commander in dark leather and fur cloak, standing upright with hand on sword pommel"
+            },
+            {
+              "role": "ranger",
+              "visual": "seasoned ranger in weathered leather, facing the commander near frozen corpses"
+            }
+          ],
+          "action": "commander pointing toward corpse field, ranger facing commander, both standing visible in snow forest",
+          "composition": "commander on the left, ranger on the right, both full bodies visible mid-shot among frozen bodies",
+          "lighting": "dim forest night light",
+          "styleHints": "dark fantasy illustration"
+        },
+        "minimal": {
+          "environment": "snowy forest camp",
+          "characters": [
+            {
+              "role": "commander",
+              "visual": "commander standing"
+            },
+            {
+              "role": "ranger",
+              "visual": "ranger standing"
+            }
+          ],
+          "action": "two rangers facing each other talking",
+          "composition": "two characters standing facing each other"
+        },
+        "compressed": {
+          "environment": "snow camp",
+          "characters": [
+            { "role": "commander", "visual": "commander" },
+            { "role": "ranger", "visual": "ranger" }
+          ],
+          "action": "talk",
+          "composition": "camp scene"
+        }
+      }
+    }
+  ]
+}

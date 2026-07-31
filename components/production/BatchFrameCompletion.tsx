@@ -30,6 +30,8 @@ type PendingFill = {
   frameIndex: number;
   caption: string;
   routeTitle: string;
+  /** Creator: Expression present on frame_provenance_v1 for this frame. */
+  hasRendererExpression: boolean;
   providerId: MediaAdmissionProviderId;
   /** Candidate URL after obtain/generate — not Asset truth until Write */
   candidateUrl: string | null;
@@ -112,6 +114,28 @@ function frameAssetUrl(
   return typeof url === "string" && url.trim() ? url.trim() : null;
 }
 
+function jobHasRendererExpression(job: GenerateJobRow): boolean {
+  return Boolean(job.input_json?.renderer_expression);
+}
+
+function ExpressionBadge({ has }: { has: boolean }) {
+  return has ? (
+    <span
+      className="inline-flex shrink-0 rounded border border-teal-700/30 bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-900"
+      title="生成将使用 Discovery Renderer Expression（短 prompt）"
+    >
+      Expression
+    </span>
+  ) : (
+    <span
+      className="inline-flex shrink-0 rounded border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600"
+      title="无 Expression：将走 caption 长包装（旧帧 / 未重新 Propose）"
+    >
+      Caption only
+    </span>
+  );
+}
+
 /** In-flight Execution jobs: block duplicate enqueue for the same frame. */
 function activeJobForFrame(
   jobs: GenerateJobRow[],
@@ -185,6 +209,9 @@ export function BatchFrameCompletion({
           frameIndex,
           caption: frame.caption,
           routeTitle: route.title || route.tsid,
+          hasRendererExpression: Boolean(
+            route.frameHasRendererExpression?.[frameIndex]
+          ),
           providerId: "local_upload",
           candidateUrl: null,
           candidateLabel: null,
@@ -411,6 +438,53 @@ export function BatchFrameCompletion({
     }
   };
 
+  const discardFrameJob = async (job: GenerateJobRow) => {
+    setRequeueingId(job.id);
+    setWriteError(null);
+    try {
+      const result = await discardGenerateJob({
+        workId,
+        jobId: job.id,
+        reason: "operator_discarded",
+      });
+      if (!result.ok) {
+        setWriteError(result.message);
+        return;
+      }
+      const frameIndex = jobFrameIndex(job);
+      const hosted = jobHosted(job);
+      if (frameIndex !== null && hosted?.url) {
+        const key = rowKey(job.subject_id, frameIndex);
+        setRows((prev) =>
+          prev.map((r) =>
+            rowKey(r.routeTsid, r.frameIndex) === key &&
+            r.candidateUrl === hosted.url
+              ? { ...r, candidateUrl: null, candidateLabel: null }
+              : r
+          )
+        );
+      }
+      setRetryPanelJobId(null);
+      setRevisionNotes((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
+      await refreshJobs();
+      setAdmitHint("已丢弃该任务（不写入 Asset）。");
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRequeueingId(null);
+    }
+  };
+
+  const clearCandidateForRow = (row: PendingFill) => {
+    const key = rowKey(row.routeTsid, row.frameIndex);
+    patchRow(key, { candidateUrl: null, candidateLabel: null });
+    setAdmitHint("已清除该帧候选（未写 Asset）。");
+  };
+
   const requeueFromJob = async (job: GenerateJobRow) => {
     if (job.subject_type !== "scene") return;
     const frameIndex = jobFrameIndex(job);
@@ -531,16 +605,42 @@ export function BatchFrameCompletion({
       className="space-y-3 scroll-mt-8"
       aria-labelledby="batch-frames-heading"
     >
-      <div>
-        <h2
-          id="batch-frames-heading"
-          className="text-base font-semibold text-zinc-900"
-        >
-          批量补齐画面图
-        </h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          排队 → Worker → Candidate → Accept 写 Asset。Job ≠ Candidate ≠ Asset。
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2
+            id="batch-frames-heading"
+            className="text-base font-semibold text-zinc-900"
+          >
+            批量补齐画面图
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            排队 → Worker → Candidate → Accept 写 Asset。Job ≠ Candidate ≠ Asset。
+            青绿「Expression」= Discovery 短 prompt；灰「Caption only」= 旧帧长包装。
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            disabled={
+              writing || enqueueBusy || enqueueableRows.length === 0
+            }
+            onClick={() => void enqueueRows(rows)}
+          >
+            {enqueueBusy
+              ? "排队中…"
+              : `缺画面排队（${enqueueableRows.length}）`}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={enqueueBusy}
+            onClick={() => void refreshJobs()}
+          >
+            刷新
+          </Button>
+        </div>
       </div>
 
       {writeError ? (
@@ -585,9 +685,12 @@ export function BatchFrameCompletion({
                     />
                   ) : null}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-900">
-                      {row.routeTitle} · 帧 {row.frameIndex + 1}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-medium text-zinc-900">
+                        {row.routeTitle} · 帧 {row.frameIndex + 1}
+                      </p>
+                      <ExpressionBadge has={row.hasRendererExpression} />
+                    </div>
                     <p className="truncate text-xs text-zinc-500">{row.caption}</p>
                     {enqueueBlocked ? (
                       <p className="mt-1 text-[11px] text-amber-700">
@@ -622,6 +725,18 @@ export function BatchFrameCompletion({
                         : "已排队"
                       : "排队生成"}
                   </Button>
+                  {row.candidateUrl ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={row.busy || writing || enqueueBusy}
+                      onClick={() => clearCandidateForRow(row)}
+                      className="text-zinc-500"
+                    >
+                      清除候选
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="outline"
@@ -710,23 +825,9 @@ export function BatchFrameCompletion({
       )}
 
       {rows.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={
-              writing || enqueueBusy || enqueueableRows.length === 0
-            }
-            onClick={() => void enqueueRows(rows)}
-          >
-            {enqueueBusy
-              ? "排队中…"
-              : `全部排队（${enqueueableRows.length}）`}
-          </Button>
-          <p className="text-xs text-zinc-500">
-            已 queued/running 的帧不会重复入队；Worker 跑完后再 Accept。
-          </p>
-        </div>
+        <p className="text-xs text-zinc-500">
+          顶部「缺画面排队」可一次入队全部可排帧；已 queued/running 的不会重复入队。
+        </p>
       ) : null}
 
       <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 px-4 py-3">
@@ -834,10 +935,11 @@ export function BatchFrameCompletion({
                     </button>
                   ) : null}
                   <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                       <span className="font-medium text-zinc-800">
                         {job.status}
                       </span>
+                      <ExpressionBadge has={jobHasRendererExpression(job)} />
                       <span className="text-zinc-500">
                         {job.subject_id} · {frameLabel}
                       </span>
@@ -963,6 +1065,20 @@ export function BatchFrameCompletion({
                             {retryPanelJobId === job.id
                               ? "收起修改意见"
                               : "附修改意见重试"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-zinc-500"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id
+                            }
+                            onClick={() => void discardFrameJob(job)}
+                          >
+                            {requeueingId === job.id ? "处理中…" : "丢弃"}
                           </Button>
                         </>
                       ) : null}

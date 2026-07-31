@@ -10,6 +10,14 @@ import type {
   DiscoveryCandidate,
   DiscoveryCandidateType,
 } from "@/lib/discovery/propose-types";
+import {
+  findCastConsistencyErrors,
+  findForbiddenPhysicsCues,
+} from "@/lib/discovery/expression-capability-rules";
+import {
+  parseRendererExpression,
+  parseVisualIntent,
+} from "@/lib/discovery/visual-contract";
 
 const ASSET_FIELD_NAMES = new Set([
   "portraitUrl",
@@ -195,6 +203,39 @@ function validateSceneFields(
   if (!isNonEmptyString(fields.title)) {
     return { ok: false, errors: ["Scene fields require non-empty title"] };
   }
+
+  const expressionResult = parseRendererExpression(fields.rendererExpression);
+  if (!expressionResult.ok) {
+    return { ok: false, errors: expressionResult.errors };
+  }
+
+  // A4 propose hard-gate: reject complex physics cues (static geometry only).
+  const physicsHits = findForbiddenPhysicsCues(expressionResult.value);
+  if (physicsHits.length) {
+    return {
+      ok: false,
+      errors: [
+        `rendererExpression forbids physics cues (A4): ${physicsHits.join(", ")} — use static visible geometry`,
+      ],
+    };
+  }
+
+  // Rule 5: action/composition actor count ↔ characters[] consistency.
+  const castErrors = findCastConsistencyErrors(expressionResult.value);
+  if (castErrors.length) {
+    return {
+      ok: false,
+      errors: castErrors.map(
+        (e) => `rendererExpression cast inconsistency: ${e}`
+      ),
+    };
+  }
+
+  const intentResult = parseVisualIntent(fields.visualIntent);
+  if (!intentResult.ok) {
+    return { ok: false, errors: intentResult.errors };
+  }
+
   const parsedChapter = Number(String(chapterNumber).trim());
   return {
     ok: true,
@@ -209,6 +250,8 @@ function validateSceneFields(
         ? { chapter_title: fields.chapter_title ?? null }
         : {}),
       ...(isNonEmptyString(fields.summary) ? { summary: fields.summary.trim() } : {}),
+      ...(intentResult.value ? { visualIntent: intentResult.value } : {}),
+      rendererExpression: expressionResult.value,
     },
   };
 }

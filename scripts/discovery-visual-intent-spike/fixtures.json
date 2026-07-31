@@ -1,0 +1,27 @@
+{
+  "workTitle": "Spike Narrative Fixtures",
+  "scenes": [
+    {
+      "id": "scene-1",
+      "label": "Character relationship",
+      "source": "A young knight protecting an old king in a castle hall",
+      "expect": [
+        "two characters",
+        "protection relationship",
+        "knight between danger and king"
+      ]
+    },
+    {
+      "id": "scene-2",
+      "label": "Location",
+      "source": "A village hidden in a snowy mountain valley at night",
+      "expect": ["village", "mountain", "snow", "night atmosphere"]
+    },
+    {
+      "id": "scene-3",
+      "label": "Event",
+      "source": "Two warriors fighting beside a burning battlefield",
+      "expect": ["two warriors", "conflict", "battlefield", "fire"]
+    }
+  ]
+}

@@ -43,6 +43,37 @@ export const acceptedStoryUnitStagingSchema = z.object({
   locationId: z.string().nullable().optional(),
 });
 
+const rendererExpressionCharacterSchema = z.object({
+  role: z.string().trim().min(1),
+  visual: z.string().trim().min(1),
+});
+
+const rendererExpressionSchema = z.object({
+  environment: z.string().trim().min(1),
+  characters: z.array(rendererExpressionCharacterSchema),
+  action: z.string().trim().min(1),
+  composition: z.string().trim().min(1),
+  lighting: z.string().trim().min(1).optional(),
+  styleHints: z.string().trim().min(1).optional(),
+});
+
+const visualIntentSchema = z
+  .object({
+    characters: z
+      .array(
+        z.object({
+          role: z.string().trim().min(1),
+          name: z.string().trim().min(1).optional(),
+        })
+      )
+      .optional(),
+    relationship: z.string().nullable().optional(),
+    emotion: z.string().trim().min(1).optional(),
+    purpose: z.string().trim().min(1).optional(),
+  })
+  .nullable()
+  .optional();
+
 /** Queue / import staging — parent fields preferred; legacy may omit. */
 export const acceptedSceneCandidateStagingSchema = z.object({
   workId: stagingWorkId,
@@ -53,6 +84,8 @@ export const acceptedSceneCandidateStagingSchema = z.object({
   chapter_number: z.union([z.number(), z.string()]),
   title: z.string().trim().min(1),
   summary: z.string().optional(),
+  visualIntent: visualIntentSchema,
+  rendererExpression: rendererExpressionSchema.optional(),
   acceptedAt: z.string().min(1),
 });
 

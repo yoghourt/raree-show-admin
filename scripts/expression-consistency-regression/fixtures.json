@@ -1,0 +1,47 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "size": 512,
+  "cases": [
+    {
+      "id": "case-duel",
+      "label": "Duel (stable)",
+      "expression": {
+        "environment": "snowy forest clearing at night",
+        "characters": [
+          { "role": "knight", "visual": "armored knight holding steel sword" },
+          { "role": "white_walker", "visual": "tall gaunt creature holding ice sword" }
+        ],
+        "action": "knight and white walker facing each other with raised swords",
+        "composition": "two warriors facing each other in forest clearing"
+      }
+    },
+    {
+      "id": "case-camp",
+      "label": "Three rangers (cast-consistent)",
+      "expression": {
+        "environment": "snowy pine forest",
+        "characters": [
+          { "role": "ranger", "visual": "ranger holding spear" },
+          { "role": "ranger", "visual": "ranger holding bow" },
+          { "role": "commander", "visual": "commander holding sword" }
+        ],
+        "action": "three rangers standing near frozen bodies on snow",
+        "composition": "three figures standing in forest clearing"
+      }
+    },
+    {
+      "id": "case-tree",
+      "label": "Tree climb (capability boundary)",
+      "expression": {
+        "environment": "dark forest clearing at night",
+        "characters": [
+          { "role": "scout", "visual": "scout climbing tree branches" },
+          { "role": "commander", "visual": "knight standing below holding drawn sword" }
+        ],
+        "action": "scout climbing tall ironwood tree while commander waits below",
+        "composition": "scout in upper tree branches, knight on ground below"
+      }
+    }
+  ]
+}

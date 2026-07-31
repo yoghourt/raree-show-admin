@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { parseFrameProvenance } from "@/lib/rollout/scenes-server";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
 
 const TABLE = "scenes";
@@ -26,6 +27,7 @@ type ReadingRouteRow = {
   story_images_v2: unknown | null;
   location_id: string;
   character_ids: string[] | null;
+  frame_provenance_v1?: unknown;
 };
 
 function parseStoryImagesV2(raw: unknown): ReadingFrame[] | null {
@@ -46,6 +48,13 @@ function parseStoryImagesV2(raw: unknown): ReadingFrame[] | null {
 }
 
 function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
+  const frames = parseStoryImagesV2(row.story_images_v2);
+  const provenance = parseFrameProvenance(row.frame_provenance_v1);
+  const frameHasRendererExpression = (frames ?? []).map((_, frameIndex) =>
+    provenance.some(
+      (p) => p.frameIndex === frameIndex && Boolean(p.rendererExpression)
+    )
+  );
   return {
     workId: row.work_id,
     tsid: row.tsid,
@@ -54,9 +63,10 @@ function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
     chapter_title: row.chapter_title ?? null,
     summary: row.summary,
     tags: row.tags ?? [],
-    story_images_v2: parseStoryImagesV2(row.story_images_v2),
+    story_images_v2: frames,
     locationId: locationIdFromDb(row.location_id),
     characterIds: row.character_ids ?? [],
+    frameHasRendererExpression,
   };
 }
 

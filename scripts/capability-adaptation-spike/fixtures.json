@@ -1,0 +1,57 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "scenes": [
+    {
+      "id": "scene-1",
+      "label": "Relationship (protection)",
+      "source": "A young knight protecting an old king in a castle hall",
+      "readerQuestion": "Can a reader see that a knight is protecting an old king?",
+      "visualIntent": {
+        "characters": [
+          { "name": "Young Knight", "role": "Defender", "position": "in front" },
+          { "name": "Old King", "role": "Protected", "position": "behind knight" }
+        ],
+        "relationship": "knight protects king",
+        "event": "protective stand",
+        "environment": "castle hall",
+        "composition": "knight in front of king, blocking danger",
+        "emotion": "duty and urgency"
+      }
+    },
+    {
+      "id": "scene-2",
+      "label": "Emotional relationship (comfort)",
+      "source": "A mother comforting a child after a battle",
+      "readerQuestion": "Can a reader see that a mother is comforting a child after battle?",
+      "visualIntent": {
+        "characters": [
+          { "name": "Mother", "role": "Comforter", "position": "kneeling or seated, holding child" },
+          { "name": "Child", "role": "Comforted", "position": "in mother's arms" }
+        ],
+        "relationship": "mother comforts child",
+        "event": "comfort after battle",
+        "environment": "battlefield edge, smoke in distance",
+        "composition": "close embrace, mother wrapping child",
+        "emotion": "tenderness amid aftermath"
+      }
+    },
+    {
+      "id": "scene-3",
+      "label": "Event (control — already supported)",
+      "source": "Two warriors fighting beside a burning battlefield",
+      "readerQuestion": "Can a reader see two warriors fighting by a burning battlefield?",
+      "visualIntent": {
+        "characters": [
+          { "name": "Warrior One", "role": "Combatant", "position": "left" },
+          { "name": "Warrior Two", "role": "Combatant", "position": "right" }
+        ],
+        "relationship": "hostile combat",
+        "event": "two warriors fighting",
+        "environment": "burning battlefield",
+        "composition": "two fighters in melee with fire behind",
+        "emotion": "intense conflict"
+      }
+    }
+  ]
+}

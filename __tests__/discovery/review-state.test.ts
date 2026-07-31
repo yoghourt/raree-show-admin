@@ -176,6 +176,12 @@ describe("Accept handoff guards", () => {
         parentStoryCandidateId: "story-cand-1",
         chapter_number: 1,
         title: "Courtyard",
+        rendererExpression: {
+          environment: "winter courtyard",
+          characters: [],
+          action: "household stands facing gate",
+          composition: "wide courtyard view",
+        },
       },
     });
     const items = createReviewItems([story, scene]);
@@ -202,6 +208,12 @@ describe("Accept handoff guards", () => {
         chapter_number: 1,
         title: "Courtyard",
         summary: "Arrival",
+        rendererExpression: {
+          environment: "winter courtyard",
+          characters: [],
+          action: "household stands facing gate",
+          composition: "wide courtyard view",
+        },
       },
     });
     const items = createReviewItems([story, scene]);
@@ -222,6 +234,9 @@ describe("Accept handoff guards", () => {
         items[0]!.reviewId
       );
       expect(sceneAccept.staging.parentStoryTitle).toBe("The Arc");
+      expect(sceneAccept.staging.rendererExpression?.environment).toBe(
+        "winter courtyard"
+      );
     }
   });
 
@@ -240,6 +255,12 @@ describe("Accept handoff guards", () => {
         parentStoryCandidateId: "story-cand-1",
         chapter_number: 1,
         title: "Courtyard",
+        rendererExpression: {
+          environment: "winter courtyard",
+          characters: [],
+          action: "household stands facing gate",
+          composition: "wide courtyard view",
+        },
       },
     });
     const sceneBad = makeCandidate({
@@ -250,6 +271,12 @@ describe("Accept handoff guards", () => {
         parentStoryCandidateId: "story-cand-1",
         chapter_number: 0,
         title: "Broken",
+        rendererExpression: {
+          environment: "winter courtyard",
+          characters: [],
+          action: "household stands facing gate",
+          composition: "wide courtyard view",
+        },
       },
     });
     const char = makeCandidate({
@@ -297,6 +324,12 @@ describe("Accept handoff guards", () => {
         parentStoryCandidateId: "story-cand-1",
         chapter_number: 1,
         title: "Courtyard",
+        rendererExpression: {
+          environment: "winter courtyard",
+          characters: [],
+          action: "household stands facing gate",
+          composition: "wide courtyard view",
+        },
       },
     });
     let items = createReviewItems([story, scene]);

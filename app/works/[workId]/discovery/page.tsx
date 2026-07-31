@@ -6,9 +6,11 @@ import { useParams, useSearchParams } from "next/navigation";
 import * as React from "react";
 
 import { DiscoveryComposer } from "@/components/discovery/DiscoveryComposer";
+import { Button } from "@/components/ui/button";
 import { useDiscoverySession } from "@/hooks/useDiscoverySession";
 import { useRollout } from "@/hooks/useRollout";
 import {
+  DISCOVERY_GO_PRODUCTION,
   DISCOVERY_PAGE_SUBTITLE,
   DISCOVERY_PAGE_TITLE,
 } from "@/lib/discovery/ui-copy";
@@ -144,11 +146,20 @@ export default function WorkDiscoveryPage() {
         <span className="font-medium text-zinc-800">{DISCOVERY_PAGE_TITLE}</span>
       </nav>
 
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          {DISCOVERY_PAGE_TITLE}
-        </h1>
-        <p className="text-muted-foreground text-sm">{DISCOVERY_PAGE_SUBTITLE}</p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+            {DISCOVERY_PAGE_TITLE}
+          </h1>
+          <p className="text-muted-foreground text-sm">{DISCOVERY_PAGE_SUBTITLE}</p>
+        </div>
+        {workId ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/works/${encodeURIComponent(workId)}/production`}>
+              {DISCOVERY_GO_PRODUCTION}
+            </Link>
+          </Button>
+        ) : null}
       </header>
 
       {operatorId ? (

@@ -78,6 +78,22 @@ describe("frame draft prompt (derived Job input)", () => {
     expect(hits).toBeGreaterThanOrEqual(3);
   });
 
+  it("prefers short rendererExpression transport over caption wrapper", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "legacy caption",
+      rendererExpression: {
+        environment: "bridge at dusk",
+        characters: [{ role: "lovers", visual: "facing each other" }],
+        action: "couple parting on bridge",
+        composition: "centered couple, river below",
+      },
+    });
+    expect(prompt).toContain("couple parting on bridge");
+    expect(prompt).not.toContain("legacy caption");
+    expect(prompt).not.toContain("Scene content (authoritative)");
+    expect(prompt.length).toBeLessThan(600);
+  });
+
   it("frame negatives allow groups unlike avatar", () => {
     const neg = buildFrameNegativePrompt("街垒夜战多人");
     expect(neg).toContain("blank");

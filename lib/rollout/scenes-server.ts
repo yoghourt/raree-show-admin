@@ -1,15 +1,28 @@
 /**
- * Hotfix — server-side scenes helpers with Discovery provenance.
+ * Hot path — server-side scenes helpers with Discovery provenance.
  * Reader contract for story_images_v2 remains [{url, caption}].
+ * Creator-only Expression/Intent live on frame_provenance_v1 (ADR-011 A3).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type {
+  RendererExpression,
+  VisualIntent,
+} from "@/lib/discovery/visual-contract";
+import {
+  parseRendererExpression,
+  parseVisualIntent,
+} from "@/lib/discovery/visual-contract";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
 
 export type FrameProvenanceEntry = {
   sourceReviewId: string;
   frameIndex: number;
+  /** Creator generation input — not Reader Truth. */
+  rendererExpression?: RendererExpression;
+  /** Audit only — MUST NOT be fed to Image Port. */
+  visualIntent?: VisualIntent | null;
 };
 
 export type SceneRowWithProvenance = {
@@ -58,10 +71,25 @@ export function parseFrameProvenance(raw: unknown): FrameProvenanceEntry[] {
       typeof (item as { sourceReviewId?: unknown }).sourceReviewId === "string" &&
       typeof (item as { frameIndex?: unknown }).frameIndex === "number"
     ) {
-      out.push({
-        sourceReviewId: (item as FrameProvenanceEntry).sourceReviewId,
-        frameIndex: (item as FrameProvenanceEntry).frameIndex,
-      });
+      const rec = item as FrameProvenanceEntry & {
+        rendererExpression?: unknown;
+        visualIntent?: unknown;
+      };
+      const entry: FrameProvenanceEntry = {
+        sourceReviewId: rec.sourceReviewId,
+        frameIndex: rec.frameIndex,
+      };
+      const expr = parseRendererExpression(rec.rendererExpression);
+      if (expr.ok) {
+        entry.rendererExpression = expr.value;
+      }
+      if ("visualIntent" in rec) {
+        const intent = parseVisualIntent(rec.visualIntent);
+        if (intent.ok && intent.value) {
+          entry.visualIntent = intent.value;
+        }
+      }
+      out.push(entry);
     }
   }
   return out;

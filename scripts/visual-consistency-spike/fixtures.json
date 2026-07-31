@@ -1,0 +1,58 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "storyTitle": "The Knight and the King",
+  "frames": [
+    {
+      "id": "frame-1",
+      "beat": "arrival",
+      "narrative": "A young knight arrives at a stone castle.",
+      "exactIntent": "A young knight on horseback arriving at the gates of a grand stone castle under cloudy skies.",
+      "adaptedExpression": "Young knight in armor walking toward a stone castle gate. Tall castle towers. Overcast sky."
+    },
+    {
+      "id": "frame-2",
+      "beat": "meeting",
+      "narrative": "The knight meets an old king in the castle hall.",
+      "exactIntent": "A young knight and an old crowned king facing each other and speaking in a castle hall.",
+      "adaptedExpression": "Young knight and elderly king standing near each other in a stone castle hall. Both clearly visible."
+    },
+    {
+      "id": "frame-3",
+      "beat": "danger",
+      "narrative": "Danger approaches the castle.",
+      "exactIntent": "Enemy forces approaching a castle with torches and weapons under a dark threatening sky.",
+      "adaptedExpression": "Dark castle silhouette. Distant fires and smoke. Ominous night sky. Threat approaching."
+    },
+    {
+      "id": "frame-4",
+      "beat": "protection",
+      "narrative": "The knight protects the old king.",
+      "exactIntent": "A young knight standing in front of an old king, blocking an enemy attack, protecting the king in a castle hall.",
+      "adaptedExpression": "Young knight holding a sword, standing alert beside an old king. Castle hall under threat. King close behind the knight."
+    },
+    {
+      "id": "frame-5",
+      "beat": "aftermath",
+      "narrative": "After the battle, the king thanks the knight.",
+      "exactIntent": "An old king gratefully thanking a young knight after battle, emotional gratitude relationship in a damaged castle hall.",
+      "adaptedExpression": "Old king placing a hand on a young knight's shoulder. Quiet castle hall after battle. Smoke outside window."
+    }
+  ],
+  "strategies": {
+    "A": {
+      "label": "exact-intent-local",
+      "renderer": "local",
+      "promptField": "exactIntent"
+    },
+    "B": {
+      "label": "narrative-adaptation-local",
+      "renderer": "local",
+      "promptField": "adaptedExpression"
+    },
+    "C": {
+      "label": "mixed-local-cloud",
+      "note": "Frames 1-3 Local; frames 4-5 Cloud (difficult relationship beats). Comparison only."
+    }
+  }
+}
