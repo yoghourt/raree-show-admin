@@ -8,7 +8,7 @@
 /** Local shape — avoid importing visual-contract (cycle with A4 checks). */
 type ExpressionCharacter = { role: string; visual: string };
 type ExpressionLike = {
-  environment?: string;
+  environment: string;
   characters: ExpressionCharacter[];
   action: string;
   composition: string;
