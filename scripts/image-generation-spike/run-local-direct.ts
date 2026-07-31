@@ -54,10 +54,10 @@ async function main(): Promise<void> {
   const skipExisting =
     process.env.SPIKE_SKIP_EXISTING === "1" ||
     process.env.SPIKE_SKIP_EXISTING === "true"
-  const altProvider =
+  const altProvider: Arm["providerId"] =
     LOCAL_ALT_PROVIDER === "localai" ? "localai" : "local"
 
-  const arms: Arm[] = [
+  const allArms: Arm[] = [
     {
       key: "current",
       modelId: LOCAL_MODEL_CURRENT,
@@ -70,7 +70,8 @@ async function main(): Promise<void> {
       basename: "local-direct-alt",
       providerId: altProvider,
     },
-  ].filter((a) => !only || only === a.key)
+  ]
+  const arms = allArms.filter((a) => !only || only === a.key)
 
   logStep("local-direct start", {
     localai: localaiBaseUrl(),
