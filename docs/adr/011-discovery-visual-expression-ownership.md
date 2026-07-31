@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Type:** Architecture ADR  
-**Version:** 0.3  
+**Version:** 0.4  
 **Last Updated:** 2026-07-31  
 **Owner:** Architect  
 **Related ADR:** ADR-006 (Discovery Copilot Architecture); ADR-010 (Image Runtime — Port / Creator ⊥ Reader; Deployment Local/Cloud remains replaceable)  
@@ -10,9 +10,10 @@
 **Evidence:** Spike findings (local `docs/findings/`; runners under `scripts/*-spike/`)  
 **Amendment A1 (2026-07-31):** Architecture Review — accept ownership boundary; refine D1 (renderer-executable form, Local-first capability orientation without model coupling); Visual Intent field presence optional by scene with quality-when-present.  
 **Amendment A2 (2026-07-31):** SPEC-DVE-001 Contract Freeze Accepted.  
-**Amendment A3 (2026-07-31):** Grant **scoped Production Authorization** for Creator-path Discovery Visual Intent + Renderer Expression → Image Port execution → Candidate (Human Accept → Assets). Constraints PA-A–PA-F. Does **not** authorize Planner/Adapter intelligence, frame-level Cloud-by-default, Reader generation, or auto-Accept.
+**Amendment A3 (2026-07-31):** Grant **scoped Production Authorization** for Creator-path Discovery Visual Intent + Renderer Expression → Image Port execution → Candidate (Human Accept → Assets). Constraints PA-A–PA-F. Does **not** authorize Planner/Adapter intelligence, frame-level Cloud-by-default, Reader generation, or auto-Accept.  
+**Amendment A4 (2026-07-31):** Grant **Expression Capability Adaptation** (Discovery propose rules only): retain adaptation; tighten to **static visible geometry**; forbid complex physics motion cues in Expression; **MUST NOT** add AI layers; **MUST NOT** frame-level Cloud switch. Evidence: `capability-adaptation-v2-spike`.
 
-> **Authorization note:** Architecture boundary **Accepted**; SPEC-DVE-001 **Contract Freeze** + **Production Authorization (scoped, A3)**. Implementation MUST stay inside A3 allowlist / Constraints PA-A–PA-F.
+> **Authorization note:** Architecture boundary **Accepted**; SPEC-DVE-001 **Contract Freeze** + **Production Authorization (scoped, A3)** + **Capability Adaptation (A4)**. Implementation MUST stay inside A3 allowlist / Constraints PA-A–PA-F and A4 Expression rules.
 
 ---
 
@@ -63,7 +64,8 @@ Spike chain (evidence):
 * `capability-adaptation-validation-spike` — Visible-expression adaptation expands Local coverage (hybrid, not Cloud-default)  
 * `visual-consistency-adaptation-spike` — Optimize for consistent narrative visualization, not max single-frame quality  
 * `discovery-expression-ownership-spike` — Discovery should own Expression; external adapter increases drift  
-* `discovery-visual-expression-contract-spike` — Minimum Intent / Expression field split validated
+* `discovery-visual-expression-contract-spike` — Minimum Intent / Expression field split validated  
+* `capability-adaptation-v2-spike` — Static visible geometry improves hard multi-char beats; complex physics cues worsen Local blank rate
 
 Governing pressures: Convergence Before Expansion · Local-first Creator economics · Runtime supremacy of a clear ownership boundary.
 
@@ -93,6 +95,18 @@ Discovery MUST NOT become coupled to a specific renderer implementation or model
 No independent **Planner**, **Adapter intelligence**, or **Prompt Optimizer intelligence** layer MAY sit between Discovery and Renderer for story meaning.
 
 Transport-only helpers (field join, length cap, blank guard) are **not** narrative intelligence layers.
+
+### D1a — Expression Capability Adaptation (A4)
+
+Discovery propose MAY apply **capability adaptation rules** inside Renderer Expression authorship:
+
+* Convert abstract relationships into **static visible geometry** (placement, pose, prop presence).  
+* Prefer frozen stills of power/relationship over spectacular physics.  
+* **MUST NOT** use complex physics motion as sole cues (lift / hoist / mid-air choke / shatter-into-fragments / throw / explode / flying debris / anonymous crowds).  
+* **MUST NOT** introduce a new AI call, Planner, Adapter, or Prompt Optimizer.  
+* **MUST NOT** authorize frame-level Cloud switch for hard beats (PA-E / D4 remain).
+
+Normative rule text: `lib/discovery/expression-capability-rules.ts` · SPEC-DVE-001 §6.3.
 
 ### D2 — Dual output: Visual Intent + Renderer Expression
 
@@ -238,6 +252,7 @@ Human Accept → Assets
 * Thin transport (join / length / blank-guard) without narrative rewrite  
 * Minimal Candidate / staging fields required to carry Expression (scoped)  
 * Existing Cloudinary Candidate upload + Human Accept paths  
+* **A4:** Discovery propose Expression capability adaptation rules (static geometry; forbid complex physics cues) — `lib/discovery/expression-capability-rules.ts`  
 
 ### Production denylist (MUST NOT under A3)
 

@@ -6,15 +6,16 @@
 | ----- | ----- |
 | Title | Discovery Renderer Expression Contract |
 | Status | **Accepted — Contract Freeze** |
-| Version | v1.1 |
+| Version | v1.2 |
 | Owner | Architect |
 | Last Updated | 2026-07-31 |
-| Derived From | ADR-011 (Accepted · **A3**) · ADR-006 · ADR-010 (Port boundary; provider selection out of scope) |
-| Evidence | discovery-expression-ownership-spike · discovery-visual-expression-contract-spike |
+| Derived From | ADR-011 (Accepted · **A3** · **A4**) · ADR-006 · ADR-010 (Port boundary; provider selection out of scope) |
+| Evidence | discovery-expression-ownership-spike · discovery-visual-expression-contract-spike · capability-adaptation-v2-spike |
 | Contract Freeze | **Granted** |
 | Production Authorization | **Granted (scoped)** — ADR-011 **A3** · Constraints PA-A–PA-F · §13 |
+| Capability Adaptation | **Granted (A4)** — static visible geometry in Expression; no new AI layer; no frame Cloud |
 
-> **Contract Freeze + scoped Production Authorization (A3).** Implementation MAY wire Creator-path Discovery Expression → Image Port → Candidate within §13 allowlist. Contract Freeze ≠ unbounded Production Authorization.
+> **Contract Freeze + scoped Production Authorization (A3) + Capability Adaptation (A4).** Implementation MAY wire Creator-path Discovery Expression → Image Port → Candidate within §13 allowlist. Expression authorship MUST prefer static geometry (A4). Contract Freeze ≠ unbounded Production Authorization.
 
 ---
 
@@ -242,6 +243,9 @@ MUST NOT contain:
 * Hidden motivations  
 * Second planner output blocks  
 * Quality-spam `styleHints` (§5.4)  
+* Complex physics / spectacular motion as sole cues (**A4**): lifting, hoisting, mid-air choke, throwing, shattering into fragments, exploding, flying debris, large anonymous crowds  
+
+**A4 preference:** static visible geometry (who / where / pose / prop) over cinematic physics. Runtime rule text: `lib/discovery/expression-capability-rules.ts`.
 
 ---
 

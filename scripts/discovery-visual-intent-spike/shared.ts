@@ -119,15 +119,14 @@ export function logStep(msg: string, extra?: Record<string, unknown>): void {
   else console.info(`[discovery-vi-spike] ${msg}`)
 }
 
-/** Mirror production captionFromStaging(title, summary). */
+/** Mirror production captionFromStaging — summary only; title fallback. */
 export function captionFromSceneFields(scene: {
   title: string
   summary: string
 }): string {
-  const title = scene.title.trim()
   const summary = scene.summary.trim()
-  if (!summary || summary === title) return title
-  return `${title} — ${summary}`
+  if (summary) return summary
+  return scene.title.trim()
 }
 
 /** Baseline A: Discovery scene fields → production frame prompt builder. */

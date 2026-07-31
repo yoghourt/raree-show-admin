@@ -223,6 +223,7 @@ export const zhCN = {
     pageTitle: '从正文提炼',
     pageSubtitle:
       '粘贴正文 → 确认 → 写入作品。',
+    goProduction: '去制作',
     storyCandidate: '故事',
     sceneCandidate: '画面',
     sceneCandidateStaging: '已确认的画面',

@@ -10,6 +10,11 @@ import { randomUUID } from "crypto";
 import { callDiscoveryTextLlm } from "@/lib/discovery/discovery-text-llm";
 import { MAX_CANDIDATES_PER_TYPE } from "@/lib/discovery/constants";
 import {
+  EXPRESSION_CAPABILITY_EXAMPLE,
+  EXPRESSION_CAPABILITY_RULES,
+  EXPRESSION_COURTYARD_EXAMPLE,
+} from "@/lib/discovery/expression-capability-rules";
+import {
   capCandidatesByType,
   dedupeCandidates,
   filterScenesWithValidParents,
@@ -58,7 +63,7 @@ const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
   character: `{"candidates":[{"displayName":"Arya Stark","summary":"Young Stark daughter.","fields":{"name":"Arya Stark","house":"Stark"}}]}`,
   location: `{"candidates":[{"displayName":"Winterfell","summary":"Seat of House Stark.","fields":{"name":"Winterfell","region":"The North"}}]}`,
   story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
-  scene: `{"candidates":[{"displayName":"Courtyard Welcome","summary":"Royal arrival scene.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Bran I","title":"Courtyard Welcome","summary":"Household gathers in the courtyard.","visualIntent":{"relationship":"household greets royal party","purpose":"establish arrival tension"},"rendererExpression":{"environment":"winter castle courtyard","characters":[{"role":"lord","visual":"gray cloak, standing upright"},{"role":"king","visual":"gold trim cloak, raising hand"},{"role":"guards","visual":"spears at sides"}],"action":"lord and household stand facing arriving royal party","composition":"foreground household, background royal procession entering gates"}}}]}`,
+  scene: `{"candidates":[{"displayName":"Moonlit Duel","summary":"Ser Waymar Royce faces the Other under the trees.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Prologue","title":"Moonlit Duel","summary":"Ser Waymar Royce confronts a White Walker in a fatal duel; Will watches from cover.","visualIntent":{"relationship":"knight confronts white walker","purpose":"establish lethal threat","emotion":"defiance"},"rendererExpression":${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}}}]}`,
 };
 
 function mockCandidatesForType(
@@ -137,16 +142,7 @@ function mockCandidatesForType(
               relationship: "household greets royal party",
               purpose: "establish arrival tension",
             },
-            rendererExpression: {
-              environment: "winter castle courtyard",
-              characters: [
-                { role: "lord", visual: "gray cloak, standing upright" },
-                { role: "king", visual: "gold trim cloak, raising hand" },
-              ],
-              action: "lord and household stand facing arriving royal party",
-              composition:
-                "foreground household, background royal procession entering gates",
-            },
+            rendererExpression: { ...EXPRESSION_COURTYARD_EXAMPLE },
           },
         },
       ];
@@ -240,13 +236,23 @@ Optional per item: confidence ("green"|"yellow"|"red"), evidence ([{sourceLabel,
 Example shape for type "${candidateType}":
 ${TYPE_EXAMPLES[candidateType]}
 ${candidateType === "scene" ? `\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.
+
+Reader-facing prose (CRITICAL — not Expression):
+- fields.title, fields.summary, displayName, and top-level summary are for human readers.
+  Frame caption after write uses fields.summary (fallback to title if summary empty).
+- Prefer proper names from the narrative (e.g. Will, Ser Waymar Royce, Gared) when the text supports them.
+- Do NOT shorten, role-genericize, or "minimize" reader prose to match Local image constraints.
+- Expression minimality rules below apply ONLY to fields.rendererExpression — NEVER to title/summary/caption-bound fields.
+
 Visualization (ADR-011 / SPEC-DVE-001 — required):
-- fields.rendererExpression is REQUIRED: { environment, characters (array, MAY be []), action, composition; optional lighting, styleHints }.
-- action MUST be visible behavior (pose/props), NOT abstract relations alone (e.g. use "holding sword before kneeling king", NOT only "protects").
-- characters MAY be [] for landscape/atmosphere scenes; when non-empty each item needs role + visual.
+- fields.rendererExpression is REQUIRED: { environment, characters (array, MAY be []), action, composition }.
+- Default: OMIT lighting and styleHints (Local minimality). Do not emit cinematic or quality wording inside rendererExpression only.
+- characters MAY be [] for landscape/atmosphere scenes; when non-empty each item needs role + short visual (identity + one prop).
 - fields.visualIntent is OPTIONAL by scene: { characters?, relationship?, emotion?, purpose? }. Presence optional; quality when present.
 - visualIntent is narrative meaning only — NO camera/composition/prompt tokens in Intent.
-- styleHints (if any) = stable style family only; FORBIDDEN: masterpiece, 8k, best quality, ultra detailed.
+- If styleHints is ever present (rare): stable style family only; FORBIDDEN: masterpiece, 8k, best quality, ultra detailed.
+
+${EXPRESSION_CAPABILITY_RULES}
 \n` : ""}
 ${candidateType === "location" ? '\nLocation fields MUST use fields.name (place name). Do NOT return prose paragraphs as the only value.\n' : ""}
 ${candidateType === "story" ? '\nStory fields MUST use fields.title and fields.summary (editorial story unit). Optional boundaryHint. Return {"candidates":[...]} — each item needs displayName, summary, and fields with title + summary.\n' : ""}

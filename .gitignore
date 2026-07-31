@@ -67,6 +67,16 @@ next-env.d.ts
 
 # Capability adaptation spike outputs
 /scripts/capability-adaptation-spike/results/
+/scripts/capability-adaptation-v2-spike/results/
+
+# Expression minimality spike outputs
+/scripts/expression-minimality-spike/results/
+
+# Expression minimality regression outputs
+/scripts/expression-minimality-regression/results/
+
+# Expression cast-consistency regression outputs
+/scripts/expression-consistency-regression/results/
 
 # Visual consistency spike outputs
 /scripts/visual-consistency-spike/results/

@@ -1,0 +1,71 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "discoveryModel": "gemini-3.5-flash-lite",
+  "size": 512,
+  "cases": [
+    {
+      "id": "case-duel",
+      "label": "Ser Waymar duel with the Other",
+      "intentSummary": "knight fights white walker",
+      "source": "Ser Waymar Royce fights a White Walker in a snow-covered clearing. The Other's magical ice blade clashes with Waymar's steel sword and shatters it.",
+      "baselineExpression": {
+        "environment": "snow-covered clearing illuminated by pale blue moonlight reflecting off ice",
+        "characters": [
+          {
+            "role": "White Walker",
+            "visual": "tall, gaunt figure with pale skin, shifting camouflage armor, and a glowing translucent ice sword"
+          },
+          {
+            "role": "knight",
+            "visual": "young noble clad in fine armor, holding a raised steel sword"
+          }
+        ],
+        "action": "the knight strikes forward with his steel sword against the glowing ice blade of the tall pale creature",
+        "composition": "close-up action shot focusing on the clashing swords and the glowing blue light of the ice blade"
+      }
+    },
+    {
+      "id": "case-throat",
+      "label": "Wight rises and overwhelms ranger",
+      "intentSummary": "white walker overwhelms ranger",
+      "source": "Waymar's corpse rises as a wight with icy blue eyes and chokes Will to death in the dark snowy forest.",
+      "baselineExpression": {
+        "environment": "dark, freezing forest floor covered in snow and scattered frost",
+        "characters": [
+          {
+            "role": "undead wight",
+            "visual": "corpse with pale cold skin, torn noble attire, and glowing supernatural blue eyes"
+          },
+          {
+            "role": "ranger",
+            "visual": "terrified ranger crouching in the snow, hands reaching out in defense"
+          }
+        ],
+        "action": "the reanimated corpse grips the ranger by the throat, hoisting him up in the dark snow-covered forest",
+        "composition": "low-angle medium shot emphasizing the towering threat of the blue-eyed undead knight"
+      }
+    },
+    {
+      "id": "case-camp",
+      "label": "Rangers at frozen wildling camp",
+      "intentSummary": "commander and ranger discuss at corpse camp",
+      "source": "Night's Watch rangers Will, Gared, and Ser Waymar Royce scout deep in the haunted forest and discover a frozen wildling camp with corpses in the snow.",
+      "baselineExpression": {
+        "environment": "haunted forest north of the Wall, deep snow, dark pine trees",
+        "characters": [
+          {
+            "role": "ranger",
+            "visual": "weathered leather armor, holding a spear, looking uneasy"
+          },
+          {
+            "role": "commander",
+            "visual": "fine noble cloak over chainmail, standing proudly with a hand on his sword hilt"
+          }
+        ],
+        "action": "rangers stand amidst frozen bodies in the snow, pointing toward the dark tree line while debating their next move",
+        "composition": "wide shot of snowy forest camp with rangers in the foreground surrounding dead wildlings"
+      }
+    }
+  ]
+}

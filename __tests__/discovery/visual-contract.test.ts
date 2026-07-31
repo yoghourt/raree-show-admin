@@ -1,10 +1,14 @@
 /**
- * SPEC-DVE-001 / ADR-011 A3 — Visual Intent + Renderer Expression contract
+ * SPEC-DVE-001 / ADR-011 A3–A4 — Visual Intent + Renderer Expression contract
  */
 
 import { describe, expect, it } from "vitest";
 
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
+import {
+  findForbiddenPhysicsCues,
+  FORBIDDEN_PHYSICS_PATTERN,
+} from "@/lib/discovery/expression-capability-rules";
 import { buildFrameDraftPrompt } from "@/lib/prompts/frame-draft";
 import { parseFrameProvenance } from "@/lib/rollout/scenes-server";
 import {
@@ -51,6 +55,116 @@ describe("parseRendererExpression", () => {
     });
     expect(result.ok).toBe(false);
   });
+
+  it("warns on forbidden physics cues without rejecting parse (legacy render path)", () => {
+    const result = parseRendererExpression({
+      ...SAMPLE_EXPRESSION,
+      action: "monster lifts soldier by the throat",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings.some((w) => w.includes("forbidden physics"))).toBe(
+        true
+      );
+    }
+  });
+});
+
+describe("A4 capability adaptation", () => {
+  it("detects lift/shatter cues", () => {
+    expect(FORBIDDEN_PHYSICS_PATTERN.test("lifts ranger")).toBe(true);
+    expect(FORBIDDEN_PHYSICS_PATTERN.test("sword shatters into fragments")).toBe(
+      true
+    );
+    expect(FORBIDDEN_PHYSICS_PATTERN.test("hands gripping collar")).toBe(false);
+    expect(
+      findForbiddenPhysicsCues({
+        action: "white walker towering over fallen ranger",
+        composition: "both full bodies visible",
+        characters: [],
+      })
+    ).toEqual([]);
+  });
+
+  it("hard-rejects physics cues on scene propose", () => {
+    const result = normalizeRawCandidate(
+      {
+        displayName: "Choke",
+        summary: "s",
+        fields: {
+          parentStoryCandidateId: "story-1",
+          chapter_number: 1,
+          title: "Choke",
+          rendererExpression: {
+            ...SAMPLE_EXPRESSION,
+            action: "undead lifts ranger by the throat",
+          },
+        },
+      },
+      "scene",
+      "work-1"
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join(" ")).toMatch(/physics cues/i);
+    }
+  });
+
+  it("hard-rejects cast count mismatch on scene propose", () => {
+    const result = normalizeRawCandidate(
+      {
+        displayName: "Camp",
+        summary: "s",
+        fields: {
+          parentStoryCandidateId: "story-1",
+          chapter_number: 1,
+          title: "Camp",
+          rendererExpression: {
+            environment: "snowy pine forest",
+            characters: [
+              { role: "ranger", visual: "holding spear" },
+              { role: "commander", visual: "holding sword" },
+            ],
+            action: "three rangers standing near frozen bodies on snow",
+            composition: "three figures standing in forest clearing",
+          },
+        },
+      },
+      "scene",
+      "work-1"
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join(" ")).toMatch(/cast inconsistency/i);
+    }
+  });
+
+  it("accepts consistent three-ranger cast", () => {
+    const result = normalizeRawCandidate(
+      {
+        displayName: "Camp",
+        summary: "s",
+        fields: {
+          parentStoryCandidateId: "story-1",
+          chapter_number: 1,
+          title: "Camp",
+          rendererExpression: {
+            environment: "snowy pine forest",
+            characters: [
+              { role: "ranger", visual: "holding spear" },
+              { role: "ranger", visual: "holding bow" },
+              { role: "commander", visual: "holding sword" },
+            ],
+            action: "three rangers standing near frozen bodies on snow",
+            composition: "three figures standing in forest clearing",
+          },
+        },
+      },
+      "scene",
+      "work-1"
+    );
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("parseVisualIntent", () => {
@@ -76,6 +190,8 @@ describe("rendererExpressionToPrompt", () => {
     expect(prompt).toContain("Composition: foreground knight");
     expect(prompt).toContain("knight: armor, sword raised");
     expect(prompt).not.toContain("protects");
+    expect(prompt).toContain("frozen cinematic still");
+    expect(prompt).toContain("static poses");
   });
 });
 

@@ -1,10 +1,17 @@
 /**
- * SPEC-DVE-001 / ADR-011 A3 — Discovery Visual Intent + Renderer Expression.
+ * SPEC-DVE-001 / ADR-011 A3–A4 — Discovery Visual Intent + Renderer Expression.
  *
  * Intent = narrative meaning (NOT Renderer input).
  * Expression = only input to Renderer (Image Port path).
  * Transport helpers join fields only — MUST NOT invent story meaning.
+ * A4: prefer static visible geometry; flag complex physics cues (propose hard-gates).
  */
+
+import {
+  findCastConsistencyErrors,
+  findForbiddenPhysicsCues,
+  missingMultiCharacterPlacement,
+} from "@/lib/discovery/expression-capability-rules";
 
 export type VisualIntentCharacter = {
   role: string;
@@ -219,12 +226,31 @@ export function parseRendererExpression(raw: unknown): {
   }
 
   const abstractOnly =
-    /^(protects?|comforts?|loves?|hates?|guards?)\b/i.test(action) &&
-    action.split(/\s+/).length <= 3;
+    /^(protects?|comforts?|loves?|hates?|guards?|debates?|overwhelms?|fights?)\b/i.test(
+      action
+    ) && action.split(/\s+/).length <= 4;
   if (abstractOnly) {
     warnings.push(
       "rendererExpression.action looks abstract-only; prefer visible pose/prop wording"
     );
+  }
+
+  const physicsHits = findForbiddenPhysicsCues(expression);
+  if (physicsHits.length) {
+    warnings.push(
+      `rendererExpression has forbidden physics cues (A4): ${physicsHits.join(", ")}; prefer static geometry`
+    );
+  }
+
+  if (missingMultiCharacterPlacement(expression)) {
+    warnings.push(
+      "rendererExpression multi-character cast should state placement (left/right/foreground/facing)"
+    );
+  }
+
+  const castErrors = findCastConsistencyErrors(expression);
+  for (const err of castErrors) {
+    warnings.push(`rendererExpression cast inconsistency: ${err}`);
   }
 
   return { ok: true, value: expression, warnings };
@@ -249,7 +275,8 @@ export function rendererExpressionToPrompt(re: RendererExpression): string {
 
   const body = parts.join(" ").trim();
   if (!body) return "";
-  return `${body} One cinematic narrative still, clear readable subjects, no text, no watermark.`;
+  // A4 transport bias only — frozen still; MUST NOT rewrite narrative fields.
+  return `${body} One frozen cinematic still, static poses, clear readable subjects, no motion blur, no text, no watermark.`;
 }
 
 export function isRendererExpression(

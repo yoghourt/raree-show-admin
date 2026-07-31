@@ -76,6 +76,12 @@ export const FRAME_NEGATIVE_PROMPT = [
   "mutated",
   "extra limbs",
   "disfigured",
+  // A4 — bias Local away from spectacle physics blanks (Deployment negatives only).
+  "motion blur",
+  "mid-air action",
+  "flying debris",
+  "shattered fragments",
+  "exploding",
 ].join(", ");
 
 export function buildFrameNegativePrompt(_caption?: string): string {

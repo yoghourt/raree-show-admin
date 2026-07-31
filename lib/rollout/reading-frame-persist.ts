@@ -34,13 +34,11 @@ export type FramePersistResult =
     };
 
 function captionFromStaging(staging: AcceptedSceneCandidateStaging): string {
-  // Frame caption = Scene progression text only (never parent Story summary).
-  // Default: scene title. Optional scene summary appends when operator filled it.
-  const title = staging.title.trim();
+  // Frame caption = scene summary for readers (never parent Story summary).
+  // Fallback to title only when summary is empty.
   const summary = staging.summary?.trim();
-  if (!title) return summary || "";
-  if (summary && summary !== title) return `${title} — ${summary}`;
-  return title;
+  if (summary) return summary;
+  return staging.title.trim();
 }
 
 function frameFromStaging(staging: AcceptedSceneCandidateStaging): ReadingFrame {

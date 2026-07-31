@@ -11,6 +11,10 @@ import type {
   DiscoveryCandidateType,
 } from "@/lib/discovery/propose-types";
 import {
+  findCastConsistencyErrors,
+  findForbiddenPhysicsCues,
+} from "@/lib/discovery/expression-capability-rules";
+import {
   parseRendererExpression,
   parseVisualIntent,
 } from "@/lib/discovery/visual-contract";
@@ -203,6 +207,28 @@ function validateSceneFields(
   const expressionResult = parseRendererExpression(fields.rendererExpression);
   if (!expressionResult.ok) {
     return { ok: false, errors: expressionResult.errors };
+  }
+
+  // A4 propose hard-gate: reject complex physics cues (static geometry only).
+  const physicsHits = findForbiddenPhysicsCues(expressionResult.value);
+  if (physicsHits.length) {
+    return {
+      ok: false,
+      errors: [
+        `rendererExpression forbids physics cues (A4): ${physicsHits.join(", ")} — use static visible geometry`,
+      ],
+    };
+  }
+
+  // Rule 5: action/composition actor count ↔ characters[] consistency.
+  const castErrors = findCastConsistencyErrors(expressionResult.value);
+  if (castErrors.length) {
+    return {
+      ok: false,
+      errors: castErrors.map(
+        (e) => `rendererExpression cast inconsistency: ${e}`
+      ),
+    };
   }
 
   const intentResult = parseVisualIntent(fields.visualIntent);
