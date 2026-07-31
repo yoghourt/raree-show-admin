@@ -2,16 +2,17 @@
 
 **Status:** Accepted  
 **Type:** Architecture ADR  
-**Version:** 0.2  
+**Version:** 0.3  
 **Last Updated:** 2026-07-31  
 **Owner:** Architect  
 **Related ADR:** ADR-006 (Discovery Copilot Architecture); ADR-010 (Image Runtime — Port / Creator ⊥ Reader; Deployment Local/Cloud remains replaceable)  
-**Related SPEC:** `docs/specs/spec-dve-001-discovery-renderer-expression-contract.md` (**Contract Freeze**)  
+**Related SPEC:** `docs/specs/spec-dve-001-discovery-renderer-expression-contract.md` (**Contract Freeze** · **Production Authorization scoped**)  
 **Evidence:** Spike findings (local `docs/findings/`; runners under `scripts/*-spike/`)  
-**Amendment A1 (2026-07-31):** Architecture Review — accept ownership boundary; refine D1 (renderer-executable form, Local-first capability orientation without model coupling); Visual Intent field presence optional by scene with quality-when-present. Does **not** grant Production Authorization, schema migration, or Runtime wiring.  
-**Amendment A2 (2026-07-31):** SPEC-DVE-001 Contract Freeze Accepted. Still does **not** grant Production Authorization or Runtime wiring.
+**Amendment A1 (2026-07-31):** Architecture Review — accept ownership boundary; refine D1 (renderer-executable form, Local-first capability orientation without model coupling); Visual Intent field presence optional by scene with quality-when-present.  
+**Amendment A2 (2026-07-31):** SPEC-DVE-001 Contract Freeze Accepted.  
+**Amendment A3 (2026-07-31):** Grant **scoped Production Authorization** for Creator-path Discovery Visual Intent + Renderer Expression → Image Port execution → Candidate (Human Accept → Assets). Constraints PA-A–PA-F. Does **not** authorize Planner/Adapter intelligence, frame-level Cloud-by-default, Reader generation, or auto-Accept.
 
-> **Authorization note:** Architecture boundary is **Accepted**; SPEC-DVE-001 Contract Freeze is **Granted**. This ADR does **not** grant Production Authorization, schema migration, CPP/queue integration, or Runtime implementation.
+> **Authorization note:** Architecture boundary **Accepted**; SPEC-DVE-001 **Contract Freeze** + **Production Authorization (scoped, A3)**. Implementation MUST stay inside A3 allowlist / Constraints PA-A–PA-F.
 
 ---
 
@@ -35,9 +36,9 @@ Discovery
 
 This ADR does **not** freeze:
 
-* Production Discovery candidate schema migration  
+* Unrelated / wholesale schema redesign (A3 PA-F allows **minimal** Intent/Expression payload only)  
 * Image provider / model selection (Deployment; ADR-010)  
-* Queue / CPP / Asset persistence  
+* Queue / CPP redesign beyond Expression → existing Port wiring  
 * Whole-route Cloud Deployment policies (distinct from rejected frame-level Cloud switching)
 
 ---
@@ -189,20 +190,71 @@ Discovery meaning → Planner interpretation → Renderer prompt
 
 * Discovery becomes more responsible (meaning + executable expression)  
 * Renderer capability limits remain visible (e.g. multi-role geometry) — handled by Expression quality + Deployment policy, not by inventing a Planner  
-* Requires Production Authorization (separate from Contract Freeze) before Runtime wiring
+* Local Renderer capability limits remain visible; Expression quality + Deployment policy address them — not a Planner revival
 
-### Follow-ons (not granted by this ADR)
+### Follow-ons (outside A3 — need a new grant)
 
-* Production Authorization for Discovery emitting Expression into Creator frame path  
-* Schema / Candidate payload migration (explicitly deferred)
+* Reader Runtime image generation  
+* Frame-level Cloud switching as product default  
+* Auto-Accept Candidates → Assets  
+* Independent Planner / Adapter intelligence layers  
+
+---
+
+## Production Authorization (scoped — A3)
+
+**Authority:** Architect Decision 2026-07-31 — **GRANT WITH CONSTRAINTS (PA-A–PA-F)**  
+**Normative detail:** SPEC-DVE-001 §13
+
+### Authorized (Creator path)
+
+```text
+Discovery
+  ├── Visual Intent
+  └── Renderer Expression
+         ↓
+Image Generation Port (ADR-010 / SPEC-IMG-001)
+         ↓
+Candidate (Media Admission)
+         ↓
+Human Accept → Assets
+```
+
+### Constraints
+
+| Id | Constraint |
+| -- | ---------- |
+| **PA-A** | Renderer consumes **Renderer Expression only**; MUST NOT read Visual Intent for generation |
+| **PA-B** | No Planner / Adapter intelligence / Prompt Optimizer intelligence between Discovery and Renderer |
+| **PA-C** | Candidate ≠ Asset until Human Accept (existing Media Admission / Asset authority) |
+| **PA-D** | Creator Runtime only; Reader generation **denied** |
+| **PA-E** | Frame-level Cloud-by-default for “hard” frames **denied** (ADR-011 D4 / R3); Deployment Local+Cloud fallback remains ADR-010 |
+| **PA-F** | Minimal payload / staging extension for Intent+Expression **MAY** proceed; wholesale unrelated schema redesign **MUST NOT** |
+
+### Production allowlist (MAY under A3)
+
+* Discovery propose / scene visualization path emitting Visual Intent + Renderer Expression (SPEC-DVE-001)  
+* Creator Scene Frame draft / job input derived from Expression → existing Image Generation Port  
+* Thin transport (join / length / blank-guard) without narrative rewrite  
+* Minimal Candidate / staging fields required to carry Expression (scoped)  
+* Existing Cloudinary Candidate upload + Human Accept paths  
+
+### Production denylist (MUST NOT under A3)
+
+* Independent Visual Planner or Adapter intelligence services  
+* Quality-spam `styleHints` / Prompt Optimizer layer  
+* Mid-sequence frame-level Cloud switch as architecture default  
+* Reader Runtime / `raree-show-web` generation hot path  
+* Auto-Accept into Assets  
+* Freezing any provider/model as Architecture  
 
 ---
 
 ## Compatibility
 
 * **ADR-006:** Extends Discovery responsibility for visualization outputs; does not redefine Authority Emergence or Human Review.  
-* **ADR-010 / SPEC-IMG-001:** Image Port / Deployment Local·Cloud remain; this ADR constrains **what semantic input** Creator visualization derives from Discovery Expression, not which provider executes bytes.  
-* **SPEC-D3-003:** Current propose candidate field bundles are unchanged until a future amendment / Production Authorization explicitly extends Scene (or related) payloads.
+* **ADR-010 / SPEC-IMG-001:** Image Port / Deployment Local·Cloud remain; A3 authorizes Expression as Creator visualization **input**, not a new Port or provider hierarchy.  
+* **SPEC-D3-003:** Scene (or related) Candidate payloads MAY gain Intent/Expression under A3 PA-F; unrelated propose redesign remains out of scope.
 
 ---
 

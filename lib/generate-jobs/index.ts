@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { RendererExpression } from "@/lib/discovery/visual-contract";
+import { parseRendererExpression } from "@/lib/discovery/visual-contract";
 import { supabase as defaultSupabase } from "@/lib/supabase";
 
 const TABLE = "generate_jobs";
@@ -19,6 +21,8 @@ export type SceneFrameJobInput = {
   route_title?: string;
   /** Operator revision note at enqueue (display); also embedded in caption for prompt. */
   operator_revision?: string;
+  /** SPEC-DVE-001 Expression — preferred prompt source when present. */
+  renderer_expression?: RendererExpression;
 };
 
 /** Character portrait generate intent (CPP-C). */
@@ -108,12 +112,15 @@ export function parseSceneFrameJobInput(
     typeof revisionRaw === "string" && revisionRaw.trim()
       ? revisionRaw.trim()
       : undefined;
+  const exprParsed = parseRendererExpression(inputJson.renderer_expression);
+  const renderer_expression = exprParsed.ok ? exprParsed.value : undefined;
   return {
     asset_slot: "scene_frame",
     frame_index: frameIndex,
     caption,
     ...(route_title ? { route_title } : {}),
     ...(operator_revision ? { operator_revision } : {}),
+    ...(renderer_expression ? { renderer_expression } : {}),
   };
 }
 

@@ -45,12 +45,45 @@ const storyFieldsSchema = z.object({
   boundaryHint: z.string().optional(),
 });
 
+const rendererExpressionSchema = z.object({
+  environment: z.string().min(1),
+  characters: z.array(
+    z.object({
+      role: z.string().min(1),
+      visual: z.string().min(1),
+    })
+  ),
+  action: z.string().min(1),
+  composition: z.string().min(1),
+  lighting: z.string().optional(),
+  styleHints: z.string().optional(),
+});
+
+const visualIntentSchema = z
+  .object({
+    characters: z
+      .array(
+        z.object({
+          role: z.string().min(1),
+          name: z.string().optional(),
+        })
+      )
+      .optional(),
+    relationship: z.string().nullable().optional(),
+    emotion: z.string().optional(),
+    purpose: z.string().optional(),
+  })
+  .nullable()
+  .optional();
+
 const sceneFieldsSchema = z.object({
   parentStoryCandidateId: z.string().min(1),
   chapter_title: z.string().nullable().optional(),
   chapter_number: z.union([z.number(), z.string()]),
   title: z.string(),
   summary: z.string().optional(),
+  visualIntent: visualIntentSchema,
+  rendererExpression: rendererExpressionSchema,
 });
 
 export const discoveryCandidateSchema = z.object({

@@ -6,15 +6,15 @@
 | ----- | ----- |
 | Title | Discovery Renderer Expression Contract |
 | Status | **Accepted — Contract Freeze** |
-| Version | v1.0 |
+| Version | v1.1 |
 | Owner | Architect |
 | Last Updated | 2026-07-31 |
-| Derived From | ADR-011 (Accepted) · ADR-006 · ADR-010 (Port boundary; provider selection out of scope) |
+| Derived From | ADR-011 (Accepted · **A3**) · ADR-006 · ADR-010 (Port boundary; provider selection out of scope) |
 | Evidence | discovery-expression-ownership-spike · discovery-visual-expression-contract-spike |
 | Contract Freeze | **Granted** |
-| Production Authorization | **Not granted** |
+| Production Authorization | **Granted (scoped)** — ADR-011 **A3** · Constraints PA-A–PA-F · §13 |
 
-> **Contract Freeze granted.** Architecture ownership (ADR-011) and this Runtime Contract are frozen. Do **not** migrate production schemas or wire Runtime until **Production Authorization** is granted separately. Contract Freeze ≠ Production Authorization.
+> **Contract Freeze + scoped Production Authorization (A3).** Implementation MAY wire Creator-path Discovery Expression → Image Port → Candidate within §13 allowlist. Contract Freeze ≠ unbounded Production Authorization.
 
 ---
 
@@ -342,8 +342,8 @@ Renderer input = `rendererExpression` only.
 | Prompt optimizer intelligence | **Rejected** (ADR-011) |
 | Queue / job envelope | Generate-jobs / CPP specs |
 | CPP integration | SPEC-CPP-001 |
-| Production Candidate schema migration | Future Production Authorization |
-| Asset Accept / `story_images_v2` | Existing Asset authority |
+| Production Candidate schema migration beyond PA-F minimal fields | Needs new grant |
+| Asset Accept / `story_images_v2` | Existing Asset authority (Human Accept; A3 PA-C) |
 
 ---
 
@@ -362,8 +362,8 @@ Per `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC` three-state model:
 | State | SPEC-DVE-001 |
 | ----- | ------------ |
 | Contract Freeze | **Granted** (this SPEC Accepted) |
-| Spike Implementation Authorization | Completed (evidence spikes; not a production path) |
-| Production Authorization | **Not granted** |
+| Spike Implementation Authorization | Completed (evidence spikes) |
+| Production Authorization | **Granted (scoped)** → ADR-011 **A3** · Constraints PA-A–PA-F · §13 |
 
 Contract Freeze checklist (closed):
 
@@ -373,8 +373,52 @@ Contract Freeze checklist (closed):
 - [x] Intent presence-optional / quality-when-present  
 - [x] `styleHints` anti-optimizer constraint  
 
-Before Production Authorization / Runtime wiring:
+---
 
-- [ ] Explicit Production Authorization grant  
-- [ ] Schema / Candidate payload migration plan (if any)  
-- [ ] Creator frame path wiring plan (Discovery Expression → Port)
+## 13. Production Authorization (granted — scoped, A3)
+
+**Authority:** ADR-011 Amendment **A3** · Architect Decision 2026-07-31 — GRANT WITH CONSTRAINTS (PA-A–PA-F)
+
+### 13.1 Authorized path
+
+```text
+Discovery → Visual Intent + Renderer Expression
+                ↓
+     (Expression only) → Image Generation Port
+                ↓
+            Candidate
+                ↓
+     Human Accept → Assets
+```
+
+### 13.2 Constraints (normative)
+
+| Id | Rule |
+| -- | ---- |
+| **PA-A** | Generation input = `rendererExpression` only |
+| **PA-B** | No Planner / Adapter intelligence / Prompt Optimizer intelligence |
+| **PA-C** | Candidate ≠ Asset until Human Accept |
+| **PA-D** | Creator Runtime only; Reader generation denied |
+| **PA-E** | Frame-level Cloud-by-default denied; Deployment Local+Cloud fallback per ADR-010 |
+| **PA-F** | Minimal Intent/Expression payload extension MAY proceed; unrelated schema redesign MUST NOT |
+
+### 13.3 Production allowlist (MAY)
+
+* Discovery propose / scene visualization emitting Intent + Expression  
+* Creator Scene Frame draft / generate-job input built from Expression → existing Port  
+* Thin transport (join / length / blank-guard) without narrative rewrite  
+* Minimal staging / Candidate fields to carry Expression  
+* Existing Cloudinary Candidate + Human Accept wiring  
+
+### 13.4 Production denylist (MUST NOT)
+
+* Independent Visual Planner or Adapter intelligence services  
+* Quality-spam `styleHints` / Prompt Optimizer layer  
+* Mid-sequence frame-level Cloud switch as product default  
+* Reader Runtime generation hot path  
+* Auto-Accept into Assets  
+* Freezing provider/model IDs in this Contract  
+
+### 13.5 Implementation note
+
+Production Authorization **permits** implementation inside §13.3. It does **not** by itself ship code. Implementers MUST preserve PA-A–PA-F and ADR-011 D1–D4.

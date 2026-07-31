@@ -1,5 +1,6 @@
 import { imageGenerate } from "@/lib/ai/capability";
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload";
+import type { RendererExpression } from "@/lib/discovery/visual-contract";
 import { formatRequestError } from "@/lib/format-request-error";
 import type {
   CharacterPortraitJobInput,
@@ -39,19 +40,39 @@ export type ExecuteImageGenerateResult =
 export async function executeSceneFrameImageGenerate(input: {
   caption: string;
   routeTitle?: string;
+  rendererExpression?: RendererExpression | null;
 }): Promise<ExecuteImageGenerateResult> {
   const started = Date.now();
   const caption = input.caption.trim();
-  if (!caption) {
+  const hasExpression = Boolean(input.rendererExpression);
+  if (!caption && !hasExpression) {
     return {
       ok: false,
-      message: "缺少帧说明（Asset Caption）。",
+      message: "缺少帧说明（Asset Caption）或 Renderer Expression。",
       durationMs: Date.now() - started,
     };
   }
 
   const routeTitle = input.routeTitle?.trim() || undefined;
-  const prompt = buildFrameDraftPrompt({ caption, routeTitle });
+  const prompt = buildFrameDraftPrompt({
+    caption: caption || " ",
+    routeTitle,
+    rendererExpression: input.rendererExpression,
+  });
+  if (!prompt.trim()) {
+    return {
+      ok: false,
+      message: "无法从 Expression/Caption 构造生成 prompt。",
+      durationMs: Date.now() - started,
+    };
+  }
+
+  console.info("[executeSceneFrameImageGenerate] prompt", {
+    hasExpr: hasExpression,
+    promptLen: prompt.length,
+    routeTitle: routeTitle ?? null,
+    size: "512x512",
+  });
 
   try {
     const candidate = await imageGenerate({
@@ -59,7 +80,9 @@ export async function executeSceneFrameImageGenerate(input: {
       assetSlot: "scene_frame",
       prompt,
       negativePrompt: buildFrameNegativePrompt(caption),
-      size: { width: 1280, height: 720 },
+      // Option B: square Local-friendly size (spike-aligned). Widescreen 1280×720
+      // clamped to 768×432 raised blank-white rate on sd-3.5-medium-ggml.
+      size: { width: 512, height: 512 },
     });
     let url: string;
     try {
@@ -219,6 +242,7 @@ export async function executeImageGenerateJob(input: {
     return executeSceneFrameImageGenerate({
       caption: input.sceneFrame.caption,
       routeTitle: input.sceneFrame.route_title,
+      rendererExpression: input.sceneFrame.renderer_expression,
     });
   }
   return {

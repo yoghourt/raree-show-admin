@@ -108,7 +108,7 @@ describe("executeImageGenerateJob dispatch", () => {
     expect(imageGenerate).toHaveBeenCalledWith(
       expect.objectContaining({
         assetSlot: "scene_frame",
-        size: { width: 1280, height: 720 },
+        size: { width: 512, height: 512 },
       })
     );
   });

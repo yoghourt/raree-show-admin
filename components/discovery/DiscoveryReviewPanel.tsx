@@ -236,6 +236,13 @@ function sceneStagingToReviewItem(
           : {}),
         title: scene.title,
         ...(scene.summary ? { summary: scene.summary } : {}),
+        ...(scene.visualIntent ? { visualIntent: scene.visualIntent } : {}),
+        rendererExpression: scene.rendererExpression ?? {
+          environment: "unspecified place",
+          characters: [],
+          action: "empty scene",
+          composition: "wide view",
+        },
       },
     },
   };
@@ -589,6 +596,10 @@ export function DiscoveryReviewPanel({
           : editSummary.trim()
             ? { summary: editSummary.trim() }
             : {}),
+        ...(original.visualIntent
+          ? { visualIntent: original.visualIntent }
+          : {}),
+        rendererExpression: original.rendererExpression,
       };
     } else {
       parsed = parsedRecord as unknown as DiscoveryCandidateFields;

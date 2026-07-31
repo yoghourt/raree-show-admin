@@ -155,6 +155,50 @@ export function FrameJobResultDialog({
               label="画面描述（caption）"
               value={jobBaseCaption || undefined}
             />
+            <div
+              className={
+                input?.renderer_expression
+                  ? "rounded-md border border-teal-200 bg-teal-50 p-2"
+                  : "rounded-md border border-zinc-200 bg-white p-2"
+              }
+            >
+              <p className="text-xs font-medium text-zinc-800">
+                {input?.renderer_expression
+                  ? "生成输入：Renderer Expression"
+                  : "生成输入：Caption only（无 Expression）"}
+              </p>
+              {input?.renderer_expression ? (
+                <div className="mt-2 space-y-1.5 text-xs text-zinc-800">
+                  <p>
+                    <span className="text-zinc-500">environment · </span>
+                    {input.renderer_expression.environment}
+                  </p>
+                  <p>
+                    <span className="text-zinc-500">action · </span>
+                    {input.renderer_expression.action}
+                  </p>
+                  <p>
+                    <span className="text-zinc-500">composition · </span>
+                    {input.renderer_expression.composition}
+                  </p>
+                  {(input.renderer_expression.characters?.length ?? 0) > 0 ? (
+                    <p>
+                      <span className="text-zinc-500">characters · </span>
+                      {input.renderer_expression.characters
+                        .map((c) => `${c.role}: ${c.visual}`)
+                        .join("; ")}
+                    </p>
+                  ) : (
+                    <p className="text-zinc-500">characters · []</p>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-1 text-[11px] leading-snug text-zinc-500">
+                  本 Job 入队时 provenance 无 Expression，走 caption 长包装。旧帧需重新
+                  Discovery Propose → Accept → Rollout 才会带上 Expression。
+                </p>
+              )}
+            </div>
             {showLive ? (
               <div className="space-y-3 border-t border-zinc-200 pt-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-amber-800">

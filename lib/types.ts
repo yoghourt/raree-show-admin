@@ -25,6 +25,11 @@ export type ReadingRoute = {
   story_images_v2: ReadingFrame[] | null;
   locationId: string | null;
   characterIds: string[];
+  /**
+   * Creator-only: per-frame Expression presence from frame_provenance_v1.
+   * Index-aligned with story_images_v2. Not Reader Truth (ADR-011 A3).
+   */
+  frameHasRendererExpression?: boolean[];
 };
 
 export type Character = {

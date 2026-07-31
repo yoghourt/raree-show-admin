@@ -29,11 +29,18 @@ describe("scene chapter_number", () => {
   });
 
   it("validateSceneAcceptFields aligns with Rollout rules", () => {
+    const expression = {
+      environment: "winter courtyard",
+      characters: [] as { role: string; visual: string }[],
+      action: "household stands facing gate",
+      composition: "wide courtyard view",
+    };
     const bad = validateSceneAcceptFields({
       parentStoryCandidateId: "story-1",
       chapter_number: "Bran I",
       chapter_title: "Bran I",
       title: "Courtyard",
+      rendererExpression: expression,
     });
     expect(bad.ok).toBe(false);
 
@@ -41,6 +48,7 @@ describe("scene chapter_number", () => {
       chapter_number: 1,
       chapter_title: "Bran I",
       title: "Courtyard",
+      rendererExpression: expression,
     } as never);
     expect(missingParent.ok).toBe(false);
 
@@ -49,6 +57,7 @@ describe("scene chapter_number", () => {
       chapter_number: 1,
       chapter_title: "Bran I",
       title: "Courtyard",
+      rendererExpression: expression,
     });
     expect(good.ok).toBe(true);
   });

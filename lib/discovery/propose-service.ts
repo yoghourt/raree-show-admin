@@ -49,6 +49,8 @@ const REGISTRY_FIELD_HINTS: Record<DiscoveryCandidateType, string[]> = {
     "chapter_number",
     "title",
     "summary",
+    "visualIntent",
+    "rendererExpression",
   ],
 };
 
@@ -56,7 +58,7 @@ const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
   character: `{"candidates":[{"displayName":"Arya Stark","summary":"Young Stark daughter.","fields":{"name":"Arya Stark","house":"Stark"}}]}`,
   location: `{"candidates":[{"displayName":"Winterfell","summary":"Seat of House Stark.","fields":{"name":"Winterfell","region":"The North"}}]}`,
   story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
-  scene: `{"candidates":[{"displayName":"Courtyard Welcome","summary":"Royal arrival scene.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Bran I","title":"Courtyard Welcome","summary":"Household gathers in the courtyard."}}]}`,
+  scene: `{"candidates":[{"displayName":"Courtyard Welcome","summary":"Royal arrival scene.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Bran I","title":"Courtyard Welcome","summary":"Household gathers in the courtyard.","visualIntent":{"relationship":"household greets royal party","purpose":"establish arrival tension"},"rendererExpression":{"environment":"winter castle courtyard","characters":[{"role":"lord","visual":"gray cloak, standing upright"},{"role":"king","visual":"gold trim cloak, raising hand"},{"role":"guards","visual":"spears at sides"}],"action":"lord and household stand facing arriving royal party","composition":"foreground household, background royal procession entering gates"}}}]}`,
 };
 
 function mockCandidatesForType(
@@ -131,6 +133,20 @@ function mockCandidatesForType(
             chapter_title: "Bran I",
             title: "Courtyard Welcome",
             summary: "Stark household assembles to greet the king.",
+            visualIntent: {
+              relationship: "household greets royal party",
+              purpose: "establish arrival tension",
+            },
+            rendererExpression: {
+              environment: "winter castle courtyard",
+              characters: [
+                { role: "lord", visual: "gray cloak, standing upright" },
+                { role: "king", visual: "gold trim cloak, raising hand" },
+              ],
+              action: "lord and household stand facing arriving royal party",
+              composition:
+                "foreground household, background royal procession entering gates",
+            },
           },
         },
       ];
@@ -223,7 +239,15 @@ Optional per item: confidence ("green"|"yellow"|"red"), evidence ([{sourceLabel,
 
 Example shape for type "${candidateType}":
 ${TYPE_EXAMPLES[candidateType]}
-${candidateType === "scene" ? '\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.\n' : ""}
+${candidateType === "scene" ? `\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.
+Visualization (ADR-011 / SPEC-DVE-001 — required):
+- fields.rendererExpression is REQUIRED: { environment, characters (array, MAY be []), action, composition; optional lighting, styleHints }.
+- action MUST be visible behavior (pose/props), NOT abstract relations alone (e.g. use "holding sword before kneeling king", NOT only "protects").
+- characters MAY be [] for landscape/atmosphere scenes; when non-empty each item needs role + visual.
+- fields.visualIntent is OPTIONAL by scene: { characters?, relationship?, emotion?, purpose? }. Presence optional; quality when present.
+- visualIntent is narrative meaning only — NO camera/composition/prompt tokens in Intent.
+- styleHints (if any) = stable style family only; FORBIDDEN: masterpiece, 8k, best quality, ultra detailed.
+\n` : ""}
 ${candidateType === "location" ? '\nLocation fields MUST use fields.name (place name). Do NOT return prose paragraphs as the only value.\n' : ""}
 ${candidateType === "story" ? '\nStory fields MUST use fields.title and fields.summary (editorial story unit). Optional boundaryHint. Return {"candidates":[...]} — each item needs displayName, summary, and fields with title + summary.\n' : ""}
 

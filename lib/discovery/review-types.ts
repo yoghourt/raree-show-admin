@@ -8,6 +8,10 @@ import type {
   DiscoveryCandidate,
   DiscoveryCandidateFields,
 } from "@/lib/discovery/propose-types";
+import type {
+  RendererExpression,
+  VisualIntent,
+} from "@/lib/discovery/visual-contract";
 
 export type ReviewItemStatus =
   | "pending"
@@ -84,6 +88,13 @@ export interface AcceptedSceneCandidateStaging {
   chapter_number: number | string;
   title: string;
   summary?: string;
+  /** Audit only — not used for image generation (SPEC-DVE-001). */
+  visualIntent?: VisualIntent | null;
+  /**
+   * Creator generation input — projected to frame_provenance_v1 (ADR-011 A3).
+   * Present on new Accepts; optional for legacy queue snapshots.
+   */
+  rendererExpression?: RendererExpression;
   acceptedAt: string;
 }
 

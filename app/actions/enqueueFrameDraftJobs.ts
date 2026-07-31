@@ -7,6 +7,10 @@ import {
   type GenerateJobRow,
   type SceneFrameJobInput,
 } from "@/lib/generate-jobs"
+import {
+  getSceneRowByTsid,
+  parseFrameProvenance,
+} from "@/lib/rollout/scenes-server"
 import { createSupabaseServerClient } from "@/lib/supabase-server"
 
 export type EnqueueFrameDraftJobsResult =
@@ -40,6 +44,7 @@ const inputSchema = z.object({
 
 /**
  * SPIKE-IMG-003: enqueue image.generate intents as Execution jobs.
+ * Attaches rendererExpression from frame_provenance_v1 when present (ADR-011 A3).
  * Does NOT call imageGenerate, create Candidates, or write Assets.
  */
 export async function enqueueFrameDraftJobs(input: {
@@ -65,9 +70,27 @@ export async function enqueueFrameDraftJobs(input: {
     return { ok: false, message: "未登录，无法排队生成。" }
   }
 
+  const provenanceByScene = new Map<
+    string,
+    ReturnType<typeof parseFrameProvenance>
+  >()
+
   const jobs: GenerateJobRow[] = []
   try {
     for (const frame of parsed.data.frames) {
+      let provenance = provenanceByScene.get(frame.sceneTsid)
+      if (!provenance) {
+        const row = await getSceneRowByTsid(
+          supabase,
+          parsed.data.workId,
+          frame.sceneTsid
+        )
+        provenance = parseFrameProvenance(row?.frame_provenance_v1)
+        provenanceByScene.set(frame.sceneTsid, provenance)
+      }
+      const entry = provenance.find((p) => p.frameIndex === frame.frameIndex)
+      const rendererExpression = entry?.rendererExpression
+
       const inputJson: SceneFrameJobInput = {
         asset_slot: "scene_frame",
         frame_index: frame.frameIndex,
@@ -75,6 +98,9 @@ export async function enqueueFrameDraftJobs(input: {
         ...(frame.routeTitle ? { route_title: frame.routeTitle } : {}),
         ...(frame.operatorRevision
           ? { operator_revision: frame.operatorRevision }
+          : {}),
+        ...(rendererExpression
+          ? { renderer_expression: rendererExpression }
           : {}),
       }
       const job = await enqueueGenerateJob(
