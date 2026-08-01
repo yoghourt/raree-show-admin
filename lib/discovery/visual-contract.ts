@@ -8,8 +8,10 @@
  */
 
 import {
+  assessSceneFaceSafety,
   findCastConsistencyErrors,
   findForbiddenPhysicsCues,
+  findRestrictedFullFaceSceneCues,
   missingMultiCharacterPlacement,
 } from "@/lib/discovery/expression-capability-rules";
 
@@ -251,6 +253,20 @@ export function parseRendererExpression(raw: unknown): {
   const castErrors = findCastConsistencyErrors(expression);
   for (const err of castErrors) {
     warnings.push(`rendererExpression cast inconsistency: ${err}`);
+  }
+
+  const fullFaceCues = findRestrictedFullFaceSceneCues(expression);
+  if (fullFaceCues.length) {
+    warnings.push(
+      `rendererExpression has restricted full-face scene cues (Rule 6): ${fullFaceCues.join(", ")}; prefer hidden/distant/partial for scene_frame`
+    );
+  } else {
+    const faceSafety = assessSceneFaceSafety(expression);
+    if (faceSafety.safety_status !== "allowed") {
+      warnings.push(
+        `rendererExpression face safety ${faceSafety.safety_status} (${faceSafety.reason})`
+      );
+    }
   }
 
   return { ok: true, value: expression, warnings };

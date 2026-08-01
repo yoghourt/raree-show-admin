@@ -6,8 +6,11 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import {
+  assessSceneFaceSafety,
   findForbiddenPhysicsCues,
+  findRestrictedFullFaceSceneCues,
   FORBIDDEN_PHYSICS_PATTERN,
+  FULL_FACE_SCENE_PATTERN,
 } from "@/lib/discovery/expression-capability-rules";
 import { buildFrameDraftPrompt } from "@/lib/prompts/frame-draft";
 import { parseFrameProvenance } from "@/lib/rollout/scenes-server";
@@ -164,6 +167,79 @@ describe("A4 capability adaptation", () => {
       "work-1"
     );
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("Rule 6 Face Safety", () => {
+  it("detects unrestricted full-face scene cues", () => {
+    expect(FULL_FACE_SCENE_PATTERN.test("close-up of boy's face")).toBe(true);
+    expect(
+      findRestrictedFullFaceSceneCues({
+        environment: "snow",
+        characters: [{ role: "boy", visual: "young boy" }],
+        action: "close-up of boy's terrified face staring at the camera",
+        composition: "tight face fill frame",
+      }).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("allows face-safe night duel Expression", () => {
+    const assessment = assessSceneFaceSafety({
+      environment: "snow clearing under moonlight",
+      characters: [
+        { role: "knight", visual: "armored knight in closed helmet holding sword" },
+        {
+          role: "white_walker",
+          visual: "hooded ice warrior holding sword face hidden",
+        },
+      ],
+      action: "two warriors facing each other with swords crossed at middle distance",
+      composition: "wide shot two silhouettes facing each other",
+    });
+    expect(assessment.safety_status).toBe("allowed");
+    expect(["hidden", "distant", "partial"]).toContain(
+      assessment.inferredVisibility
+    );
+  });
+
+  it("hard-rejects full-face scene cues on propose", () => {
+    const result = normalizeRawCandidate(
+      {
+        displayName: "Close Face",
+        summary: "s",
+        fields: {
+          parentStoryCandidateId: "story-1",
+          chapter_number: 1,
+          title: "Close Face",
+          rendererExpression: {
+            environment: "snowy roadside",
+            characters: [{ role: "boy", visual: "young boy" }],
+            action: "close-up of boy's terrified face staring at the camera",
+            composition: "tight face fill frame",
+          },
+        },
+      },
+      "scene",
+      "work-1"
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join(" ")).toMatch(/full-face|Rule 6|face safety/i);
+    }
+  });
+
+  it("marks high-risk without mitigation as requires_human_review", () => {
+    const assessment = assessSceneFaceSafety({
+      environment: "dark forest under moonlight",
+      characters: [
+        { role: "knight", visual: "knight holding sword" },
+        { role: "walker", visual: "pale warrior holding ice blade" },
+      ],
+      action: "two warriors facing each other",
+      composition: "two characters facing each other",
+    });
+    expect(assessment.safety_status).toBe("requires_human_review");
+    expect(assessment.sceneRisk).toBe("high");
   });
 });
 

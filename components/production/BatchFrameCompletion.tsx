@@ -958,6 +958,15 @@ export function BatchFrameCompletion({
                           job.error}
                       </p>
                     ) : null}
+                    {hosted?.faceSafety &&
+                    hosted.faceSafety.safety_status !== "allowed" ? (
+                      <p className="text-[11px] text-amber-800">
+                        Face Safety: {hosted.faceSafety.safety_status}
+                        {" · "}
+                        {hosted.faceSafety.reason}
+                        {" — Human Accept 前请人工确认脸部是否惊悚"}
+                      </p>
+                    ) : null}
                     {hosted?.url ? (
                       <p className="truncate text-[11px] text-zinc-500">
                         Execution 结果 ≠ Candidate ≠ Asset

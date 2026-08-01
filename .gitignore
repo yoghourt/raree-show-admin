@@ -78,6 +78,11 @@ next-env.d.ts
 # Expression cast-consistency regression outputs
 /scripts/expression-consistency-regression/results/
 
+# Renderer model qualification spike outputs
+/scripts/renderer-model-qualification-spike/results/
+/scripts/asoiaf-first-three-chapters-spike/results/
+/scripts/face-coherence-portrait-ref-spike/results/
+
 # Visual consistency spike outputs
 /scripts/visual-consistency-spike/results/
 

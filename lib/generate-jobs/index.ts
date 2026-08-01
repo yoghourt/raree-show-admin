@@ -23,6 +23,11 @@ export type SceneFrameJobInput = {
   operator_revision?: string;
   /** SPEC-DVE-001 Expression — preferred prompt source when present. */
   renderer_expression?: RendererExpression;
+  /**
+   * Rule 6: allow restricted full-face Expression through Port.
+   * Human Accept remains required — this is not auto-Accept.
+   */
+  face_safety_override?: boolean;
 };
 
 /** Character portrait generate intent (CPP-C). */
@@ -114,6 +119,7 @@ export function parseSceneFrameJobInput(
       : undefined;
   const exprParsed = parseRendererExpression(inputJson.renderer_expression);
   const renderer_expression = exprParsed.ok ? exprParsed.value : undefined;
+  const face_safety_override = inputJson.face_safety_override === true;
   return {
     asset_slot: "scene_frame",
     frame_index: frameIndex,
@@ -121,6 +127,7 @@ export function parseSceneFrameJobInput(
     ...(route_title ? { route_title } : {}),
     ...(operator_revision ? { operator_revision } : {}),
     ...(renderer_expression ? { renderer_expression } : {}),
+    ...(face_safety_override ? { face_safety_override: true } : {}),
   };
 }
 

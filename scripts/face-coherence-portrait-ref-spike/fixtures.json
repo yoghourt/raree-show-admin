@@ -1,0 +1,121 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "size": 512,
+  "cases": [
+    {
+      "id": "case-duel",
+      "label": "Prologue — Moonlit Confrontation",
+      "routeTitle": "Prologue",
+      "summary": "Ser Waymar Royce draws his sword to confront an Other in the moonlit forest while Will watches from hiding.",
+      "focusRole": "knight",
+      "portraitName": "Ser Waymar Royce",
+      "expression": {
+        "environment": "dark snowy forest under moonlight",
+        "characters": [
+          {
+            "role": "knight",
+            "visual": "knight in frosted armor holding crystal sword"
+          },
+          {
+            "role": "white_walker",
+            "visual": "tall pale warrior holding ice blade"
+          }
+        ],
+        "action": "two warriors facing each other with swords drawn",
+        "composition": "two characters facing each other in forest clearing"
+      },
+      "faceMitigationExpression": {
+        "environment": "dark snowy forest under moonlight",
+        "characters": [
+          {
+            "role": "knight",
+            "visual": "knight in closed helmet and frosted armor holding sword"
+          },
+          {
+            "role": "white_walker",
+            "visual": "tall hooded pale figure holding ice blade face hidden"
+          }
+        ],
+        "action": "two warriors facing each other with swords drawn at middle distance",
+        "composition": "wide shot two silhouettes facing across snowy clearing"
+      }
+    },
+    {
+      "id": "case-direwolf",
+      "label": "Bran I — Direwolf Pups",
+      "routeTitle": "Bran I",
+      "summary": "The Stark children find newborn direwolf pups beside their dead mother in the snow.",
+      "focusRole": "youth",
+      "portraitName": "Jon Snow",
+      "expression": {
+        "environment": "snowy roadside with fallen dead wolf",
+        "characters": [
+          {
+            "role": "boy",
+            "visual": "young boy kneeling holding small wolf pup"
+          },
+          {
+            "role": "youth",
+            "visual": "older youth standing looking down"
+          }
+        ],
+        "action": "boy kneeling near dead wolf, holding small pup",
+        "composition": "boy kneeling in foreground, youth standing behind"
+      },
+      "faceMitigationExpression": {
+        "environment": "snowy roadside with fallen dead wolf",
+        "characters": [
+          {
+            "role": "boy",
+            "visual": "young boy in hooded cloak kneeling holding pup face turned down"
+          },
+          {
+            "role": "youth",
+            "visual": "older youth in dark cloak standing back three-quarter view"
+          }
+        ],
+        "action": "two figures looking down at dead wolf and pup in snow",
+        "composition": "medium-wide shot faces secondary to wolf and snow"
+      }
+    },
+    {
+      "id": "case-godswood",
+      "label": "Catelyn I — Godswood Conversation",
+      "routeTitle": "Catelyn I",
+      "summary": "Catelyn and Eddard Stark converse beneath the red-leaved heart tree in the Winterfell godswood about southron news and family duty.",
+      "focusRole": "man",
+      "portraitName": "Eddard Stark",
+      "expression": {
+        "environment": "godswood with red-leaved heart tree and still water",
+        "characters": [
+          {
+            "role": "woman",
+            "visual": "woman in dark dress walking"
+          },
+          {
+            "role": "man",
+            "visual": "man sitting near tree holding sword"
+          }
+        ],
+        "action": "woman standing before seated man talking",
+        "composition": "woman on left facing seated man on right under large tree"
+      },
+      "faceMitigationExpression": {
+        "environment": "godswood with red-leaved heart tree and still water",
+        "characters": [
+          {
+            "role": "woman",
+            "visual": "woman in dark dress seen from behind"
+          },
+          {
+            "role": "man",
+            "visual": "bearded man in fur cloak face in soft shadow sitting by tree"
+          }
+        ],
+        "action": "woman standing before seated man talking at reading distance",
+        "composition": "wide shot under tree faces not close-up"
+      }
+    }
+  ]
+}

@@ -6,16 +6,17 @@
 | ----- | ----- |
 | Title | Discovery Renderer Expression Contract |
 | Status | **Accepted — Contract Freeze** |
-| Version | v1.2 |
+| Version | v1.3 |
 | Owner | Architect |
-| Last Updated | 2026-07-31 |
+| Last Updated | 2026-08-01 |
 | Derived From | ADR-011 (Accepted · **A3** · **A4**) · ADR-006 · ADR-010 (Port boundary; provider selection out of scope) |
-| Evidence | discovery-expression-ownership-spike · discovery-visual-expression-contract-spike · capability-adaptation-v2-spike |
+| Evidence | discovery-expression-ownership-spike · discovery-visual-expression-contract-spike · capability-adaptation-v2-spike · face-coherence-portrait-ref-spike · face-safety-visual-expression-policy-spike |
 | Contract Freeze | **Granted** |
 | Production Authorization | **Granted (scoped)** — ADR-011 **A3** · Constraints PA-A–PA-F · §13 |
 | Capability Adaptation | **Granted (A4)** — static visible geometry in Expression; no new AI layer; no frame Cloud |
+| Face Safety (P1) | **Granted (Capability Rules Rule 6)** — Creator `scene_frame` face-visibility ceiling; no identity transfer; no ADR-011 reopen |
 
-> **Contract Freeze + scoped Production Authorization (A3) + Capability Adaptation (A4).** Implementation MAY wire Creator-path Discovery Expression → Image Port → Candidate within §13 allowlist. Expression authorship MUST prefer static geometry (A4). Contract Freeze ≠ unbounded Production Authorization.
+> **Contract Freeze + scoped Production Authorization (A3) + Capability Adaptation (A4) + Face Safety Rule 6 (P1).** Implementation MAY wire Creator-path Discovery Expression → Image Port → Candidate within §13 allowlist. Expression authorship MUST prefer static geometry (A4) and scene_frame face visibility ≤ partial (Rule 6). Contract Freeze ≠ unbounded Production Authorization.
 
 ---
 
@@ -244,8 +245,43 @@ MUST NOT contain:
 * Second planner output blocks  
 * Quality-spam `styleHints` (§5.4)  
 * Complex physics / spectacular motion as sole cues (**A4**): lifting, hoisting, mid-air choke, throwing, shattering into fragments, exploding, flying debris, large anonymous crowds  
+* Unrestricted **full-face** scene presentation as default (**Rule 6**): close-up face, tight face fill, facing-camera portrait framing on `scene_frame`
 
-**A4 preference:** static visible geometry (who / where / pose / prop) over cinematic physics. Runtime rule text: `lib/discovery/expression-capability-rules.ts`.
+**A4 preference:** static visible geometry (who / where / pose / prop) over cinematic physics.  
+**Rule 6 preference:** for Creator `scene_frame`, face visibility ≤ `partial` (`hidden` | `back_view` | `distant` | `partial`). HIGH-risk beats (night, battlefield, crowd, monster/creature, heavy armor, blizzard) SHOULD use `hidden` or `distant`.  
+
+Runtime rule text: `lib/discovery/expression-capability-rules.ts`.
+
+### 6.4 Face Safety capability (Rule 6) — Creator scene_frame
+
+Controlled vocabulary (presentation only; encoded in Expression strings in P1 — no required new schema field):
+
+```ts
+type FaceVisibility =
+  | "hidden"
+  | "back_view"
+  | "distant"
+  | "partial"
+  | "full"
+```
+
+| Track | Default ceiling | Notes |
+| ----- | --------------- | ----- |
+| `scene_frame` | ≤ `partial` | `full` is restricted; needs explicit override + Human Accept |
+| `portrait` | `full` allowed | Portrait rail unchanged; Rule 6 does **not** apply |
+
+Discovery owns authorship of safe presentation. Renderer executes Expression only and MUST NOT infer narrative meaning or inject portrait references.
+
+Policy assessment shape (execution / Accept advisory):
+
+```json
+{
+  "safety_status": "allowed | requires_human_review | restricted",
+  "reason": "full_face_scene_expression"
+}
+```
+
+No computer-vision face detector is required. Human Accept remains final authority for Assets.
 
 ---
 
@@ -256,15 +292,18 @@ MUST NOT contain:
 3. When `characters.length > 0`, each item has non-empty `role` and `visual`; `composition` SHOULD describe multi-figure placement.  
 4. `action` is visually executable (not abstract-only; see §6.1).  
 5. Empty / blank Expression MUST trigger rejection or blank-guard (no silent render).  
-6. Visual Intent fields are optional by scene; when present, Discovery owns semantic quality. Renderer MUST NOT “fix” Intent by inventing meaning.
+6. Visual Intent fields are optional by scene; when present, Discovery owns semantic quality. Renderer MUST NOT “fix” Intent by inventing meaning.  
+7. **Face Safety (Rule 6):** unrestricted full-face scene cues MUST be rejected at Discovery propose; before Port execution, assess Expression and attach `faceSafety` for Human Accept. `restricted` without explicit override MUST NOT call Image Port. Portrait jobs MUST skip this gate.
 
 Validation ownership:
 
 | Check | Owner |
 | ----- | ----- |
 | Intent + Expression authorship quality | Discovery |
-| Expression required-field / blank guard before Port call | Renderer Runtime (or thin transport) |
+| Face Safety Rule 6 authorship + propose hard-gate | Discovery |
+| Expression required-field / blank guard / Face Safety assess before Port | Renderer Runtime (or thin transport) |
 | Story reinterpretation | **Forbidden** for Renderer |
+| Asset Accept | Human |
 
 ---
 
