@@ -63,6 +63,26 @@ If action says "three rangers", characters[] MUST have three entries (one visual
 Do NOT write "three …" while listing only two roles.
 Bad: characters[ranger, commander] + action "three rangers examine frozen bodies".
 Good: three character entries + action "three rangers examining frozen bodies".
+
+Rule 6 — Face Safety (Creator scene_frame; NOT portrait):
+Local scene frames often collapse small faces into uncanny / horror artifacts.
+Goal: prevent immersion-breaking face presentation — NOT perfect faces or identity lock.
+MUST NOT add portrait reference / InstantID / IP-Adapter instructions.
+MUST NOT change reader-facing title/summary.
+
+Allowed scene_frame face presentation (default ceiling = partial):
+  hidden | back_view | distant | partial
+Restricted by default:
+  full (forward readable face filling meaningful frame area)
+
+Creator default: face visibility <= partial.
+HIGH-risk beats (night, battlefield, crowd, monster/creature, heavy armor, blizzard)
+  MUST prefer hidden or distant — helmets, hoods, silhouettes, wide/medium-wide shots.
+FORBIDDEN as default scene cues: close-up face, tight face fill, facing camera portrait framing.
+Encode safety into characters[].visual + action + composition (no new required schema fields).
+Bad: action "close-up of boy's terrified face staring at camera".
+Good: "two figures looking down at dead wolf at reading distance" + hoods/profiles/wide shot.
+Portrait rail (assetSlot=portrait) is OUT OF SCOPE for this rule — full faces remain allowed there.
 `.trim();
 
 /**
@@ -139,21 +159,21 @@ export function findCastConsistencyErrors(
   return errors;
 }
 
-/** Few-shot for scene TYPE_EXAMPLES — minimal sufficient duel geometry. */
+/** Few-shot for scene TYPE_EXAMPLES — minimal duel + face-safe (Rule 6). */
 export const EXPRESSION_CAPABILITY_EXAMPLE: ExpressionLike = {
-  environment: "snow clearing",
+  environment: "snow clearing under moonlight",
   characters: [
     {
       role: "knight",
-      visual: "armored knight holding sword",
+      visual: "armored knight in closed helmet holding sword",
     },
     {
       role: "white_walker",
-      visual: "ice warrior holding sword",
+      visual: "hooded ice warrior holding sword face hidden",
     },
   ],
-  action: "two warriors facing each other with swords crossed",
-  composition: "two characters facing each other",
+  action: "two warriors facing each other with swords crossed at middle distance",
+  composition: "wide shot two silhouettes facing each other",
 };
 
 /** Mock / courtyard beat — minimal static greeting. */
@@ -206,4 +226,231 @@ export function isAbstractOnlyAction(action: string): boolean {
     return true;
   }
   return false;
+}
+
+// --- Rule 6: Face Safety (scene_frame) ------------------------------------
+
+export type FaceVisibilityMode =
+  | "hidden"
+  | "back_view"
+  | "distant"
+  | "partial"
+  | "full"
+  | "unknown";
+
+export type SceneFaceRisk = "high" | "medium" | "low";
+
+/**
+ * Policy result for Creator scene_frame Face Safety.
+ * Portrait generation MUST NOT use this gate.
+ */
+export type FaceSafetyStatus =
+  | "allowed"
+  | "requires_human_review"
+  | "restricted";
+
+export type SceneFaceSafetyAssessment = {
+  safety_status: FaceSafetyStatus;
+  /** Primary machine reason code */
+  reason: string;
+  reasons: string[];
+  inferredVisibility: FaceVisibilityMode;
+  sceneRisk: SceneFaceRisk;
+  requiresExplicitOverride: boolean;
+};
+
+/** Unambiguous unrestricted full-face scene requests — propose hard-gate. */
+export const FULL_FACE_SCENE_PATTERN =
+  /\b(close[\s-]?up|tight\s+face|face\s+fill(?:s|ing)?\s+frame|facing\s+the\s+camera|looking\s+at\s+the\s+camera|staring\s+at\s+the\s+camera|portrait\s+of\s+(?:the\s+)?(?:boy|girl|man|woman|face)|detailed\s+face|facial\s+close)\b/i;
+
+const HIGH_RISK_SCENE_PATTERN =
+  /\b(night|moonlight|moonlit|battlefield|battle\b|crowd|horde|army of|monster|creature|undead|white\s*walker|other\b|wight|helmet|heavy\s+armor|armou?red\s+host|blizzard|snowstorm|dark\s+forest|haunted)\b/i;
+
+const SAFE_VISIBILITY_PATTERN =
+  /\b(helmet|hood(?:ed)?|face\s+hidden|faces?\s+hidden|veil(?:ed)?|silhouette|from\s+behind|back\s+(?:view|turned)|facing\s+away|occiput|wide\s+shot|medium[\s-]?wide|reading\s+distance|middle\s+distance|faces?\s+secondary|profile|soft\s+shadow|face\s+in\s+(?:soft\s+)?shadow)\b/i;
+
+const PARTIAL_VISIBILITY_PATTERN =
+  /\b(profile|three[\s-]?quarter|¾|partial(?:ly)?\s+(?:visible|obscured)|face\s+turned)\b/i;
+
+function expressionTextBlob(
+  expression: Pick<
+    ExpressionLike,
+    "environment" | "action" | "composition" | "characters"
+  >
+): string {
+  return [
+    expression.environment ?? "",
+    expression.action ?? "",
+    expression.composition ?? "",
+    ...(expression.characters ?? []).map((c) => `${c.role} ${c.visual}`),
+  ].join(" ");
+}
+
+export function classifySceneFaceRisk(
+  expression: Pick<
+    ExpressionLike,
+    "environment" | "action" | "composition" | "characters"
+  >
+): SceneFaceRisk {
+  const blob = expressionTextBlob(expression);
+  if (HIGH_RISK_SCENE_PATTERN.test(blob)) return "high";
+  const cast = expression.characters?.length ?? 0;
+  if (cast >= 2) return "medium";
+  if (cast === 0) return "low";
+  return "medium";
+}
+
+export function inferFaceVisibility(
+  expression: Pick<
+    ExpressionLike,
+    "environment" | "action" | "composition" | "characters"
+  >
+): FaceVisibilityMode {
+  const blob = expressionTextBlob(expression);
+  if ((expression.characters?.length ?? 0) === 0) return "distant";
+  if (FULL_FACE_SCENE_PATTERN.test(blob)) return "full";
+  if (
+    /\b(helmet|hood(?:ed)?|face\s+hidden|faces?\s+hidden|silhouette|from\s+behind|back\s+(?:view|turned)|facing\s+away)\b/i.test(
+      blob
+    )
+  ) {
+    if (/\b(from\s+behind|back\s+(?:view|turned)|facing\s+away)\b/i.test(blob)) {
+      return "back_view";
+    }
+    return "hidden";
+  }
+  if (
+    /\b(wide\s+shot|medium[\s-]?wide|reading\s+distance|middle\s+distance|faces?\s+secondary)\b/i.test(
+      blob
+    )
+  ) {
+    return "distant";
+  }
+  if (PARTIAL_VISIBILITY_PATTERN.test(blob) || SAFE_VISIBILITY_PATTERN.test(blob)) {
+    return "partial";
+  }
+  return "unknown";
+}
+
+/**
+ * Hard-gate cues for propose: unrestricted full-face scene Expression.
+ * Does NOT apply to portrait assetSlot.
+ */
+export function findRestrictedFullFaceSceneCues(
+  expression: Pick<
+    ExpressionLike,
+    "environment" | "action" | "composition" | "characters"
+  >
+): string[] {
+  if ((expression.characters?.length ?? 0) === 0) return [];
+  const blob = expressionTextBlob(expression);
+  const match = blob.match(FULL_FACE_SCENE_PATTERN);
+  return match?.[0] ? [match[0].toLowerCase()] : [];
+}
+
+/**
+ * Assess Creator scene_frame Face Safety against Rule 6.
+ * Portrait path MUST NOT call this for blocking.
+ */
+export function assessSceneFaceSafety(
+  expression: Pick<
+    ExpressionLike,
+    "environment" | "action" | "composition" | "characters"
+  >,
+  options?: { explicitOverride?: boolean }
+): SceneFaceSafetyAssessment {
+  const castLen = expression.characters?.length ?? 0;
+  if (castLen === 0) {
+    return {
+      safety_status: "allowed",
+      reason: "no_cast_landscape",
+      reasons: ["empty characters[] — face policy N/A"],
+      inferredVisibility: "distant",
+      sceneRisk: "low",
+      requiresExplicitOverride: false,
+    };
+  }
+
+  const sceneRisk = classifySceneFaceRisk(expression);
+  const inferredVisibility = inferFaceVisibility(expression);
+  const fullCues = findRestrictedFullFaceSceneCues(expression);
+  const blob = expressionTextBlob(expression);
+  const hasSafeCue = SAFE_VISIBILITY_PATTERN.test(blob);
+  const reasons: string[] = [];
+
+  if (fullCues.length) {
+    reasons.push(`full_face_cue:${fullCues.join(",")}`);
+  }
+  if (sceneRisk === "high" && !hasSafeCue && inferredVisibility !== "hidden") {
+    reasons.push("high_risk_without_face_mitigation");
+  }
+  if (inferredVisibility === "full") {
+    reasons.push("inferred_visibility_full");
+  }
+  if (
+    inferredVisibility === "unknown" &&
+    sceneRisk !== "low" &&
+    !hasSafeCue
+  ) {
+    reasons.push("ambiguous_face_presentation");
+  }
+
+  const override = options?.explicitOverride === true;
+
+  // Unambiguous full-face request
+  if (fullCues.length || inferredVisibility === "full") {
+    if (override) {
+      return {
+        safety_status: "requires_human_review",
+        reason: "full_face_scene_expression_override",
+        reasons: [...reasons, "explicit_override"],
+        inferredVisibility: "full",
+        sceneRisk,
+        requiresExplicitOverride: false,
+      };
+    }
+    return {
+      safety_status: "restricted",
+      reason: "full_face_scene_expression",
+      reasons,
+      inferredVisibility: "full",
+      sceneRisk,
+      requiresExplicitOverride: true,
+    };
+  }
+
+  // HIGH risk without mitigation → human review (generation may still run)
+  if (sceneRisk === "high" && !hasSafeCue) {
+    return {
+      safety_status: "requires_human_review",
+      reason: "high_risk_scene_face_exposure",
+      reasons:
+        reasons.length > 0 ? reasons : ["high_risk_scene_face_exposure"],
+      inferredVisibility,
+      sceneRisk,
+      requiresExplicitOverride: false,
+    };
+  }
+
+  if (inferredVisibility === "unknown" && sceneRisk === "medium") {
+    return {
+      safety_status: "requires_human_review",
+      reason: "ambiguous_face_presentation",
+      reasons:
+        reasons.length > 0 ? reasons : ["ambiguous_face_presentation"],
+      inferredVisibility,
+      sceneRisk,
+      requiresExplicitOverride: false,
+    };
+  }
+
+  return {
+    safety_status: "allowed",
+    reason: "within_scene_face_ceiling",
+    reasons: reasons.length ? reasons : ["face_visibility_within_partial_ceiling"],
+    inferredVisibility:
+      inferredVisibility === "unknown" ? "partial" : inferredVisibility,
+    sceneRisk,
+    requiresExplicitOverride: false,
+  };
 }

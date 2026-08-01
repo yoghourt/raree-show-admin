@@ -1,0 +1,77 @@
+{
+  "seed": 42,
+  "size": 512,
+  "cases": [
+    {
+      "id": "case-duel",
+      "label": "Duel — two-character facing",
+      "expression": {
+        "environment": "snowy forest clearing at night",
+        "characters": [
+          { "role": "knight", "visual": "armored knight holding steel sword" },
+          { "role": "white_walker", "visual": "tall gaunt creature holding ice sword" }
+        ],
+        "action": "knight and white walker facing each other with raised swords",
+        "composition": "two warriors facing each other in forest clearing"
+      }
+    },
+    {
+      "id": "case-throat",
+      "label": "Throat/restraint — power geometry (static)",
+      "expression": {
+        "environment": "dark snowy forest",
+        "characters": [
+          { "role": "wight", "visual": "undead standing over fallen ranger" },
+          { "role": "ranger", "visual": "fallen ranger on snow" }
+        ],
+        "action": "undead standing above fallen ranger",
+        "composition": "two figures, one standing one fallen"
+      }
+    },
+    {
+      "id": "case-tree",
+      "label": "Tree — vertical spatial boundary",
+      "expression": {
+        "environment": "dark forest clearing at night",
+        "characters": [
+          { "role": "scout", "visual": "scout climbing tree branches" },
+          { "role": "commander", "visual": "knight standing below holding drawn sword" }
+        ],
+        "action": "scout climbing tall ironwood tree while commander waits below",
+        "composition": "scout in upper tree branches, knight on ground below"
+      }
+    }
+  ],
+  "models": [
+    {
+      "id": "baseline",
+      "label": "Baseline — production LocalAI",
+      "providerId": "localai",
+      "modelId": "sd-3.5-medium-ggml",
+      "family": "sd3.5-medium-ggml"
+    },
+    {
+      "id": "candidate-a",
+      "label": "Candidate A — SDXL family",
+      "providerId": "local",
+      "modelId": "sdxl-turbo",
+      "family": "sdxl",
+      "baseUrlEnv": "IMAGE_CREATOR_LOCAL_BASE",
+      "defaultBaseUrl": "http://127.0.0.1:8191"
+    },
+    {
+      "id": "candidate-b",
+      "label": "Candidate B — stronger semantic (LocalAI FLUX.2 Klein)",
+      "providerId": "localai",
+      "modelId": "flux.2-klein-4b",
+      "family": "flux2-klein"
+    },
+    {
+      "id": "candidate-d",
+      "label": "Candidate D — SD 3.5 Large GGML",
+      "providerId": "localai",
+      "modelId": "sd-3.5-large-ggml",
+      "family": "sd3.5-large-ggml"
+    }
+  ]
+}

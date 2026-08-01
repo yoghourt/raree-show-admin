@@ -1,5 +1,9 @@
 import { imageGenerate } from "@/lib/ai/capability";
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload";
+import {
+  assessSceneFaceSafety,
+  type SceneFaceSafetyAssessment,
+} from "@/lib/discovery/expression-capability-rules";
 import type { RendererExpression } from "@/lib/discovery/visual-contract";
 import { formatRequestError } from "@/lib/format-request-error";
 import type {
@@ -20,6 +24,8 @@ export type ExecuteImageGenerateOk = {
   mimeType: string;
   usedFallback: boolean;
   durationMs: number;
+  /** Rule 6 Face Safety — advisory for Human Accept (scene_frame only). */
+  faceSafety?: SceneFaceSafetyAssessment;
 };
 
 export type ExecuteImageGenerateErr = {
@@ -41,6 +47,11 @@ export async function executeSceneFrameImageGenerate(input: {
   caption: string;
   routeTitle?: string;
   rendererExpression?: RendererExpression | null;
+  /**
+   * Explicit operator override for restricted full-face Expression (Rule 6).
+   * Does not skip Human Accept — only records override on the safety assessment.
+   */
+  faceSafetyOverride?: boolean;
 }): Promise<ExecuteImageGenerateResult> {
   const started = Date.now();
   const caption = input.caption.trim();
@@ -49,6 +60,35 @@ export async function executeSceneFrameImageGenerate(input: {
     return {
       ok: false,
       message: "缺少帧说明（Asset Caption）或 Renderer Expression。",
+      durationMs: Date.now() - started,
+    };
+  }
+
+  const faceSafety = input.rendererExpression
+    ? assessSceneFaceSafety(input.rendererExpression, {
+        explicitOverride: input.faceSafetyOverride === true,
+      })
+    : undefined;
+
+  if (faceSafety) {
+    console.info("[executeSceneFrameImageGenerate] faceSafety", {
+      safety_status: faceSafety.safety_status,
+      reason: faceSafety.reason,
+      inferredVisibility: faceSafety.inferredVisibility,
+      sceneRisk: faceSafety.sceneRisk,
+      requiresExplicitOverride: faceSafety.requiresExplicitOverride,
+    });
+  }
+
+  // Restricted without override: block before Port (propose should already reject).
+  if (
+    faceSafety?.safety_status === "restricted" &&
+    faceSafety.requiresExplicitOverride &&
+    !input.faceSafetyOverride
+  ) {
+    return {
+      ok: false,
+      message: `Face Safety restricted (${faceSafety.reason}): scene_frame full-face Expression requires explicit override + Human Accept.`,
       durationMs: Date.now() - started,
     };
   }
@@ -108,6 +148,14 @@ export async function executeSceneFrameImageGenerate(input: {
       mimeType: candidate.mimeType,
       capabilityId: "image.generate",
       usedFallback: candidate.usedFallback,
+      ...(faceSafety
+        ? {
+            faceSafety: {
+              safety_status: faceSafety.safety_status,
+              reason: faceSafety.reason,
+            },
+          }
+        : {}),
     });
 
     return {
@@ -117,6 +165,7 @@ export async function executeSceneFrameImageGenerate(input: {
       mimeType: candidate.mimeType,
       usedFallback: candidate.usedFallback,
       durationMs: Date.now() - started,
+      ...(faceSafety ? { faceSafety } : {}),
     };
   } catch (e) {
     const message = formatRequestError(e);
@@ -243,6 +292,7 @@ export async function executeImageGenerateJob(input: {
       caption: input.sceneFrame.caption,
       routeTitle: input.sceneFrame.route_title,
       rendererExpression: input.sceneFrame.renderer_expression,
+      faceSafetyOverride: input.sceneFrame.face_safety_override === true,
     });
   }
   return {

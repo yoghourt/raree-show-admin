@@ -11,8 +11,10 @@ import type {
   DiscoveryCandidateType,
 } from "@/lib/discovery/propose-types";
 import {
+  assessSceneFaceSafety,
   findCastConsistencyErrors,
   findForbiddenPhysicsCues,
+  findRestrictedFullFaceSceneCues,
 } from "@/lib/discovery/expression-capability-rules";
 import {
   parseRendererExpression,
@@ -228,6 +230,26 @@ function validateSceneFields(
       errors: castErrors.map(
         (e) => `rendererExpression cast inconsistency: ${e}`
       ),
+    };
+  }
+
+  // Rule 6: propose hard-gate unrestricted full-face scene Expression.
+  const fullFaceCues = findRestrictedFullFaceSceneCues(expressionResult.value);
+  if (fullFaceCues.length) {
+    return {
+      ok: false,
+      errors: [
+        `rendererExpression forbids unrestricted full-face scene cues (Rule 6): ${fullFaceCues.join(", ")} — use hidden/back_view/distant/partial; full requires Human Accept override at generation`,
+      ],
+    };
+  }
+  const faceSafety = assessSceneFaceSafety(expressionResult.value);
+  if (faceSafety.safety_status === "restricted") {
+    return {
+      ok: false,
+      errors: [
+        `rendererExpression face safety restricted (${faceSafety.reason}) — prefer helmets/hoods/wide shots; full face needs explicit override + Human Accept`,
+      ],
     };
   }
 
