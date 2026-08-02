@@ -280,16 +280,19 @@ Reader-facing prose (CRITICAL — not Expression):
 - fields.title, fields.summary, displayName, and top-level summary are for human readers.
   Frame caption after write uses fields.summary (fallback to title if summary empty).
 - Prefer proper names from the narrative (e.g. Will, Ser Waymar Royce, Gared) when the text supports them.
-- Do NOT shorten, role-genericize, or "minimize" reader prose to match Local image constraints.
-- Expression minimality rules below apply ONLY to fields.rendererExpression — NEVER to title/summary/caption-bound fields.
+- Do NOT shorten, role-genericize, or "minimize" reader prose for image-model constraints.
+- Expression authorship rules below apply ONLY to fields.rendererExpression — NEVER to title/summary/caption-bound fields.
 
-Visualization (ADR-011 / SPEC-DVE-001 — required):
-- fields.rendererExpression is REQUIRED: { environment, characters (array, MAY be []), action, composition }.
-- Default: OMIT lighting and styleHints (Local minimality). Do not emit cinematic or quality wording inside rendererExpression only.
-- characters MAY be [] for landscape/atmosphere scenes; when non-empty each item needs role + short visual (identity + one prop).
+Visualization (ADR-011 A5 / SPEC-DVE-001 v1.4 — required):
+- fields.rendererExpression is REQUIRED Canonical Visual Expression:
+  { environment, characters (array, MAY be []), action, composition,
+    lighting?, atmosphere?, threatPerception?, visualEmphasis?, styleHints? }.
+- Author for the best renderer: include optional lighting/atmosphere/threatPerception/visualEmphasis when Intent supports them.
+- characters MAY be [] for landscape/atmosphere scenes; when non-empty each item needs role + visual (identity + prop/costume).
 - fields.visualIntent is OPTIONAL by scene: { characters?, relationship?, emotion?, purpose? }. Presence optional; quality when present.
 - visualIntent is narrative meaning only — NO camera/composition/prompt tokens in Intent.
-- If styleHints is ever present (rare): stable style family only; FORBIDDEN: masterpiece, 8k, best quality, ultra detailed.
+- Narrow-fold Intent cues into Expression optional fields in the SAME propose output (no second AI call).
+- styleHints: stable style family only; FORBIDDEN: masterpiece, 8k, best quality, ultra detailed.
 
 ${EXPRESSION_CAPABILITY_RULES}
 

@@ -6,6 +6,10 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import {
+  expressionToPrompt,
+  projectExpressionForDeployment,
+} from "@/lib/discovery/execution-projection";
+import {
   adaptSceneExpressionForLocalCapability,
   assessSceneFaceSafety,
   findForbiddenPhysicsCues,
@@ -30,7 +34,9 @@ const SAMPLE_EXPRESSION = {
     { role: "knight", visual: "armor, sword raised" },
     { role: "king", visual: "crown, seated on throne" },
   ],
-  action: "knight kneels holding sword before king",
+  // left/right + both roles so Local adapt keeps action (only forces composition).
+  action:
+    "knight left kneeling with sword raised, king right on throne, both fully visible",
   composition: "foreground knight, background king on throne",
 };
 
@@ -60,6 +66,23 @@ describe("parseRendererExpression", () => {
       styleHints: "masterpiece, 8k",
     });
     expect(result.ok).toBe(false);
+  });
+
+  it("accepts optional atmosphere / threatPerception / visualEmphasis", () => {
+    const result = parseRendererExpression({
+      ...SAMPLE_EXPRESSION,
+      lighting: "cold moonlight",
+      atmosphere: "bitter hush",
+      threatPerception: "unseen pressure in the fog",
+      visualEmphasis: "spears and formation",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.atmosphere).toBe("bitter hush");
+      expect(result.value.threatPerception).toBe("unseen pressure in the fog");
+      expect(result.value.visualEmphasis).toBe("spears and formation");
+      expect(result.value.lighting).toBe("cold moonlight");
+    }
   });
 
   it("warns on forbidden physics cues without rejecting parse (legacy render path)", () => {
@@ -268,29 +291,90 @@ describe("Rule 6 Face Safety", () => {
   });
 
   it("thins long Expression transport under Local blank threshold", () => {
-    const prompt = rendererExpressionToPrompt({
-      environment:
-        "ancient godswood with dark waters and weirwood trees under overcast daylight and mist",
-      characters: [
-        {
-          role: "Catelyn Stark",
-          visual:
-            "woman in southern-style noble gown holding raven scroll, dark gown with southern-cut grace, sealed letter",
-        },
-        {
-          role: "Eddard Stark",
-          visual:
-            "man in dark fur-lined doublet holding Valyrian steel sword Ice, dark northern fur cloak, ancestral greatsword",
-        },
-      ],
-      action:
-        "sealed letter scroll resting on stone ledge between two figures, both looking down at letter, exactly two figures",
-      composition:
-        "medium-wide shot of two figures standing by stone wall with faces in profile, faces secondary, exactly 2 figures",
-    });
+    const prompt = expressionToPrompt(
+      {
+        environment:
+          "ancient godswood with dark waters and weirwood trees under overcast daylight and mist",
+        characters: [
+          {
+            role: "Catelyn Stark",
+            visual:
+              "woman in southern-style noble gown holding raven scroll, dark gown with southern-cut grace, sealed letter",
+          },
+          {
+            role: "Eddard Stark",
+            visual:
+              "man in dark fur-lined doublet holding Valyrian steel sword Ice, dark northern fur cloak, ancestral greatsword",
+          },
+        ],
+        action:
+          "sealed letter scroll resting on stone ledge between two figures, both looking down at letter, exactly two figures",
+        composition:
+          "medium-wide shot of two figures standing by stone wall with faces in profile, faces secondary, exactly 2 figures",
+        atmosphere: "grave hush before hard news",
+      },
+      "local"
+    );
     expect(prompt.length).toBeLessThan(520);
     expect(prompt).not.toMatch(/exactly two figures/i);
     expect(prompt).toMatch(/both figures fully visible/i);
+    expect(prompt).not.toMatch(/Atmosphere:/i);
+  });
+
+  it("cloud projection preserves atmosphere and authored composition", () => {
+    const expr = {
+      ...SAMPLE_EXPRESSION,
+      atmosphere: "tense loyalty under threat",
+      threatPerception: "imminent violence",
+      lighting: "ember key, faces in soft shadow",
+    };
+    const prompt = expressionToPrompt(expr, "cloud");
+    expect(prompt).toMatch(/Atmosphere: tense loyalty/i);
+    expect(prompt).toMatch(/Threat: imminent violence/i);
+    expect(prompt).toMatch(/Lighting: ember key/i);
+    expect(prompt).toContain("foreground knight, background king");
+    expect(prompt).not.toMatch(/both figures fully visible/i);
+    expect(prompt).toContain("Single narrative still");
+  });
+
+  it("propose persist keeps authored composition (no Local adapt overwrite)", () => {
+    const result = normalizeRawCandidate(
+      {
+        displayName: "Patrol",
+        summary: "s",
+        fields: {
+          parentStoryCandidateId: "story-1",
+          chapter_number: 1,
+          title: "Patrol",
+          rendererExpression: {
+            environment: "snow forest beyond the Wall",
+            characters: [
+              { role: "ranger lead", visual: "black cloak, spear" },
+              { role: "ranger mate", visual: "black furs" },
+            ],
+            action:
+              "ranger lead left, ranger mate right, both fully visible scanning trees",
+            composition:
+              "medium-wide story still, lead slightly forward, forest depth behind",
+            atmosphere: "bitter cold hush",
+          },
+        },
+      },
+      "scene",
+      "work-1"
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const expr = result.candidate.fields.rendererExpression as {
+        composition: string;
+        atmosphere?: string;
+      };
+      expect(expr.composition).toContain("forest depth behind");
+      expect(expr.composition).not.toMatch(
+        /^medium wide shot, both figures fully visible/
+      );
+      expect(expr.atmosphere).toBe("bitter cold hush");
+    }
   });
 
   it("remaps generic roles to Role names by order", () => {
@@ -377,9 +461,9 @@ describe("parseVisualIntent", () => {
 });
 
 describe("rendererExpressionToPrompt", () => {
-  it("joins expression fields without inventing meaning", () => {
-    const prompt = rendererExpressionToPrompt(SAMPLE_EXPRESSION);
-    expect(prompt).toContain("Action: knight kneels");
+  it("joins expression fields without inventing meaning (local profile)", () => {
+    const prompt = expressionToPrompt(SAMPLE_EXPRESSION, "local");
+    expect(prompt).toContain("Action: knight left kneeling");
     expect(prompt).toContain("Environment: castle hall");
     expect(prompt).toContain("both figures fully visible");
     expect(prompt).toContain("profiles or looking down");
@@ -388,6 +472,19 @@ describe("rendererExpressionToPrompt", () => {
     expect(prompt).toContain("Frozen still");
     expect(prompt).toContain("No extra people");
   });
+
+  it("legacy rendererExpressionToPrompt still returns a prompt", () => {
+    expect(rendererExpressionToPrompt(SAMPLE_EXPRESSION).length).toBeGreaterThan(
+      20
+    );
+  });
+
+  it("local projectExpressionForDeployment applies dual-cast rewrite", () => {
+    const projected = projectExpressionForDeployment(SAMPLE_EXPRESSION, "local");
+    expect(projected.composition).toMatch(/both figures fully visible/i);
+    const cloud = projectExpressionForDeployment(SAMPLE_EXPRESSION, "cloud");
+    expect(cloud.composition).toBe(SAMPLE_EXPRESSION.composition);
+  });
 });
 
 describe("buildFrameDraftPrompt Expression-first", () => {
@@ -395,24 +492,26 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     const prompt = buildFrameDraftPrompt({
       caption: "legacy caption should not dominate",
       rendererExpression: SAMPLE_EXPRESSION,
+      projectionProfile: "local",
     });
-    expect(prompt).toContain("knight kneels holding sword");
+    expect(prompt).toContain("knight left kneeling");
     expect(prompt).not.toContain("legacy caption should not dominate");
     expect(prompt).not.toContain("Scene content (authoritative)");
     expect(prompt).not.toContain("Must match scene:");
-    expect(prompt.split("knight kneels holding sword").length - 1).toBe(1);
+    expect(prompt.split("knight left kneeling").length - 1).toBe(1);
   });
 
   it("keeps operator revision with Expression", () => {
     const prompt = buildFrameDraftPrompt({
       caption: "legacy\n\n[操作员修改意见] 加雨",
       rendererExpression: SAMPLE_EXPRESSION,
+      projectionProfile: "local",
     });
     expect(prompt).toContain("OPERATOR OVERRIDE");
     expect(prompt).toContain("加雨");
-    expect(prompt).toContain("knight kneels");
+    expect(prompt).toContain("knight left kneeling");
     expect(prompt.indexOf("OPERATOR OVERRIDE")).toBeLessThan(
-      prompt.indexOf("knight kneels")
+      prompt.indexOf("knight left kneeling")
     );
   });
 
@@ -489,7 +588,7 @@ describe("parseFrameProvenance Expression round-trip", () => {
       },
     ]);
     expect(parsed).toHaveLength(1);
-    expect(parsed[0]!.rendererExpression?.action).toContain("kneels");
+    expect(parsed[0]!.rendererExpression?.action).toContain("kneeling");
     expect(parsed[0]!.visualIntent?.purpose).toBe("establish tension");
   });
 });

@@ -2,18 +2,19 @@
 
 **Status:** Accepted  
 **Type:** Architecture ADR  
-**Version:** 0.4  
-**Last Updated:** 2026-07-31  
+**Version:** 0.5  
+**Last Updated:** 2026-08-02  
 **Owner:** Architect  
 **Related ADR:** ADR-006 (Discovery Copilot Architecture); ADR-010 (Image Runtime — Port / Creator ⊥ Reader; Deployment Local/Cloud remains replaceable)  
-**Related SPEC:** `docs/specs/spec-dve-001-discovery-renderer-expression-contract.md` (**Contract Freeze** · **Production Authorization scoped**)  
-**Evidence:** Spike findings (local `docs/findings/`; runners under `scripts/*-spike/`)  
+**Related SPEC:** `docs/specs/spec-dve-001-discovery-renderer-expression-contract.md` (**Contract Freeze** · **v1.4** · **Production Authorization scoped**)  
+**Evidence:** Spike findings (local `docs/findings/`; runners under `scripts/*-spike/`); `scripts/rich-expression-projection-spike/`  
 **Amendment A1 (2026-07-31):** Architecture Review — accept ownership boundary; refine D1 (renderer-executable form, Local-first capability orientation without model coupling); Visual Intent field presence optional by scene with quality-when-present.  
 **Amendment A2 (2026-07-31):** SPEC-DVE-001 Contract Freeze Accepted.  
 **Amendment A3 (2026-07-31):** Grant **scoped Production Authorization** for Creator-path Discovery Visual Intent + Renderer Expression → Image Port execution → Candidate (Human Accept → Assets). Constraints PA-A–PA-F. Does **not** authorize Planner/Adapter intelligence, frame-level Cloud-by-default, Reader generation, or auto-Accept.  
-**Amendment A4 (2026-07-31):** Grant **Expression Capability Adaptation** (Discovery propose rules only): retain adaptation; tighten to **static visible geometry**; forbid complex physics motion cues in Expression; **MUST NOT** add AI layers; **MUST NOT** frame-level Cloud switch. Evidence: `capability-adaptation-v2-spike`.
+**Amendment A4 (2026-07-31):** Grant **Expression Capability Adaptation** (Discovery propose rules only): retain adaptation; tighten to **static visible geometry**; forbid complex physics motion cues in Expression; **MUST NOT** add AI layers; **MUST NOT** frame-level Cloud switch. Evidence: `capability-adaptation-v2-spike`.  
+**Amendment A5 (2026-08-02):** **Runtime Truth v1 Freeze** — Visual Expression ⊥ Execution Projection. Canonical Visual Expression is provider-independent narrative-visible form; Local-first capability constraints belong to Execution Projection / Deployment, not Discovery authorship. Intent narrow-fold into Expression allowed (no second LLM). Paper freeze only — runtime cleanup Implementation Authorization **deferred**. Evidence: EAR Local-leak · Spike 2 `rich-expression-projection-spike` · Spike 3 boundary freeze.
 
-> **Authorization note:** Architecture boundary **Accepted**; SPEC-DVE-001 **Contract Freeze** + **Production Authorization (scoped, A3)** + **Capability Adaptation (A4)**. Implementation MUST stay inside A3 allowlist / Constraints PA-A–PA-F and A4 Expression rules.
+> **Authorization note:** Architecture boundary **Accepted**; SPEC-DVE-001 **Contract Freeze (v1.4)** + **Production Authorization (scoped, A3)** + **Capability Adaptation (A4)** + **Expression ⊥ Projection (A5)**. Implementation MUST stay inside A3 allowlist / Constraints PA-A–PA-F, A4 Discovery authorship rules, and A5 Projection ownership. A5 does **not** by itself grant runtime cleanup code.
 
 ---
 
@@ -21,26 +22,32 @@
 
 This ADR freezes the **ownership boundary** for narrative visualization intelligence:
 
-1. **Discovery** is the **single narrative intelligence boundary** for scene visualization meaning and renderer-executable visual form.
+1. **Discovery** is the **single narrative intelligence boundary** for scene visualization meaning and **Canonical Visual Expression** (what should appear if the best renderer existed).
 2. Discovery produces **two** outputs for visualization:
-   - **Visual Intent** — narrative meaning
-   - **Renderer Expression** — renderer-executable visible representation
-3. **Renderer** (Image Generation Port consumer path) **consumes Renderer Expression only** and MUST NOT reinterpret story meaning.
+   - **Visual Intent** — narrative meaning (why the scene matters)
+   - **Visual Expression** (aka Renderer Expression — transitional name) — provider-independent visible representation
+3. **Execution Projection** (Deployment / Renderer runtime) adapts Expression to a specific renderer capability **deterministically** (no AI rewrite).
+4. **Renderer** (Image Generation Port consumer path) consumes the **projected** Expression-derived generation input only and MUST NOT reinterpret story meaning from Visual Intent.
 
 ```text
 Discovery
-├── Visual Intent          (narrative meaning)
-└── Renderer Expression    (executable visual representation)
+├── Visual Intent           (narrative meaning)
+└── Visual Expression       (canonical visible form)
          ↓
-      Renderer  →  Candidate
+Execution Projection        (Deployment / renderer capability)
+         ↓
+      Renderer → Candidate
 ```
+
+`rendererExpression` remains an acceptable transitional identifier for Visual Expression in payloads and code until a rename grant.
 
 This ADR does **not** freeze:
 
 * Unrelated / wholesale schema redesign (A3 PA-F allows **minimal** Intent/Expression payload only)  
 * Image provider / model selection (Deployment; ADR-010)  
 * Queue / CPP redesign beyond Expression → existing Port wiring  
-* Whole-route Cloud Deployment policies (distinct from rejected frame-level Cloud switching)
+* Whole-route Cloud Deployment policies (distinct from rejected frame-level Cloud switching)  
+* Dual persistence of `executionProjection` (Runtime Truth v1 = single persisted Expression + runtime projection)
 
 ---
 
@@ -56,6 +63,7 @@ Approaches considered and tested via spikes:
 | Separate Gemini visual planner | Extra interpretation hop → semantic drift risk |
 | Prompt / adapter intelligence layer | Moves narrative decisions into execution; drift |
 | Frame-level Cloud fallback | Higher single-frame fidelity; **breaks visual consistency** |
+| Local-shaped Expression fed to all renderers | Cloud quality rises; **narrative alignment capped** (Spike 2) |
 
 Spike chain (evidence):
 
@@ -65,9 +73,10 @@ Spike chain (evidence):
 * `visual-consistency-adaptation-spike` — Optimize for consistent narrative visualization, not max single-frame quality  
 * `discovery-expression-ownership-spike` — Discovery should own Expression; external adapter increases drift  
 * `discovery-visual-expression-contract-spike` — Minimum Intent / Expression field split validated  
-* `capability-adaptation-v2-spike` — Static visible geometry improves hard multi-char beats; complex physics cues worsen Local blank rate
+* `capability-adaptation-v2-spike` — Static visible geometry improves hard multi-char beats; complex physics cues worsen Local blank rate  
+* `rich-expression-projection-spike` — Same Cloud model: Rich Expression ≫ Local-shaped Expression on narrative alignment; Rich→Local projection remains usable (non-blank)
 
-Governing pressures: Convergence Before Expansion · Local-first Creator economics · Runtime supremacy of a clear ownership boundary.
+Governing pressures: Convergence Before Expansion · Local-first Creator **economics via Deployment/Projection** · Runtime supremacy of a clear ownership boundary · **Weakest renderer MUST NOT define the product's visual language**.
 
 ---
 
@@ -78,37 +87,47 @@ Governing pressures: Convergence Before Expansion · Local-first Creator economi
 Discovery is the **sole** architectural owner of:
 
 * Narrative understanding relevant to scene visualization  
-* Conversion of abstract relationships into **renderer-executable visual form**, optimized for the **current Local-first runtime capability** (as Renderer Expression)
+* Conversion of abstract relationships into **Canonical Visual Expression** — the provider-independent visible form answering: *if the best renderer existed, what should appear?*
 
 Dependency direction MUST be:
 
 ```text
 Discovery Contract
        ↓
-Current Renderer Capability
+Visual Expression (canonical)
        ↓
-Execution
+Execution Projection (Deployment / renderer capability)
+       ↓
+Renderer / Image Port
 ```
 
-Discovery MUST NOT become coupled to a specific renderer implementation or model capability (e.g. SDXL / FLUX / LocalAI-specific behavior as Architecture).
+Discovery MUST NOT become coupled to a specific renderer implementation or model capability (e.g. SDXL / FLUX / LocalAI-specific blank avoidance) as Architecture.
+
+**Local-first** Creator economics remain valid as **Deployment default and Execution Projection profiles** (ADR-010 · D4). They MUST NOT shrink Canonical Visual Expression authorship to the weakest renderer's prompt budget.
 
 No independent **Planner**, **Adapter intelligence**, or **Prompt Optimizer intelligence** layer MAY sit between Discovery and Renderer for story meaning.
 
-Transport-only helpers (field join, length cap, blank guard) are **not** narrative intelligence layers.
+Execution Projection helpers (field join, length cap, field omit, blank guard, deterministic safety rewrites for a Deployment profile) are **not** narrative intelligence layers — and MUST NOT invent story meaning.
 
-### D1a — Expression Capability Adaptation (A4)
+### D1a — Expression Capability Adaptation (A4) — authorship vs projection (A5 refine)
 
-Discovery propose MAY apply **capability adaptation rules** inside Renderer Expression authorship:
+**Discovery authorship (A4 — remains):**
 
 * Convert abstract relationships into **static visible geometry** (placement, pose, prop presence).  
-* Prefer frozen stills of power/relationship over spectacular physics.  
-* **MUST NOT** use complex physics motion as sole cues (lift / hoist / mid-air choke / shatter-into-fragments / throw / explode / flying debris / anonymous crowds).  
+* Prefer frozen stills of power/relationship over spectacular physics as **product continuity** cues when authored into Expression.  
+* Face Safety product ceilings for Creator `scene_frame` (SPEC-DVE-001 Rule 6).  
 * **MUST NOT** introduce a new AI call, Planner, Adapter, or Prompt Optimizer.  
 * **MUST NOT** authorize frame-level Cloud switch for hard beats (PA-E / D4 remain).
 
-Normative rule text: `lib/discovery/expression-capability-rules.ts` · SPEC-DVE-001 §6.3.
+**Execution Projection (A5 — not Discovery persist truth):**
 
-### D2 — Dual output: Visual Intent + Renderer Expression
+* Prompt length caps, optional-field omit (e.g. drop `lighting` / `atmosphere` on Local profiles), dual-cast composition string overrides for Local face-safety blank avoidance, unsupported-cue downgrade, resolution / negatives.  
+* MAY run at **execute time** against Canonical Expression.  
+* MUST NOT overwrite persisted Canonical Expression as the sole stored truth with a Local-minimized rewrite.
+
+Normative field / projection split: SPEC-DVE-001 v1.4. Runtime rule text today still mixes layers in `lib/discovery/expression-capability-rules.ts` — **cleanup Implementation Authorization deferred** (A5).
+
+### D2 — Dual output: Visual Intent + Visual Expression
 
 Discovery Result for visualization MUST be able to carry:
 
@@ -119,16 +138,17 @@ Discovery Result
 │     relationship?
 │     emotion? / purpose?
 │
-└── Renderer Expression
+└── Visual Expression (rendererExpression transitional)
       environment
       characters[{ role, visual }]   (MAY be empty)
       action
       composition
       lighting? / styleHints?
+      atmosphere? / threatPerception? / visualEmphasis?
 ```
 
 **Visual Intent** represents narrative meaning (why the scene matters).  
-**Renderer Expression** represents executable visual representation (what the Renderer draws).
+**Visual Expression** represents canonical visible representation (what should be drawn).
 
 These concepts MUST NOT be collapsed into a single ambiguous blob.
 
@@ -136,11 +156,19 @@ These concepts MUST NOT be collapsed into a single ambiguous blob.
 
 Normative field semantics and validation live in **SPEC-DVE-001**.
 
+### D2a — Intent narrow-fold (A5)
+
+Visual Intent remains **non-input** to the Renderer / Image Port (PA-A).
+
+Discovery MAY, within the **same authorship boundary** (no second LLM / Planner), deterministically fold selected Intent cues into Visual Expression fields — e.g. `emotion` → `atmosphere`, `relationship` / power → visible geometry or `visualEmphasis`, threat meaning → `threatPerception` + visible action.
+
+Folding MUST NOT become a separate interpretation service.
+
 ### D3 — Renderer boundary
 
 **Renderer MUST:**
 
-* Consume **Renderer Expression** as the visualization execution input  
+* Consume **Visual Expression** (after Execution Projection) as the visualization generation input  
 * Execute image generation via the Image Generation Port (ADR-010 / SPEC-IMG-001)
 
 **Renderer MUST NOT:**
@@ -168,6 +196,18 @@ Highest quality individual frame via mid-sequence Cloud switch
 
 Frame-level Cloud switching for “hard” frames is **rejected** as a default architecture pattern (see Rejected Alternatives). Whole-surface Deployment bindings remain ADR-010 Deployment concern.
 
+**A5 clarify:** D4 constrains **Deployment / continuity policy**, not Canonical Expression authorship. Local-first defaults apply via Execution Projection profiles and surface Deployment, not by defining the product's visual language as Local-minimized Expression.
+
+### D5 — Visual Expression ⊥ Execution Projection (A5)
+
+| Layer | Owner | Persisted (v1) | May |
+| ----- | ----- | -------------- | --- |
+| Visual Expression | Discovery | **Yes** (canonical) | Define what should appear for any capable renderer |
+| Execution Projection | Deployment / Renderer runtime | **No** (runtime; optional debug snapshot later) | Cap, omit, deterministic safety rewrite, size, negatives per profile |
+| Visual Intent | Discovery | Yes (audit) | Meaning; narrow-fold into Expression; never Port input |
+
+**Principle:** Discovery decides what the story should visually mean. Execution decides how a specific renderer can produce it. No renderer capability MAY become the product's visual language.
+
 ---
 
 ## Rejected Alternatives
@@ -188,44 +228,54 @@ Discovery meaning → Planner interpretation → Renderer prompt
 
 **Rejected:** Improves isolated fidelity; harms reading continuity (style / cast discontinuity across frames). Evidence: visual-consistency-adaptation-spike Strategy C.
 
+### R4 — Local-shaped Expression as sole product language (A5)
+
+**Rejected:** Feeding Local-minimized Expression to all renderers caps narrative alignment on high-capability models. Evidence: `rich-expression-projection-spike`.
+
 ---
 
 ## Consequences
 
 ### Positive
 
-* Fewer transformation points  
+* Fewer transformation points for **story meaning**  
 * Lower semantic drift  
-* Local-first architecture compatible with Creator cost goals  
+* Local-first **economics** via Deployment / Projection without shrinking visual language  
 * Predictable production cost narrative (no per-hard-frame Cloud tax by default)  
-* Clear validation ownership (Discovery produces; Renderer executes Expression)
+* Clear validation ownership (Discovery produces Canonical Expression; Projection adapts; Renderer executes)  
+* Future Local ↔ Cloud swap is an **execution / Deployment** decision
 
 ### Negative / accepted costs
 
-* Discovery becomes more responsible (meaning + executable expression)  
-* Renderer capability limits remain visible (e.g. multi-role geometry) — handled by Expression quality + Deployment policy, not by inventing a Planner  
-* Local Renderer capability limits remain visible; Expression quality + Deployment policy address them — not a Planner revival
+* Discovery remains responsible (meaning + canonical visible expression)  
+* Runtime must migrate propose-time Local adapt-over-persist (deferred Implementation Grant)  
+* Local Renderer capability limits remain visible at Projection — not a Planner revival  
 
-### Follow-ons (outside A3 — need a new grant)
+### Follow-ons (need a new grant)
 
 * Reader Runtime image generation  
 * Frame-level Cloud switching as product default  
 * Auto-Accept Candidates → Assets  
 * Independent Planner / Adapter intelligence layers  
+* **A5 runtime cleanup** (split capability rules; move adapt/caps to execute-time Projection; persist Canonical only)  
+* Dual persistence of executionProjection snapshots  
 
 ---
 
 ## Production Authorization (scoped — A3)
 
 **Authority:** Architect Decision 2026-07-31 — **GRANT WITH CONSTRAINTS (PA-A–PA-F)**  
-**Normative detail:** SPEC-DVE-001 §13
+**Normative detail:** SPEC-DVE-001 §13  
+**A5 note:** Paper Runtime Truth v1 Freeze; cleanup Implementation Authorization **deferred**
 
 ### Authorized (Creator path)
 
 ```text
 Discovery
   ├── Visual Intent
-  └── Renderer Expression
+  └── Visual Expression (rendererExpression)
+         ↓
+Execution Projection (execute-time; Deployment profile)
          ↓
 Image Generation Port (ADR-010 / SPEC-IMG-001)
          ↓
@@ -238,7 +288,7 @@ Human Accept → Assets
 
 | Id | Constraint |
 | -- | ---------- |
-| **PA-A** | Renderer consumes **Renderer Expression only**; MUST NOT read Visual Intent for generation |
+| **PA-A** | Generation input derives from **Visual Expression only** (via Projection → prompt); MUST NOT read Visual Intent for generation |
 | **PA-B** | No Planner / Adapter intelligence / Prompt Optimizer intelligence between Discovery and Renderer |
 | **PA-C** | Candidate ≠ Asset until Human Accept (existing Media Admission / Asset authority) |
 | **PA-D** | Creator Runtime only; Reader generation **denied** |
@@ -247,12 +297,12 @@ Human Accept → Assets
 
 ### Production allowlist (MAY under A3)
 
-* Discovery propose / scene visualization path emitting Visual Intent + Renderer Expression (SPEC-DVE-001)  
+* Discovery propose / scene visualization path emitting Visual Intent + Visual Expression (SPEC-DVE-001)  
 * Creator Scene Frame draft / job input derived from Expression → existing Image Generation Port  
-* Thin transport (join / length / blank-guard) without narrative rewrite  
+* Thin transport / **Execution Projection** (join / length / omit / blank-guard) without narrative rewrite — **execute-time** under A5  
 * Minimal Candidate / staging fields required to carry Expression (scoped)  
 * Existing Cloudinary Candidate upload + Human Accept paths  
-* **A4:** Discovery propose Expression capability adaptation rules (static geometry; forbid complex physics cues) — `lib/discovery/expression-capability-rules.ts`  
+* **A4:** Discovery Expression authorship rules (static geometry; Face Safety product ceiling; forbid complex physics as sole cues) — normative in SPEC-DVE-001; runtime file may still mix Projection until cleanup grant  
 
 ### Production denylist (MUST NOT under A3)
 
@@ -262,28 +312,33 @@ Human Accept → Assets
 * Reader Runtime / `raree-show-web` generation hot path  
 * Auto-Accept into Assets  
 * Freezing any provider/model as Architecture  
+* Treating Local blank-avoidance rewrites as Canonical Expression truth (A5)
 
 ---
 
 ## Compatibility
 
 * **ADR-006:** Extends Discovery responsibility for visualization outputs; does not redefine Authority Emergence or Human Review.  
-* **ADR-010 / SPEC-IMG-001:** Image Port / Deployment Local·Cloud remain; A3 authorizes Expression as Creator visualization **input**, not a new Port or provider hierarchy.  
-* **SPEC-D3-003:** Scene (or related) Candidate payloads MAY gain Intent/Expression under A3 PA-F; unrelated propose redesign remains out of scope.
+* **ADR-010 / SPEC-IMG-001:** Image Port / Deployment Local·Cloud remain; A3/A5 authorize Expression as Creator visualization **input**, Projection as Deployment adaptation — not a new Port or provider hierarchy.  
+* **SPEC-D3-003:** Scene (or related) Candidate payloads MAY gain Intent/Expression under A3 PA-F; unrelated propose redesign remains out of scope.  
+* **SPEC-DVE-001 v1.4:** Normative contract for Intent / Expression / Projection split and optional Expression fields.
 
 ---
 
-## Frozen boundary (reminder)
+## Frozen boundary (reminder) — Runtime Truth v1
 
 ```text
 Discovery
-├── Visual Intent        (meaning)
-└── Renderer Expression  (execution form)
+├── Visual Intent         (meaning; audit; narrow-fold source)
+└── Visual Expression     (canonical visible form)
+         ↓
+Execution Projection      (Deployment / renderer capability)
          ↓
       Renderer → Candidate
 ```
 
-* Discovery decides visual meaning.  
-* Renderer executes expression.  
-* Renderer does not reinterpret stories.  
+* Discovery decides what the story should visually mean.  
+* Execution decides how a specific renderer can produce it.  
+* No renderer capability may become the product's visual language.  
+* Renderer does not reinterpret stories from Intent.  
 * No Planner · No Adapter intelligence · No Prompt Optimizer intelligence.

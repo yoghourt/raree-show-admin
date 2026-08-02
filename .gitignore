@@ -93,6 +93,7 @@ next-env.d.ts
 
 # Discovery contract spike outputs
 /scripts/discovery-contract-spike/results/
+/scripts/rich-expression-projection-spike/results/
 
 # Python virtualenvs (local image spike / Diffusers)
 .venv/

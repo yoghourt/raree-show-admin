@@ -63,7 +63,7 @@ export async function generateCharacterAvatar(
       referenceImages: referencePortraitUrl
         ? [{ url: referencePortraitUrl }]
         : undefined,
-      size: { width: 1024, height: 1024 },
+      size: { width: 512, height: 512 },
     })
     let url: string
     try {

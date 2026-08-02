@@ -47,6 +47,23 @@ function parseStoryImagesV2(raw: unknown): ReadingFrame[] | null {
   return out;
 }
 
+function expressionHasNarrativeCues(
+  expr: {
+    lighting?: string;
+    atmosphere?: string;
+    threatPerception?: string;
+    visualEmphasis?: string;
+  } | undefined
+): boolean {
+  if (!expr) return false;
+  return Boolean(
+    expr.lighting?.trim() ||
+      expr.atmosphere?.trim() ||
+      expr.threatPerception?.trim() ||
+      expr.visualEmphasis?.trim()
+  );
+}
+
 function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
   const frames = parseStoryImagesV2(row.story_images_v2);
   const provenance = parseFrameProvenance(row.frame_provenance_v1);
@@ -55,6 +72,12 @@ function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
       (p) => p.frameIndex === frameIndex && Boolean(p.rendererExpression)
     )
   );
+  const frameExpressionHasNarrativeCues = (frames ?? []).map((_, frameIndex) => {
+    const entry = provenance.find(
+      (p) => p.frameIndex === frameIndex && p.rendererExpression
+    );
+    return expressionHasNarrativeCues(entry?.rendererExpression);
+  });
   return {
     workId: row.work_id,
     tsid: row.tsid,
@@ -67,6 +90,7 @@ function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
     locationId: locationIdFromDb(row.location_id),
     characterIds: row.character_ids ?? [],
     frameHasRendererExpression,
+    frameExpressionHasNarrativeCues,
   };
 }
 

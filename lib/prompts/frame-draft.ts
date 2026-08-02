@@ -1,18 +1,21 @@
 /**
  * Server-only Scene Frame draft prompt (derived Job input — not Runtime Truth).
- * Prefer Renderer Expression (SPEC-DVE-001 / ADR-011 A3); caption is legacy fallback.
+ * Prefer Visual Expression (SPEC-DVE-001 / ADR-011 A5); caption is legacy fallback.
  * Visual Intent MUST NOT be passed here.
  *
- * Expression path: thin transport only (spike-aligned) — Local models blank more on
- * long English instructional wrappers with thrice-repeated scene text.
+ * Expression path: Execution Projection by Deployment profile (A5).
  * Caption-legacy path: denser wrapper kept for weaker caption-only inputs.
  *
  * Operator revision notes (`[操作员修改意见] …`) are promoted to the front —
  * trailing Chinese notes lose to early English style tokens.
  */
 
+import {
+  expressionToPrompt,
+  resolveProjectionProfileFromEnv,
+  type ProjectionProfile,
+} from "@/lib/discovery/execution-projection";
 import type { RendererExpression } from "@/lib/discovery/visual-contract";
-import { rendererExpressionToPrompt } from "@/lib/discovery/visual-contract";
 
 export const FRAME_REVISION_MARKER = "[操作员修改意见]";
 
@@ -120,15 +123,18 @@ export function buildFrameNegativePrompt(
 }
 
 /**
- * Spike-aligned short prompt when Expression is present.
- * Join Expression once; optional operator override / route title only.
+ * Expression → prompt via Execution Projection; optional operator override / route title.
  */
 function buildExpressionPrompt(input: {
   expression: RendererExpression;
   revisionNote: string;
   routeTitle: string;
+  projectionProfile: ProjectionProfile;
 }): string {
-  const body = rendererExpressionToPrompt(input.expression).trim();
+  const body = expressionToPrompt(
+    input.expression,
+    input.projectionProfile
+  ).trim();
   if (!body) return "";
 
   const parts: string[] = [];
@@ -198,6 +204,8 @@ export function buildFrameDraftPrompt(input: {
   routeTitle?: string;
   /** When present, authoritative scene content (PA-A). Caption used only for revision notes / legacy. */
   rendererExpression?: RendererExpression | null;
+  /** A5 Deployment profile; defaults from IMAGE_CREATOR_ACCEPT_PROVIDER. */
+  projectionProfile?: ProjectionProfile;
 }): string {
   const { base, revisionNote } = splitFrameCaption(input.caption);
   const routeTitle = input.routeTitle?.trim() ?? "";
@@ -207,6 +215,8 @@ export function buildFrameDraftPrompt(input: {
       expression: input.rendererExpression,
       revisionNote,
       routeTitle,
+      projectionProfile:
+        input.projectionProfile ?? resolveProjectionProfileFromEnv(),
     });
   }
 
