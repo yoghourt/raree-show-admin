@@ -1,12 +1,17 @@
 /**
- * SPEC-DVE-001 / ADR-011 A3–A4 — Discovery Visual Intent + Renderer Expression.
+ * SPEC-DVE-001 / ADR-011 A3–A5 — Discovery Visual Intent + Visual Expression.
  *
- * Intent = narrative meaning (NOT Renderer input).
- * Expression = only input to Renderer (Image Port path).
- * Transport helpers join fields only — MUST NOT invent story meaning.
+ * Intent = narrative meaning (NOT Renderer / Port input).
+ * Expression = Canonical visible form (provider-independent).
+ * Execution Projection (see execution-projection.ts) adapts Expression at execute time.
  * A4: prefer static visible geometry; flag complex physics cues (propose hard-gates).
+ * A5: Local caps/omits belong to Projection — not Canonical authorship.
  */
 
+import {
+  expressionToPrompt,
+  resolveProjectionProfileFromEnv,
+} from "@/lib/discovery/execution-projection";
 import {
   assessSceneFaceSafety,
   findCastConsistencyErrors,
@@ -32,13 +37,18 @@ export type RendererExpressionCharacter = {
   visual: string;
 };
 
+/** Canonical Visual Expression (transitional name: rendererExpression). */
 export type RendererExpression = {
   environment: string;
   characters: RendererExpressionCharacter[];
   action: string;
   composition: string;
+  /** Lighting intent (not a model hyperparameter). */
   lighting?: string;
   styleHints?: string;
+  atmosphere?: string;
+  threatPerception?: string;
+  visualEmphasis?: string;
 };
 
 export type ContractValidation = {
@@ -58,34 +68,14 @@ export const MINIMAL_RENDERER_EXPRESSION: RendererExpression = {
 const STYLE_HINTS_FORBIDDEN =
   /\b(best quality|masterpiece|8k|ultra detailed|ultradetailed)\b/i;
 
-const MAX_PROMPT_PART_LEN = 400;
-/** Local sd-3.5-medium blanks above ~600 chars — keep Expression transport lean. */
-const LOCAL_VISUAL_MAX = 64;
-const LOCAL_ACTION_MAX = 96;
-const LOCAL_ENV_MAX = 72;
-const LOCAL_COMPOSITION_MAX = 72;
-
 function trimStr(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function capPart(value: string): string {
-  if (value.length <= MAX_PROMPT_PART_LEN) return value;
-  return value.slice(0, MAX_PROMPT_PART_LEN).trim();
-}
-
-function stripExactlyFigureCues(text: string): string {
-  return text
-    .replace(/,?\s*exactly\s+(?:\d+|two|three|four|five|six)\s+figures?\b/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .replace(/^[\s,]+|[\s,]+$/g, "")
-    .trim();
-}
-
-function hardCap(value: string, max: number): string {
-  const t = value.trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, Math.max(0, max - 1)).trim()}…`;
+function optionalNonEmpty(rec: Record<string, unknown>, key: string): string | undefined {
+  if (!(key in rec) || rec[key] === undefined || rec[key] === null) return undefined;
+  const v = trimStr(rec[key]);
+  return v || undefined;
 }
 
 /** Intent presence is optional by scene; quality-when-present only. */
@@ -230,10 +220,10 @@ export function parseRendererExpression(raw: unknown): {
     composition,
   };
 
-  const lighting = trimStr(rec.lighting);
+  const lighting = optionalNonEmpty(rec, "lighting");
   if (lighting) expression.lighting = lighting;
 
-  const styleHints = trimStr(rec.styleHints);
+  const styleHints = optionalNonEmpty(rec, "styleHints");
   if (styleHints) {
     if (STYLE_HINTS_FORBIDDEN.test(styleHints)) {
       return {
@@ -245,6 +235,13 @@ export function parseRendererExpression(raw: unknown): {
     }
     expression.styleHints = styleHints;
   }
+
+  const atmosphere = optionalNonEmpty(rec, "atmosphere");
+  if (atmosphere) expression.atmosphere = atmosphere;
+  const threatPerception = optionalNonEmpty(rec, "threatPerception");
+  if (threatPerception) expression.threatPerception = threatPerception;
+  const visualEmphasis = optionalNonEmpty(rec, "visualEmphasis");
+  if (visualEmphasis) expression.visualEmphasis = visualEmphasis;
 
   const abstractOnly =
     /^(protects?|comforts?|loves?|hates?|guards?|debates?|overwhelms?|fights?)\b/i.test(
@@ -292,61 +289,12 @@ export function parseRendererExpression(raw: unknown): {
 }
 
 /**
- * Thin transport: field join for Image Port prompt.
- * MUST NOT reinterpret story or read Visual Intent.
- * Caps length for Local (long prompts → near_white_flat blanks).
+ * Thin transport → Image Port prompt via Execution Projection.
+ * Default profile follows Deployment accept provider (A5).
+ * Prefer `expressionToPrompt(expr, profile)` when the caller knows the profile.
  */
 export function rendererExpressionToPrompt(re: RendererExpression): string {
-  const castLen = re.characters?.length ?? 0;
-  const cast = (re.characters ?? [])
-    .map((c) => {
-      const role = hardCap(capPart(c.role), 28);
-      const visual = hardCap(
-        stripExactlyFigureCues(capPart(c.visual)),
-        LOCAL_VISUAL_MAX
-      );
-      return `${role}: ${visual}`;
-    })
-    .join("; ");
-
-  let action = stripExactlyFigureCues(capPart(re.action ?? ""));
-  action = hardCap(action, LOCAL_ACTION_MAX);
-
-  let composition = stripExactlyFigureCues(capPart(re.composition ?? ""));
-  if (castLen === 2) {
-    // Dual-cast: both visible + no camera stare (Rule 12); keep short for Local.
-    composition =
-      "medium wide shot, both figures fully visible, profiles or looking down";
-  } else if (castLen > 2) {
-    if (
-      composition.length > LOCAL_COMPOSITION_MAX ||
-      !/\bmedium[\s-]?wide\b|\bwide\s+shot\b/i.test(composition)
-    ) {
-      composition = "medium wide shot, faces secondary";
-    } else {
-      composition = hardCap(composition, LOCAL_COMPOSITION_MAX);
-    }
-  } else {
-    composition = hardCap(composition, LOCAL_COMPOSITION_MAX);
-  }
-
-  const environment = hardCap(
-    stripExactlyFigureCues(capPart(re.environment ?? "")),
-    LOCAL_ENV_MAX
-  );
-
-  const parts = [
-    cast && `Characters: ${cast}.`,
-    action && `Action: ${action}.`,
-    environment && `Environment: ${environment}.`,
-    composition && `Composition: ${composition}.`,
-    // lighting / styleHints omitted from Local transport (minimality; often unused)
-  ].filter(Boolean);
-
-  const body = parts.join(" ").trim();
-  if (!body) return "";
-  // Short bias only — long English wrappers raise Local blank rate.
-  return `${body} No extra people. Frozen still, no text, no watermark.`;
+  return expressionToPrompt(re, resolveProjectionProfileFromEnv());
 }
 
 export function isRendererExpression(

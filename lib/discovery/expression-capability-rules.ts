@@ -1,8 +1,9 @@
 /**
- * ADR-011 A4 + Expression Minimality + cast consistency.
+ * ADR-011 A4 + A5 + cast consistency / Face Safety.
  *
- * ExpressionCapabilityConstraints for Discovery authorship — NOT a PromptOptimizer,
- * Planner, Adapter, or extra AI call. Local-first: minimum sufficient visible geometry.
+ * Discovery authorship rules for Canonical Visual Expression — NOT a PromptOptimizer,
+ * Planner, Adapter, or extra AI call.
+ * Local blank-avoidance rewrites live in Execution Projection (execute-time).
  */
 
 /** Local shape — avoid importing visual-contract (cycle with A4 checks). */
@@ -16,38 +17,44 @@ type ExpressionLike = {
 
 /**
  * Injected into Discovery scene propose prompts.
- * Spike evidence: more Expression detail ≠ better Local rendering.
+ * Canonical Visual Expression authorship (ADR-011 A5) — not Local blank avoidance.
  */
 export const EXPRESSION_CAPABILITY_RULES = `
-Renderer Expression — Local capability constraints (required):
-These rules apply ONLY to fields.rendererExpression (image execution input).
+Renderer Expression — Canonical Visual Expression authorship (required):
+These rules apply ONLY to fields.rendererExpression (canonical visible form for image execution).
 They MUST NOT change fields.title, fields.summary, displayName, or other reader-facing prose
 (those become frame caption for readers and MUST keep proper names when the narrative supports them).
 
-Discovery converts narrative meaning into MINIMUM SUFFICIENT visible geometry inside rendererExpression.
-Goal: consistent readable narrative visualization — NOT maximum prompt completeness.
+Answer: if the best renderer existed, what should appear?
+Discovery converts narrative meaning into visible geometry + optional narrative-visible cues.
 MUST NOT add Planner / Adapter / PromptOptimizer layers.
+MUST NOT shrink Expression to a weak Local model's prompt budget (Deployment Projection handles that).
 
-Rule 1 — Minimal required geometry (default payload):
-Emit ONLY: environment; characters[{role, visual}]; action; composition.
-character.visual = short identity + ONE visible object/prop (e.g. "armored knight holding sword").
-action = one short static visible clause.
-composition = placement of required figures (e.g. "two characters facing each other").
-Do NOT add information unless it improves reader understanding of who/where/what is visible.
+Rule 1 — Required geometry:
+Emit: environment; characters[{role, visual}]; action; composition.
+character.visual = identity + visible prop/costume cues (keep readable, not quality-spam).
+action = static visible clause (who/where/what is happening).
+composition = placement / shot intent for required figures.
+Optional when they improve the still: lighting, atmosphere, threatPerception, visualEmphasis, styleHints.
 
-Rule 2 — Remove non-essential modifiers:
-Do NOT generate by default: lighting, styleHints, cinematic wording, quality tokens,
-or stacks of decorative adjectives.
-Reason: extra constraints raise Local blank / failure rate (minimality spike).
+Rule 2 — Optional narrative-visible cues (encouraged when Intent supports them):
+lighting = lighting intent (cold moonlight, ember key, etc.) — not model hyperparameters.
+atmosphere = mood of the air/place (bitter hush, dread, isolation).
+threatPerception = how threat should read visually (unseen fog pressure, inhuman scale).
+visualEmphasis = narrative focus (formation, prop, scale contrast).
+styleHints = stable style family only (e.g. "desaturated dark fantasy illustration").
+FORBIDDEN in styleHints: masterpiece, 8k, best quality, ultra detailed.
+Intent narrow-fold (same propose call, no second AI): when visualIntent has emotion/purpose/
+relationship/threat-like meaning, encode into atmosphere / visualEmphasis / threatPerception
+and visible action — do not leave meaning only in Intent.
 
-Rule 3 — Static geometry preferred:
+Rule 3 — Static geometry preferred (product continuity):
 Prefer verbs/poses: standing, facing, holding, behind, near, fallen, pointing.
 FORBIDDEN as motion/physics cues: shattering, lifting, hoisting, throwing, exploding,
 mid-air collision/choke, flying debris, large anonymous crowds.
 Prefer mid/wide with all required bodies over close-ups that drop a character.
 Prefer 2 clear figures over crowds when the beat is a relationship.
-Prefer flat left/right or front/back placement — avoid upper/lower tree stacking when possible
-(Local weak on vertical multi-figure geometry; see capability profile finding).
+Prefer flat left/right or front/back placement — avoid upper/lower tree stacking when possible.
 
 Rule 4 — Abstract action expansion:
 Abstract meaning (protect, fight, talk, threaten, betray, overwhelm, debate)
@@ -65,8 +72,7 @@ Bad: characters[ranger, commander] + action "three rangers examine frozen bodies
 Good: three character entries + action "three rangers examining frozen bodies".
 
 Rule 6 — Face Safety (Creator scene_frame; NOT portrait):
-Local scene frames often collapse small faces into uncanny / horror artifacts.
-Goal: prevent immersion-breaking face presentation — NOT perfect faces or identity lock.
+Product ceiling: prevent immersion-breaking full-face scene presentation.
 MUST NOT add portrait reference / InstantID / IP-Adapter instructions.
 MUST NOT change reader-facing title/summary.
 
@@ -90,13 +96,13 @@ FORBIDDEN as role labels: woman, man, lady, lord, girl, boy, person, figure (alo
 Proper names stay in reader title/summary; Expression role strings MUST match Role candidates
 so Character Archive cues can fold by name.
 
-Rule 8 — Dual-cast Face Safety default composition:
-When characters[].length >= 2, composition MUST include medium-wide (or wide) + faces secondary
+Rule 8 — Dual-cast Face Safety composition intent:
+When characters[].length >= 2, composition SHOULD include medium-wide (or wide) + faces secondary
 (or profiles / reading distance). FORBIDDEN without mitigation: waist-up, bust shot,
 tight two-shot, head-and-shoulders framing.
 
-Rule 9 — Static object transfer (Local hand collapse):
-Do NOT use handing / passing / exchanging letters or props hand-to-hand.
+Rule 9 — Static object transfer (readable prop beats):
+Do NOT use handing / passing / exchanging letters or props hand-to-hand as the sole cue.
 Prefer static visible layout: object on table / on ground / resting against tree;
 figures looking at or standing near the object.
 Bad: "woman handing parchment to man".
@@ -111,7 +117,7 @@ Good: "Winterfell solar, stone chamber, wooden table".
 FORBIDDEN: generic fog forest / anonymous stone room without place cue.
 
 Rule 11 — Prop salience + cast differentiation:
-Each character.visual = ONE costume cue + at most ONE iconic prop (short).
+Each character.visual = costume cue + at most ONE iconic prop (keep clear nouns).
 Iconic props (Ice, sealed letter) MUST be the clearest noun in that visual — not buried
 under three clothing adjectives.
 Do NOT give every figure the same fur-cloak look.
@@ -217,8 +223,12 @@ export function findCastConsistencyErrors(
   return errors;
 }
 
-/** Few-shot for scene TYPE_EXAMPLES — minimal duel + face-safe (Rule 6). */
-export const EXPRESSION_CAPABILITY_EXAMPLE: ExpressionLike = {
+/** Few-shot for scene TYPE_EXAMPLES — duel + face-safe + optional atmosphere (A5). */
+export const EXPRESSION_CAPABILITY_EXAMPLE: ExpressionLike & {
+  atmosphere?: string;
+  threatPerception?: string;
+  lighting?: string;
+} = {
   environment: "Haunted Forest clearing under moonlight",
   characters: [
     {
@@ -232,6 +242,9 @@ export const EXPRESSION_CAPABILITY_EXAMPLE: ExpressionLike = {
   ],
   action: "two warriors facing each other, swords crossed at middle distance",
   composition: "wide shot, faces secondary, two silhouettes",
+  lighting: "cold moonlight, pale rim on ice blade",
+  atmosphere: "supernatural cold, wrong stillness",
+  threatPerception: "inhuman opponent; lethal scale",
 };
 
 /** Mock / courtyard beat — minimal static greeting + face-safe dual cast. */
@@ -371,8 +384,10 @@ export function sharpenExpressionAnchors<T extends ExpressionLike>(
 }
 
 /**
- * Deterministic Discovery authorship adapt (not Renderer intelligence).
- * Applies Rules 8–12 so Face Safety + Local landmarks/props/cast fail less often.
+ * Local Execution Projection adapt (ADR-011 A5).
+ * Apply at execute time via projectExpressionForDeployment("local").
+ * MUST NOT overwrite persisted Canonical Expression at propose/validate.
+ * Applies Rules 8–12 for Local face-safety + landmark/prop blank avoidance.
  */
 export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>(
   expression: T

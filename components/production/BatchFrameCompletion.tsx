@@ -32,6 +32,8 @@ type PendingFill = {
   routeTitle: string;
   /** Creator: Expression present on frame_provenance_v1 for this frame. */
   hasRendererExpression: boolean;
+  /** Creator: Expression includes lighting/atmosphere/threat/emphasis (A5). */
+  hasNarrativeCues: boolean;
   providerId: MediaAdmissionProviderId;
   /** Candidate URL after obtain/generate — not Asset truth until Write */
   candidateUrl: string | null;
@@ -118,20 +120,64 @@ function jobHasRendererExpression(job: GenerateJobRow): boolean {
   return Boolean(job.input_json?.renderer_expression);
 }
 
-function ExpressionBadge({ has }: { has: boolean }) {
-  return has ? (
-    <span
-      className="inline-flex shrink-0 rounded border border-teal-700/30 bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-900"
-      title="生成将使用 Discovery Renderer Expression（短 prompt）"
-    >
-      Expression
-    </span>
-  ) : (
-    <span
-      className="inline-flex shrink-0 rounded border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600"
-      title="无 Expression：将走 caption 长包装（旧帧 / 未重新 Propose）"
-    >
-      Caption only
+function jobHasNarrativeCues(job: GenerateJobRow): boolean {
+  const expr = job.input_json?.renderer_expression as
+    | {
+        lighting?: string;
+        atmosphere?: string;
+        threatPerception?: string;
+        visualEmphasis?: string;
+      }
+    | undefined;
+  if (!expr) return false;
+  return Boolean(
+    expr.lighting?.trim() ||
+      expr.atmosphere?.trim() ||
+      expr.threatPerception?.trim() ||
+      expr.visualEmphasis?.trim()
+  );
+}
+
+function ExpressionBadge({
+  has,
+  hasNarrativeCues,
+}: {
+  has: boolean;
+  hasNarrativeCues?: boolean;
+}) {
+  if (!has) {
+    return (
+      <span
+        className="inline-flex shrink-0 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
+        title="frame_provenance_v1 无 rendererExpression：将走 caption 长包装（旧帧或未重新 Propose/Accept）"
+      >
+        仅 Caption
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex shrink-0 flex-wrap items-center gap-1">
+      <span
+        className="inline-flex rounded border border-teal-700/40 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-900"
+        title="frame_provenance_v1 有 Canonical Expression；生成走 Expression → Projection"
+      >
+        有 Expression
+      </span>
+      {hasNarrativeCues ? (
+        <span
+          className="inline-flex rounded border border-sky-600/30 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-900"
+          title="含 lighting / atmosphere / threatPerception / visualEmphasis 之一"
+        >
+          含氛围字段
+        </span>
+      ) : (
+        <span
+          className="inline-flex rounded border border-zinc-300 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600"
+          title="有 Expression，但无 lighting/atmosphere/threat/emphasis（Cloud 叙事增益有限）"
+        >
+          基础几何
+        </span>
+      )}
     </span>
   );
 }
@@ -211,6 +257,9 @@ export function BatchFrameCompletion({
           routeTitle: route.title || route.tsid,
           hasRendererExpression: Boolean(
             route.frameHasRendererExpression?.[frameIndex]
+          ),
+          hasNarrativeCues: Boolean(
+            route.frameExpressionHasNarrativeCues?.[frameIndex]
           ),
           providerId: "local_upload",
           candidateUrl: null,
@@ -479,6 +528,56 @@ export function BatchFrameCompletion({
     }
   };
 
+  const discardAllTerminalFrameJobs = async () => {
+    const terminal = jobs.filter(
+      (j) => j.status === "succeeded" || j.status === "failed"
+    );
+    if (terminal.length === 0) {
+      setAdmitHint("没有可丢弃的 succeeded/failed 画面任务。");
+      return;
+    }
+    setEnqueueBusy(true);
+    setWriteError(null);
+    setAdmitHint(null);
+    try {
+      let failed = 0;
+      const hostedUrlsToClear = new Set<string>();
+      for (const job of terminal) {
+        const result = await discardGenerateJob({
+          workId,
+          jobId: job.id,
+          reason: "operator_bulk_discard",
+        });
+        if (!result.ok) {
+          failed += 1;
+          continue;
+        }
+        const hosted = jobHosted(job);
+        if (hosted?.url) hostedUrlsToClear.add(hosted.url);
+      }
+      if (hostedUrlsToClear.size > 0) {
+        setRows((prev) =>
+          prev.map((r) =>
+            r.candidateUrl && hostedUrlsToClear.has(r.candidateUrl)
+              ? { ...r, candidateUrl: null, candidateLabel: null }
+              : r
+          )
+        );
+      }
+      setRetryPanelJobId(null);
+      await refreshJobs();
+      setAdmitHint(
+        failed === 0
+          ? `已丢弃 ${terminal.length} 条终端任务（queued/running 保留）。`
+          : `丢弃完成，其中 ${failed} 条失败；请刷新后对剩余项逐条丢弃。`
+      );
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setEnqueueBusy(false);
+    }
+  };
+
   const clearCandidateForRow = (row: PendingFill) => {
     const key = rowKey(row.routeTsid, row.frameIndex);
     patchRow(key, { candidateUrl: null, candidateLabel: null });
@@ -615,7 +714,15 @@ export function BatchFrameCompletion({
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
             排队 → Worker → Candidate → Accept 写 Asset。Job ≠ Candidate ≠ Asset。
-            青绿「Expression」= Discovery 短 prompt；灰「Caption only」= 旧帧长包装。
+          </p>
+          <p className="mt-1 text-xs text-zinc-600">
+            徽章：
+            <span className="text-teal-800">有 Expression</span>
+            （Canonical，可走 Projection）·
+            <span className="text-sky-800">含氛围字段</span>
+            （lighting/atmosphere/threat…）·
+            <span className="text-amber-800">仅 Caption</span>
+            （旧帧/未写 provenance，走长包装）。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -640,6 +747,20 @@ export function BatchFrameCompletion({
           >
             刷新
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={
+              enqueueBusy ||
+              !jobs.some(
+                (j) => j.status === "succeeded" || j.status === "failed"
+              )
+            }
+            onClick={() => void discardAllTerminalFrameJobs()}
+          >
+            清理脏数据
+          </Button>
         </div>
       </div>
 
@@ -661,6 +782,13 @@ export function BatchFrameCompletion({
       {rows.length === 0 ? (
         <p className="text-sm text-zinc-500">没有待补图的帧。</p>
       ) : (
+        <>
+          <p className="text-xs text-zinc-600" role="status">
+            待补 {rows.length} 帧 · 有 Expression{" "}
+            {rows.filter((r) => r.hasRendererExpression).length} · 含氛围字段{" "}
+            {rows.filter((r) => r.hasNarrativeCues).length} · 仅 Caption{" "}
+            {rows.filter((r) => !r.hasRendererExpression).length}
+          </p>
         <ul className="space-y-3">
           {rows.map((row) => {
             const key = rowKey(row.routeTsid, row.frameIndex);
@@ -689,7 +817,10 @@ export function BatchFrameCompletion({
                       <p className="truncate text-sm font-medium text-zinc-900">
                         {row.routeTitle} · 帧 {row.frameIndex + 1}
                       </p>
-                      <ExpressionBadge has={row.hasRendererExpression} />
+                      <ExpressionBadge
+                        has={row.hasRendererExpression}
+                        hasNarrativeCues={row.hasNarrativeCues}
+                      />
                     </div>
                     <p className="truncate text-xs text-zinc-500">{row.caption}</p>
                     {enqueueBlocked ? (
@@ -822,6 +953,7 @@ export function BatchFrameCompletion({
             );
           })}
         </ul>
+        </>
       )}
 
       {rows.length > 0 ? (
@@ -853,6 +985,20 @@ export function BatchFrameCompletion({
               onClick={() => void refreshJobs()}
             >
               刷新
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={
+                enqueueBusy ||
+                !jobs.some(
+                  (j) => j.status === "succeeded" || j.status === "failed"
+                )
+              }
+              onClick={() => void discardAllTerminalFrameJobs()}
+            >
+              清理脏数据
             </Button>
           </div>
         </div>
@@ -939,7 +1085,10 @@ export function BatchFrameCompletion({
                       <span className="font-medium text-zinc-800">
                         {job.status}
                       </span>
-                      <ExpressionBadge has={jobHasRendererExpression(job)} />
+                      <ExpressionBadge
+                        has={jobHasRendererExpression(job)}
+                        hasNarrativeCues={jobHasNarrativeCues(job)}
+                      />
                       <span className="text-zinc-500">
                         {job.subject_id} · {frameLabel}
                       </span>

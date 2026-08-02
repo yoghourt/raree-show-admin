@@ -1,5 +1,10 @@
 import { imageGenerate } from "@/lib/ai/capability";
+import { loadCreatorImageDeploymentConfig } from "@/lib/ai/image/deploymentConfig";
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload";
+import {
+  resolveProjectionProfile,
+  sceneFrameSizeForProfile,
+} from "@/lib/discovery/execution-projection";
 import {
   assessSceneFaceSafety,
   type SceneFaceSafetyAssessment,
@@ -94,10 +99,16 @@ export async function executeSceneFrameImageGenerate(input: {
   }
 
   const routeTitle = input.routeTitle?.trim() || undefined;
+  const deployment = loadCreatorImageDeploymentConfig();
+  const projectionProfile = resolveProjectionProfile(
+    deployment.acceptProviderId
+  );
+  const frameSize = sceneFrameSizeForProfile(projectionProfile);
   const prompt = buildFrameDraftPrompt({
     caption: caption || " ",
     routeTitle,
     rendererExpression: input.rendererExpression,
+    projectionProfile,
   });
   if (!prompt.trim()) {
     return {
@@ -111,7 +122,8 @@ export async function executeSceneFrameImageGenerate(input: {
     hasExpr: hasExpression,
     promptLen: prompt.length,
     routeTitle: routeTitle ?? null,
-    size: "512x512",
+    projectionProfile,
+    size: `${frameSize.width}x${frameSize.height}`,
   });
 
   try {
@@ -122,9 +134,8 @@ export async function executeSceneFrameImageGenerate(input: {
       negativePrompt: buildFrameNegativePrompt(caption, {
         castCount: input.rendererExpression?.characters?.length,
       }),
-      // Option B: square Local-friendly size (spike-aligned). Widescreen 1280×720
-      // clamped to 768×432 raised blank-white rate on sd-3.5-medium-ggml.
-      size: { width: 512, height: 512 },
+      // A5: Local profile 512² (blank mitigation); Cloud profile 1024².
+      size: frameSize,
     });
     let url: string;
     try {
@@ -219,7 +230,7 @@ export async function executePortraitImageGenerate(input: {
           referenceUrl.startsWith("https://"))
           ? [{ url: referenceUrl }]
           : undefined,
-      size: { width: 1024, height: 1024 },
+      size: { width: 512, height: 512 },
     });
     let url: string;
     try {

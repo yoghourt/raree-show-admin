@@ -80,7 +80,7 @@ describe("executeImageGenerateJob dispatch", () => {
     expect(imageGenerate).toHaveBeenCalledWith(
       expect.objectContaining({
         assetSlot: "portrait",
-        size: { width: 1024, height: 1024 },
+        size: { width: 512, height: 512 },
       })
     );
   });

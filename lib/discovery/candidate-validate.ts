@@ -16,7 +16,6 @@ import {
   type RoleArchiveRef,
 } from "@/lib/discovery/character-archive";
 import {
-  adaptSceneExpressionForLocalCapability,
   assessSceneFaceSafety,
   findCastConsistencyErrors,
   findForbiddenPhysicsCues,
@@ -261,12 +260,8 @@ function validateSceneFields(
     };
   }
 
-  // Authorship adapt (Rules 8–12) for Face Safety + Local landmarks/props/cast.
-  const adaptedExpression = adaptSceneExpressionForLocalCapability(
-    authoredExpression
-  );
-
-  const faceSafety = assessSceneFaceSafety(adaptedExpression);
+  // Face Safety on Canonical Expression (A5: do not Local-adapt before persist).
+  const faceSafety = assessSceneFaceSafety(authoredExpression);
   if (faceSafety.safety_status === "restricted") {
     return {
       ok: false,
@@ -296,7 +291,7 @@ function validateSceneFields(
         : {}),
       ...(isNonEmptyString(fields.summary) ? { summary: fields.summary.trim() } : {}),
       ...(intentResult.value ? { visualIntent: intentResult.value } : {}),
-      rendererExpression: adaptedExpression,
+      rendererExpression: authoredExpression,
     },
   };
 }

@@ -66,6 +66,9 @@ const rendererExpressionSchema = z.object({
   composition: z.string().min(1),
   lighting: z.string().optional(),
   styleHints: z.string().optional(),
+  atmosphere: z.string().optional(),
+  threatPerception: z.string().optional(),
+  visualEmphasis: z.string().optional(),
 });
 
 const visualIntentSchema = z

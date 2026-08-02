@@ -30,6 +30,11 @@ export type ReadingRoute = {
    * Index-aligned with story_images_v2. Not Reader Truth (ADR-011 A3).
    */
   frameHasRendererExpression?: boolean[];
+  /**
+   * Creator-only: Expression has optional narrative cues
+   * (lighting / atmosphere / threatPerception / visualEmphasis). A5 smoke aid.
+   */
+  frameExpressionHasNarrativeCues?: boolean[];
 };
 
 export type Character = {
