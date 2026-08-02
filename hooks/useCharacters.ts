@@ -95,6 +95,29 @@ export function useCharacters(workId: string) {
     [workId, refresh]
   );
 
+  const deleteCharacters = React.useCallback(
+    async (tsids: string[]) => {
+      const ids = [...new Set(tsids.map((t) => t.trim()).filter(Boolean))];
+      if (ids.length === 0) return;
+      try {
+        for (const tsid of ids) {
+          await charactersApi.deleteById(workId, tsid);
+        }
+        await refresh();
+      } catch (e) {
+        setError(toErrorMessage(e));
+        // Partial deletes may have succeeded — refresh so UI matches DB.
+        try {
+          await refresh();
+        } catch {
+          /* keep original error */
+        }
+        throw e;
+      }
+    },
+    [workId, refresh]
+  );
+
   return {
     characters,
     loading,
@@ -102,6 +125,7 @@ export function useCharacters(workId: string) {
     createCharacter,
     updateCharacter,
     deleteCharacter,
+    deleteCharacters,
     refresh,
   };
 }

@@ -39,6 +39,11 @@ import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
 import * as locationsApi from "@/lib/locations";
 import type { Character, Location } from "@/lib/types";
 import {
+  parseCharacterArchive,
+  type CharacterArchive,
+} from "@/lib/discovery/character-archive";
+import {
+  type CharacterCandidateFields,
   type DiscoveryCandidateFields,
   type DiscoveryCandidateType,
   type SceneCandidateFields,
@@ -158,6 +163,63 @@ function confidenceLabel(confidence: "green" | "yellow" | "red"): string {
   return CONFIDENCE_LABELS[confidence];
 }
 
+function readCharacterArchive(
+  fields: DiscoveryCandidateFields
+): CharacterArchive | null {
+  const raw = (fields as CharacterCandidateFields).characterArchive;
+  const parsed = parseCharacterArchive(raw);
+  return parsed.ok ? parsed.value : null;
+}
+
+function CharacterArchivePreview({ archive }: { archive: CharacterArchive }) {
+  const costume =
+    archive.costumeCues.length > 0
+      ? archive.costumeCues.join(" · ")
+      : discoveryReviewUi.characterArchiveCueNone;
+  const props =
+    archive.propCues.length > 0
+      ? archive.propCues.join(" · ")
+      : discoveryReviewUi.characterArchiveCueNone;
+  return (
+    <div className="space-y-1 rounded-md border border-zinc-200 bg-zinc-50/80 px-2.5 py-2 text-xs">
+      {archive.visualSummary ? (
+        <p className="text-zinc-700">
+          <span className="text-muted-foreground font-medium">
+            {candidateFieldLabel("visualSummary")}：
+          </span>
+          {archive.visualSummary}
+        </p>
+      ) : null}
+      <p className="text-zinc-700">
+        <span className="text-muted-foreground font-medium">
+          {candidateFieldLabel("costumeCues")}：
+        </span>
+        {costume}
+      </p>
+      <p className="text-zinc-700">
+        <span className="text-muted-foreground font-medium">
+          {candidateFieldLabel("propCues")}：
+        </span>
+        {props}
+      </p>
+    </div>
+  );
+}
+
+function formatFieldValue(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 function FieldsPreview({
   fields,
   candidateType,
@@ -165,6 +227,9 @@ function FieldsPreview({
   fields: DiscoveryCandidateFields;
   candidateType?: DiscoveryCandidateType;
 }) {
+  const archive =
+    candidateType === "character" ? readCharacterArchive(fields) : null;
+
   const entries = Object.entries(
     fields as unknown as Record<string, unknown>
   ).filter(([key, value]) => {
@@ -173,24 +238,46 @@ function FieldsPreview({
     if (candidateType === "scene") {
       return key === "title" || key === "summary";
     }
+    // characterArchive rendered as structured block below
+    if (key === "characterArchive") return false;
     return true;
   });
-  if (entries.length === 0) {
+
+  if (entries.length === 0 && !archive && candidateType !== "character") {
     return (
       <p className="text-muted-foreground text-xs">{discoveryReviewUi.noFields}</p>
     );
   }
+
   return (
-    <dl className="grid gap-1 text-xs">
-      {entries.map(([key, value]) => (
-        <div key={key} className="grid grid-cols-[8rem_1fr] gap-2">
-          <dt className="text-muted-foreground font-medium">
-            {candidateFieldLabel(key)}
-          </dt>
-          <dd className="break-words">{String(value)}</dd>
+    <div className="space-y-2">
+      {entries.length > 0 ? (
+        <dl className="grid gap-1 text-xs">
+          {entries.map(([key, value]) => (
+            <div key={key} className="grid grid-cols-[8rem_1fr] gap-2">
+              <dt className="text-muted-foreground font-medium">
+                {candidateFieldLabel(key)}
+              </dt>
+              <dd className="break-words">{formatFieldValue(value)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {candidateType === "character" ? (
+        <div className="space-y-1">
+          <p className="text-muted-foreground text-xs font-medium">
+            {candidateFieldLabel("characterArchive")}
+          </p>
+          {archive ? (
+            <CharacterArchivePreview archive={archive} />
+          ) : (
+            <p className="text-amber-800/90 text-xs">
+              {discoveryReviewUi.characterArchiveEmptyHint}
+            </p>
+          )}
         </div>
-      ))}
-    </dl>
+      ) : null}
+    </div>
   );
 }
 
@@ -272,6 +359,11 @@ function ReviewItemCard({
   onDiscard: () => void;
   onRegen: () => void;
 }) {
+  const fields = getEffectiveFields(item);
+  const archivePresent =
+    item.candidate.candidateType === "character" &&
+    readCharacterArchive(fields) !== null;
+
   return (
     <div className="space-y-3 rounded-lg border border-zinc-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -281,6 +373,19 @@ function ReviewItemCard({
             {existingBadge ? (
               <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
                 {existingBadge}
+              </span>
+            ) : null}
+            {item.candidate.candidateType === "character" ? (
+              <span
+                className={
+                  archivePresent
+                    ? "rounded bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-900"
+                    : "rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900"
+                }
+              >
+                {archivePresent
+                  ? discoveryReviewUi.characterArchivePresent
+                  : discoveryReviewUi.characterArchiveMissing}
               </span>
             ) : null}
           </div>
@@ -296,7 +401,7 @@ function ReviewItemCard({
         </span>
       </div>
       <FieldsPreview
-        fields={getEffectiveFields(item)}
+        fields={fields}
         candidateType={item.candidate.candidateType}
       />
       {item.candidate.evidence?.length ? (

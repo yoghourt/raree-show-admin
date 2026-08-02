@@ -82,6 +82,8 @@ next-env.d.ts
 /scripts/renderer-model-qualification-spike/results/
 /scripts/asoiaf-first-three-chapters-spike/results/
 /scripts/face-coherence-portrait-ref-spike/results/
+/scripts/asoiaf-route-1-3-calibration/results/
+/scripts/character-archive-mvp-spike/results/
 
 # Visual consistency spike outputs
 /scripts/visual-consistency-spike/results/

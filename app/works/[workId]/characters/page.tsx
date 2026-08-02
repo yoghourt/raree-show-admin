@@ -59,7 +59,7 @@ export default function WorkCharactersPage() {
     };
   }, [workId]);
 
-  const { characters, loading, error, deleteCharacter } =
+  const { characters, loading, error, deleteCharacter, deleteCharacters } =
     useCharacters(workId);
 
   const workTitle =
@@ -120,6 +120,7 @@ export default function WorkCharactersPage() {
         loading={loading}
         error={error}
         onDelete={deleteCharacter}
+        onDeleteMany={deleteCharacters}
       />
     </div>
   );

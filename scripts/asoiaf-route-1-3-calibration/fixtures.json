@@ -1,0 +1,116 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "size": 512,
+  "workTitle": "A Song of Ice and Fire — Winterfell opening route (calibration)",
+  "styleAnchor": {
+    "palette": "desaturated northern cold: slate, charcoal, muted brown, sparse warm ember accents indoors",
+    "texture": "painterly cinematic illustration, soft film grain, no photoreal face close-up",
+    "camera_language": "medium-wide / wide storybook stills; profiles and lowered gazes; faces secondary to props and place",
+    "lighting": "moody directional light; deep shadow on faces acceptable; avoid bright frontal key on faces"
+  },
+  "frames": [
+    {
+      "id": "route-1",
+      "label": "Route I — Godswood after execution",
+      "title": "Ned and Catelyn in the Godswood",
+      "caption": "Catelyn finds Ned sitting quietly by the dark waters of the heart tree, cleaning his Valyrian steel sword Ice after an execution.",
+      "identitySupport": {
+        "namesInCaption": ["Catelyn", "Ned"],
+        "costumeCues": ["fur cloak", "dark northern gown", "greatsword Ice"],
+        "relationshipCue": "wife approaches husband in sacred grove"
+      },
+      "policy": {
+        "shot_type": "medium_wide",
+        "camera_distance": "reading_distance",
+        "face_visibility": "partial",
+        "composition_focus": "greatsword and heart-tree pool; figures secondary",
+        "lighting_style": "cool mist, faces in soft shadow"
+      },
+      "expression": {
+        "environment": "godswood dark pool and large tree",
+        "characters": [
+          {
+            "role": "lord",
+            "visual": "bearded man in fur cloak seated cleaning greatsword head bowed"
+          },
+          {
+            "role": "lady",
+            "visual": "woman in dark gown standing in profile"
+          }
+        ],
+        "action": "lady standing near seated lord with long sword by dark pool",
+        "composition": "wide shot tree and pool, two figures, faces secondary"
+      },
+      "beforeNotes": "Web Route 1: Ned face muddy/collapsed in shadow; Catelyn face small and soft; event readable via sword+grove but uncanny risk high on Ned."
+    },
+    {
+      "id": "route-2",
+      "label": "Route II — Grave news delivered",
+      "title": "News of Jon Arryn's Death and the Royal Visit",
+      "caption": "Catelyn delivers grave news of Jon Arryn's death and King Robert's journey north to Winterfell.",
+      "identitySupport": {
+        "namesInCaption": ["Catelyn", "Jon Arryn", "King Robert", "Winterfell"],
+        "costumeCues": ["dark gown", "fur-trimmed cloak", "parchment letter"],
+        "relationshipCue": "wife brings grave letter to husband indoors"
+      },
+      "policy": {
+        "shot_type": "medium",
+        "camera_distance": "table_distance",
+        "face_visibility": "partial",
+        "composition_focus": "shared parchment on table; profiles only",
+        "lighting_style": "warm indoor ember key; faces in profile shadow"
+      },
+      "expression": {
+        "environment": "dim winterfell solar wooden table candlelight",
+        "characters": [
+          {
+            "role": "lady",
+            "visual": "auburn-haired woman in dark gown holding parchment in profile"
+          },
+          {
+            "role": "lord",
+            "visual": "bearded man in fur-trimmed cloak seated profile looking down at letter"
+          }
+        ],
+        "action": "lady and lord both looking down at shared letter on table",
+        "composition": "medium shot across table, two profiles facing letter, faces secondary to parchment"
+      },
+      "beforeNotes": "Web Route 2: profiles help; faces still soft/generic vs sidebar portraits; story clear via letter prop."
+    },
+    {
+      "id": "route-3",
+      "label": "Route III — Betrothal and Lysa's letter",
+      "title": "Betrothal and the Suspicion of Murder",
+      "caption": "King Robert proposes a marriage between Prince Joffrey and Sansa, while Lysa's letter accuses the Lannisters of murder.",
+      "identitySupport": {
+        "namesInCaption": ["King Robert", "Prince Joffrey", "Sansa", "Lysa", "Lannisters"],
+        "costumeCues": ["royal cloak", "northern gown", "sealed letter"],
+        "relationshipCue": "political talk over dual documents (betrothal + accusation)"
+      },
+      "policy": {
+        "shot_type": "medium",
+        "camera_distance": "document_distance",
+        "face_visibility": "partial",
+        "composition_focus": "two documents / letter between figures",
+        "lighting_style": "warm low key; lowered gazes on parchment"
+      },
+      "expression": {
+        "environment": "winterfell hall warm torchlight heavy wood table",
+        "characters": [
+          {
+            "role": "king",
+            "visual": "bearded king in dark royal cloak looking down at parchment profile"
+          },
+          {
+            "role": "lady",
+            "visual": "northern lady in dark gown holding sealed letter profile toward table"
+          }
+        ],
+        "action": "king and lady looking down at parchment and sealed letter on table",
+        "composition": "medium shot two profiles over documents, faces not facing camera"
+      },
+      "beforeNotes": "Web Route 3: strongest immersion; lowered gazes + letter already near Face Safety ceiling; keep and lock style to Routes 1–2."
+    }
+  ]
+}

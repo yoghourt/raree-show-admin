@@ -59,6 +59,11 @@ const STYLE_HINTS_FORBIDDEN =
   /\b(best quality|masterpiece|8k|ultra detailed|ultradetailed)\b/i;
 
 const MAX_PROMPT_PART_LEN = 400;
+/** Local sd-3.5-medium blanks above ~600 chars — keep Expression transport lean. */
+const LOCAL_VISUAL_MAX = 64;
+const LOCAL_ACTION_MAX = 96;
+const LOCAL_ENV_MAX = 72;
+const LOCAL_COMPOSITION_MAX = 72;
 
 function trimStr(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -67,6 +72,20 @@ function trimStr(value: unknown): string {
 function capPart(value: string): string {
   if (value.length <= MAX_PROMPT_PART_LEN) return value;
   return value.slice(0, MAX_PROMPT_PART_LEN).trim();
+}
+
+function stripExactlyFigureCues(text: string): string {
+  return text
+    .replace(/,?\s*exactly\s+(?:\d+|two|three|four|five|six)\s+figures?\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s,]+|[\s,]+$/g, "")
+    .trim();
+}
+
+function hardCap(value: string, max: number): string {
+  const t = value.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, Math.max(0, max - 1)).trim()}…`;
 }
 
 /** Intent presence is optional by scene; quality-when-present only. */
@@ -275,24 +294,59 @@ export function parseRendererExpression(raw: unknown): {
 /**
  * Thin transport: field join for Image Port prompt.
  * MUST NOT reinterpret story or read Visual Intent.
+ * Caps length for Local (long prompts → near_white_flat blanks).
  */
 export function rendererExpressionToPrompt(re: RendererExpression): string {
+  const castLen = re.characters?.length ?? 0;
   const cast = (re.characters ?? [])
-    .map((c) => `${capPart(c.role)}: ${capPart(c.visual)}`)
+    .map((c) => {
+      const role = hardCap(capPart(c.role), 28);
+      const visual = hardCap(
+        stripExactlyFigureCues(capPart(c.visual)),
+        LOCAL_VISUAL_MAX
+      );
+      return `${role}: ${visual}`;
+    })
     .join("; ");
+
+  let action = stripExactlyFigureCues(capPart(re.action ?? ""));
+  action = hardCap(action, LOCAL_ACTION_MAX);
+
+  let composition = stripExactlyFigureCues(capPart(re.composition ?? ""));
+  if (castLen === 2) {
+    // Dual-cast: both visible + no camera stare (Rule 12); keep short for Local.
+    composition =
+      "medium wide shot, both figures fully visible, profiles or looking down";
+  } else if (castLen > 2) {
+    if (
+      composition.length > LOCAL_COMPOSITION_MAX ||
+      !/\bmedium[\s-]?wide\b|\bwide\s+shot\b/i.test(composition)
+    ) {
+      composition = "medium wide shot, faces secondary";
+    } else {
+      composition = hardCap(composition, LOCAL_COMPOSITION_MAX);
+    }
+  } else {
+    composition = hardCap(composition, LOCAL_COMPOSITION_MAX);
+  }
+
+  const environment = hardCap(
+    stripExactlyFigureCues(capPart(re.environment ?? "")),
+    LOCAL_ENV_MAX
+  );
+
   const parts = [
     cast && `Characters: ${cast}.`,
-    re.action && `Action: ${capPart(re.action)}.`,
-    re.environment && `Environment: ${capPart(re.environment)}.`,
-    re.composition && `Composition: ${capPart(re.composition)}.`,
-    re.lighting?.trim() && `Lighting: ${capPart(re.lighting.trim())}.`,
-    re.styleHints?.trim() && `Style: ${capPart(re.styleHints.trim())}.`,
+    action && `Action: ${action}.`,
+    environment && `Environment: ${environment}.`,
+    composition && `Composition: ${composition}.`,
+    // lighting / styleHints omitted from Local transport (minimality; often unused)
   ].filter(Boolean);
 
   const body = parts.join(" ").trim();
   if (!body) return "";
-  // A4 transport bias only — frozen still; MUST NOT rewrite narrative fields.
-  return `${body} One frozen cinematic still, static poses, clear readable subjects, no motion blur, no text, no watermark.`;
+  // Short bias only — long English wrappers raise Local blank rate.
+  return `${body} No extra people. Frozen still, no text, no watermark.`;
 }
 
 export function isRendererExpression(

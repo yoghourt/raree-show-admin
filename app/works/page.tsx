@@ -9,7 +9,7 @@ import { useWorks } from "@/hooks/useWorks";
 import { messages } from "@/lib/locale";
 
 export default function WorksPage() {
-  const { works, loading, error, deleteWork } = useWorks();
+  const { works, loading, error, deleteWork, deleteWorks } = useWorks();
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
@@ -44,6 +44,7 @@ export default function WorksPage() {
         loading={loading}
         error={error}
         onDelete={deleteWork}
+        onDeleteMany={deleteWorks}
       />
     </div>
   );

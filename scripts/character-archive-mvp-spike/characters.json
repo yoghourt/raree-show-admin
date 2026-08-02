@@ -1,0 +1,67 @@
+{
+  "schemaNote": "Character Archive MVP — spike-only concept, no DB / no ADR change",
+  "characters": [
+    {
+      "characterId": "char_ned_stark",
+      "displayName": "Ned Stark",
+      "visualIdentitySummary": "Northern lord shaped by honor, duty and winter",
+      "signatureFeatures": [
+        "dark northern clothing",
+        "wolf-house quiet gravity",
+        "ancestral greatsword presence",
+        "stern noble posture"
+      ],
+      "costumeCues": [
+        "heavy wool and fur cloak",
+        "plain winter noble attire",
+        "dark muted northern colors"
+      ],
+      "propCues": ["greatsword Ice at hand or across knees"],
+      "relationshipCues": [
+        "husband receiving counsel",
+        "lord of Winterfell in sacred grove or solar"
+      ],
+      "environmentAssociations": ["Winterfell", "godswood", "northern hall"]
+    },
+    {
+      "characterId": "char_catelyn_stark",
+      "displayName": "Catelyn Stark",
+      "visualIdentitySummary": "Northern lady with southern riverland grace; protective political presence",
+      "signatureFeatures": [
+        "auburn hair cue",
+        "dignified upright posture",
+        "letter and message-bearer association",
+        "protective urgency without panic"
+      ],
+      "costumeCues": [
+        "dark northern gown with finer southern-influenced cut",
+        "modest noble trim",
+        "cloak for winter travel indoors"
+      ],
+      "propCues": ["sealed letter or parchment", "message scroll"],
+      "relationshipCues": [
+        "wife bringing grave news to husband",
+        "mother-politician at council table"
+      ],
+      "environmentAssociations": ["Winterfell solar", "godswood approach", "council table"]
+    },
+    {
+      "characterId": "char_robert_baratheon",
+      "displayName": "Robert Baratheon",
+      "visualIdentitySummary": "Boisterous southern king worn by war and feast, still royal in bulk",
+      "signatureFeatures": [
+        "broad heavy build",
+        "thick beard",
+        "royal presence at table",
+        "antler-king swagger softened by age"
+      ],
+      "costumeCues": [
+        "dark royal cloak over bulky frame",
+        "richer southern cloth than northern plain wool"
+      ],
+      "propCues": ["royal seal or betrothal parchment"],
+      "relationshipCues": ["king proposing marriage match to northern hosts"],
+      "environmentAssociations": ["Winterfell great hall", "feast table"]
+    }
+  ]
+}

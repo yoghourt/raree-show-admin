@@ -95,6 +95,28 @@ export function useWorks() {
     [refresh]
   );
 
+  const deleteWorks = React.useCallback(
+    async (ids: string[]) => {
+      const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+      if (unique.length === 0) return;
+      try {
+        for (const id of unique) {
+          await deleteWorkApi(id);
+        }
+        await refresh();
+      } catch (e) {
+        setError(toErrorMessage(e));
+        try {
+          await refresh();
+        } catch {
+          /* keep original error */
+        }
+        throw e;
+      }
+    },
+    [refresh]
+  );
+
   return {
     works,
     loading,
@@ -102,6 +124,7 @@ export function useWorks() {
     createWork,
     updateWork,
     deleteWork,
+    deleteWorks,
     refresh,
   };
 }

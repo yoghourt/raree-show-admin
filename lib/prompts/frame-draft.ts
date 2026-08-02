@@ -84,9 +84,38 @@ export const FRAME_NEGATIVE_PROMPT = [
   "exploding",
 ].join(", ");
 
-export function buildFrameNegativePrompt(_caption?: string): string {
-  // Caption cues reserved for later (weather/crowding); keep Deployment-stable for now.
+export function buildFrameNegativePrompt(
+  _caption?: string,
+  options?: { castCount?: number }
+): string {
   void _caption;
+  const cast = options?.castCount;
+  if (cast === 2) {
+    return [
+      FRAME_NEGATIVE_PROMPT,
+      "three people",
+      "three figures",
+      "group of three",
+      "extra person",
+      "crowd",
+      "solo portrait",
+      "single person",
+      "one person only",
+      "looking at camera",
+      "facing the viewer",
+      "sand map",
+      "terrain map",
+    ].join(", ");
+  }
+  if (cast === 1) {
+    return [
+      FRAME_NEGATIVE_PROMPT,
+      "two people",
+      "couple",
+      "extra person",
+      "crowd",
+    ].join(", ");
+  }
   return FRAME_NEGATIVE_PROMPT;
 }
 

@@ -6,11 +6,14 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import {
+  adaptSceneExpressionForLocalCapability,
   assessSceneFaceSafety,
   findForbiddenPhysicsCues,
   findRestrictedFullFaceSceneCues,
   FORBIDDEN_PHYSICS_PATTERN,
   FULL_FACE_SCENE_PATTERN,
+  remapGenericRolesToRoleNames,
+  sharpenExpressionAnchors,
 } from "@/lib/discovery/expression-capability-rules";
 import { buildFrameDraftPrompt } from "@/lib/prompts/frame-draft";
 import { parseFrameProvenance } from "@/lib/rollout/scenes-server";
@@ -173,6 +176,8 @@ describe("A4 capability adaptation", () => {
 describe("Rule 6 Face Safety", () => {
   it("detects unrestricted full-face scene cues", () => {
     expect(FULL_FACE_SCENE_PATTERN.test("close-up of boy's face")).toBe(true);
+    expect(FULL_FACE_SCENE_PATTERN.test("faces not close-up")).toBe(false);
+    expect(FULL_FACE_SCENE_PATTERN.test("no close-up framing")).toBe(false);
     expect(
       findRestrictedFullFaceSceneCues({
         environment: "snow",
@@ -241,6 +246,119 @@ describe("Rule 6 Face Safety", () => {
     expect(assessment.safety_status).toBe("requires_human_review");
     expect(assessment.sceneRisk).toBe("high");
   });
+
+  it("authorship adapt rewrites hand transfer and close dual framing", () => {
+    const adapted = adaptSceneExpressionForLocalCapability({
+      environment: "stone chamber",
+      characters: [
+        { role: "woman", visual: "winter wrap" },
+        { role: "man", visual: "leather garb" },
+      ],
+      action: "woman handing parchment to man across table",
+      composition: "two-shot framing figures from waist up indoors",
+    });
+    expect(adapted.action).toMatch(/letter on table/i);
+    expect(adapted.action).not.toMatch(/handing/i);
+    expect(adapted.composition).toMatch(/both figures fully visible/i);
+    expect(adapted.composition).toMatch(/profiles or looking down/i);
+    expect(adapted.action).toMatch(/left/i);
+    expect(adapted.action).toMatch(/right/i);
+    const safety = assessSceneFaceSafety(adapted);
+    expect(safety.safety_status).toBe("allowed");
+  });
+
+  it("thins long Expression transport under Local blank threshold", () => {
+    const prompt = rendererExpressionToPrompt({
+      environment:
+        "ancient godswood with dark waters and weirwood trees under overcast daylight and mist",
+      characters: [
+        {
+          role: "Catelyn Stark",
+          visual:
+            "woman in southern-style noble gown holding raven scroll, dark gown with southern-cut grace, sealed letter",
+        },
+        {
+          role: "Eddard Stark",
+          visual:
+            "man in dark fur-lined doublet holding Valyrian steel sword Ice, dark northern fur cloak, ancestral greatsword",
+        },
+      ],
+      action:
+        "sealed letter scroll resting on stone ledge between two figures, both looking down at letter, exactly two figures",
+      composition:
+        "medium-wide shot of two figures standing by stone wall with faces in profile, faces secondary, exactly 2 figures",
+    });
+    expect(prompt.length).toBeLessThan(520);
+    expect(prompt).not.toMatch(/exactly two figures/i);
+    expect(prompt).toMatch(/both figures fully visible/i);
+  });
+
+  it("remaps generic roles to Role names by order", () => {
+    const remapped = remapGenericRolesToRoleNames(
+      {
+        environment: "godswood",
+        characters: [
+          { role: "woman", visual: "gown" },
+          { role: "man", visual: "cloak" },
+        ],
+        action: "facing",
+        composition: "wide",
+      },
+      ["Catelyn Stark", "Eddard Stark"]
+    );
+    expect(remapped.characters[0].role).toBe("Catelyn Stark");
+    expect(remapped.characters[1].role).toBe("Eddard Stark");
+  });
+
+  it("sharpens godswood landmark and costume mutex", () => {
+    const sharpened = sharpenExpressionAnchors({
+      environment: "ancient forest with dark water and mist",
+      characters: [
+        {
+          role: "Eddard Stark",
+          visual:
+            "dark northern tunic, heavy fur cloak, Valyrian steel sword Ice",
+        },
+        {
+          role: "Catelyn Stark",
+          visual: "southern noble gown, fur-trimmed winter cloak, letter scroll",
+        },
+      ],
+      action: "two figures standing near dark pool",
+      composition: "medium wide shot",
+    });
+    expect(sharpened.environment).toMatch(/weirwood face/i);
+    expect(sharpened.environment).not.toMatch(/mist forest|ancient forest/i);
+    expect(sharpened.characters[0].visual.toLowerCase()).toMatch(/ice/);
+    expect(sharpened.characters[0].visual).not.toMatch(/gown/i);
+    expect(sharpened.characters[1].visual).toMatch(/gown/i);
+    expect(sharpened.characters[1].visual).not.toMatch(/fur-trimmed|fur mantle|heavy fur/i);
+    expect(sharpened.characters[0].visual.split(",").length).toBeLessThanOrEqual(
+      2
+    );
+    expect(sharpened.characters[1].visual.split(",").length).toBeLessThanOrEqual(
+      2
+    );
+  });
+
+  it("adapt dual-cast names left/right and strips exactly-N", () => {
+    const adapted = adaptSceneExpressionForLocalCapability({
+      environment: "Winterfell chamber",
+      characters: [
+        { role: "Eddard Stark", visual: "fur cloak" },
+        { role: "Catelyn Stark", visual: "southern gown" },
+      ],
+      action: "letter on table, exactly two figures",
+      composition: "medium wide shot, faces secondary, exactly 2 figures",
+    });
+    expect(adapted.action).not.toMatch(/exactly/i);
+    expect(adapted.action).toMatch(/Eddard/i);
+    expect(adapted.action).toMatch(/Catelyn/i);
+    expect(adapted.action).toMatch(/left/i);
+    expect(adapted.action).toMatch(/right/i);
+    expect(adapted.composition).toMatch(/both figures fully visible/i);
+    expect(adapted.environment).toMatch(/Winterfell|stone|table/i);
+  });
 });
 
 describe("parseVisualIntent", () => {
@@ -263,11 +381,12 @@ describe("rendererExpressionToPrompt", () => {
     const prompt = rendererExpressionToPrompt(SAMPLE_EXPRESSION);
     expect(prompt).toContain("Action: knight kneels");
     expect(prompt).toContain("Environment: castle hall");
-    expect(prompt).toContain("Composition: foreground knight");
+    expect(prompt).toContain("both figures fully visible");
+    expect(prompt).toContain("profiles or looking down");
     expect(prompt).toContain("knight: armor, sword raised");
     expect(prompt).not.toContain("protects");
-    expect(prompt).toContain("frozen cinematic still");
-    expect(prompt).toContain("static poses");
+    expect(prompt).toContain("Frozen still");
+    expect(prompt).toContain("No extra people");
   });
 });
 
