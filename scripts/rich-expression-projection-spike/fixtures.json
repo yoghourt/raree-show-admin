@@ -1,0 +1,93 @@
+{
+  "seed": 42,
+  "cloudModel": "black-forest-labs/FLUX.1-dev",
+  "localaiModel": "sd-3.5-medium-ggml",
+  "cases": [
+    {
+      "id": "wall-scouting",
+      "label": "The Scouting Mission Beyond the Wall",
+      "scenePurpose": "Night's Watch rangers on a cold reconnaissance beyond the Wall; unease and discipline, not battle.",
+      "relationship": "three sworn brothers on patrol; mutual watchfulness",
+      "threat": "unseen cold threat in the woods — tension before contact",
+      "currentExpression": {
+        "environment": "snow forest beyond the Wall",
+        "characters": [
+          {
+            "role": "ranger lead",
+            "visual": "bearded man in black cloak holding spear"
+          },
+          {
+            "role": "ranger left",
+            "visual": "man in black furs looking aside"
+          },
+          {
+            "role": "ranger right",
+            "visual": "man in dark cloak holding staff"
+          }
+        ],
+        "action": "three rangers standing in snowy woods, both fully visible",
+        "composition": "medium wide shot, faces secondary"
+      },
+      "richExpression": {
+        "environment": "frozen pine forest beyond the Wall, deep snow path, bare black trunks fading into white fog",
+        "characters": [
+          {
+            "role": "ranger lead",
+            "visual": "weathered Night's Watch ranger in black wool and ragged fur, spear grounded, eyes scanning treeline"
+          },
+          {
+            "role": "ranger left",
+            "visual": "younger brother in black cloak and shaggy fur, breath visible, body angled outward on watch"
+          },
+          {
+            "role": "ranger right",
+            "visual": "older ranger in dark layered wool, long spear across body, stance tight with cold fatigue"
+          }
+        ],
+        "action": "three Night's Watch rangers pause on a snow path in formation, scanning the silent woods; no enemy yet visible",
+        "composition": "medium-wide story still, three figures as readable group, lead slightly forward, forest depth behind, faces secondary to cold and formation",
+        "lighting": "flat overcast northern light, pale fog bloom, deep shadow under trees, no warm key",
+        "styleHints": "desaturated cinematic dark fantasy illustration, cold slate and charcoal palette",
+        "atmosphere": "bitter cold, hush before danger, isolation beyond the Wall",
+        "emotionalTone": "disciplined unease, brotherhood under strain",
+        "threatPerception": "invisible threat in the fog — scale of wilderness over men",
+        "visualEmphasis": "formation and cold environment over faces; snow and spears as story anchors"
+      }
+    },
+    {
+      "id": "others-encounter",
+      "label": "Encounter with the Others",
+      "scenePurpose": "First contact with the supernatural Other; human vulnerability against inhuman cold presence.",
+      "relationship": "lone Watch presence confronting something not human",
+      "threat": "Other / unnatural cold — wrong light, wrong stillness",
+      "currentExpression": {
+        "environment": "snow forest at night",
+        "characters": [
+          {
+            "role": "ranger",
+            "visual": "armored figure in dark cloak holding sword"
+          }
+        ],
+        "action": "ranger standing in snowy woods with sword lowered",
+        "composition": "medium wide shot, faces secondary"
+      },
+      "richExpression": {
+        "environment": "night forest beyond the Wall, crusted snow path between black trunks, pale moon through mist",
+        "characters": [
+          {
+            "role": "ranger",
+            "visual": "Night's Watch ranger in dark plate and black cloak, closed helm or hooded, sword pointed down, body braced"
+          }
+        ],
+        "action": "lone ranger stands frozen on the snow path as unnatural pale presence gathers in the mist ahead — confrontation without clash yet",
+        "composition": "wide cinematic still, small human figure left-of-center against towering trees and moonlit mist; supernatural space dominates frame",
+        "lighting": "cold moon backlight, green-white mist glow ahead, rim light on armor, face hidden or distant",
+        "styleHints": "dark fantasy cinematic illustration, icy desaturated blues and charcoal",
+        "atmosphere": "supernatural cold, dread, wrong stillness",
+        "emotionalTone": "awe and terror; human scale dwarfed",
+        "threatPerception": "Otherly presence larger than the man — inhuman cold and pale light, not a mundane duel",
+        "visualEmphasis": "scale contrast human vs forest/mist threat; sword as only warm-metal anchor"
+      }
+    }
+  ]
+}
