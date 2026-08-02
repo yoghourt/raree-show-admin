@@ -1,0 +1,117 @@
+{
+  "model": "sd-3.5-medium-ggml",
+  "seed": 42,
+  "size": 512,
+  "styleSuffix": "Style: desaturated northern chronicle; painterly grain; faces secondary.",
+  "note": "Archive visuals MUST stay short — long cue stacks blank Local (minimality).",
+  "cases": [
+    {
+      "id": "godswood",
+      "label": "Route I — Godswood",
+      "caption": "Catelyn finds Ned sitting quietly by the dark waters of the heart tree, cleaning his Valyrian steel sword Ice after an execution.",
+      "cast": ["char_ned_stark", "char_catelyn_stark"],
+      "baselineExpression": {
+        "environment": "godswood dark pool and large tree",
+        "characters": [
+          {
+            "role": "Ned Stark",
+            "visual": "bearded man seated cleaning sword head bowed"
+          },
+          {
+            "role": "Catelyn Stark",
+            "visual": "woman standing in profile"
+          }
+        ],
+        "action": "Catelyn standing near Ned with long sword by dark pool",
+        "composition": "wide shot tree and pool, two figures, faces secondary"
+      },
+      "archiveExpression": {
+        "environment": "godswood dark pool and large tree",
+        "characters": [
+          {
+            "role": "Ned Stark",
+            "visual": "northern lord in fur-wool cloak seated with greatsword head bowed"
+          },
+          {
+            "role": "Catelyn Stark",
+            "visual": "auburn-haired lady in dark northern gown standing profile"
+          }
+        ],
+        "action": "Catelyn standing near Ned with greatsword by dark pool",
+        "composition": "wide shot tree and pool, two figures, faces secondary"
+      }
+    },
+    {
+      "id": "letter",
+      "label": "Route II — Grave news letter",
+      "caption": "Catelyn delivers grave news of Jon Arryn's death and King Robert's journey north to Winterfell.",
+      "cast": ["char_ned_stark", "char_catelyn_stark"],
+      "baselineExpression": {
+        "environment": "dim indoor wooden table candlelight",
+        "characters": [
+          {
+            "role": "Catelyn Stark",
+            "visual": "woman holding parchment in profile"
+          },
+          {
+            "role": "Ned Stark",
+            "visual": "bearded man seated looking down at letter"
+          }
+        ],
+        "action": "Catelyn and Ned looking down at shared letter on table",
+        "composition": "medium shot across table, two profiles, faces secondary to parchment"
+      },
+      "archiveExpression": {
+        "environment": "dim indoor wooden table candlelight",
+        "characters": [
+          {
+            "role": "Catelyn Stark",
+            "visual": "auburn-haired lady in dark gown holding sealed letter"
+          },
+          {
+            "role": "Ned Stark",
+            "visual": "northern lord in fur cloak seated looking down at parchment"
+          }
+        ],
+        "action": "Catelyn and Ned looking down at sealed letter on table",
+        "composition": "medium shot across table, two profiles, faces secondary to parchment"
+      }
+    },
+    {
+      "id": "betrothal",
+      "label": "Route III — Betrothal and accusation",
+      "caption": "King Robert proposes a marriage between Prince Joffrey and Sansa, while Lysa's letter accuses the Lannisters of murder.",
+      "cast": ["char_robert_baratheon", "char_catelyn_stark"],
+      "baselineExpression": {
+        "environment": "indoor hall warm torchlight wooden table",
+        "characters": [
+          {
+            "role": "King Robert",
+            "visual": "bearded king looking down at parchment profile"
+          },
+          {
+            "role": "Catelyn Stark",
+            "visual": "lady holding sealed letter profile toward table"
+          }
+        ],
+        "action": "king and lady looking down at parchment and sealed letter",
+        "composition": "medium shot two profiles over documents, faces secondary"
+      },
+      "archiveExpression": {
+        "environment": "indoor hall warm torchlight wooden table",
+        "characters": [
+          {
+            "role": "King Robert",
+            "visual": "broad king in dark royal cloak looking down at parchment"
+          },
+          {
+            "role": "Catelyn Stark",
+            "visual": "auburn-haired lady in dark gown holding sealed letter"
+          }
+        ],
+        "action": "king and lady looking down at parchment and sealed letter",
+        "composition": "medium shot two profiles over documents, faces secondary"
+      }
+    }
+  ]
+}

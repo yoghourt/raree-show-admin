@@ -83,6 +83,51 @@ Encode safety into characters[].visual + action + composition (no new required s
 Bad: action "close-up of boy's terrified face staring at camera".
 Good: "two figures looking down at dead wolf at reading distance" + hoods/profiles/wide shot.
 Portrait rail (assetSlot=portrait) is OUT OF SCOPE for this rule — full faces remain allowed there.
+
+Rule 7 — Role names in characters[].role (SPEC-CHAR-001):
+characters[].role MUST be the Role display name (e.g. "Eddard Stark", "Catelyn Stark").
+FORBIDDEN as role labels: woman, man, lady, lord, girl, boy, person, figure (alone).
+Proper names stay in reader title/summary; Expression role strings MUST match Role candidates
+so Character Archive cues can fold by name.
+
+Rule 8 — Dual-cast Face Safety default composition:
+When characters[].length >= 2, composition MUST include medium-wide (or wide) + faces secondary
+(or profiles / reading distance). FORBIDDEN without mitigation: waist-up, bust shot,
+tight two-shot, head-and-shoulders framing.
+
+Rule 9 — Static object transfer (Local hand collapse):
+Do NOT use handing / passing / exchanging letters or props hand-to-hand.
+Prefer static visible layout: object on table / on ground / resting against tree;
+figures looking at or standing near the object.
+Bad: "woman handing parchment to man".
+Good: "sealed letter on wooden table between two figures, both looking at letter".
+Do NOT repeat "exactly N figures" in action (composition face-safety is enough).
+
+Rule 10 — Hard scene anchors (short, specific):
+environment MUST name ONE concrete landmark, ≤ ~12 words.
+Bad: "ancient forest with dark water and mist".
+Good: "Winterfell godswood, pale carved weirwood by dark pool".
+Good: "Winterfell solar, stone chamber, wooden table".
+FORBIDDEN: generic fog forest / anonymous stone room without place cue.
+
+Rule 11 — Prop salience + cast differentiation:
+Each character.visual = ONE costume cue + at most ONE iconic prop (short).
+Iconic props (Ice, sealed letter) MUST be the clearest noun in that visual — not buried
+under three clothing adjectives.
+Do NOT give every figure the same fur-cloak look.
+Letter/scroll appears ONLY on the beat that needs it (not every dual-cast frame).
+Differentiate Roles: e.g. Ned = northern fur + greatsword Ice; Catelyn = southern gown
+(letter only when she bears news).
+Costume mutex: Catelyn MUST NOT wear heavy fur mantle; Ned MUST NOT wear southern gown.
+Letter beats: "sealed parchment letter only" — FORBIDDEN sand/terrain/map props.
+
+Rule 12 — Dual-cast both visible (anti missing figure):
+When characters[].length === 2, action MUST name both Roles with left/right placement
+(e.g. "Eddard left by pool with Ice, Catelyn right standing, both fully visible").
+composition MUST include: medium-wide + both figures fully visible + profiles or looking down.
+FORBIDDEN: single centered hero portrait; one figure cropped out; facing-camera stare.
+Godswood env MUST be exclusive landmark: "pale weirwood face carved in white bark, dark pool"
+(do not dilute with generic mist forest).
 `.trim();
 
 /**
@@ -117,43 +162,56 @@ const FIGURE_NOUN =
   /\b(?:rangers?|warriors?|knights?|figures?|characters?|men|women|people|soldiers?|scouts?|bodies)\b/i;
 
 /**
- * Stated actor count in action/composition when a figure noun is nearby.
- * Returns null when no explicit count cue.
+ * Stated actor counts in action/composition when a figure noun is nearby.
+ * Ignores authorship bias "exactly N figures" (Rule 9 transport cue).
  */
+export function statedActorCountsInText(text: string): number[] {
+  const lower = text
+    .toLowerCase()
+    .replace(/\bexactly\s+[1-6]\s+figures?\b/g, " ");
+  const counts = new Set<number>();
+  if (/\ba\s+pair\s+of\b/.test(lower) && FIGURE_NOUN.test(lower)) {
+    counts.add(2);
+  }
+  for (const m of lower.matchAll(
+    /\b([1-6])\s+(?:rangers?|warriors?|knights?|figures?|characters?|men|women|people|soldiers?|scouts?)\b/g
+  )) {
+    counts.add(Number(m[1]));
+  }
+  for (const m of lower.matchAll(
+    /\b(one|two|three|four|five|six|both)\s+(?:rangers?|warriors?|knights?|figures?|characters?|men|women|people|soldiers?|scouts?)\b/g
+  )) {
+    const n = WORD_COUNT[m[1]!];
+    if (n != null) counts.add(n);
+  }
+  if (/\bboth\b/.test(lower) && FIGURE_NOUN.test(lower)) counts.add(2);
+  return [...counts];
+}
+
+/** First stated actor count, or null when none. */
 export function statedActorCountInText(text: string): number | null {
-  const lower = text.toLowerCase();
-  // "a pair of …"
-  if (/\ba\s+pair\s+of\b/.test(lower) && FIGURE_NOUN.test(lower)) return 2;
-  // digit: "3 rangers", "2 figures"
-  const digit = lower.match(
-    /\b([1-6])\s+(?:rangers?|warriors?|knights?|figures?|characters?|men|women|people|soldiers?|scouts?)\b/
-  );
-  if (digit) return Number(digit[1]);
-  // word: "three rangers", "both warriors", "two characters"
-  const word = lower.match(
-    /\b(one|two|three|four|five|six|both)\s+(?:rangers?|warriors?|knights?|figures?|characters?|men|women|people|soldiers?|scouts?)\b/
-  );
-  if (word) return WORD_COUNT[word[1]!] ?? null;
-  if (/\bboth\b/.test(lower) && FIGURE_NOUN.test(lower)) return 2;
-  return null;
+  const counts = statedActorCountsInText(text);
+  return counts[0] ?? null;
 }
 
 /**
  * Cast consistency errors (Rule 5).
- * Empty when stated actor count in action/composition matches characters[].length.
+ * Empty when every stated actor count matches characters[].length.
  */
 export function findCastConsistencyErrors(
   expression: Pick<ExpressionLike, "action" | "composition" | "characters">
 ): string[] {
   const castLen = expression.characters?.length ?? 0;
   const blob = `${expression.action ?? ""} ${expression.composition ?? ""}`;
-  const stated = statedActorCountInText(blob);
+  const statedCounts = statedActorCountsInText(blob);
   const errors: string[] = [];
 
-  if (stated !== null && castLen > 0 && stated !== castLen) {
-    errors.push(
-      `action/composition states ${stated} actors but characters[] has ${castLen}`
-    );
+  for (const stated of statedCounts) {
+    if (castLen > 0 && stated !== castLen) {
+      errors.push(
+        `action/composition states ${stated} actors but characters[] has ${castLen}`
+      );
+    }
   }
 
   return errors;
@@ -161,37 +219,260 @@ export function findCastConsistencyErrors(
 
 /** Few-shot for scene TYPE_EXAMPLES — minimal duel + face-safe (Rule 6). */
 export const EXPRESSION_CAPABILITY_EXAMPLE: ExpressionLike = {
-  environment: "snow clearing under moonlight",
+  environment: "Haunted Forest clearing under moonlight",
   characters: [
     {
-      role: "knight",
-      visual: "armored knight in closed helmet holding sword",
+      role: "Waymar Royce",
+      visual: "steel sword, closed helm armor",
     },
     {
-      role: "white_walker",
-      visual: "hooded ice warrior holding sword face hidden",
+      role: "White Walker",
+      visual: "ice sword, hooded pale figure",
     },
   ],
-  action: "two warriors facing each other with swords crossed at middle distance",
-  composition: "wide shot two silhouettes facing each other",
+  action: "two warriors facing each other, swords crossed at middle distance",
+  composition: "wide shot, faces secondary, two silhouettes",
 };
 
-/** Mock / courtyard beat — minimal static greeting. */
+/** Mock / courtyard beat — minimal static greeting + face-safe dual cast. */
 export const EXPRESSION_COURTYARD_EXAMPLE: ExpressionLike = {
-  environment: "snowy courtyard",
+  environment: "Winterfell courtyard, snow, gate behind",
   characters: [
     {
-      role: "lord",
-      visual: "noble in fur cloak standing",
+      role: "Eddard Stark",
+      visual: "northern fur cloak, greatsword Ice",
     },
     {
-      role: "king",
-      visual: "crowned king standing",
+      role: "Robert Baratheon",
+      visual: "crowned king, dark royal cloak",
     },
   ],
-  action: "lord and king facing each other",
-  composition: "lord on left, king on right",
+  action: "two nobles facing each other across courtyard",
+  composition: "medium wide shot, faces secondary",
 };
+
+/** Generic role labels that block Character Archive name fold. */
+export const GENERIC_EXPRESSION_ROLE_PATTERN =
+  /^(woman|man|lady|lord|girl|boy|female|male|person|figure|king|queen)$/i;
+
+/** Hand-to-hand object transfer — Local often collapses hands (Rule 9). */
+export const HAND_TRANSFER_ACTION_PATTERN =
+  /\b(handing|hands?\s+(?:over|to)|pass(?:es|ing)?\s+(?:a\s+|the\s+)?(?:letter|parchment|scroll|note)|giv(?:es|ing)\s+(?:a\s+|the\s+)?(?:letter|parchment|scroll)|exchang(?:es|ing)\s+(?:a\s+|the\s+)?(?:letter|parchment))\b/i;
+
+const CLOSE_DUAL_FRAMING_PATTERN =
+  /\b(waist[\s-]?up|bust\s+shot|tight\s+two[\s-]?shot|two[\s-]?shot|head[\s-]and[\s-]shoulders|from\s+the\s+waist)\b/i;
+
+function hardCapAtBoundary(text: string, maxLen: number): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length <= maxLen) return t;
+  const cut = t.slice(0, maxLen);
+  const at = Math.max(cut.lastIndexOf(","), cut.lastIndexOf(" "));
+  return (at > maxLen * 0.4 ? cut.slice(0, at) : cut).trim();
+}
+
+const PROP_CUE_PATTERN =
+  /\b(ice|greatsword|sword|letter|scroll|parchment|raven)\b/i;
+const COSTUME_CUE_PATTERN =
+  /\b(cloak|gown|tunic|fur|dress|armor|armour|robe|wrap|mantle|doublet)\b/i;
+const HEAVY_FUR_PATTERN =
+  /\b(fur[\s-]?(?:trimmed\s+)?(?:winter\s+)?(?:cloak|mantle)|heavy\s+fur|fur\s+mantle|shaggy\s+fur)\b/i;
+const SOUTHERN_GOWN_PATTERN = /\b(southern[\s-]?(style\s+)?|noble\s+)?gown\b|\bdress\b/i;
+
+function shortRoleLabel(role: string): string {
+  const parts = role.trim().split(/\s+/).filter(Boolean);
+  return parts[0] || role.trim();
+}
+
+function roleMentions(text: string, role: string): boolean {
+  const full = role.trim().toLowerCase();
+  const first = shortRoleLabel(role).toLowerCase();
+  const t = text.toLowerCase();
+  return (full.length > 2 && t.includes(full)) || (first.length > 2 && t.includes(first));
+}
+
+function cleanupVisualList(visual: string): string {
+  return visual
+    .replace(/\s*,\s*,+/g, ", ")
+    .replace(/^[\s,]+|[\s,]+$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function applyCostumeMutex(role: string, visual: string): string {
+  let v = visual;
+  if (/catelyn/i.test(role)) {
+    v = v.replace(HEAVY_FUR_PATTERN, "");
+    v = cleanupVisualList(v);
+    if (!SOUTHERN_GOWN_PATTERN.test(v)) {
+      v = v ? `${v}, southern noble gown` : "southern noble gown";
+    }
+  } else if (/eddard|\bned\b/i.test(role)) {
+    v = v.replace(SOUTHERN_GOWN_PATTERN, "");
+    v = cleanupVisualList(v);
+    if (!/\b(fur|tunic|mantle|cloak|doublet)\b/i.test(v) && !PROP_CUE_PATTERN.test(v)) {
+      v = v ? `${v}, northern fur cloak` : "northern fur cloak";
+    }
+  }
+  return cleanupVisualList(v);
+}
+
+function pickSalientVisualParts(visual: string): string {
+  const parts = visual
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length <= 2) return hardCapAtBoundary(parts.join(", "), 56);
+  const prop = parts.find((p) => PROP_CUE_PATTERN.test(p));
+  const costume = parts.find((p) => p !== prop && COSTUME_CUE_PATTERN.test(p));
+  const keep: string[] = [];
+  if (prop) keep.push(prop);
+  if (costume) keep.push(costume);
+  for (const p of parts) {
+    if (keep.length >= 2) break;
+    if (!keep.includes(p)) keep.push(p);
+  }
+  return hardCapAtBoundary(keep.join(", "), 56);
+}
+
+/**
+ * Rule 10–12: landmark exclusivity, prop salience, costume mutex.
+ */
+export function sharpenExpressionAnchors<T extends ExpressionLike>(
+  expression: T
+): T {
+  let environment = hardCapAtBoundary(expression.environment ?? "", 64);
+  const actionBlob = `${expression.action ?? ""} ${expression.composition ?? ""}`;
+  const placeBlob = `${environment} ${actionBlob}`;
+
+  if (/\b(godswood|weirwood|heart\s*tree|dark\s+pool)\b/i.test(placeBlob)) {
+    // Exclusive landmark — do not dilute with generic forest mist.
+    environment = "pale weirwood face carved in white bark, dark pool";
+  } else if (
+    /\bwinterfell\b/i.test(placeBlob) &&
+    !/\b(stone chamber|solar|great hall|courtyard)\b/i.test(environment)
+  ) {
+    environment = hardCapAtBoundary(
+      `Winterfell stone chamber, wooden table`,
+      64
+    );
+  } else if (
+    /\b(chamber|solar|table|letter|parchment|scroll)\b/i.test(placeBlob) &&
+    !/\b(stone chamber|solar|wooden table)\b/i.test(environment)
+  ) {
+    environment = hardCapAtBoundary("Winterfell stone chamber, wooden table", 64);
+  }
+
+  const characters = (expression.characters ?? []).map((ch) => {
+    const muted = applyCostumeMutex(ch.role, ch.visual.trim());
+    return { ...ch, visual: pickSalientVisualParts(muted) };
+  });
+
+  return { ...expression, environment, characters };
+}
+
+/**
+ * Deterministic Discovery authorship adapt (not Renderer intelligence).
+ * Applies Rules 8–12 so Face Safety + Local landmarks/props/cast fail less often.
+ */
+export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>(
+  expression: T
+): T {
+  const castLen = expression.characters?.length ?? 0;
+  const chars = expression.characters ?? [];
+  let action = (expression.action ?? "").trim();
+  let composition = (expression.composition ?? "").trim();
+
+  // Drop redundant cast-count stacks (LLM + adapt) — blanks Local when repeated.
+  action = action
+    .replace(/,?\s*exactly\s+(?:\d+|two|three)\s+figures?\b/gi, "")
+    .replace(/\b(sand|terrain)\s+map\b/gi, "sealed parchment letter")
+    .replace(/\bmap\b/gi, "letter")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s,]+|[\s,]+$/g, "")
+    .trim();
+
+  if (HAND_TRANSFER_ACTION_PATTERN.test(action)) {
+    action =
+      "sealed parchment letter on wooden table, both looking down at letter";
+  }
+
+  if (castLen === 2) {
+    const left = shortRoleLabel(chars[0]!.role);
+    const right = shortRoleLabel(chars[1]!.role);
+    const namesBoth =
+      roleMentions(action, chars[0]!.role) &&
+      roleMentions(action, chars[1]!.role);
+    const hasPlacement = /\bleft\b/i.test(action) && /\bright\b/i.test(action);
+
+    if (!namesBoth || !hasPlacement) {
+      if (/\b(letter|scroll|parchment)\b/i.test(action)) {
+        action = `sealed parchment letter on table, ${left} left, ${right} right, both looking down`;
+      } else if (
+        /\b(godswood|weirwood|pool|ice|sword)\b/i.test(
+          `${action} ${expression.environment ?? ""}`
+        )
+      ) {
+        action = `${left} left by pool with sword, ${right} right standing, both fully visible`;
+      } else {
+        action = `${left} left, ${right} right, both fully visible`;
+      }
+    } else if (!/\bboth\b/i.test(action)) {
+      action = `${action}, both fully visible`;
+    }
+
+    composition =
+      "medium wide shot, both figures fully visible, profiles or looking down";
+  } else if (castLen > 2) {
+    composition = composition
+      .replace(new RegExp(CLOSE_DUAL_FRAMING_PATTERN.source, "gi"), " ")
+      .replace(/,?\s*exactly\s+(?:\d+|two|three)\s+figures?\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s,]+|[\s,]+$/g, "")
+      .trim();
+    if (
+      composition.length > 72 ||
+      !/\bmedium[\s-]?wide\b|\bwide\s+shot\b/i.test(composition)
+    ) {
+      composition = "medium wide shot, faces secondary";
+    }
+  }
+
+  action = hardCapAtBoundary(action, 110);
+
+  return sharpenExpressionAnchors({
+    ...expression,
+    action: action || expression.action,
+    composition: composition || expression.composition,
+  });
+}
+
+/**
+ * When Expression uses generic roles, remap to Role names by order
+ * so Character Archive fold can match (propose should already use names).
+ */
+export function remapGenericRolesToRoleNames<T extends ExpressionLike>(
+  expression: T,
+  roleNames: string[]
+): T {
+  const names = roleNames.map((n) => n.trim()).filter(Boolean);
+  const chars = expression.characters ?? [];
+  if (!names.length || !chars.length || chars.length !== names.length) {
+    return expression;
+  }
+  const genericCount = chars.filter((c) =>
+    GENERIC_EXPRESSION_ROLE_PATTERN.test(c.role.trim())
+  ).length;
+  if (genericCount < Math.ceil(chars.length / 2)) {
+    return expression;
+  }
+  return {
+    ...expression,
+    characters: chars.map((ch, i) => ({
+      ...ch,
+      role: names[i] ?? ch.role,
+    })),
+  };
+}
 
 export function findForbiddenPhysicsCues(
   expression: Pick<ExpressionLike, "action" | "composition" | "characters">
@@ -259,15 +540,18 @@ export type SceneFaceSafetyAssessment = {
   requiresExplicitOverride: boolean;
 };
 
-/** Unambiguous unrestricted full-face scene requests — propose hard-gate. */
+/**
+ * Unambiguous unrestricted full-face scene requests — propose hard-gate.
+ * Negative phrasing ("not close-up", "no close-up") MUST NOT match.
+ */
 export const FULL_FACE_SCENE_PATTERN =
-  /\b(close[\s-]?up|tight\s+face|face\s+fill(?:s|ing)?\s+frame|facing\s+the\s+camera|looking\s+at\s+the\s+camera|staring\s+at\s+the\s+camera|portrait\s+of\s+(?:the\s+)?(?:boy|girl|man|woman|face)|detailed\s+face|facial\s+close)\b/i;
+  /(?<!\bnot\s)(?<!\bno\s)\b(close[\s-]?up|tight\s+face|face\s+fill(?:s|ing)?\s+frame|facing\s+the\s+camera|looking\s+at\s+the\s+camera|staring\s+at\s+the\s+camera|portrait\s+of\s+(?:the\s+)?(?:boy|girl|man|woman|face)|detailed\s+face|facial\s+close)\b/i;
 
 const HIGH_RISK_SCENE_PATTERN =
   /\b(night|moonlight|moonlit|battlefield|battle\b|crowd|horde|army of|monster|creature|undead|white\s*walker|other\b|wight|helmet|heavy\s+armor|armou?red\s+host|blizzard|snowstorm|dark\s+forest|haunted)\b/i;
 
 const SAFE_VISIBILITY_PATTERN =
-  /\b(helmet|hood(?:ed)?|face\s+hidden|faces?\s+hidden|veil(?:ed)?|silhouette|from\s+behind|back\s+(?:view|turned)|facing\s+away|occiput|wide\s+shot|medium[\s-]?wide|reading\s+distance|middle\s+distance|faces?\s+secondary|profile|soft\s+shadow|face\s+in\s+(?:soft\s+)?shadow)\b/i;
+  /\b(helmet|hood(?:ed)?|face\s+hidden|faces?\s+hidden|veil(?:ed)?|silhouette|from\s+behind|back\s+(?:view|turned)|facing\s+away|occiput|wide\s+shot|medium[\s-]?wide|reading\s+distance|middle\s+distance|faces?\s+secondary|profile|profiles|looking\s+down|both\s+figures\s+fully\s+visible|soft\s+shadow|face\s+in\s+(?:soft\s+)?shadow)\b/i;
 
 const PARTIAL_VISIBILITY_PATTERN =
   /\b(profile|three[\s-]?quarter|¾|partial(?:ly)?\s+(?:visible|obscured)|face\s+turned)\b/i;

@@ -6,6 +6,7 @@
  */
 
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
+import type { CharacterArchive } from "@/lib/discovery/character-archive";
 import type {
   RendererExpression,
   VisualIntent,
@@ -32,11 +33,17 @@ export interface DiscoveryEvidenceRef {
   url?: string;
 }
 
+/**
+ * Discovery character candidate ≈ Role (editorial).
+ * Character Archive is a Role capability (SPEC-CHAR-001) — not a separate entity.
+ */
 export interface CharacterCandidateFields {
   name: string;
   house?: string;
   description?: string;
   signatureQuote?: string;
+  /** Stable visual identity cues for this Role — Discovery-only; not Renderer input. */
+  characterArchive?: CharacterArchive;
 }
 
 export interface LocationCandidateFields {

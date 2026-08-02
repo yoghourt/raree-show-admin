@@ -200,6 +200,26 @@ describe("proposeAllCandidateTypes (mock)", () => {
     if (scene && "parentStoryCandidateId" in scene.fields) {
       expect(scene.fields.parentStoryCandidateId).toBe(story!.candidateId);
     }
+    const character = candidates.find((c) => c.candidateType === "character");
+    expect(character).toBeTruthy();
+    if (
+      character &&
+      "characterArchive" in character.fields &&
+      character.fields.characterArchive
+    ) {
+      expect(character.fields.characterArchive.costumeCues.length).toBeGreaterThan(
+        0
+      );
+    }
+    if (scene && "rendererExpression" in scene.fields) {
+      const ned = scene.fields.rendererExpression.characters.find((c) =>
+        /eddard/i.test(c.role)
+      );
+      expect(ned?.visual).toMatch(/fur cloak|greatsword|northern|Ice/i);
+      expect(scene.fields.rendererExpression.composition).toMatch(
+        /both figures fully visible|medium wide|faces secondary/i
+      );
+    }
   });
 
   it("orders story before scene in DISCOVERY_CANDIDATE_TYPES", async () => {

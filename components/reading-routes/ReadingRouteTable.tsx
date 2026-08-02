@@ -6,6 +6,7 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -62,6 +63,7 @@ export type ReadingRouteTableProps = {
   loading: boolean;
   error: string | null;
   onDelete: (tsid: string) => Promise<void>;
+  onDeleteMany: (tsids: string[]) => Promise<void>;
 };
 
 function TableSkeleton() {
@@ -79,32 +81,96 @@ function TableSkeleton() {
   );
 }
 
+type DeleteDialogState =
+  | { mode: "single"; tsid: string }
+  | { mode: "bulk"; tsids: string[] }
+  | null;
+
 export function ReadingRouteTable({
   workId,
   scenes,
   loading,
   error,
   onDelete,
+  onDeleteMany,
 }: ReadingRouteTableProps) {
-  const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [deleteDialog, setDeleteDialog] = React.useState<DeleteDialogState>(
     null
   );
   const [deleteSubmitting, setDeleteSubmitting] = React.useState(false);
 
   const scenesBase = `/works/${encodeURIComponent(workId)}/reading-routes`;
+  const allIds = React.useMemo(() => scenes.map((s) => s.tsid), [scenes]);
+
+  React.useEffect(() => {
+    setSelected((prev) => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (allIds.includes(id)) next.add(id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [allIds]);
+
+  const allSelected =
+    allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const toggleOne = (tsid: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(tsid);
+      else next.delete(tsid);
+      return next;
+    });
+  };
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(allIds) : new Set());
+  };
 
   const confirmDelete = async () => {
-    if (!deleteTargetId) return;
+    if (!deleteDialog) return;
     setDeleteSubmitting(true);
     try {
-      await onDelete(deleteTargetId);
-      setDeleteTargetId(null);
+      if (deleteDialog.mode === "single") {
+        await onDelete(deleteDialog.tsid);
+        setSelected((prev) => {
+          const next = new Set(prev);
+          next.delete(deleteDialog.tsid);
+          return next;
+        });
+      } else {
+        await onDeleteMany(deleteDialog.tsids);
+        setSelected(new Set());
+      }
+      setDeleteDialog(null);
     } catch {
       /* 错误由父级 error 展示 */
     } finally {
       setDeleteSubmitting(false);
     }
   };
+
+  const selectedTitles = React.useMemo(() => {
+    if (!deleteDialog || deleteDialog.mode !== "bulk") return [];
+    const idSet = new Set(deleteDialog.tsids);
+    return scenes
+      .filter((s) => idSet.has(s.tsid))
+      .map((s) => s.title)
+      .slice(0, 8);
+  }, [scenes, deleteDialog]);
+
+  const headerCheckbox = (
+    <Checkbox
+      checked={
+        allSelected ? true : someSelected ? "indeterminate" : false
+      }
+      onCheckedChange={(value) => toggleAll(value === true)}
+      aria-label="全选故事"
+    />
+  );
 
   return (
     <>
@@ -142,127 +208,208 @@ export function ReadingRouteTable({
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-zinc-200">
-              {groupScenesByChapter(scenes).map((group) => (
-                <div key={group.chapterNumber}>
-                  <div className="bg-zinc-100/90 px-4 py-2.5">
-                    <h3 className="text-[13px] font-semibold text-zinc-800">
-                      {messages.common.chapterN(group.chapterNumber)}
-                      {group.chapterTitle ? (
-                        <span className="font-medium text-zinc-600">
-                          {" "}
-                          · {group.chapterTitle}
-                        </span>
-                      ) : null}
-                    </h3>
+            <>
+              {selected.size > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50/90 px-4 py-2.5">
+                  <p className="text-sm text-zinc-700">
+                    已选 <span className="font-medium">{selected.size}</span>{" "}
+                    个故事
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelected(new Set())}
+                    >
+                      取消选择
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() =>
+                        setDeleteDialog({
+                          mode: "bulk",
+                          tsids: [...selected],
+                        })
+                      }
+                    >
+                      <Trash2 className="size-3.5" aria-hidden />
+                      批量删除
+                    </Button>
                   </div>
-                  <Table className="min-w-max">
-                    <TableHeader>
-                      <TableRow className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50">
-                        <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                          {messages.common.businessId}
-                        </TableHead>
-                        <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                          标题
-                        </TableHead>
-                        <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 md:table-cell">
-                          章节序号
-                        </TableHead>
-                        <TableHead className="hidden h-10 max-w-[240px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
-                          摘要
-                        </TableHead>
-                        <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 sm:table-cell">
-                          标签
-                        </TableHead>
-                        <TableHead className="h-10 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                          操作
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {group.scenes.map((scene) => (
-                        <TableRow
-                          key={scene.tsid}
-                          className="border-zinc-100 transition-colors hover:bg-zinc-50/90"
-                        >
-                          <TableCell className="whitespace-nowrap py-3">
-                            <span
-                              className={cn(
-                                "inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-700"
-                              )}
-                              title={scene.tsid}
-                            >
-                              {scene.tsid}
-                            </span>
-                          </TableCell>
-                          <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
-                            {scene.title}
-                          </TableCell>
-                          <TableCell className="hidden py-3 whitespace-nowrap text-zinc-600 md:table-cell">
-                            {chapterCellText(scene)}
-                          </TableCell>
-                          <TableCell className="hidden max-w-[240px] py-3 whitespace-normal text-sm text-zinc-600 lg:table-cell">
-                            {scene.summary}
-                          </TableCell>
-                          <TableCell className="hidden py-3 sm:table-cell">
-                            <div className="flex max-w-[220px] flex-wrap gap-1">
-                              {scene.tags.length === 0 ? (
-                                <span className="text-xs text-zinc-400">—</span>
-                              ) : (
-                                scene.tags.map((tag) => (
-                                  <span
-                                    key={`${scene.tsid}-${tag}`}
-                                    className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[11px] font-medium text-zinc-600"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3 text-right whitespace-nowrap">
-                            <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="sm" asChild>
-                                <Link
-                                  href={`${scenesBase}/${encodeURIComponent(scene.tsid)}/edit`}
-                                >
-                                  <Pencil className="size-3.5" aria-hidden />
-                                  编辑
-                                </Link>
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                type="button"
-                                onClick={() => setDeleteTargetId(scene.tsid)}
-                              >
-                                <Trash2 className="size-3.5" aria-hidden />
-                                删除
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
                 </div>
-              ))}
-            </div>
+              ) : null}
+              <div className="divide-y divide-zinc-200">
+                {groupScenesByChapter(scenes).map((group) => (
+                  <div key={group.chapterNumber}>
+                    <div className="bg-zinc-100/90 px-4 py-2.5">
+                      <h3 className="text-[13px] font-semibold text-zinc-800">
+                        {messages.common.chapterN(group.chapterNumber)}
+                        {group.chapterTitle ? (
+                          <span className="font-medium text-zinc-600">
+                            {" "}
+                            · {group.chapterTitle}
+                          </span>
+                        ) : null}
+                      </h3>
+                    </div>
+                    <Table className="min-w-max">
+                      <TableHeader>
+                        <TableRow className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50">
+                          <TableHead className="h-10 w-10">
+                            {headerCheckbox}
+                          </TableHead>
+                          <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
+                            {messages.common.businessId}
+                          </TableHead>
+                          <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
+                            标题
+                          </TableHead>
+                          <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 md:table-cell">
+                            章节序号
+                          </TableHead>
+                          <TableHead className="hidden h-10 max-w-[240px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
+                            摘要
+                          </TableHead>
+                          <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 sm:table-cell">
+                            标签
+                          </TableHead>
+                          <TableHead className="h-10 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
+                            操作
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {group.scenes.map((scene) => {
+                          const isChecked = selected.has(scene.tsid);
+                          return (
+                            <TableRow
+                              key={scene.tsid}
+                              data-state={isChecked ? "selected" : undefined}
+                              className="border-zinc-100 transition-colors hover:bg-zinc-50/90"
+                            >
+                              <TableCell className="py-3">
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(value) =>
+                                    toggleOne(scene.tsid, value === true)
+                                  }
+                                  aria-label={`选择 ${scene.title}`}
+                                />
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap py-3">
+                                <span
+                                  className={cn(
+                                    "inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-700"
+                                  )}
+                                  title={scene.tsid}
+                                >
+                                  {scene.tsid}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
+                                {scene.title}
+                              </TableCell>
+                              <TableCell className="hidden py-3 whitespace-nowrap text-zinc-600 md:table-cell">
+                                {chapterCellText(scene)}
+                              </TableCell>
+                              <TableCell className="hidden max-w-[240px] py-3 whitespace-normal text-sm text-zinc-600 lg:table-cell">
+                                {scene.summary}
+                              </TableCell>
+                              <TableCell className="hidden py-3 sm:table-cell">
+                                <div className="flex max-w-[220px] flex-wrap gap-1">
+                                  {scene.tags.length === 0 ? (
+                                    <span className="text-xs text-zinc-400">
+                                      —
+                                    </span>
+                                  ) : (
+                                    scene.tags.map((tag) => (
+                                      <span
+                                        key={`${scene.tsid}-${tag}`}
+                                        className="inline-flex rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[11px] font-medium text-zinc-600"
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-3 text-right whitespace-nowrap">
+                                <div className="flex justify-end gap-1">
+                                  <Button variant="ghost" size="sm" asChild>
+                                    <Link
+                                      href={`${scenesBase}/${encodeURIComponent(scene.tsid)}/edit`}
+                                    >
+                                      <Pencil
+                                        className="size-3.5"
+                                        aria-hidden
+                                      />
+                                      编辑
+                                    </Link>
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    type="button"
+                                    onClick={() =>
+                                      setDeleteDialog({
+                                        mode: "single",
+                                        tsid: scene.tsid,
+                                      })
+                                    }
+                                  >
+                                    <Trash2
+                                      className="size-3.5"
+                                      aria-hidden
+                                    />
+                                    删除
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
 
       <Dialog
-        open={deleteTargetId !== null}
+        open={deleteDialog !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteTargetId(null);
+          if (!open) setDeleteDialog(null);
         }}
       >
         <DialogContent showCloseButton>
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              {messages.works.deleteConfirm}
+              {deleteDialog?.mode === "bulk" ? (
+                <>
+                  确定要删除选中的{" "}
+                  <span className="font-medium text-foreground">
+                    {deleteDialog.tsids.length}
+                  </span>{" "}
+                  个故事吗？删除后无法恢复。
+                  {selectedTitles.length > 0 ? (
+                    <span className="mt-2 block text-zinc-600">
+                      {selectedTitles.join("、")}
+                      {deleteDialog.tsids.length > selectedTitles.length
+                        ? "…"
+                        : ""}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                messages.works.deleteConfirm
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">
@@ -270,7 +417,7 @@ export function ReadingRouteTable({
               type="button"
               variant="outline"
               disabled={deleteSubmitting}
-              onClick={() => setDeleteTargetId(null)}
+              onClick={() => setDeleteDialog(null)}
             >
               取消
             </Button>
@@ -280,7 +427,11 @@ export function ReadingRouteTable({
               disabled={deleteSubmitting}
               onClick={() => void confirmDelete()}
             >
-              {deleteSubmitting ? "删除中…" : "删除"}
+              {deleteSubmitting
+                ? "删除中…"
+                : deleteDialog?.mode === "bulk"
+                  ? `删除 ${deleteDialog.tsids.length} 个`
+                  : "删除"}
             </Button>
           </DialogFooter>
         </DialogContent>

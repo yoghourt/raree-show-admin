@@ -119,7 +119,9 @@ export async function executeSceneFrameImageGenerate(input: {
       surface: "creator",
       assetSlot: "scene_frame",
       prompt,
-      negativePrompt: buildFrameNegativePrompt(caption),
+      negativePrompt: buildFrameNegativePrompt(caption, {
+        castCount: input.rendererExpression?.characters?.length,
+      }),
       // Option B: square Local-friendly size (spike-aligned). Widescreen 1280×720
       // clamped to 768×432 raised blank-white rate on sd-3.5-medium-ggml.
       size: { width: 512, height: 512 },

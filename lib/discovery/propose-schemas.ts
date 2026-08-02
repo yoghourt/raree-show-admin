@@ -26,11 +26,20 @@ const evidenceRefSchema = z.object({
   url: z.string().optional(),
 });
 
+const characterArchiveSchema = z
+  .object({
+    visualSummary: z.string().optional(),
+    costumeCues: z.array(z.string()),
+    propCues: z.array(z.string()),
+  })
+  .optional();
+
 const characterFieldsSchema = z.object({
   name: z.string(),
   house: z.string().optional(),
   description: z.string().optional(),
   signatureQuote: z.string().optional(),
+  characterArchive: characterArchiveSchema,
 });
 
 const locationFieldsSchema = z.object({

@@ -11,10 +11,17 @@ import type {
   DiscoveryCandidateType,
 } from "@/lib/discovery/propose-types";
 import {
+  foldCharacterArchivesIntoExpression,
+  parseCharacterArchive,
+  type RoleArchiveRef,
+} from "@/lib/discovery/character-archive";
+import {
+  adaptSceneExpressionForLocalCapability,
   assessSceneFaceSafety,
   findCastConsistencyErrors,
   findForbiddenPhysicsCues,
   findRestrictedFullFaceSceneCues,
+  remapGenericRolesToRoleNames,
 } from "@/lib/discovery/expression-capability-rules";
 import {
   parseRendererExpression,
@@ -114,6 +121,10 @@ function validateCharacterFields(
   if (!isNonEmptyString(fields.name)) {
     return { ok: false, errors: ["Character fields require non-empty name"] };
   }
+  const archiveResult = parseCharacterArchive(fields.characterArchive);
+  if (!archiveResult.ok) {
+    return { ok: false, errors: archiveResult.errors };
+  }
   return {
     ok: true,
     fields: {
@@ -124,6 +135,9 @@ function validateCharacterFields(
         : {}),
       ...(isNonEmptyString(fields.signatureQuote)
         ? { signatureQuote: fields.signatureQuote.trim() }
+        : {}),
+      ...(archiveResult.value
+        ? { characterArchive: archiveResult.value }
         : {}),
     },
   };
@@ -211,8 +225,11 @@ function validateSceneFields(
     return { ok: false, errors: expressionResult.errors };
   }
 
-  // A4 propose hard-gate: reject complex physics cues (static geometry only).
-  const physicsHits = findForbiddenPhysicsCues(expressionResult.value);
+  const authoredExpression = expressionResult.value;
+
+  // Hard-gates on authored Expression (before adapt) so Rules 8–12 cannot
+  // rewrite away physics / cast / full-face violations.
+  const physicsHits = findForbiddenPhysicsCues(authoredExpression);
   if (physicsHits.length) {
     return {
       ok: false,
@@ -223,7 +240,7 @@ function validateSceneFields(
   }
 
   // Rule 5: action/composition actor count ↔ characters[] consistency.
-  const castErrors = findCastConsistencyErrors(expressionResult.value);
+  const castErrors = findCastConsistencyErrors(authoredExpression);
   if (castErrors.length) {
     return {
       ok: false,
@@ -234,7 +251,7 @@ function validateSceneFields(
   }
 
   // Rule 6: propose hard-gate unrestricted full-face scene Expression.
-  const fullFaceCues = findRestrictedFullFaceSceneCues(expressionResult.value);
+  const fullFaceCues = findRestrictedFullFaceSceneCues(authoredExpression);
   if (fullFaceCues.length) {
     return {
       ok: false,
@@ -243,7 +260,13 @@ function validateSceneFields(
       ],
     };
   }
-  const faceSafety = assessSceneFaceSafety(expressionResult.value);
+
+  // Authorship adapt (Rules 8–12) for Face Safety + Local landmarks/props/cast.
+  const adaptedExpression = adaptSceneExpressionForLocalCapability(
+    authoredExpression
+  );
+
+  const faceSafety = assessSceneFaceSafety(adaptedExpression);
   if (faceSafety.safety_status === "restricted") {
     return {
       ok: false,
@@ -273,7 +296,65 @@ function validateSceneFields(
         : {}),
       ...(isNonEmptyString(fields.summary) ? { summary: fields.summary.trim() } : {}),
       ...(intentResult.value ? { visualIntent: intentResult.value } : {}),
-      rendererExpression: expressionResult.value,
+      rendererExpression: adaptedExpression,
+    },
+  };
+}
+
+/** Collect Role archives from character candidates for Expression fold. */
+export function roleArchivesFromCharacterCandidates(
+  candidates: DiscoveryCandidate[]
+): RoleArchiveRef[] {
+  const roles: RoleArchiveRef[] = [];
+  for (const c of candidates) {
+    if (c.candidateType !== "character") continue;
+    const fields = c.fields as {
+      name?: string;
+      characterArchive?: unknown;
+    };
+    const name = fields.name?.trim() || c.displayName.trim();
+    const parsed = parseCharacterArchive(fields.characterArchive);
+    if (!parsed.ok || !parsed.value) continue;
+    roles.push({ name, archive: parsed.value });
+  }
+  return roles;
+}
+
+/**
+ * SPEC-CHAR-001: after scene parse, fold budgeted Role archive cues into Expression.
+ * Deterministic Discovery post-step — not Renderer intelligence.
+ */
+export function applyCharacterArchivesToSceneCandidate(
+  candidate: DiscoveryCandidate,
+  characterCandidates: DiscoveryCandidate[]
+): DiscoveryCandidate {
+  if (candidate.candidateType !== "scene") return candidate;
+  const roleNames = characterCandidates
+    .filter((c) => c.candidateType === "character")
+    .map((c) => {
+      const fields = c.fields as { name?: string };
+      return fields.name?.trim() || c.displayName.trim();
+    })
+    .filter(Boolean);
+  const roles = roleArchivesFromCharacterCandidates(characterCandidates);
+  const fields = candidate.fields as {
+    rendererExpression: Parameters<
+      typeof foldCharacterArchivesIntoExpression
+    >[0];
+  };
+  // Remap woman/man → Role names (by order) when LLM ignored Rule 7.
+  let expression = remapGenericRolesToRoleNames(
+    fields.rendererExpression,
+    roleNames
+  );
+  if (roles.length > 0) {
+    expression = foldCharacterArchivesIntoExpression(expression, roles);
+  }
+  return {
+    ...candidate,
+    fields: {
+      ...candidate.fields,
+      rendererExpression: expression,
     },
   };
 }

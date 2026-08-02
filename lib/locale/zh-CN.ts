@@ -279,6 +279,10 @@ export const zhCN = {
       chapter_number: '章节序号',
       parentStoryCandidateId: '所属故事',
       parentStoryTitle: '所属故事',
+      characterArchive: '角色档案',
+      visualSummary: '视觉摘要',
+      costumeCues: '服饰线索',
+      propCues: '道具线索',
     },
     handoff: {
       backToDiscovery: '← 返回正文提炼',
@@ -315,6 +319,11 @@ export const zhCN = {
       regening: '重新提炼中…',
       confirmRegen: '确认重新提炼',
       noFields: '无字段内容',
+      characterArchivePresent: '角色档案 · 有',
+      characterArchiveMissing: '角色档案 · 无',
+      characterArchiveEmptyHint:
+        '未带稳定视觉线索（服饰/道具）。场景识别可能偏弱；可编辑字段补上 characterArchive，或重新提炼。',
+      characterArchiveCueNone: '（无）',
       tierLabel: (tier: number) => `层级 ${tier}`,
       goCreateCharacter: '前往创建角色（预填表单）',
       goCreateLocation: '前往创建地点（预填表单）',

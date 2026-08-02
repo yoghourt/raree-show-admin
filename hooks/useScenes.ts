@@ -93,6 +93,28 @@ export function useScenes(workId: string) {
     [workId, refresh]
   );
 
+  const deleteScenes = React.useCallback(
+    async (tsids: string[]) => {
+      const ids = [...new Set(tsids.map((t) => t.trim()).filter(Boolean))];
+      if (ids.length === 0) return;
+      try {
+        for (const tsid of ids) {
+          await deleteSceneApi(workId, tsid);
+        }
+        await refresh();
+      } catch (e) {
+        setError(toErrorMessage(e));
+        try {
+          await refresh();
+        } catch {
+          /* keep original error */
+        }
+        throw e;
+      }
+    },
+    [workId, refresh]
+  );
+
   return {
     scenes,
     loading,
@@ -100,6 +122,7 @@ export function useScenes(workId: string) {
     createScene,
     updateScene,
     deleteScene,
+    deleteScenes,
     refresh,
   };
 }

@@ -6,6 +6,7 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ export type WorkTableProps = {
   loading: boolean;
   error: string | null;
   onDelete: (id: string) => Promise<void>;
+  onDeleteMany: (ids: string[]) => Promise<void>;
 };
 
 function TableSkeleton() {
@@ -49,29 +51,86 @@ function TableSkeleton() {
   );
 }
 
+type DeleteDialogState =
+  | { mode: "single"; id: string }
+  | { mode: "bulk"; ids: string[] }
+  | null;
+
 export function WorkTable({
   works,
   loading,
   error,
   onDelete,
+  onDeleteMany,
 }: WorkTableProps) {
-  const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [deleteDialog, setDeleteDialog] = React.useState<DeleteDialogState>(
     null
   );
   const [deleteSubmitting, setDeleteSubmitting] = React.useState(false);
 
+  const allIds = React.useMemo(() => works.map((w) => w.id), [works]);
+
+  React.useEffect(() => {
+    setSelected((prev) => {
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (allIds.includes(id)) next.add(id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [allIds]);
+
+  const allSelected =
+    allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(allIds) : new Set());
+  };
+
   const confirmDelete = async () => {
-    if (!deleteTargetId) return;
+    if (!deleteDialog) return;
     setDeleteSubmitting(true);
     try {
-      await onDelete(deleteTargetId);
-      setDeleteTargetId(null);
+      if (deleteDialog.mode === "single") {
+        await onDelete(deleteDialog.id);
+        setSelected((prev) => {
+          const next = new Set(prev);
+          next.delete(deleteDialog.id);
+          return next;
+        });
+      } else {
+        await onDeleteMany(deleteDialog.ids);
+        setSelected(new Set());
+      }
+      setDeleteDialog(null);
     } catch {
       /* 错误由父级 error 展示 */
     } finally {
       setDeleteSubmitting(false);
     }
   };
+
+  const selectedTitles = React.useMemo(() => {
+    if (!deleteDialog || deleteDialog.mode !== "bulk") return [];
+    const idSet = new Set(deleteDialog.ids);
+    return works
+      .filter((w) => idSet.has(w.id))
+      .map((w) => w.title)
+      .slice(0, 8);
+  }, [works, deleteDialog]);
+
+  const deleteWarning = `请先处理或迁移其下的${messages.domain.readingRoute}、角色、地点数据，或在数据库外键上启用级联删除。`;
 
   return (
     <>
@@ -109,141 +168,227 @@ export function WorkTable({
               </p>
             </div>
           ) : (
-            <Table className="min-w-max">
-              <TableHeader>
-                <TableRow className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50">
-                  <TableHead className="h-10 w-20 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                    封面
-                  </TableHead>
-                  <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                    标题
-                  </TableHead>
-                  <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 sm:table-cell">
-                    {messages.common.businessId}
-                  </TableHead>
-                  <TableHead className="hidden h-10 max-w-[280px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
-                    描述
-                  </TableHead>
-                  <TableHead className="h-10 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
-                    操作
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {works.map((work) => (
-                  <TableRow
-                    key={work.id}
-                    className="border-zinc-100 transition-colors hover:bg-zinc-50/90"
-                  >
-                    <TableCell className="py-2">
-                      {/* 封面为任意外链 URL，不使用 next/image 远程域名配置 */}
-                      {work.coverImage ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={work.coverImage}
-                          alt=""
-                          className="h-10 w-14 rounded-md border border-border object-cover"
-                        />
-                      ) : (
-                        <div className="h-10 w-14 rounded-md border border-border bg-muted" />
-                      )}
-                    </TableCell>
-                    <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
-                      <Link
-                        href={`/works/${encodeURIComponent(work.id)}/edit`}
-                        className="hover:underline"
+            <>
+              {selected.size > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50/90 px-4 py-2.5">
+                  <p className="text-sm text-zinc-700">
+                    已选 <span className="font-medium">{selected.size}</span>{" "}
+                    个作品
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelected(new Set())}
+                    >
+                      取消选择
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() =>
+                        setDeleteDialog({
+                          mode: "bulk",
+                          ids: [...selected],
+                        })
+                      }
+                    >
+                      <Trash2 className="size-3.5" aria-hidden />
+                      批量删除
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              <Table className="min-w-max">
+                <TableHeader>
+                  <TableRow className="border-zinc-200 bg-zinc-50 hover:bg-zinc-50">
+                    <TableHead className="h-10 w-10">
+                      <Checkbox
+                        checked={
+                          allSelected
+                            ? true
+                            : someSelected
+                              ? "indeterminate"
+                              : false
+                        }
+                        onCheckedChange={(value) =>
+                          toggleAll(value === true)
+                        }
+                        aria-label="全选作品"
+                      />
+                    </TableHead>
+                    <TableHead className="h-10 w-20 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
+                      封面
+                    </TableHead>
+                    <TableHead className="h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
+                      标题
+                    </TableHead>
+                    <TableHead className="hidden h-10 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 sm:table-cell">
+                      {messages.common.businessId}
+                    </TableHead>
+                    <TableHead className="hidden h-10 max-w-[280px] text-[11px] font-semibold uppercase tracking-wide text-zinc-600 lg:table-cell">
+                      描述
+                    </TableHead>
+                    <TableHead className="h-10 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-600">
+                      操作
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {works.map((work) => {
+                    const isChecked = selected.has(work.id);
+                    return (
+                      <TableRow
+                        key={work.id}
+                        data-state={isChecked ? "selected" : undefined}
+                        className="border-zinc-100 transition-colors hover:bg-zinc-50/90"
                       >
-                        {work.title}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="hidden py-3 sm:table-cell">
-                      <span
-                        className={cn(
-                          "inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-700"
-                        )}
-                        title={work.tsid}
-                      >
-                        {work.tsid}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden max-w-[280px] py-3 text-sm text-zinc-600 lg:table-cell">
-                      <span className="line-clamp-2">{work.description}</span>
-                    </TableCell>
-                    <TableCell className="py-3 text-right">
-                      <div className="flex flex-wrap justify-end gap-1">
-                        <Button variant="outline" size="sm" asChild>
+                        <TableCell className="py-3">
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={(value) =>
+                              toggleOne(work.id, value === true)
+                            }
+                            aria-label={`选择 ${work.title}`}
+                          />
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {work.coverImage ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={work.coverImage}
+                              alt=""
+                              className="h-10 w-14 rounded-md border border-border object-cover"
+                            />
+                          ) : (
+                            <div className="h-10 w-14 rounded-md border border-border bg-muted" />
+                          )}
+                        </TableCell>
+                        <TableCell className="py-3 font-medium whitespace-nowrap text-zinc-900">
                           <Link
                             href={`/works/${encodeURIComponent(work.id)}/edit`}
+                            className="hover:underline"
                           >
-                            <Pencil className="size-3.5" aria-hidden />
-                            编辑
+                            {work.title}
                           </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/production`}
+                        </TableCell>
+                        <TableCell className="hidden py-3 sm:table-cell">
+                          <span
+                            className={cn(
+                              "inline-block rounded-md border border-zinc-200 bg-zinc-100 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-700"
+                            )}
+                            title={work.tsid}
                           >
-                            制作
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/reading-routes`}
-                          >
-                            {messages.domain.readingRoute}
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/characters`}
-                          >
-                            角色
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/locations`}
-                          >
-                            地点
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link
-                            href={`/works/${encodeURIComponent(work.id)}/discovery`}
-                          >
-                            {DISCOVERY_PAGE_TITLE}
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          type="button"
-                          onClick={() => setDeleteTargetId(work.id)}
-                        >
-                          <Trash2 className="size-3.5" aria-hidden />
-                          删除
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                            {work.tsid}
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden max-w-[280px] py-3 text-sm text-zinc-600 lg:table-cell">
+                          <span className="line-clamp-2">
+                            {work.description}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-3 text-right">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link
+                                href={`/works/${encodeURIComponent(work.id)}/edit`}
+                              >
+                                <Pencil className="size-3.5" aria-hidden />
+                                编辑
+                              </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link
+                                href={`/works/${encodeURIComponent(work.id)}/production`}
+                              >
+                                制作
+                              </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link
+                                href={`/works/${encodeURIComponent(work.id)}/reading-routes`}
+                              >
+                                {messages.domain.readingRoute}
+                              </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link
+                                href={`/works/${encodeURIComponent(work.id)}/characters`}
+                              >
+                                角色
+                              </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link
+                                href={`/works/${encodeURIComponent(work.id)}/locations`}
+                              >
+                                地点
+                              </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link
+                                href={`/works/${encodeURIComponent(work.id)}/discovery`}
+                              >
+                                {DISCOVERY_PAGE_TITLE}
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              type="button"
+                              onClick={() =>
+                                setDeleteDialog({
+                                  mode: "single",
+                                  id: work.id,
+                                })
+                              }
+                            >
+                              <Trash2 className="size-3.5" aria-hidden />
+                              删除
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </>
           )}
         </CardContent>
       </Card>
 
       <Dialog
-        open={deleteTargetId !== null}
+        open={deleteDialog !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteTargetId(null);
+          if (!open) setDeleteDialog(null);
         }}
       >
         <DialogContent showCloseButton>
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              确定要删除该作品吗？请先处理或迁移其下的{messages.domain.readingRoute}、角色、地点数据，或在数据库外键上启用级联删除。
+              {deleteDialog?.mode === "bulk" ? (
+                <>
+                  确定要删除选中的{" "}
+                  <span className="font-medium text-foreground">
+                    {deleteDialog.ids.length}
+                  </span>{" "}
+                  个作品吗？{deleteWarning}
+                  {selectedTitles.length > 0 ? (
+                    <span className="mt-2 block text-zinc-600">
+                      {selectedTitles.join("、")}
+                      {deleteDialog.ids.length > selectedTitles.length
+                        ? "…"
+                        : ""}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <>确定要删除该作品吗？{deleteWarning}</>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">
@@ -251,7 +396,7 @@ export function WorkTable({
               type="button"
               variant="outline"
               disabled={deleteSubmitting}
-              onClick={() => setDeleteTargetId(null)}
+              onClick={() => setDeleteDialog(null)}
             >
               取消
             </Button>
@@ -261,7 +406,11 @@ export function WorkTable({
               disabled={deleteSubmitting}
               onClick={() => void confirmDelete()}
             >
-              {deleteSubmitting ? "删除中…" : "删除"}
+              {deleteSubmitting
+                ? "删除中…"
+                : deleteDialog?.mode === "bulk"
+                  ? `删除 ${deleteDialog.ids.length} 个`
+                  : "删除"}
             </Button>
           </DialogFooter>
         </DialogContent>

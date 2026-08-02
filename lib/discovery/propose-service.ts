@@ -10,11 +10,7 @@ import { randomUUID } from "crypto";
 import { callDiscoveryTextLlm } from "@/lib/discovery/discovery-text-llm";
 import { MAX_CANDIDATES_PER_TYPE } from "@/lib/discovery/constants";
 import {
-  EXPRESSION_CAPABILITY_EXAMPLE,
-  EXPRESSION_CAPABILITY_RULES,
-  EXPRESSION_COURTYARD_EXAMPLE,
-} from "@/lib/discovery/expression-capability-rules";
-import {
+  applyCharacterArchivesToSceneCandidate,
   capCandidatesByType,
   dedupeCandidates,
   filterScenesWithValidParents,
@@ -22,9 +18,19 @@ import {
   getCandidateLabelKey,
   normalizeRawCandidate,
 } from "@/lib/discovery/candidate-validate";
+import {
+  CHARACTER_ARCHIVE_PROPOSE_RULES,
+  CHARACTER_ARCHIVE_SCENE_FOLD_RULES,
+} from "@/lib/discovery/character-archive";
+import {
+  EXPRESSION_CAPABILITY_EXAMPLE,
+  EXPRESSION_CAPABILITY_RULES,
+  EXPRESSION_COURTYARD_EXAMPLE,
+} from "@/lib/discovery/expression-capability-rules";
 import { parseCandidateArray } from "@/lib/discovery/propose-parse";
 import {
   DISCOVERY_CANDIDATE_TYPES,
+  type CharacterCandidateFields,
   type DiscoveryCandidate,
   type DiscoveryCandidateType,
   type ProposeTypeError,
@@ -45,7 +51,13 @@ export function isDiscoveryProposeMockMode(): boolean {
 }
 
 const REGISTRY_FIELD_HINTS: Record<DiscoveryCandidateType, string[]> = {
-  character: ["name", "house", "description", "signatureQuote"],
+  character: [
+    "name",
+    "house",
+    "description",
+    "signatureQuote",
+    "characterArchive",
+  ],
   location: ["name", "region", "description"],
   story: ["title", "summary", "boundaryHint"],
   scene: [
@@ -60,7 +72,7 @@ const REGISTRY_FIELD_HINTS: Record<DiscoveryCandidateType, string[]> = {
 };
 
 const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
-  character: `{"candidates":[{"displayName":"Arya Stark","summary":"Young Stark daughter.","fields":{"name":"Arya Stark","house":"Stark"}}]}`,
+  character: `{"candidates":[{"displayName":"Eddard Stark","summary":"Lord of Winterfell.","fields":{"name":"Eddard Stark","house":"Stark","characterArchive":{"visualSummary":"Northern lord shaped by honor and winter","costumeCues":["dark northern fur cloak","wool noble attire"],"propCues":["ancestral greatsword"]}}}]}`,
   location: `{"candidates":[{"displayName":"Winterfell","summary":"Seat of House Stark.","fields":{"name":"Winterfell","region":"The North"}}]}`,
   story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
   scene: `{"candidates":[{"displayName":"Moonlit Duel","summary":"Ser Waymar Royce faces the Other under the trees.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Prologue","title":"Moonlit Duel","summary":"Ser Waymar Royce confronts a White Walker in a fatal duel; Will watches from cover.","visualIntent":{"relationship":"knight confronts white walker","purpose":"establish lethal threat","emotion":"defiance"},"rendererExpression":${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}}}]}`,
@@ -85,6 +97,11 @@ function mockCandidatesForType(
             name: "Eddard Stark",
             house: "Stark",
             description: "Warden of the North who values honor above politics.",
+            characterArchive: {
+              visualSummary: "Northern lord shaped by honor and winter",
+              costumeCues: ["dark northern fur cloak", "wool noble attire"],
+              propCues: ["ancestral greatsword"],
+            },
           },
         },
       ];
@@ -165,6 +182,25 @@ function formatStoryListForPrompt(
 }
 
 /** Exported for provider-eval harness only — production path unchanged. */
+function formatRoleArchiveListForPrompt(
+  characterCandidates: DiscoveryCandidate[]
+): string {
+  const lines = characterCandidates
+    .filter((c) => c.candidateType === "character")
+    .map((c) => {
+      const fields = c.fields as CharacterCandidateFields;
+      const archive = fields.characterArchive;
+      if (!archive) {
+        return `- ${fields.name}: (no characterArchive)`;
+      }
+      return `- ${fields.name}: costumeCues=${JSON.stringify(archive.costumeCues)}; propCues=${JSON.stringify(archive.propCues)}`;
+    });
+  if (lines.length === 0) {
+    return "(none — author Expression visuals without Role archive fold)";
+  }
+  return lines.join("\n");
+}
+
 export function buildProposePrompt(params: {
   workTitle: string;
   narrative: NarrativeInputBundle;
@@ -173,6 +209,8 @@ export function buildProposePrompt(params: {
   previousCandidate?: DiscoveryCandidate;
   excludeCandidates?: DiscoveryCandidate[];
   storyCandidates?: DiscoveryCandidate[];
+  /** Role candidates (character) for SPEC-CHAR-001 scene Expression fold. */
+  characterCandidates?: DiscoveryCandidate[];
 }): string {
   const {
     workTitle,
@@ -182,6 +220,7 @@ export function buildProposePrompt(params: {
     previousCandidate,
     excludeCandidates,
     storyCandidates = [],
+    characterCandidates = [],
   } = params;
   const hints = REGISTRY_FIELD_HINTS[candidateType].join(", ");
 
@@ -253,7 +292,13 @@ Visualization (ADR-011 / SPEC-DVE-001 — required):
 - If styleHints is ever present (rare): stable style family only; FORBIDDEN: masterpiece, 8k, best quality, ultra detailed.
 
 ${EXPRESSION_CAPABILITY_RULES}
+
+${CHARACTER_ARCHIVE_SCENE_FOLD_RULES}
+
+Role Character Archives available for cue selection:
+${formatRoleArchiveListForPrompt(characterCandidates)}
 \n` : ""}
+${candidateType === "character" ? `\n${CHARACTER_ARCHIVE_PROPOSE_RULES}\n` : ""}
 ${candidateType === "location" ? '\nLocation fields MUST use fields.name (place name). Do NOT return prose paragraphs as the only value.\n' : ""}
 ${candidateType === "story" ? '\nStory fields MUST use fields.title and fields.summary (editorial story unit). Optional boundaryHint. Return {"candidates":[...]} — each item needs displayName, summary, and fields with title + summary.\n' : ""}
 
@@ -270,9 +315,16 @@ async function generateForType(params: {
   previousCandidate?: DiscoveryCandidate;
   excludeCandidates?: DiscoveryCandidate[];
   storyCandidates?: DiscoveryCandidate[];
+  characterCandidates?: DiscoveryCandidate[];
 }): Promise<{ candidates: DiscoveryCandidate[]; error?: ProposeTypeError }> {
-  const { workId, workTitle, narrative, candidateType, storyCandidates = [] } =
-    params;
+  const {
+    workId,
+    workTitle,
+    narrative,
+    candidateType,
+    storyCandidates = [],
+    characterCandidates = [],
+  } = params;
 
   if (candidateType === "scene" && storyCandidates.length === 0) {
     return {
@@ -287,8 +339,18 @@ async function generateForType(params: {
   }
 
   if (isDiscoveryProposeMockMode()) {
+    const mocked = mockCandidatesForType(
+      workId,
+      candidateType,
+      storyCandidates
+    );
     return {
-      candidates: mockCandidatesForType(workId, candidateType, storyCandidates),
+      candidates:
+        candidateType === "scene"
+          ? mocked.map((c) =>
+              applyCharacterArchivesToSceneCandidate(c, characterCandidates)
+            )
+          : mocked,
     };
   }
 
@@ -391,7 +453,13 @@ async function generateForType(params: {
         capped.length
       );
     }
-    return { candidates: capped };
+    const withArchives =
+      candidateType === "scene"
+        ? capped.map((c) =>
+            applyCharacterArchivesToSceneCandidate(c, characterCandidates)
+          )
+        : capped;
+    return { candidates: withArchives };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Generation failed";
     // parseCandidateArray throw — not provider envelope / network errors
@@ -443,10 +511,13 @@ export async function proposeCandidateTypes(params: {
   const errors: ProposeTypeError[] = [];
   const newlyGenerated: DiscoveryCandidate[] = [];
 
-  // Story-first: process types in order so Scene sees prior Story candidates
+  // Story-first order; Scene also sees Role (character) archives for SPEC-CHAR-001.
   for (const candidateType of types) {
     const storyCandidates = allCandidates.filter(
       (c) => c.candidateType === "story"
+    );
+    const characterCandidates = allCandidates.filter(
+      (c) => c.candidateType === "character"
     );
     const result = await generateForType({
       workId: params.workId,
@@ -456,6 +527,8 @@ export async function proposeCandidateTypes(params: {
       feedback: params.feedback,
       storyCandidates:
         candidateType === "scene" ? storyCandidates : undefined,
+      characterCandidates:
+        candidateType === "scene" ? characterCandidates : undefined,
     });
     allCandidates.push(...result.candidates);
     newlyGenerated.push(...result.candidates);
@@ -501,6 +574,8 @@ export async function regenCandidate(params: {
   siblingCandidates?: DiscoveryCandidate[];
   /** Story candidates in session — required when regenerating scene. */
   storyCandidates?: DiscoveryCandidate[];
+  /** Role (character) candidates — SPEC-CHAR-001 fold when regenerating scene. */
+  characterCandidates?: DiscoveryCandidate[];
   feedback?: string | null;
 }): Promise<{ candidate?: DiscoveryCandidate; error?: ProposeTypeError }> {
   if (params.previousCandidate.candidateType !== params.candidateType) {
@@ -525,6 +600,11 @@ export async function regenCandidate(params: {
   const storyCandidates =
     params.storyCandidates ??
     (params.siblingCandidates ?? []).filter((c) => c.candidateType === "story");
+  const characterCandidates =
+    params.characterCandidates ??
+    (params.siblingCandidates ?? []).filter(
+      (c) => c.candidateType === "character"
+    );
 
   const result = await generateForType({
     workId: params.workId,
@@ -536,6 +616,8 @@ export async function regenCandidate(params: {
     excludeCandidates: params.siblingCandidates,
     storyCandidates:
       params.candidateType === "scene" ? storyCandidates : undefined,
+    characterCandidates:
+      params.candidateType === "scene" ? characterCandidates : undefined,
   });
 
   const excludeKeys = new Set(

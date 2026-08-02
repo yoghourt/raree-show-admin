@@ -100,7 +100,8 @@ export default function WorkReadingRoutesPage() {
     };
   }, []);
 
-  const { scenes, loading, error, deleteScene } = useScenes(workId);
+  const { scenes, loading, error, deleteScene, deleteScenes } =
+    useScenes(workId);
 
   const pendingCount = useRolloutPendingCount(workId, operatorId);
 
@@ -183,6 +184,7 @@ export default function WorkReadingRoutesPage() {
         loading={loading}
         error={error}
         onDelete={deleteScene}
+        onDeleteMany={deleteScenes}
       />
     </div>
   );
