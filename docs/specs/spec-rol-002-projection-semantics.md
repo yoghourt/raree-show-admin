@@ -30,7 +30,7 @@ Sections below that define Approved Scene → Reading Route association describe
 | Derived From | ADR-007 v1.2 (`docs/adr/007-rollout-architecture.md`)                 |
 | Related      | ADR-004, ADR-005 v2.0, ADR-006 v1.3, SPEC-ROL-001, SPEC-D3-002, SPEC-RDX-001, Runtime Reading Governance RC1 |
 | Supersedes   | SPEC-ROL-002 v0.1 (withdrawn — capability drift; see Architect Review 2026-07-11) |
-| Amendment    | v1.1 — Hotfix Product Recovery: Scene → Reading Frame endpoint        |
+| Amendment    | v1.1 — Hotfix Product Recovery: Scene → Reading Frame endpoint; **Governance note (2026-08-05):** ADR-012 closes Editorial Scene ↔ Runtime **ownership** mapping as association → Scene Context → projection → Reading Frame. Hotfix Frame materialization remains visual projection; Scene Context is **not** a Frame alias. Operational SPEC for Context materialization remains downstream. |
 
 **Architect Review (2026-07-11):** v0.1 incorrectly owned **Runtime Reading Experience** semantics under the Rollout namespace. v0.2 restores **Projection-only** scope. Reader progression, navigation, caption rendering, session, and Assistant consumption belong to **SPEC-RDX-001** (Accepted — separate capability).
 

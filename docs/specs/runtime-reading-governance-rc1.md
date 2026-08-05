@@ -50,19 +50,23 @@ Capability semantics MUST be resolved in `raree-show-admin` (SPEC-RDX-001). Web 
 
 ## 4. Deferred Capability
 
-The following remain **explicitly deferred** beyond RC1. No implementation discussion in this document.
+The following remain **explicitly deferred** beyond RC1 **unless marked Authorized**.
+ Authorization means **architecture decision completed** — **not** implementation complete.
+ No implementation discussion in this document.
 
 | Deferred item | Notes |
 | ------------- | ----- |
-| **Scene-aware Reading** | Editorial progression overlay at Frame level; Scene ↔ Frame binding not closed |
+| **Scene-aware Reading** | **Authorized by ADR-012** (architecture decision completed). Scene Context is Runtime ownership boundary; Scene Context-aware Reading accepted under SPEC-RDX-001 v1.4 terminology correction. Implementation / operational SPEC remain downstream. |
 | **Frame Narrative Consumption Policy** | caption rendering, fallback rules — Implementation / Presentation SPEC |
 | **Cross-session Resume** | Progress persistence semantics beyond RDX-3 capability layer |
-| **SceneProjectionLink Consumption** | Web Reader read path for upstream projection association metadata |
+| **SceneProjectionLink Consumption** | **Authorized by ADR-012** as architecture for association/projection consumption path (Editorial Scene → Scene Context → Reading Frame). Historical link-table shapes are not re-authorized; operational SPEC remains downstream. **Not** implementation complete. |
 | **Future Presentation Specification** | Rendering, animation, visual composition (Implementation) |
 | **ROL-002 Open Questions** | OQ-ROL2-P01 ~ P06 — projection mapping details; deferred to implementation phase |
 | **Cross-Route Session Policy** | SPEC-RDX-001 RDX-5 handoff — deferred |
 
 RC1 **does not** block baseline **Reader Step** (frame-centric) implementation within an existing Reading Route.
+
+**Amendment (2026-08-05):** ADR-012 Governance Closure Pass — Scene-aware Reading and association/projection consumption path marked **Authorized by ADR-012** (decision complete ≠ shipped).
 
 ---
 
