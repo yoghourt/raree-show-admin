@@ -4,9 +4,9 @@
 **Type:** Rollout ADR
 **Version:** 1.2
 **Last Updated:** 2026-07-11
-**Amendment:** A1 (Runtime Vocabulary Alignment — vocabulary only; Decision semantics and topology unchanged; Scene → Reading Route; Story Image → Reading Frame; normative vocabulary in `governance/vocabulary/runtime-lexicon.md`), A2 (Editorial Scene alignment with ADR-005 v2.0 — Story↔Reading Route projection unchanged; Editorial Scene ↔ Runtime mapping explicitly deferred; terminology and cross-references; **no** Decision semantics, Runtime topology, or projection architecture redesign). Prior amendment A1 preserved in substance.
+**Amendment:** A1 (Runtime Vocabulary Alignment — vocabulary only; Decision semantics and topology unchanged; Scene → Reading Route; Story Image → Reading Frame; normative vocabulary in `governance/vocabulary/runtime-lexicon.md`), A2 (Editorial Scene alignment with ADR-005 v2.0 — Story↔Reading Route projection unchanged; Editorial Scene ↔ Runtime mapping explicitly deferred; terminology and cross-references; **no** Decision semantics, Runtime topology, or projection architecture redesign), A3 (ADR-012 Scene Context Runtime Boundary — **closes** Editorial Scene ↔ Runtime mapping deferral as association → Scene Context → projection → Reading Frame; Association ≠ Identity; Projection ≠ Identity; Scene Context is **not** a Frame alias; Story↔Reading Route projection unchanged). Prior amendments A1–A2 preserved in substance.
 **Owner:** Architect
-**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Runtime Truth v1); ADR-005 v2.0 (Narrative Information Model — Editorial Domain, Story and Scene ontology, Information Emergence); ADR-006 v1.3 (Discovery Copilot Architecture — Authority Emergence and Discovery boundary); ADR-D2-001 (Canonical Metadata Authority)
+**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Runtime Truth v1); ADR-005 v2.0 (Narrative Information Model — Editorial Domain, Story and Scene ontology, Information Emergence); ADR-006 v1.3 (Discovery Copilot Architecture — Authority Emergence and Discovery boundary); ADR-D2-001 (Canonical Metadata Authority); ADR-012 (Scene Context Runtime Boundary)
 
 ---
 
@@ -23,7 +23,8 @@ It defines:
   linked by governed projection, not identity merge.
 * The **Editorial narrative hierarchy** (Story → Scene per ADR-005 v2.0) and its
   relationship to Runtime Domain representation — domain-separated; **Editorial
-  Scene ↔ Runtime mapping is not defined or authorized by this ADR** (deferred).
+  Scene ↔ Runtime mapping is closed by ADR-012** as association to Scene Context
+  and projection to Reading Frame (not identity merge; not Frame alias).
 * The **Dual-Domain Coexistence Model** — how Editorial and Runtime domains operate
   during rollout.
 * **Authority precedence and reconciliation** — how governance resolves divergence
@@ -98,9 +99,11 @@ ADR-005 v2.0 rejects **Scene equated to Story** (Alternative B — editorial Sto
  with Reading Route or treat editorial approval as automatic Runtime persistence.
 
 **Editorial Scene** MUST NOT be conflated with **Reading Route** or **Reading Frame**.
- Editorial Scene ↔ Runtime governed mapping is **deferred** (ADR-005 Deferred Decisions;
- this ADR §Deferred Decisions) and is **not** closed by the Story ↔ Reading Route
- projection model below.
+ Editorial Scene ↔ Runtime governed mapping was historically deferred at this ADR’s
+ acceptance; **Amendment A3 / ADR-012 closes** that deferral as association →
+ Scene Context → projection → Reading Frame (Association ≠ Identity; Projection ≠
+ Identity). Story ↔ Reading Route projection below is unchanged and does **not**
+ by itself equal Scene Context ownership.
 
 **Problem 3 — Dual-domain divergence lacks reconciliation rules.**
 
@@ -620,11 +623,12 @@ When Editorial Domain and Runtime Domain descriptions diverge, **split precedenc
 
 ## Deferred Decisions
 
-The following are explicitly deferred. They MUST NOT be inferred from this ADR.
+The following are explicitly deferred. They MUST NOT be inferred from this ADR
+except where marked **Closed**.
 
 | Deferred item | Expected governance home |
 | ------------- | ------------------------ |
-| **Editorial Scene ↔ Runtime Reading Route / Reading Frame governed mapping** | **SPEC** (architecture deferral acknowledged; ADR-005 v2.0 Deferred Decisions) |
+| **Editorial Scene ↔ Runtime Reading Route / Reading Frame governed mapping** | **Closed by ADR-012** — see §Closed Mapping (Amendment A3). Downstream SPEC may operationalize; MUST NOT reopen identity merge or treat Scene Context as Frame alias. |
 | Projection schema, link model, or API (Story ↔ Reading Route) | SPEC |
 | Synchronization algorithms or batch migration | SPEC or Implementation |
 | Scene Candidate → Runtime Reading Route review UI | SPEC |
@@ -634,7 +638,40 @@ The following are explicitly deferred. They MUST NOT be inferred from this ADR.
 | Knowledge Graph integration | post-v1 capability (Constitution roadmap) |
 | Alias merge / cross-reference resolution | post-v1 capability |
 
-Implementation of any deferred item MUST follow **ADR → SPEC → Implementation**
+### Closed Mapping (Amendment A3 — ADR-012)
+
+Historical deferral:
+
+```text
+Editorial Scene ↔ Runtime mapping deferred
+```
+
+Closed form (architecture decision completed; not an implementation grant):
+
+```text
+Editorial Scene
+      |
+      association
+      ↓
+Scene Context
+      |
+      projection
+      ↓
+Reading Frame
+```
+
+Mandatory:
+
+```text
+Association ≠ Identity
+Projection ≠ Identity
+```
+
+Scene Context is **not** a Reading Frame alias. Editorial Scene does **not** become
+Runtime by identity. Story ↔ Reading Route projection decisions of this ADR remain
+unchanged.
+
+Implementation of remaining deferred items MUST follow **ADR → SPEC → Implementation**
  (`governance/ADR_RULES.md` §13).
 
 ---
@@ -646,7 +683,8 @@ This Rollout ADR explicitly excludes:
 * Runtime Truth v1 topology redesign
 * Runtime Truth v1 Reading Route or Reading Frame semantic redefinition
 * Editorial Scene → Reading Route or Editorial Scene → Reading Frame governed
-  mapping (deferred to SPEC)
+  mapping as **identity merge** (forbidden). Mapping via Scene Context is owned by
+  **ADR-012** (association + projection); operational SPEC remains downstream.
 * Discovery or Enrichment architecture changes
 * Knowledge Graph or Relationship Graph architecture
 * Database schema, API contracts, migration SQL, or UI design
@@ -704,7 +742,8 @@ Story and Reading Route (implementation: Scene) remain domain-distinct.
 * Dual-domain model with governed projection increases governance and SPEC complexity
 * Story has no independent Runtime route — reader navigation remains Reading Route-centric (implementation: Scene)
 * Operator must understand projection vs persist vs Enrichment vs Discovery
-* Editorial Scene ↔ Runtime mapping deferred — additional SPEC work when authorized
+* Editorial Scene ↔ Runtime mapping **closed by ADR-012** (association → Scene Context →
+  projection → Reading Frame); operational SPEC remains downstream — identity merge forbidden
 * Phase 2 Story projection implementation remains entirely downstream in SPEC
 
 ---

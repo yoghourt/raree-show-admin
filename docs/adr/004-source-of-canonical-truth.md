@@ -19,8 +19,12 @@ Reading Route; Story Image → Reading Frame; normative vocabulary now in
 `governance/vocabulary/runtime-lexicon.md`; no Decisions, topology, or contracts changed),
 A9 (ADR-008 Accepted — Runtime Vocabulary Convergence; Ubiquitous Language Policy and
 Inferability Principle established; alias model superseded by Alias Acceptance Rule;
-Vocabulary Debt classification introduced; no topology or contracts changed).
-No Decisions, Acceptance Criteria, routing logic, or topology changed.
+Vocabulary Debt classification introduced; no topology or contracts changed),
+A10 (ADR-012 Scene Context Runtime Boundary — ownership evolution note; Runtime Truth v1
+delivery topology retained; Reading Route remains delivery projection; Scene Context
+introduced as narrative-moment ownership boundary; **no** Route deletion, **no** Frame
+as ownership boundary, **no** Scene Context as URL/page identity in ADR-012).
+No Decisions, Acceptance Criteria, or routing logic rewritten by A10.
 
 **A4 Historical Note:** Prior Follow-up Roadmap text described ADR-005 as
 investigation-phase "Content Topology Normalization." ADR-005 is now **Accepted**
@@ -115,6 +119,33 @@ Definitions (descriptive; no future topology implied):
 This section describes the current runtime state only. The Editorial Domain
 Narrative Information Model is governed by ADR-005 (see Known Constraint §15). Cross-domain mapping is governed by ADR-007.
 Cross-domain mapping of Story units remains outside ADR-004 scope.
+
+### Ownership evolution note (ADR-012 — Amendment A10)
+
+Runtime Truth v1 delivery topology above is **preserved as historical and delivery record**.
+ADR-012 evolves **ownership**, not Route deletion:
+
+```text
+Runtime topology evolves from:
+
+Work → Reading Route → Reading Frame
+
+toward:
+
+Work → Story → Scene Context → Reading Frame
+
+while Reading Route remains a delivery projection.
+```
+
+Mandatory under ADR-012:
+
+* **Reading Route** remains Story delivery runtime projection (not removed)
+* **Reading Frame** remains visual projection representation — **not** narrative ownership boundary
+* **Scene Context** is the Runtime ownership boundary for narrative moments (character appearance references, location context, narrative moment context, creation-facing visual context)
+* Scene Context is **not** a new URL/page routing identity in ADR-012
+* Runtime delivery abstraction (Reading Route) is retained
+
+See `docs/adr/012-scene-context-runtime-boundary.md`.
 
 ---
 

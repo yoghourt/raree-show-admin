@@ -5,8 +5,8 @@
 **Version:** 2.0
 **Last Updated:** 2026-07-11
 **Owner:** Architect
-**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Copilot authority); ADR-006 (Discovery Copilot Architecture — Authority Emergence and Human Review outcome paths); ADR-007 (Editorial → Runtime Rollout Architecture — Architecture Closure); ADR-009 (Vocabulary Architecture — Layer 3 Editorial vocabulary)
-**Amendment:** A4 (Editorial Narrative Topology Completion — introduces canonical **Scene** as the editorial progression unit within Story; extends Information Emergence, Decision 7, and invariants; clarifies Alternative B rejection scope; **no** Runtime topology, Rollout projection, or Layer 5 vocabulary changes). Prior amendments A1–A3 preserved in substance.
+**Related ADR:** ADR-004 (Source of Canonical Truth — Human Acceptance Gate and Copilot authority); ADR-006 (Discovery Copilot Architecture — Authority Emergence and Human Review outcome paths); ADR-007 (Editorial → Runtime Rollout Architecture — Architecture Closure); ADR-009 (Vocabulary Architecture — Layer 3 Editorial vocabulary); ADR-012 (Scene Context Runtime Boundary — association without identity merge)
+**Amendment:** A4 (Editorial Narrative Topology Completion — introduces canonical **Scene** as the editorial progression unit within Story; extends Information Emergence, Decision 7, and invariants; clarifies Alternative B rejection scope; **no** Runtime topology, Rollout projection, or Layer 5 vocabulary changes). A5 (ADR-012 alignment — Editorial Scene may **associate** with Scene Context without identity merge; Editorial Scene does **not** become a Runtime entity; Scene Context does **not** replace Editorial Scene; Decision 10 preserved). Prior amendments A1–A3 preserved in substance.
 
 ---
 
@@ -437,20 +437,35 @@ Scene is **not**:
 
 | Construct | Domain | Role |
 | --------- | ------ | ---- |
-| **Scene** | Editorial Domain | Progression unit within Story (Canonical Definition — Scene) |
-| **Reading Route** (implementation: Scene) | Runtime Domain | Routable reading container (ADR-004) |
-| **Reading Frame** | Runtime Domain | Ordered narrative-visual persistence unit inside a Reading Route (ADR-004) |
+| **Scene** (Editorial Scene) | Editorial Domain | Progression unit within Story (Canonical Definition — Scene) |
+| **Reading Route** (implementation: Scene) | Runtime Domain | Routable reading container / Story delivery projection (ADR-004; ownership reduced by ADR-012) |
+| **Reading Frame** | Runtime Domain | Ordered narrative-visual unit — visual projection representation (ADR-004); **not** narrative ownership (ADR-012) |
+| **Scene Context** | Runtime Domain | Runtime ownership boundary for narrative moments (ADR-012) — **not** Editorial Scene by identity |
 
 Editorial Scene and Runtime Reading Frame MUST NOT be treated as equivalent,
  interchangeable, or merged by identity.
+
+**Preserved:**
+
+```text
+Editorial Scene ≠ Runtime Scene
+Editorial Scene ≠ Reading Frame
+Editorial Scene ≠ Reading Route
+Editorial Scene ≠ Scene Context   (by identity)
+```
 
 **Reader progression semantics** are authoritative at **Editorial Scene** granularity.
  **Reading Frame** carries Runtime representation only. Progression authority MUST
  NOT be assigned to Reading Frame in governance artifacts (NIM-INV-06).
 
-Cross-domain association between Editorial Scenes and Runtime representation — if
- any — is governed by **ADR-007** and downstream SPEC. This ADR does not define,
- authorize, or implement such mapping.
+**Association (ADR-012 / Amendment A5):** Editorial Scene may **associate** with
+ **Scene Context** without identity merge. Scene Context **projects** to Reading Frame.
+ Editorial Scene does **NOT** become a Runtime entity. Scene Context does **NOT**
+ replace Editorial Scene.
+
+Cross-domain association between Editorial Scenes and Runtime representation is
+ governed by **ADR-007** as closed by **ADR-012** (association → Scene Context →
+ projection → Reading Frame). This ADR does not authorize identity merge.
 
 ---
 
@@ -590,8 +605,14 @@ Cross-domain mapping deferral from prior versions of this ADR is **closed** by
  and is **unchanged** by Amendment A4.
 
 **Editorial Scene ↔ Runtime Reading Route / Reading Frame** cross-domain mapping
- — if authorized — remains **outside** this ADR and **inside** ADR-007 / downstream
- SPEC scope. This ADR does not modify ADR-007 Rollout Model or projection decisions.
+ is **closed architecturally by ADR-012** as:
+
+```text
+Editorial Scene → associates → Scene Context → projects → Reading Frame
+```
+
+Association ≠ identity. Projection ≠ identity. This ADR does not modify ADR-007
+ Rollout Model except by recognizing ADR-012’s closure of the Scene mapping deferral.
 
 This ADR MUST NOT weaken ADR-007 rollout boundaries or ADR-004 Human Acceptance.
 
@@ -604,8 +625,9 @@ ADR-009 (Accepted) governs **Vocabulary Architecture**. **Scene** (Editorial) is
  and **Reader Step** remain Layer 5 Runtime vocabulary. ADR-009 VOC-GOV-01 and
  VOC-GOV-04 prohibit treating Editorial Scene and Runtime Reading Route as equivalent
  without an explicit semantic contract. ADR-007 owns Story ↔ Reading Route projection
- contracts; Editorial Scene ↔ Runtime representation contracts remain deferred to
- ADR-007 / SPEC unless and until authorized.
+ contracts; Editorial Scene ↔ Runtime representation contracts are **closed by
+ ADR-012** (Editorial Scene associates → Scene Context projects → Reading Frame)
+ without identity merge.
 
 This ADR MUST NOT modify Layer 5 Runtime vocabulary or RV entries.
 
@@ -633,7 +655,7 @@ The following are explicitly deferred. They MUST NOT be inferred from this ADR.
 
 | Deferred item | Expected governance home |
 | ------------- | ------------------------ |
-| Editorial Scene ↔ Runtime Reading Route / Reading Frame governed mapping | ADR-007 / SPEC |
+| Editorial Scene ↔ Runtime Reading Route / Reading Frame governed mapping | **Closed by ADR-012** (association → Scene Context → projection → Reading Frame; no identity merge). Downstream SPEC may operationalize; MUST NOT reopen identity merge. |
 | Relationship delta persistence model | SPEC (post-v1 capability) |
 | Story Arc visibility in the Runtime Domain | SPEC or post-v1 capability |
 | Knowledge Graph integration | post-v1 capability (Constitution roadmap) |
