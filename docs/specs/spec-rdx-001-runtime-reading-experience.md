@@ -5,15 +5,18 @@
 | Field        | Value                                                                 |
 | ------------ | --------------------------------------------------------------------- |
 | Title        | Runtime Reading Experience                                          |
-| Status       | **Accepted**                                                        |
-| Version      | v1.4                                                                  |
+| Status       | **Accepted** (v1.5 amendment — governance owner path confirmed)       |
+| Version      | v1.5                                                                  |
+| Base Accepted | v1.4 (2026-08-05)                                                   |
 | Owner        | Architect                                                             |
-| Last Updated | 2026-08-05                                                            |
-| Derived From | ADR-004, ADR-005 v2.0, ADR-007 v1.2, ADR-009 v1.2, ADR-012            |
-| Related      | SPEC-ROL-001, SPEC-ROL-002, SPEC-CORE-001, Runtime Reading Governance RC1 |
-| Amendment    | v1.1 — Architect Review minor revisions; v1.2 — capability boundary inlined, Accepted; v1.3 — rendering owner wording aligned with W-01 v2.1 (no semantic change); **v1.4 — ADR-012 terminology correction:** reject **Editorial Scene-centric Reading**; accept **Scene Context-aware Reading**; Reader Step remains consumption atom; do **not** accept legacy shorthand “Scene-centric Reading” |
+| Last Updated | 2026-08-07                                                            |
+| Derived From | ADR-004, ADR-005 v2.0, ADR-007 v1.2, ADR-009 v1.2, ADR-012, SPEC-SCC-001 v0.2 |
+| Related      | SPEC-ROL-001, SPEC-ROL-002, SPEC-CORE-001, SPEC-SCC-001, Runtime Reading Governance RC1 |
+| Amendment    | v1.1 — Architect Review minor revisions; v1.2 — capability boundary inlined, Accepted; v1.3 — rendering owner wording aligned with W-01 v2.1 (no semantic change); v1.4 — ADR-012 terminology correction; **v1.5 — Downstream Contract Alignment (Accepted):** Scene Context-aware Reading contractized with SPEC-SCC-001; ownership language (Route delivers / Context narrative / Frame visual); Reader Step preserved; no URL/addressing grant |
 
-**Capability authority:** This SPEC is the **sole governance authority** for **Runtime Reading Experience**. **Reader Step** is the smallest architectural capability unit (§1.5). RDX MUST preserve **Editorial progression authority** without owning Editorial semantics. The accepted boundary model (Scene-aware Frame Reading) is **not** the capability name — it is the architectural model under which this capability operates (§1.5).
+> **v1.5 Amendment — Accepted:** Aligns Reader contract with ADR-012 + SPEC-SCC-001. Does **not** authorize URL redesign, Route redesign, page identity change, Scene Context addressing, component design, or Scene Context production implementation (Spike Authorization is separate).
+
+**Capability authority:** This SPEC is the **sole governance authority** for **Runtime Reading Experience**. **Reader Step** is the smallest architectural capability unit (§1.5). RDX MUST preserve **Editorial progression authority** without owning Editorial semantics. The accepted reading model is **Scene Context-aware Reading** (§1.5); the representation boundary model (Scene-aware Frame) is **not** the capability name.
 
 **Authority boundary:** This SPEC is the **sole governance authority** for **Runtime Reading Experience** — the Layer 5 consumer capability that begins **after Projection Complete** and ends before implementation. It does **not** amend ADRs, redefine Editorial ontology, extend Rollout projection, alter Runtime topology, or specify database, API, UI, or component design.
 
@@ -67,13 +70,13 @@ Runtime Reading Experience
 
 **Ends before:** database schema, API routes, UI components, persistence mechanisms, rendering policy, Assistant implementation, or Route authoring.
 
-**Accepted boundary model** (§1.5): consumption is anchored on **Reader Step**; ordered Reader Steps within a Reading Route form the capability scope; RDX MUST preserve **Editorial progression authority** as a non-owned interpretive reference when upstream projection provides it — without owning, redefining, or merging Editorial Scene identity.
+**Accepted boundary model** (§1.5): consumption is anchored on **Reader Step**; ordered Reader Steps within a Reading Route form the capability scope; Reader **MAY** consume narrative context scoped by **Scene Context** (**Scene Context-aware Reading**); RDX MUST preserve **Editorial progression authority** as a non-owned interpretive reference when upstream association provides it — without owning, redefining, or merging Editorial Scene identity.
 
 **Rollout vs RDX disambiguation:**
 
 | Question | Owner |
 | -------- | ----- |
-| How did Editorial Scene get associated with this Reading Route? | Rollout — SPEC-ROL-001, SPEC-ROL-002 |
+| How does Editorial Scene associate toward Scene Context and project to Reading Frame? | Rollout — SPEC-ROL-001, SPEC-ROL-002 (under ADR-012 / SPEC-SCC-001) |
 | How does the Reader consume, advance, interpret, or complete reading? | RDX — this SPEC |
 
 ### 1.4 Authority sources
@@ -83,24 +86,45 @@ Runtime Reading Experience
 | **Constitution** | Reader Understanding First and Cognitive Cost First constrain capability scope — RDX preserves Editorial progression context without mandatory Editorial vocabulary at the consumption atom |
 | **ADR-004** | Frozen Runtime topology; Human Acceptance Gate inherited for upstream projection only |
 | **ADR-005 v2.0** | Editorial Story / Scene ontology; NIM-INV-06 progression authority at Editorial Scene — **preserved, not owned** |
-| **ADR-007 v1.2** | Projection closure at Reading Route; RDX MUST NOT extend Rollout |
+| **ADR-007 v1.2** | Projection architecture; RDX MUST NOT extend Rollout |
 | **ADR-009 v1.2** | Layer separation; Reader Step as Layer 5 progression unit |
+| **ADR-012** | Scene Context Runtime Boundary — ownership authority for narrative moments |
+| **SPEC-SCC-001** | Scene Context Contract — semantic ownership / consumer contract for Context-aware Reading |
 | **SPEC-ROL-001** | Implemented operator projection — upstream input only |
 | **SPEC-ROL-002** | Projection semantics — upstream input only |
 
 ### 1.5 Capability Boundary Decision
 
-Architect accepted the following boundary decision (2026-07-11). It is **normative context** for this SPEC — not a separate governance artifact.
+Architect accepted the following boundary decision (2026-07-11), with ADR-012 / SPEC-SCC-001 terminology alignment (v1.4–v1.5). It is **normative context** for this SPEC — not a separate governance artifact.
 
 #### Evaluated candidates
 
 | Candidate | Outcome | Rationale |
 | --------- | ------- | --------- |
 | **Frame-centric Reading** | Not selected | Correct atom (**Reader Step**), **insufficient scope** — excludes Editorial progression reference RDX must honor (NIM-INV-06) |
-| **Scene-centric Reading** (legacy shorthand) | **Rejected** — interpret as **Editorial Scene-centric Reading** | Editorial Scene itself is **not** the runtime consumption unit (ADR-005 Decision 10; ADR-012). Do **not** reinterpret this row as accepting Scene-centric Reading. |
-| **Editorial Scene-centric Reading** | **Rejected** | Editorial Scene as Runtime consumption / topology node violates layer separation |
-| **Scene Context-aware Reading** | **Accepted** (ADR-012) | Scene Context is Runtime ownership boundary; Reading Frame remains representation; Reader Step remains consumption atom |
-| **Scene-aware Frame** (boundary model) | **Selected model** (representation) | Reader Step atom; Editorial progression authority preserved without Editorial Scene as Runtime entity; aligns with Scene Context-aware Reading under ADR-012 |
+| **Editorial Scene-centric Reading** | **Rejected** | Editorial Scene as Runtime consumption unit / topology node violates layer separation (ADR-005 Decision 10; ADR-012). Rejected object is **Editorial Scene as Runtime consumption unit**, not Scene Context. |
+| **Scene-centric Reading** (legacy shorthand) | **Rejected** — alias of **Editorial Scene-centric Reading** | MUST be read as Editorial Scene-centric. MUST NOT be reinterpreted as accepting Scene Context-aware Reading. |
+| **Scene Context-aware Reading** | **Accepted** (ADR-012; SPEC-SCC-001) | Reader may consume narrative context scoped by Scene Context. Reading Frame remains visual representation. **Reader Step remains the consumption atom.** Scene Context ≠ URL/page routing identity. |
+| **Scene-aware Frame** (boundary model) | **Selected model** (representation) | Reader Step atom; Editorial progression authority preserved without Editorial Scene as Runtime entity; aligns with Scene Context-aware Reading |
+
+#### Ownership language (normative — ADR-012 / SPEC-SCC-001)
+
+```text
+Reading Route delivers Story.
+
+Scene Context provides narrative context.
+
+Reading Frame provides visual representation.
+```
+
+| Concern | Owner / role for RDX consumption |
+| ------- | -------------------------------- |
+| Delivery / session container | Reading Route delivers Story |
+| Narrative moment / character appearance / location context | Scene Context provides (Runtime ownership boundary) |
+| Visual representation / image asset | Reading Frame provides |
+| Consumption atom | Reader Step (unchanged) |
+
+RDX MUST NOT state or imply that Reading Route owns narrative-moment reader context (character appearance / location / beat).
 
 #### Smallest architectural capability unit — **Reader Step**
 
@@ -108,17 +132,20 @@ Architect accepted the following boundary decision (2026-07-11). It is **normati
 | -------------------- | ------ |
 | **Reading Frame alone** | Frame is Runtime **Representation** (RV-04); Reader Step is the **consumption act** (RV-06). Frame does **not** own narrative context (ADR-012). |
 | **Editorial Scene** | Layer 3 progression authority (NIM-INV-06); not a Runtime entity (ADR-005 Decision 10). **Prohibited** as runtime consumption unit. |
-| **Reading Route** | Delivery projection / navigation boundary (ADR-012); RDX operates within Route delivery scope at Step granularity; Route does **not** own narrative-moment character/location context |
-| **Scene Context as Reader Step substitute** | Scene Context is ownership boundary (ADR-012); **Reader Step remains the consumption atom** |
+| **Reading Route** | Story delivery runtime projection (ADR-012); RDX operates within Route delivery scope at Step granularity; Route does **not** own narrative-moment character/location context |
+| **Scene Context as Reader Step substitute** | Scene Context is ownership boundary (ADR-012 / SPEC-SCC-001); **Reader Step remains the consumption atom**. ADR-012 does **not** authorize addressing/navigation change. |
 
 #### Accepted boundary model (not the capability name)
 
 ```text
-Capability unit:     Reader Step (Runtime)
-Capability scope:    ordered Reader Steps within Reading Route
+Reading model:       Scene Context-aware Reading (Accepted)
+Capability unit:     Reader Step (Runtime) — remains consumption atom
+Capability scope:    ordered Reader Steps within Reading Route delivery
+Narrative context:   scoped by Scene Context when available via Runtime delivery projections
 Boundary obligation: preserve Editorial progression authority as non-owned
-                     interpretive reference when upstream projection provides it —
+                     interpretive reference when upstream association provides it —
                      MUST NOT own, redefine, or merge Editorial Scene identity
+                     MUST NOT treat Scene Context as URL/page routing identity
 ```
 
 ---
@@ -206,11 +233,13 @@ No overlap. RDX verbs are limited to: **Consumes**, **Preserves**, **Advances**,
 | **Editorial progression authority** | **Owns** (NIM-INV-06) | — | **Preserves** — MUST NOT own or redefine |
 | **Discovery / Review Accept** | **Owns** (ADR-006) | — | — |
 | **Story ↔ Route association** | Source unit | **Owns** accept + association semantics (ROL-001, ROL-002) | **Consumes** — read-only |
-| **Scene ↔ Route association** | Source unit | **Owns** accept + association semantics (ROL-001, ROL-002) | **Consumes** — read-only |
+| **Editorial Scene ↔ Scene Context association** | Source unit | **Owns** association semantics (ROL under ADR-012 / SCC-001) | **Consumes** — read-only via Runtime delivery; not Editorial production objects |
+| **Scene Context → Reading Frame projection** | — | **Owns** projection semantics (visual endpoint) | **Consumes** Frame representation; narrative context from Scene Context |
 | **Projection lifecycle** | — | **Owns** through Projection Complete | **Recognizes** entry precondition only |
-| **Reading Route (container)** | — | Target of projection | **Consumes** as scope container; **Completes** at Route boundary |
+| **Reading Route (delivery)** | — | Story delivery projection | **Consumes** as delivery scope; **Completes** at Route boundary — does **not** own narrative-moment context |
+| **Scene Context (narrative context)** | — | Runtime ownership boundary (SCC-001) | **Consumes** scoped narrative context when delivered — not as URL/page identity |
 | **Reader Step consumption** | — | — | **Consumes** — owns atomic consumption behavior |
-| **Editorial progression interpretation** | — | — | **Interprets** when projection reference present |
+| **Editorial progression interpretation** | — | — | **Interprets** when association reference present |
 | **Reader progression state** | — | — | **Advances** at Step granularity (RDX-3) |
 | **Reading Session lifecycle** | — | — | **Completes** semantic phases (§2) |
 | **Route authoring** | — | Projection Accept path | — |
@@ -271,27 +300,35 @@ Reader Step is **not identical** to Reading Frame. Reading Frame is the **repres
 | **Reading Frame** | Layer 5 — Runtime Representation (RV-04) | **Represents** a Reader Step; ordered within Route | **Prohibited** — Frame is representation; Step is consumption act |
 | **Reading Route** | Layer 5 — Runtime (RV-02) | Container and navigation boundary; scopes ordered Reader Steps | **Prohibited** — Route is container, not atomic consumption unit |
 | **Editorial Scene** | Layer 3 — Editorial (ADR-005) | Non-owned progression authority reference; NIM-INV-06 | **Prohibited** — Editorial Scene MUST NOT become a Runtime consumption unit |
-| **Scene Context** | Runtime ownership boundary (ADR-012) | Owns narrative-moment context; projects to Reading Frame | **Not** a Reader Step substitute; Context-aware Reading authorized |
+| **Scene Context** | Runtime ownership boundary (ADR-012 / SPEC-SCC-001) | Provides narrative context; projects to Reading Frame | **Not** a Reader Step substitute; **≠** URL/page identity; Context-aware Reading authorized |
 | **Story** | Layer 3 — Editorial (ADR-005) | Non-owned grouping / mental-model reference | **Prohibited** — Story MUST NOT become a Runtime routable node |
 
-### 4.3 Runtime topology (persistence order — unchanged)
+### 4.3 Runtime topology (persistence / delivery order — unchanged by this amendment)
 
-ADR-004 topology is a **Representation** concern. It does not define RDX consumption order:
+ADR-004 delivery topology is a **Representation / delivery** concern. It does not define Scene Context as a page identity:
 
 ```text
 Work
- └── Reading Route
-      └── Reading Frame
+ └── Reading Route          ← delivers Story (delivery projection)
+      └── Reading Frame     ← visual representation
+```
+
+Ownership / narrative context (ADR-012 — **not** a URL topology change):
+
+```text
+Story
+ └── Scene Context          ← narrative context ownership
+      └── projects → Reading Frame
 ```
 
 Editorial hierarchy (Layer 3 — **not** in Runtime topology):
 
 ```text
 Story
- └── Scene                  ← Editorial progression authority (NIM-INV-06)
+ └── Editorial Scene        ← Editorial progression authority (NIM-INV-06)
 ```
 
-**Cross-layer rule:** Editorial Scene and Story MAY inform RDX **Interpretation** when projection association exists. They MUST NOT appear as nodes in the Runtime topology above.
+**Cross-layer rule:** Editorial Scene and Story MAY inform RDX **Interpretation** when association exists. They MUST NOT appear as nodes in the Runtime delivery topology above. Web Reader consumes Scene Context through **Runtime delivery projections**, not by depending on Editorial production objects.
 
 ### 4.4 Reader Step behavior contracts
 
@@ -313,11 +350,15 @@ Each Reader Step **Consumption** act corresponds to exactly one Reading Frame **
 
 **RDX-RS-05 — Editorial progression interpretation**
 
-When upstream projection provides Editorial reference, RDX **Interprets** progression relative to Editorial authority and **Preserves** Editorial Scene boundaries — without collapsing a Scene into a single Step or equating Step with Scene.
+When upstream association provides Editorial reference, RDX **Interprets** progression relative to Editorial authority and **Preserves** Editorial Scene boundaries — without collapsing Editorial Scene into a single Step or equating Step with Editorial Scene or Scene Context.
 
 **RDX-RS-06 — Graceful absence**
 
-When no Editorial projection reference exists, RDX **Consumes** Reader Steps within the Route alone. Absence of Editorial reference MUST NOT invalidate consumption.
+When no Editorial association / Scene Context narrative context is available, RDX **Consumes** Reader Steps within the Route alone. Absence MUST NOT invalidate consumption.
+
+**RDX-RS-07 — Scene Context-aware narrative context**
+
+When Runtime delivery projections provide Scene Context–scoped narrative context, RDX **MAY** **Consume** that context for Scene Context-aware Reading. This does **not** make Scene Context a Reader Step, URL, or page routing identity.
 
 ---
 
@@ -339,15 +380,23 @@ RDX MUST NOT create, accept, modify, or delete StoryProjectionLink, SceneProject
 
 **RDX-INV-04 — Topology preservation**
 
-RDX and downstream specs MUST NOT introduce Runtime entities, routable nodes, or URL segments other than `Work → Reading Route → Reading Frame` (ADR-004 binding).
+RDX and downstream specs MUST NOT introduce Runtime entities, routable nodes, or URL segments other than `Work → Reading Route → Reading Frame` (ADR-004 binding). Scene Context-aware Reading does **not** authorize Scene Context as a URL/page routing identity (ADR-012; SPEC-SCC-001).
 
 **RDX-INV-05 — Progression authority non-assignment**
 
-Governance artifacts for RDX or downstream specs MUST NOT assign **Editorial progression authority** to Reading Frame, Reading Route, or Reader Step (NIM-INV-06).
+Governance artifacts for RDX or downstream specs MUST NOT assign **Editorial progression authority** to Reading Frame, Reading Route, Reader Step, or Scene Context (NIM-INV-06). Scene Context owns Runtime narrative-moment context; it does **not** become Editorial progression authority.
 
 **RDX-INV-06 — Identity separation**
 
-RDX and downstream specs MUST NOT state or imply cross-layer identity merge between Reader Step, Reading Frame, Reading Route, Editorial Scene, or Story (VOC-INV-06 spirit).
+RDX and downstream specs MUST NOT state or imply identity merge among:
+
+```text
+Editorial Scene ≠ Scene Context ≠ Reading Frame ≠ Story ≠ Reading Route ≠ Reader Step
+```
+
+**RDX-INV-06a — No Route narrative ownership recovery**
+
+RDX and downstream specs MUST NOT assign character appearance, location context, or narrative-moment ownership to Reading Route.
 
 **RDX-INV-07 — Post-projection entry**
 
@@ -412,11 +461,12 @@ Constitution
 ### Precedence
 
 ```text
-ADR-004, ADR-007  > SPEC-RDX-001   (topology; projection architecture)
-ADR-005, ADR-009  > SPEC-RDX-001   (Editorial semantics; layer model)
-SPEC-ROL-001      > SPEC-RDX-001   (implemented Rollout operator behavior — upstream)
-SPEC-ROL-002      > SPEC-RDX-001   (projection semantics — upstream)
-SPEC-RDX-001      > W-01, web runtime specs, implementation
+ADR-004, ADR-007, ADR-012  > SPEC-RDX-001   (topology; projection; Scene Context boundary)
+ADR-005, ADR-009            > SPEC-RDX-001   (Editorial semantics; layer model)
+SPEC-SCC-001                > SPEC-RDX-001   (Scene Context ownership contract — upstream for Context-aware Reading)
+SPEC-ROL-001                > SPEC-RDX-001   (implemented Rollout operator behavior — upstream)
+SPEC-ROL-002                > SPEC-RDX-001   (projection semantics — upstream)
+SPEC-RDX-001                > W-01, web runtime specs, implementation
 ```
 
 ---
@@ -430,6 +480,9 @@ Explicitly excluded from SPEC-RDX-001:
 | Governed Projection, Projection Accept, link CRUD | SPEC-ROL-001, SPEC-ROL-002 |
 | Discovery, Candidates, Human Review Accept | ADR-006, SPEC-D3-* |
 | Editorial Story / Scene ontology, ONE Rule, Information Emergence | ADR-005 |
+| Scene Context ownership contract (semantic) | SPEC-SCC-001 |
+| **URL redesign / Route redesign / page identity change** | **Not authorized** by ADR-012 or this amendment |
+| **Scene Context addressing** | **Not authorized** (ADR-012 Open Question; remains deferred) |
 | Database schema, tables, columns, migrations | Implementation |
 | Projection association persistence design | SPEC-ROL-002 / SPEC-CORE-001 |
 | HTTP / API route design | Implementation |
@@ -468,19 +521,35 @@ The following downstream work is **authorized** by **SPEC-RDX-001 Accepted** (20
 
 ## 9. Acceptance Criteria (SPEC approval)
 
-SPEC-RDX-001 is **Accepted** (2026-07-11):
+SPEC-RDX-001 is **Accepted** (2026-07-11; v1.4 terminology 2026-08-05; **v1.5 Accepted** 2026-08-07):
 
 - [x] **RDX-AC-01** — Runtime Reading owns no Editorial semantics (RDX-INV-02)
 - [x] **RDX-AC-02** — Runtime Reading owns no Projection semantics (RDX-INV-03)
 - [x] **RDX-AC-03** — Reader Step is the only Runtime capability atom (RDX-RS-01, RDX-INV-01)
 - [x] **RDX-AC-04** — Editorial Scene remains Layer 3 authority; RDX preserves, not owns (RDX-RS-05, RDX-INV-05)
-- [x] **RDX-AC-05** — Runtime topology unchanged (RDX-INV-04)
-- [x] **RDX-AC-06** — No new Runtime entities introduced (RDX-INV-04)
+- [x] **RDX-AC-05** — Runtime delivery topology unchanged (RDX-INV-04)
+- [x] **RDX-AC-06** — No new Runtime URL/page entities; Scene Context ≠ page identity (RDX-INV-04)
 - [x] **RDX-AC-07** — No implementation decisions in document body (RDX-INV-09)
 - [x] **RDX-AC-08** — Capability / Representation ownership unambiguous (§3.1 / §3.2)
-- [x] **RDX-AC-09** — Architect review Approved
+- [x] **RDX-AC-09** — Architect / governance owner Approved (incl. v1.5)
 - [x] **RDX-AC-10** — Capability boundary decision incorporated (§1.5)
 - [x] **RDX-AC-11** — Every Runtime Reading behavior maps to exactly one lifecycle phase (§2; RDX-INV-08)
+- [x] **RDX-AC-12** — Scene Context-aware Reading Accepted; Editorial Scene-centric Reading Rejected (§1.5)
+- [x] **RDX-AC-13** — Ownership language: Route delivers / Context narrative / Frame visual (§1.5)
+
+### Review Gate (v1.5 — Accepted)
+
+#### Architecture
+
+- [x] RDX supports Scene Context-aware Reading
+- [x] Editorial Scene-centric Reading remains Rejected
+- [x] Reader Step remains consumption atom
+
+#### Governance
+
+- [x] No URL / Route / page identity redesign authorized
+- [x] No Scene Context addressing authorized
+- [x] No component / schema / API freeze
 
 ---
 
@@ -489,10 +558,12 @@ SPEC-RDX-001 is **Accepted** (2026-07-11):
 ```text
 docs/adr/004-source-of-canonical-truth.md                Runtime Truth v1 topology
 docs/adr/005-narrative-information-model.md              Story / Scene; NIM-INV-06
-docs/adr/007-rollout-architecture.md                     Projection closure
+docs/adr/007-rollout-architecture.md                     Projection architecture
 docs/adr/009-vocabulary-architecture.md                  Layer 5; Reader Step
+docs/adr/012-scene-context-runtime-boundary.md           Scene Context Runtime Boundary
+docs/specs/spec-scc-001-scene-context-contract.md        Scene Context Contract (Accepted v0.2)
 docs/specs/spec-rol-001-governed-projection.md           Rollout operator (Implemented)
-docs/specs/spec-rol-002-projection-semantics.md           Projection semantics (Accepted)
+docs/specs/spec-rol-002-projection-semantics.md           Projection semantics
 docs/specs/runtime-reading-governance-rc1.md              Governance release baseline
 docs/specs/spec-core-001-entity-schema-registry.md         Runtime Representation (§3.2)
 governance/vocabulary/runtime-lexicon.md                   RV-02, RV-04, RV-06
@@ -506,11 +577,13 @@ raree-show-web/docs/runtime-architecture.md                            Downstrea
 
 **Runtime Reading Experience** is the Layer 5 capability that governs Reader consumption **after Projection Complete**.
 
+- **Reading model:** Scene Context-aware Reading (**Accepted**); Editorial Scene-centric Reading (**Rejected**)
 - **Capability atom:** Reader Step (behavior first; represented by Reading Frame; persisted by Runtime Representation)
-- **Capability scope:** ordered Reader Steps within Reading Route
-- **Boundary obligation:** preserve Editorial progression authority without owning Editorial or Projection semantics
+- **Capability scope:** ordered Reader Steps within Reading Route delivery
+- **Ownership language:** Route delivers Story; Scene Context provides narrative context; Frame provides visual representation
+- **Boundary obligation:** preserve Editorial progression authority without owning Editorial or Projection semantics; Scene Context ≠ URL/page identity
 - **Lifecycle:** Reading Session Start → Reader Step Consumption → Progress Update → Route Completion → Session Complete
 - **Downstream:** W-01, runtime architecture, and Reader implementation **authorized** (§8)
-- **Status:** Accepted 2026-07-11
+- **Status:** Accepted v1.5 (2026-08-07)
 
-No new Runtime entities. No topology change. No implementation or rendering decisions.
+No Scene Context page identity. No addressing grant. No implementation or rendering decisions.

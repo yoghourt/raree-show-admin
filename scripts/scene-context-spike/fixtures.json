@@ -1,0 +1,90 @@
+{
+  "spikeId": "SPIKE-SCC-001",
+  "workId": "work_spike_les_miserables_demo",
+  "readingRouteDelivery": {
+    "tsid": "scene_spike_route_fantine_01",
+    "title": "Fantine — Early Hardship",
+    "chapter_number": 1,
+    "story_images_v2": [],
+    "characterIds": [],
+    "locationId": null,
+    "frame_provenance_v1": []
+  },
+  "workArchiveHints": {
+    "characterArchiveRefs": [
+      { "tsid": "char_spike_fantine", "name": "Fantine", "roleHint": "mother" },
+      { "tsid": "char_spike_cosette", "name": "Cosette", "roleHint": "child" }
+    ],
+    "locationArchiveRef": {
+      "tsid": "loc_spike_paris_street",
+      "name": "Paris street corner"
+    }
+  },
+  "editorialSceneSources": [
+    {
+      "sourceReviewId": "review_scene_spike_moonlit_farewell",
+      "parentStorySourceReviewId": "review_story_spike_fantine_01",
+      "parentStoryTitle": "Fantine — Early Hardship",
+      "workId": "work_spike_les_miserables_demo",
+      "chapter_number": 1,
+      "chapter_title": "Book I",
+      "title": "Moonlit Farewell",
+      "summary": "Fantine holds Cosette close on a cold Paris street before leaving her with the Thenardiers' promise.",
+      "visualIntent": {
+        "characters": [
+          { "role": "mother", "name": "Fantine" },
+          { "role": "child", "name": "Cosette" }
+        ],
+        "relationship": "mother parting from child",
+        "emotion": "tender dread",
+        "purpose": "show the cost of survival before the reader sees the later fall"
+      },
+      "rendererExpression": {
+        "environment": "narrow Paris street at night, wet cobblestones, one dim lantern",
+        "characters": [
+          {
+            "role": "mother",
+            "visual": "thin woman in worn shawl, mid-ground left, face partly turned away"
+          },
+          {
+            "role": "child",
+            "visual": "small child clutched to the woman's chest, face nestled, distant soft focus"
+          }
+        ],
+        "action": "woman holding the child tightly before releasing her toward an unseen doorway",
+        "composition": "medium wide shot, mother-child left of center, dark street receding right",
+        "lighting": "single lantern side light, cold blue ambient",
+        "atmosphere": "quiet, damp, fragile"
+      }
+    },
+    {
+      "sourceReviewId": "review_scene_spike_factory_dismissal",
+      "parentStorySourceReviewId": "review_story_spike_fantine_01",
+      "parentStoryTitle": "Fantine — Early Hardship",
+      "workId": "work_spike_les_miserables_demo",
+      "chapter_number": 1,
+      "chapter_title": "Book I",
+      "title": "Factory Dismissal",
+      "summary": "Fantine is turned out of the workshop; the street becomes her only horizon.",
+      "visualIntent": {
+        "characters": [{ "role": "mother", "name": "Fantine" }],
+        "relationship": null,
+        "emotion": "shock turning to numbness",
+        "purpose": "mark the social ejection that begins her descent"
+      },
+      "rendererExpression": {
+        "environment": "factory yard gate at dusk, brick walls, muddy ground",
+        "characters": [
+          {
+            "role": "mother",
+            "visual": "lone woman outside closed gate, shawl tight, face lowered"
+          }
+        ],
+        "action": "standing alone after the gate has shut",
+        "composition": "wide shot, small figure against large closed gate",
+        "lighting": "fading grey dusk",
+        "atmosphere": "cold, emptied"
+      }
+    }
+  ]
+}

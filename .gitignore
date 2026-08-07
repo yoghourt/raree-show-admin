@@ -95,6 +95,9 @@ next-env.d.ts
 /scripts/discovery-contract-spike/results/
 /scripts/rich-expression-projection-spike/results/
 
+# Scene Context runtime materialization spike outputs
+/scripts/scene-context-spike/results/
+
 # Python virtualenvs (local image spike / Diffusers)
 .venv/
 **/.venv/
