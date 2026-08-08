@@ -85,7 +85,7 @@ Identity: Editorial Scene ≠ Scene Context ≠ Frame ≠ Route ≠ Story
 | Slice | Intent |
 | ----- | ------ |
 | **L2-B** | Review/Rollout UI: Story’s related entities = union of child Context refs — **PASS · Verified** · `implement-scc-001-l2b-ui-context-aggregate.md` |
-| **L2-C** | Propose signals for Context candidates (not Story membership) |
+| **L2-C** | Propose signals for Context candidates — **PASS · Verified** · `implement-scc-001-l2c-propose-context-signals.md` |
 | **Level 3** | Sunset Route fields + historical cleanup — separate authorization |
 
 ---

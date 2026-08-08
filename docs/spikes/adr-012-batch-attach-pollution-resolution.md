@@ -113,7 +113,7 @@ Discovery Character/Location candidates = **Work Archive candidates**, not Story
 | SCC-S1 Context write on Projection | Done (`scene_contexts_v1`) |
 | Stop Accept batch-write as Route authority | **Done** · L2-A PASS · Verified |
 | Review/Rollout UI aggregate from Context/child scenes | **Done** · L2-B PASS · Verified |
-| Propose signals for Context (not Story membership) | Optional → L2-C |
+| Propose signals for Context (not Story membership) | **Done** · L2-C PASS · Verified |
 | Delete Route `character_ids` / `location_id` | Level 3 · **Not authorized** |
 
 ---
@@ -134,6 +134,9 @@ docs/specs/spec-scc-001-scene-context-contract.md
 docs/spikes/implement-scc-001-s1-context-aware-projection.md
 docs/spikes/implement-scc-001-l2a-context-ownership-authority.md
 docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md
+docs/spikes/implement-scc-001-l2c-propose-context-signals.md
 lib/discovery/review-state.ts          # L2-A demoted batch attach
-lib/scene-context/                     # S1 write path · L2-B aggregate (pending)
+lib/discovery/propose-service.ts       # L2-C Propose → Context cues
+lib/discovery/scene-context-candidate-signals.ts
+lib/scene-context/                     # S1 write · L2-B aggregate
 ```

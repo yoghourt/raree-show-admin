@@ -37,6 +37,7 @@ import {
   type SceneCandidateFields,
   type StoryCandidateFields,
 } from "@/lib/discovery/propose-types";
+import { SCENE_CONTEXT_CANDIDATE_PROPOSE_RULES } from "@/lib/discovery/scene-context-candidate-signals";
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
 
 export function isDiscoveryProposeMockMode(): boolean {
@@ -75,7 +76,7 @@ const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
   character: `{"candidates":[{"displayName":"Eddard Stark","summary":"Lord of Winterfell.","fields":{"name":"Eddard Stark","house":"Stark","characterArchive":{"visualSummary":"Northern lord shaped by honor and winter","costumeCues":["dark northern fur cloak","wool noble attire"],"propCues":["ancestral greatsword"]}}}]}`,
   location: `{"candidates":[{"displayName":"Winterfell","summary":"Seat of House Stark.","fields":{"name":"Winterfell","region":"The North"}}]}`,
   story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
-  scene: `{"candidates":[{"displayName":"Moonlit Duel","summary":"Ser Waymar Royce faces the Other under the trees.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Prologue","title":"Moonlit Duel","summary":"Ser Waymar Royce confronts a White Walker in a fatal duel; Will watches from cover.","visualIntent":{"relationship":"knight confronts white walker","purpose":"establish lethal threat","emotion":"defiance"},"rendererExpression":${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}}}]}`,
+  scene: `{"candidates":[{"displayName":"Moonlit Duel","summary":"Ser Waymar Royce faces the Other under the trees.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Prologue","title":"Moonlit Duel","summary":"Ser Waymar Royce confronts a White Walker in a fatal duel; Will watches from cover.","visualIntent":{"characters":[{"role":"knight","name":"Ser Waymar Royce"},{"role":"watcher","name":"Will"}],"relationship":"knight confronts white walker","purpose":"establish lethal threat","emotion":"defiance"},"rendererExpression":${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}}}]}`,
 };
 
 function mockCandidatesForType(
@@ -243,7 +244,11 @@ export function buildProposePrompt(params: {
 Scene candidates are Editorial Scenes that belong under a Story (NOT Runtime Reading Routes).
 Proposed Story candidates in this batch (you MUST set fields.parentStoryCandidateId to one of these candidateId values):
 ${formatStoryListForPrompt(storyCandidates)}
-Do NOT use Reading-route framing. Do NOT invent parentStoryCandidateId values.\n`
+Do NOT use Reading-route framing. Do NOT invent parentStoryCandidateId values.
+parentStoryCandidateId is hierarchy only — it does NOT mean the Story owns Work-batch cast/place.
+
+${SCENE_CONTEXT_CANDIDATE_PROPOSE_RULES}
+\n`
       : "";
 
   return `You are a Discovery Copilot generating editorial Candidates for a narrative work.
@@ -290,9 +295,12 @@ Visualization (ADR-011 A5 / SPEC-DVE-001 v1.4 — required):
 - Author for the best renderer: include optional lighting/atmosphere/threatPerception/visualEmphasis when Intent supports them.
 - characters MAY be [] for landscape/atmosphere scenes; when non-empty each item needs role + visual (identity + prop/costume).
 - fields.visualIntent is OPTIONAL by scene: { characters?, relationship?, emotion?, purpose? }. Presence optional; quality when present.
+- When Expression cast is non-empty, strongly prefer visualIntent.characters with role + narrative name
+  (Context appearance candidate cues). Empty-cast landscape scenes may omit Intent characters.
 - visualIntent is narrative meaning only — NO camera/composition/prompt tokens in Intent.
 - Narrow-fold Intent cues into Expression optional fields in the SAME propose output (no second AI call).
 - styleHints: stable style family only; FORBIDDEN: masterpiece, 8k, best quality, ultra detailed.
+- Do NOT treat Work character/location candidates as Story membership lists.
 
 ${EXPRESSION_CAPABILITY_RULES}
 
