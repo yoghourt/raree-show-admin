@@ -4,7 +4,10 @@ Deployment knobs for Context-aware projection. Not Architecture constants.
 
 **Authorization (2026-08-08):** Architect Option A — controlled Level 2 expansion authorized. Prefer Work allowlist when enabling in shared envs. Level 3 still forbidden.
 
-**Batch-attach pollution track:** See `docs/spikes/adr-012-batch-attach-pollution-resolution.md`. **L2-A GRANTED** (`docs/spikes/implement-scc-001-l2a-context-ownership-authority.md`) — Accept MUST NOT batch-fill Route `character_ids` / `location_id`; Context path may enrich appearance/location archive refs by name.
+**Batch-attach pollution track:** See `docs/spikes/adr-012-batch-attach-pollution-resolution.md`.
+
+- **L2-A PASS · Verified** — Accept MUST NOT batch-fill Route `character_ids` / `location_id`; Context path may enrich appearance/location archive refs by name.
+- **L2-B PASS · Verified** (`docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md`) — Review/Rollout display = child Scene/Context union.
 
 | Env | Default | Meaning |
 | --- | ------- | ------- |

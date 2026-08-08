@@ -20,6 +20,10 @@ import type {
 } from "@/lib/discovery/review-types";
 import { messages } from "@/lib/locale";
 import { rolloutUi } from "@/lib/rollout/ui-copy";
+import {
+  aggregateStoryRelatedRefs,
+  formatStoryRelatedAggregateLine,
+} from "@/lib/scene-context/aggregate-story-refs";
 import type { Character, Location } from "@/lib/types";
 
 export type StoryWritePreviewValues = {
@@ -37,17 +41,7 @@ function stagingToValues(
   frames: AcceptedSceneCandidateStaging[],
   defaultChapter: number
 ): StoryWritePreviewValues {
-  const matchedLocation =
-    staging.locationId ??
-    staging.relatedLocationRefs?.find((r) => r.matchedTsid)?.matchedTsid ??
-    "";
-  const matchedChars =
-    staging.characterIds?.length
-      ? staging.characterIds
-      : (staging.relatedCharacterRefs ?? [])
-          .map((r) => r.matchedTsid)
-          .filter((id): id is string => Boolean(id));
-
+  // L2-A/L2-B: Route membership is non-authoritative — do not backfill from related*Refs.
   return {
     title: staging.title,
     chapter_number:
@@ -56,8 +50,8 @@ function stagingToValues(
         : defaultChapter,
     chapter_title: staging.chapter_title ?? "",
     summary: staging.summary ?? "",
-    locationId: matchedLocation,
-    characterIds: matchedChars,
+    locationId: staging.locationId?.trim() || "",
+    characterIds: staging.characterIds ?? [],
     frames: frames.map((f) => ({
       sourceReviewId: f.sourceReviewId,
       title: f.title,
@@ -181,17 +175,16 @@ export function StoryWritePreviewCard({
     }));
   }, [characters, staging]);
 
-  const pendingCreateNames = React.useMemo(() => {
-    const chars = (staging.relatedCharacterRefs ?? [])
-      .filter((r) => !r.matchedTsid && !values.characterIds.includes(r.matchedTsid ?? ""))
-      .filter((r) => !characters.some((c) => c.name === r.name))
-      .map((r) => r.name);
-    const locs = (staging.relatedLocationRefs ?? [])
-      .filter((r) => !r.matchedTsid && r.name !== "")
-      .filter((r) => !locations.some((l) => l.name === r.name))
-      .map((r) => r.name);
-    return { chars, locs };
-  }, [staging, values.characterIds, characters, locations]);
+  const frameRelatedLine = React.useMemo(() => {
+    const aggregate = aggregateStoryRelatedRefs({
+      sceneStagings: frames,
+      archive: {
+        characters: characters.map((c) => ({ name: c.name, tsid: c.tsid })),
+        locations: locations.map((l) => ({ name: l.name, tsid: l.tsid })),
+      },
+    });
+    return formatStoryRelatedAggregateLine(aggregate);
+  }, [frames, characters, locations]);
 
   const patch = (partial: Partial<StoryWritePreviewValues>) => {
     const next = { ...values, ...partial };
@@ -204,6 +197,15 @@ export function StoryWritePreviewCard({
       <p className="text-muted-foreground text-xs">
         {rolloutUi.writePreviewHint}
       </p>
+
+      <div className="space-y-1 rounded-lg border border-dashed px-3 py-2">
+        <p className="text-xs font-medium">
+          {rolloutUi.storyRelatedFromFrames}
+        </p>
+        <p className="text-muted-foreground text-xs">
+          {frameRelatedLine ?? rolloutUi.storyRelatedFromFramesEmpty}
+        </p>
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor={`title-${staging.sourceReviewId}`}>标题</Label>
@@ -345,7 +347,7 @@ export function StoryWritePreviewCard({
         </summary>
         <div className="mt-3 space-y-3">
       <div className="space-y-2">
-        <Label>地点（可选）</Label>
+        <Label>地点（可选 · 非权威）</Label>
         <FuzzyEntityCombobox
           value={values.locationId}
           options={locationOptions}
@@ -353,15 +355,10 @@ export function StoryWritePreviewCard({
           disabled={busy || locationOptions.length === 0}
           onSelect={(opt) => patch({ locationId: opt.id })}
         />
-        {pendingCreateNames.locs.length > 0 ? (
-          <p className="text-muted-foreground text-xs">
-            写入时新建地点：{pendingCreateNames.locs.join("、")}
-          </p>
-        ) : null}
       </div>
 
       <div className="space-y-2">
-        <Label>角色</Label>
+        <Label>角色（可选 · 非权威）</Label>
         <EntityMultiFuzzyPicker
           value={values.characterIds}
           options={characterOptions}
@@ -369,11 +366,6 @@ export function StoryWritePreviewCard({
           disabled={busy || characterOptions.length === 0}
           onChange={(ids) => patch({ characterIds: ids })}
         />
-        {pendingCreateNames.chars.length > 0 ? (
-          <p className="text-muted-foreground text-xs">
-            写入时新建角色：{pendingCreateNames.chars.join("、")}
-          </p>
-        ) : null}
       </div>
         </div>
       </details>

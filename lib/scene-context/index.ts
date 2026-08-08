@@ -6,6 +6,19 @@ export {
 } from "@/lib/scene-context/associate";
 export type { SceneContextArchiveCatalog } from "@/lib/scene-context/associate";
 export {
+  aggregateStoryRelatedFromContexts,
+  aggregateStoryRelatedFromSceneStagings,
+  aggregateStoryRelatedRefs,
+  formatStoryRelatedAggregateLine,
+  isStoryRelatedAggregateEmpty,
+} from "@/lib/scene-context/aggregate-story-refs";
+export type {
+  AggregateSceneSource,
+  StoryRelatedAggregate,
+  StoryRelatedCharacterCue,
+  StoryRelatedLocationCue,
+} from "@/lib/scene-context/aggregate-story-refs";
+export {
   getSceneContextWorkAllowlist,
   isSceneContextProjectionEnabledForWork,
   isSceneContextProjectionGloballyEnabled,

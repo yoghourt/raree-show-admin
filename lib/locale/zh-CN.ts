@@ -130,7 +130,7 @@ export const zhCN = {
     linksTitle:          '关联',
     noStoryStaging:      '暂时没有待保存的故事',
     writePreviewHint:
-      '以下字段与故事编辑页一致。先保证标题与画面说明可读；角色/地点为次要项。',
+      '以下字段与故事编辑页一致。先保证标题与画面说明可读。故事相关出场/地点来自画面语境并集（只读）；投递路由上的角色/地点字段为非权威可选债务。',
     noLinks:             '暂无关联',
     noStoryUnits:        '作品中还没有故事',
     persistStory:        '写入故事',
@@ -215,7 +215,9 @@ export const zhCN = {
     readingRouteLinkCount: (count: number, label: string) =>
       count > 0 ? ` · ${count} 个${label}` : '',
     entitySectionDeferred:
-      '角色/地点（次要：须先保证故事标题与画面说明可读）',
+      '投递路由角色/地点（非权威可选债务：须先保证故事标题与画面说明可读）',
+    storyRelatedFromFrames: '本故事相关（来自画面语境并集）',
+    storyRelatedFromFramesEmpty: '画面暂无可聚合的出场/地点线索',
     openReaderVerify: '打开读者端验读',
     goScenesList: '打开故事列表',
   },
@@ -306,9 +308,12 @@ export const zhCN = {
       acceptWithScenes: '确认（含画面）',
       acceptWithStoryAttrs: '确认故事（含画面）',
       storyCentricHint:
-        '以故事为单位确认：其下画面会一并带入写入。角色/地点归作品库，出场与地点语境由场景语境承载，不再整批挂到故事投递路由。',
+        '以故事为单位确认：其下画面会一并带入写入。故事相关角色/地点仅来自其子画面语境并集；作品库实体单独确认，不整批挂到投递路由。',
       entityAcceptsWithStory:
         '次要：角色/地点在作品库单独确认建档；不随故事批量写入投递路由。须先保证故事标题与画面说明可读。',
+      storyRelatedFromScenes:
+        '本故事相关（来自子画面语境，只读）',
+      storyRelatedEmpty: '子画面暂无可聚合的出场/地点线索',
       alreadyExists: '已存在',
       willCreateOnWrite: '确认后建档',
 

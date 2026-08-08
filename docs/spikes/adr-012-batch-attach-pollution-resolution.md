@@ -111,8 +111,8 @@ Discovery Character/Location candidates = **Work Archive candidates**, not Story
 | ---------- | ------ |
 | ADR-012 / SPEC-SCC-001 | Done |
 | SCC-S1 Context write on Projection | Done (`scene_contexts_v1`) |
-| Stop Accept batch-write as Route authority | **Not done** → L2-A |
-| Review/Rollout UI aggregate from Context/child scenes | **Not done** → L2-B |
+| Stop Accept batch-write as Route authority | **Done** · L2-A PASS · Verified |
+| Review/Rollout UI aggregate from Context/child scenes | **Done** · L2-B PASS · Verified |
 | Propose signals for Context (not Story membership) | Optional → L2-C |
 | Delete Route `character_ids` / `location_id` | Level 3 · **Not authorized** |
 
@@ -133,6 +133,7 @@ docs/adr/012-scene-context-runtime-boundary.md
 docs/specs/spec-scc-001-scene-context-contract.md
 docs/spikes/implement-scc-001-s1-context-aware-projection.md
 docs/spikes/implement-scc-001-l2a-context-ownership-authority.md
-lib/discovery/review-state.ts          # contamination source (to be demoted)
-lib/scene-context/                     # S1 write path
+docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md
+lib/discovery/review-state.ts          # L2-A demoted batch attach
+lib/scene-context/                     # S1 write path · L2-B aggregate (pending)
 ```

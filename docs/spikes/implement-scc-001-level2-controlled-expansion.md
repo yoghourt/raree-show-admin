@@ -62,8 +62,8 @@ Code expansion beyond S1 still requires a **named next slice** before non-allowl
 | Slice | Doc | Status |
 | ----- | --- | ------ |
 | Problem framing | `docs/spikes/adr-012-batch-attach-pollution-resolution.md` | Normative explanation |
-| **L2-A** Context ownership authority (stop Accept→Route batch attach) | `docs/spikes/implement-scc-001-l2a-context-ownership-authority.md` | **Prepared — awaiting Grant** |
-| L2-B UI aggregate from Context | (TBD after L2-A) | Not prepared |
+| **L2-A** Context ownership authority (stop Accept→Route batch attach) | `docs/spikes/implement-scc-001-l2a-context-ownership-authority.md` | **PASS · Verified** |
+| **L2-B** UI aggregate from Context / child scenes | `docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md` | **PASS · Verified** |
 | L2-C Propose→Context signals | (TBD) | Not prepared |
 | Level 3 Route field sunset | `docs/spikes/implement-scc-001-level3-route-ownership-sunset.md` | **Not authorized** |
 
@@ -78,6 +78,7 @@ docs/spikes/implement-scc-001-s1-result-review.md
 docs/spikes/implement-scc-001-s1-context-aware-projection.md
 docs/spikes/adr-012-batch-attach-pollution-resolution.md
 docs/spikes/implement-scc-001-l2a-context-ownership-authority.md
+docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md
 docs/spikes/implement-scc-001-level3-route-ownership-sunset.md
 docs/adr/012-scene-context-runtime-boundary.md
 docs/specs/spec-scc-001-scene-context-contract.md
