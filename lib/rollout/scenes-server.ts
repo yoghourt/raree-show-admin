@@ -14,6 +14,7 @@ import {
   parseRendererExpression,
   parseVisualIntent,
 } from "@/lib/discovery/visual-contract";
+import type { SceneContextRecord } from "@/lib/scene-context/types";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
 
 export type FrameProvenanceEntry = {
@@ -23,6 +24,11 @@ export type FrameProvenanceEntry = {
   rendererExpression?: RendererExpression;
   /** Audit only — MUST NOT be fed to Image Port. */
   visualIntent?: VisualIntent | null;
+  /**
+   * IMPLEMENT-SCC-001-S1: pointer to Scene Context ownership record.
+   * Provenance remains creator transport; Context owns narrative Expression.
+   */
+  sourceContextId?: string;
 };
 
 export type SceneRowWithProvenance = {
@@ -38,6 +44,8 @@ export type SceneRowWithProvenance = {
   character_ids: string[] | null;
   discovery_source_review_id: string | null;
   frame_provenance_v1: unknown;
+  /** IMPLEMENT-SCC-001-S1: Scene Context ownership records (delivery host storage). */
+  scene_contexts_v1?: unknown;
 };
 
 function locationIdToDb(locationId: string | null | undefined): string {
@@ -89,6 +97,11 @@ export function parseFrameProvenance(raw: unknown): FrameProvenanceEntry[] {
           entry.visualIntent = intent.value;
         }
       }
+      const sourceContextId = (rec as { sourceContextId?: unknown })
+        .sourceContextId;
+      if (typeof sourceContextId === "string" && sourceContextId.trim()) {
+        entry.sourceContextId = sourceContextId.trim();
+      }
       out.push(entry);
     }
   }
@@ -110,8 +123,24 @@ export function rowToReadingRoute(row: SceneRowWithProvenance): ReadingRoute {
   };
 }
 
+/** Base select — safe before scene_contexts_v1 migration is applied. */
 const SELECT_COLS =
   "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, location_id, character_ids, discovery_source_review_id, frame_provenance_v1";
+
+/**
+ * IMPLEMENT-SCC-001-S1 — requires docs/supabase/migrations/20260808000000_scene_contexts_v1.sql
+ * Typed as `string` so supabase-js does not parse the select list against generated
+ * Database types that may not yet include scene_contexts_v1 (avoids ParserError).
+ */
+const SELECT_COLS_WITH_CONTEXTS: string = `${SELECT_COLS}, scene_contexts_v1`;
+
+function asSceneRow(data: unknown): SceneRowWithProvenance {
+  return data as SceneRowWithProvenance;
+}
+
+function asSceneRowOrNull(data: unknown): SceneRowWithProvenance | null {
+  return (data as SceneRowWithProvenance | null) ?? null;
+}
 
 export async function getSceneRowByTsid(
   supabase: SupabaseClient,
@@ -126,7 +155,7 @@ export async function getSceneRowByTsid(
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return (data as SceneRowWithProvenance | null) ?? null;
+  return asSceneRowOrNull(data);
 }
 
 export async function getSceneRowByDiscoverySourceReviewId(
@@ -142,7 +171,7 @@ export async function getSceneRowByDiscoverySourceReviewId(
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return (data as SceneRowWithProvenance | null) ?? null;
+  return asSceneRowOrNull(data);
 }
 
 export async function listDiscoveryPersistedRoutes(
@@ -214,7 +243,7 @@ export async function insertReadingRouteWithProvenance(
     .single();
 
   if (error) throw new Error(error.message);
-  return data as SceneRowWithProvenance;
+  return asSceneRow(data);
 }
 
 export async function updateSceneFramesAndProvenance(
@@ -222,21 +251,62 @@ export async function updateSceneFramesAndProvenance(
   workId: string,
   tsid: string,
   frames: ReadingFrame[],
-  provenance: FrameProvenanceEntry[]
+  provenance: FrameProvenanceEntry[],
+  options?: { sceneContexts?: SceneContextRecord[] }
 ): Promise<SceneRowWithProvenance> {
+  const patch: Record<string, unknown> = {
+    story_images_v2: frames,
+    frame_provenance_v1: provenance,
+  };
+  const withContexts = options?.sceneContexts !== undefined;
+  if (withContexts) {
+    patch.scene_contexts_v1 = options.sceneContexts;
+  }
+
   const { data, error } = await supabase
     .from("scenes")
-    .update({
-      story_images_v2: frames,
-      frame_provenance_v1: provenance,
-    })
+    .update(patch)
     .eq("work_id", workId)
     .eq("tsid", tsid)
-    .select(SELECT_COLS)
+    .select(withContexts ? SELECT_COLS_WITH_CONTEXTS : SELECT_COLS)
     .single();
 
-  if (error) throw new Error(error.message);
-  return data as SceneRowWithProvenance;
+  if (error) {
+    if (
+      withContexts &&
+      /scene_contexts_v1/i.test(error.message)
+    ) {
+      throw new Error(
+        "scene_contexts_v1 missing — apply docs/supabase/migrations/20260808000000_scene_contexts_v1.sql before enabling SCENE_CONTEXT_PROJECTION_ENABLED"
+      );
+    }
+    throw new Error(error.message);
+  }
+  return asSceneRow(data);
+}
+
+/** Load Route row including scene_contexts_v1 (S1). */
+export async function getSceneRowWithContextsByTsid(
+  supabase: SupabaseClient,
+  workId: string,
+  tsid: string
+): Promise<SceneRowWithProvenance | null> {
+  const { data, error } = await supabase
+    .from("scenes")
+    .select(SELECT_COLS_WITH_CONTEXTS)
+    .eq("work_id", workId)
+    .eq("tsid", tsid)
+    .maybeSingle();
+
+  if (error) {
+    if (/scene_contexts_v1/i.test(error.message)) {
+      throw new Error(
+        "scene_contexts_v1 missing — apply docs/supabase/migrations/20260808000000_scene_contexts_v1.sql before enabling SCENE_CONTEXT_PROJECTION_ENABLED"
+      );
+    }
+    throw new Error(error.message);
+  }
+  return asSceneRowOrNull(data);
 }
 
 export async function deleteSceneRow(

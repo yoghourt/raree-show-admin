@@ -9,6 +9,7 @@ import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number"
 import type {
   DiscoveryCandidate,
   DiscoveryCandidateType,
+  SceneCandidateFields,
 } from "@/lib/discovery/propose-types";
 import {
   foldCharacterArchivesIntoExpression,
@@ -22,6 +23,7 @@ import {
   findRestrictedFullFaceSceneCues,
   remapGenericRolesToRoleNames,
 } from "@/lib/discovery/expression-capability-rules";
+import { normalizeSceneContextCandidateSignals } from "@/lib/discovery/scene-context-candidate-signals";
 import {
   parseRendererExpression,
   parseVisualIntent,
@@ -277,22 +279,24 @@ function validateSceneFields(
   }
 
   const parsedChapter = Number(String(chapterNumber).trim());
+  // L2-C: seed Intent cast structure from Expression (names filled later with char list).
+  const baseFields: SceneCandidateFields = {
+    parentStoryCandidateId: fields.parentStoryCandidateId.trim(),
+    chapter_number:
+      typeof chapterNumber === "number"
+        ? Math.trunc(chapterNumber)
+        : parsedChapter,
+    title: fields.title.trim(),
+    ...(fields.chapter_title === null || isNonEmptyString(fields.chapter_title)
+      ? { chapter_title: fields.chapter_title ?? null }
+      : {}),
+    ...(isNonEmptyString(fields.summary) ? { summary: fields.summary.trim() } : {}),
+    ...(intentResult.value ? { visualIntent: intentResult.value } : {}),
+    rendererExpression: authoredExpression,
+  };
   return {
     ok: true,
-    fields: {
-      parentStoryCandidateId: fields.parentStoryCandidateId.trim(),
-      chapter_number:
-        typeof chapterNumber === "number"
-          ? Math.trunc(chapterNumber)
-          : parsedChapter,
-      title: fields.title.trim(),
-      ...(fields.chapter_title === null || isNonEmptyString(fields.chapter_title)
-        ? { chapter_title: fields.chapter_title ?? null }
-        : {}),
-      ...(isNonEmptyString(fields.summary) ? { summary: fields.summary.trim() } : {}),
-      ...(intentResult.value ? { visualIntent: intentResult.value } : {}),
-      rendererExpression: authoredExpression,
-    },
+    fields: normalizeSceneContextCandidateSignals(baseFields),
   };
 }
 
@@ -345,12 +349,18 @@ export function applyCharacterArchivesToSceneCandidate(
   if (roles.length > 0) {
     expression = foldCharacterArchivesIntoExpression(expression, roles);
   }
-  return {
+  const withExpression: DiscoveryCandidate = {
     ...candidate,
     fields: {
       ...candidate.fields,
       rendererExpression: expression,
     },
+  };
+  // L2-C: densify Context candidate Intent names from Work character candidates.
+  const sceneFields = withExpression.fields as SceneCandidateFields;
+  return {
+    ...withExpression,
+    fields: normalizeSceneContextCandidateSignals(sceneFields, roleNames),
   };
 }
 

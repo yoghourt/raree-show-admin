@@ -520,8 +520,9 @@ export function getChildSceneReviewIdsForStory(
 }
 
 /**
- * Collect work-batch character/location candidates as story-related attributes.
- * Existing catalog hits carry matchedTsid ("已存在").
+ * @deprecated IMPLEMENT-SCC-001-L2-A — Work-batch attach is NOT Story ownership.
+ * Kept for diagnostics / migration callers. MUST NOT feed Story.characterIds.
+ * Prefer empty Route membership; appearance/location live on Scene Context.
  */
 export function buildStoryRelatedEntityRefs(
   items: DiscoveryReviewItem[],
@@ -585,14 +586,20 @@ export function buildStoryRelatedEntityRefs(
 }
 
 /**
- * Accept a Story and cascade-accept its child Scenes (+ related char/loc attrs).
- * Invalid / discarded child scenes are skipped (story still succeeds).
+ * Accept a Story and cascade-accept its child Scenes only.
+ *
+ * IMPLEMENT-SCC-001-L2-A / ADR-012:
+ * MUST NOT batch-fill Story characterIds / locationId from the Work batch.
+ * Character/Location Archive candidates remain Work-scoped (separate Accept).
+ * Appearance/location context ownership is Scene Context (Projection / SCC-S1).
+ *
+ * `catalogs` retained for API compatibility; unused for Route membership.
  */
 export function prepareAcceptStoryWithChildScenes(
   items: DiscoveryReviewItem[],
   storyReviewId: string,
   acceptedStories: AcceptedStoryUnitStaging[] = [],
-  catalogs: {
+  _catalogs: {
     characters: Array<{ name: string; tsid: string }>;
     locations: Array<{ name: string; tsid: string }>;
   } = { characters: [], locations: [] }
@@ -621,25 +628,18 @@ export function prepareAcceptStoryWithChildScenes(
     };
   }
 
-  const related = buildStoryRelatedEntityRefs(items, catalogs);
+  // L2-A: Route membership fields are non-authoritative debt — leave empty.
   const storyStaging: AcceptedStoryUnitStaging = {
     ...storyResult.staging,
-    relatedCharacterRefs: related.relatedCharacterRefs,
-    relatedLocationRefs: related.relatedLocationRefs,
-    characterIds: related.relatedCharacterRefs
-      .map((r) => r.matchedTsid)
-      .filter((id): id is string => Boolean(id)),
-    locationId:
-      related.relatedLocationRefs.find((r) => r.matchedTsid)?.matchedTsid ??
-      null,
+    relatedCharacterRefs: [],
+    relatedLocationRefs: [],
+    characterIds: [],
+    locationId: null,
   };
 
   let workingItems = markReviewAccepted(items, storyReviewId);
   const storiesForChildren = [...acceptedStories, storyStaging];
-  const acceptedReviewIds = [storyReviewId, ...related.entityReviewIds];
-  for (const entityId of related.entityReviewIds) {
-    workingItems = markReviewAccepted(workingItems, entityId);
-  }
+  const acceptedReviewIds = [storyReviewId];
 
   const sceneStagings: AcceptedSceneCandidateStaging[] = [];
   const sceneErrors: AcceptReviewError[] = [];

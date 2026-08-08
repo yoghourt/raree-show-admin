@@ -91,6 +91,8 @@ export const rolloutUi = {
   nextStepDiscovery: m.nextStepDiscovery,
   pipelineFromDiscovery: m.pipelineFromDiscovery,
   entitySectionDeferred: m.entitySectionDeferred,
+  storyRelatedFromFrames: m.storyRelatedFromFrames,
+  storyRelatedFromFramesEmpty: m.storyRelatedFromFramesEmpty,
   openReaderVerify: m.openReaderVerify,
 } as const;
 

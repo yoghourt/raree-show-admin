@@ -120,7 +120,9 @@ export type RolloutErrorCode =
   | "UNPERSIST_BLOCKED"
   | "UNPROJECT_BLOCKED"
   | "WORK_MISMATCH"
-  | "INVALID_BODY";
+  | "INVALID_BODY"
+  /** IMPLEMENT-SCC-001-S1 — Context path ownership gate failed */
+  | "RUNTIME_TRUTH_GATE_FAILED";
 
 export interface RolloutErrorBody {
   error: {

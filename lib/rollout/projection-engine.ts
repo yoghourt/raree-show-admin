@@ -40,6 +40,9 @@ export type ProjectionExecuteResult =
       readingRouteTsid: string;
       frameIndex: number;
       sourceReviewId: string;
+      /** IMPLEMENT-SCC-001-S1 — present when Context-aware path ran. */
+      contextId?: string;
+      contextPath?: boolean;
       /** Soft-compat fields for older API clients */
       approvedSceneUnit?: undefined;
       sceneProjectionLink?: undefined;
@@ -177,6 +180,10 @@ export async function executeSceneProjection(
     readingRouteTsid: result.readingRouteTsid,
     frameIndex: result.frameIndex,
     sourceReviewId: result.sourceReviewId,
+    ...(result.contextId ? { contextId: result.contextId } : {}),
+    ...(result.contextPath !== undefined
+      ? { contextPath: result.contextPath }
+      : {}),
   };
 }
 

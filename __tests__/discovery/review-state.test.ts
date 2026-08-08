@@ -299,14 +299,118 @@ describe("Accept handoff guards", () => {
     if (!cascade.ok) throw new Error("expected cascade ok");
     expect(cascade.sceneStagings).toHaveLength(1);
     expect(cascade.sceneStagings[0]!.title).toBe("Courtyard");
-    expect(cascade.storyStaging.relatedCharacterRefs).toHaveLength(1);
-    expect(cascade.storyStaging.relatedCharacterRefs![0]!.matchedTsid).toBe(
-      "char_arya"
-    );
-    expect(cascade.storyStaging.characterIds).toEqual(["char_arya"]);
-    expect(cascade.acceptedReviewIds).toContain(items[3]!.reviewId);
+    // L2-A: MUST NOT batch-fill Story Route membership from Work character batch
+    expect(cascade.storyStaging.relatedCharacterRefs).toEqual([]);
+    expect(cascade.storyStaging.relatedLocationRefs).toEqual([]);
+    expect(cascade.storyStaging.characterIds).toEqual([]);
+    expect(cascade.storyStaging.locationId).toBeNull();
+    // Character Archive candidate is NOT cascade-accepted with Story
+    expect(cascade.acceptedReviewIds).not.toContain(items[3]!.reviewId);
+    expect(cascade.acceptedReviewIds).toEqual([
+      items[0]!.reviewId,
+      items[1]!.reviewId,
+    ]);
     expect(cascade.sceneErrors).toHaveLength(1);
     expect(cascade.sceneErrors[0]!.code).toBe("ACCEPT_VALIDATION_FAILED");
+  });
+
+  it("L2-A: Story A Accept MUST NOT inherit Story B-only entities via Work batch", () => {
+    const storyA = makeCandidate({
+      candidateId: "story-a",
+      candidateType: "story",
+      displayName: "Story A",
+      fields: { title: "Story A", summary: "Arc A" },
+    });
+    const storyB = makeCandidate({
+      candidateId: "story-b",
+      candidateType: "story",
+      displayName: "Story B",
+      fields: { title: "Story B", summary: "Arc B" },
+    });
+    const sceneA = makeCandidate({
+      candidateId: "scene-a",
+      candidateType: "scene",
+      displayName: "Scene A",
+      fields: {
+        parentStoryCandidateId: "story-a",
+        chapter_number: 1,
+        title: "Scene A",
+        rendererExpression: {
+          environment: "quiet hall",
+          characters: [{ role: "lead", visual: "alone" }],
+          action: "stands",
+          composition: "wide",
+        },
+      },
+    });
+    const sceneB = makeCandidate({
+      candidateId: "scene-b",
+      candidateType: "scene",
+      displayName: "Scene B",
+      fields: {
+        parentStoryCandidateId: "story-b",
+        chapter_number: 1,
+        title: "Scene B",
+        visualIntent: {
+          characters: [{ role: "assassin", name: "Arya" }],
+          emotion: "cold",
+          purpose: "strike",
+          relationship: null,
+        },
+        rendererExpression: {
+          environment: "winter courtyard",
+          characters: [{ role: "assassin", visual: "hooded" }],
+          action: "draws blade",
+          composition: "close",
+        },
+      },
+    });
+    const arya = makeCandidate({
+      candidateId: "char-arya",
+      candidateType: "character",
+      displayName: "Arya",
+      fields: { name: "Arya", house: "Stark" },
+    });
+    const winterfell = makeCandidate({
+      candidateId: "loc-wf",
+      candidateType: "location",
+      displayName: "Winterfell",
+      fields: { name: "Winterfell", region: "North" },
+    });
+
+    const items = createReviewItems([
+      storyA,
+      storyB,
+      sceneA,
+      sceneB,
+      arya,
+      winterfell,
+    ]);
+
+    const cascadeA = prepareAcceptStoryWithChildScenes(
+      items,
+      items[0]!.reviewId,
+      [],
+      {
+        characters: [{ name: "Arya", tsid: "char_arya" }],
+        locations: [{ name: "Winterfell", tsid: "loc_winterfell" }],
+      }
+    );
+    expect(cascadeA.ok).toBe(true);
+    if (!cascadeA.ok) throw new Error("expected cascade A ok");
+
+    expect(cascadeA.storyStaging.title).toBe("Story A");
+    expect(cascadeA.storyStaging.characterIds).toEqual([]);
+    expect(cascadeA.storyStaging.locationId).toBeNull();
+    expect(cascadeA.storyStaging.relatedCharacterRefs).toEqual([]);
+    expect(cascadeA.storyStaging.relatedLocationRefs).toEqual([]);
+    // Arya / Winterfell remain pending — Work Archive, not Story A membership
+    expect(cascadeA.acceptedReviewIds).not.toContain(items[4]!.reviewId);
+    expect(cascadeA.acceptedReviewIds).not.toContain(items[5]!.reviewId);
+    expect(cascadeA.acceptedReviewIds).toEqual([
+      items[0]!.reviewId,
+      items[2]!.reviewId,
+    ]);
   });
 
   it("prepareAcceptStoryWithChildScenes skips discarded child scenes", () => {

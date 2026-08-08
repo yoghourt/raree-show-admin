@@ -61,6 +61,10 @@ import type {
   AcceptedStoryUnitStaging,
   DiscoveryReviewItem,
 } from "@/lib/discovery/review-types";
+import {
+  aggregateStoryRelatedRefs,
+  formatStoryRelatedAggregateLine,
+} from "@/lib/scene-context/aggregate-story-refs";
 import { messages } from "@/lib/locale";
 import {
   loadRolloutQueue,
@@ -1061,6 +1065,27 @@ export function DiscoveryReviewPanel({
                           story.status === "edited_pending_accept";
                         const busy =
                           isRegening && regenReviewId === story.reviewId;
+                        const storyRelated = aggregateStoryRelatedRefs({
+                          sceneSources: childScenes.map((scene) => {
+                            const fields = getEffectiveFields(
+                              scene
+                            ) as SceneCandidateFields;
+                            return {
+                              visualIntent: fields.visualIntent,
+                              rendererExpression: fields.rendererExpression,
+                            };
+                          }),
+                          archive: {
+                            characters: characterCatalog,
+                            locations: locationCatalog,
+                          },
+                        });
+                        const storyRelatedLine = formatStoryRelatedAggregateLine(
+                          storyRelated,
+                          {
+                            alreadyExistsLabel: discoveryReviewUi.alreadyExists,
+                          }
+                        );
                         return (
                           <li
                             key={story.reviewId}
@@ -1082,93 +1107,15 @@ export function DiscoveryReviewPanel({
                               }}
                             />
 
-                            {characterItems.length > 0 ? (
-                              <div className="ml-2 space-y-2 border-l pl-4">
-                                <div className="space-y-0.5">
-                                  <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                                    {DISCOVERY_CANDIDATE_TYPE_LABELS.character}
-                                  </h4>
-                                  {actionable ? (
-                                    <p className="text-muted-foreground text-xs">
-                                      {discoveryReviewUi.entityAcceptsWithStory}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <ul className="space-y-3">
-                                  {characterItems.map((item) => {
-                                    const itemActionable =
-                                      item.status === "pending" ||
-                                      item.status === "edited_pending_accept";
-                                    return (
-                                      <ReviewItemCard
-                                        key={`${story.reviewId}-${item.reviewId}`}
-                                        item={item}
-                                        busy={
-                                          isRegening &&
-                                          regenReviewId === item.reviewId
-                                        }
-                                        actionable={itemActionable}
-                                        showAccept={false}
-                                        existingBadge={entityBadge(item)}
-                                        onAccept={() => undefined}
-                                        onEdit={() => openEdit(item)}
-                                        onDiscard={() =>
-                                          discardCandidate(item.reviewId)
-                                        }
-                                        onRegen={() => {
-                                          setRegenItem(item);
-                                          setRegenFeedback("");
-                                        }}
-                                      />
-                                    );
-                                  })}
-                                </ul>
-                              </div>
-                            ) : null}
-
-                            {locationItems.length > 0 ? (
-                              <div className="ml-2 space-y-2 border-l pl-4">
-                                <div className="space-y-0.5">
-                                  <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                                    {DISCOVERY_CANDIDATE_TYPE_LABELS.location}
-                                  </h4>
-                                  {actionable ? (
-                                    <p className="text-muted-foreground text-xs">
-                                      {discoveryReviewUi.entityAcceptsWithStory}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <ul className="space-y-3">
-                                  {locationItems.map((item) => {
-                                    const itemActionable =
-                                      item.status === "pending" ||
-                                      item.status === "edited_pending_accept";
-                                    return (
-                                      <ReviewItemCard
-                                        key={`${story.reviewId}-${item.reviewId}`}
-                                        item={item}
-                                        busy={
-                                          isRegening &&
-                                          regenReviewId === item.reviewId
-                                        }
-                                        actionable={itemActionable}
-                                        showAccept={false}
-                                        existingBadge={entityBadge(item)}
-                                        onAccept={() => undefined}
-                                        onEdit={() => openEdit(item)}
-                                        onDiscard={() =>
-                                          discardCandidate(item.reviewId)
-                                        }
-                                        onRegen={() => {
-                                          setRegenItem(item);
-                                          setRegenFeedback("");
-                                        }}
-                                      />
-                                    );
-                                  })}
-                                </ul>
-                              </div>
-                            ) : null}
+                            <div className="ml-2 space-y-0.5 border-l pl-4">
+                              <p className="text-muted-foreground text-xs font-medium">
+                                {discoveryReviewUi.storyRelatedFromScenes}
+                              </p>
+                              <p className="text-muted-foreground text-xs">
+                                {storyRelatedLine ??
+                                  discoveryReviewUi.storyRelatedEmpty}
+                              </p>
+                            </div>
 
                             {childScenes.length > 0 ? (
                               <div className="ml-2 space-y-2 border-l pl-4">
@@ -1255,6 +1202,93 @@ export function DiscoveryReviewPanel({
                           </ul>
                         </li>
                       ) : null}
+
+                      {/* L2-A: Work Archive entities — once, not under every Story */}
+                      {characterItems.length > 0 ? (
+                        <li className="space-y-2 rounded-xl border border-zinc-200 p-4">
+                          <div className="space-y-0.5">
+                            <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                              {DISCOVERY_CANDIDATE_TYPE_LABELS.character}
+                              （作品库）
+                            </h4>
+                            <p className="text-muted-foreground text-xs">
+                              {discoveryReviewUi.entityAcceptsWithStory}
+                            </p>
+                          </div>
+                          <ul className="space-y-3">
+                            {characterItems.map((item) => {
+                              const itemActionable =
+                                item.status === "pending" ||
+                                item.status === "edited_pending_accept";
+                              return (
+                                <ReviewItemCard
+                                  key={item.reviewId}
+                                  item={item}
+                                  busy={
+                                    isRegening &&
+                                    regenReviewId === item.reviewId
+                                  }
+                                  actionable={itemActionable}
+                                  showAccept={itemActionable}
+                                  existingBadge={entityBadge(item)}
+                                  onAccept={() => handleAccept(item)}
+                                  onEdit={() => openEdit(item)}
+                                  onDiscard={() =>
+                                    discardCandidate(item.reviewId)
+                                  }
+                                  onRegen={() => {
+                                    setRegenItem(item);
+                                    setRegenFeedback("");
+                                  }}
+                                />
+                              );
+                            })}
+                          </ul>
+                        </li>
+                      ) : null}
+
+                      {locationItems.length > 0 ? (
+                        <li className="space-y-2 rounded-xl border border-zinc-200 p-4">
+                          <div className="space-y-0.5">
+                            <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                              {DISCOVERY_CANDIDATE_TYPE_LABELS.location}
+                              （作品库）
+                            </h4>
+                            <p className="text-muted-foreground text-xs">
+                              {discoveryReviewUi.entityAcceptsWithStory}
+                            </p>
+                          </div>
+                          <ul className="space-y-3">
+                            {locationItems.map((item) => {
+                              const itemActionable =
+                                item.status === "pending" ||
+                                item.status === "edited_pending_accept";
+                              return (
+                                <ReviewItemCard
+                                  key={item.reviewId}
+                                  item={item}
+                                  busy={
+                                    isRegening &&
+                                    regenReviewId === item.reviewId
+                                  }
+                                  actionable={itemActionable}
+                                  showAccept={itemActionable}
+                                  existingBadge={entityBadge(item)}
+                                  onAccept={() => handleAccept(item)}
+                                  onEdit={() => openEdit(item)}
+                                  onDiscard={() =>
+                                    discardCandidate(item.reviewId)
+                                  }
+                                  onRegen={() => {
+                                    setRegenItem(item);
+                                    setRegenFeedback("");
+                                  }}
+                                />
+                              );
+                            })}
+                          </ul>
+                        </li>
+                      ) : null}
                     </ul>
                   </div>
                 );
@@ -1275,6 +1309,17 @@ export function DiscoveryReviewPanel({
                               scene.parentStorySourceReviewId ===
                               unit.sourceReviewId
                           );
+                        const acceptedRelated = aggregateStoryRelatedRefs({
+                          sceneStagings: childScenes,
+                          archive: {
+                            characters: characterCatalog,
+                            locations: locationCatalog,
+                          },
+                        });
+                        const acceptedRelatedLine =
+                          formatStoryRelatedAggregateLine(acceptedRelated, {
+                            alreadyExistsLabel: discoveryReviewUi.alreadyExists,
+                          });
                         return (
                           <li key={unit.sourceReviewId} className="space-y-2">
                             <div className="flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1283,21 +1328,14 @@ export function DiscoveryReviewPanel({
                                 <p className="text-muted-foreground">
                                   {unit.summary}
                                 </p>
-                                {unit.relatedCharacterRefs?.length ||
-                                unit.relatedLocationRefs?.length ? (
-                                  <p className="text-muted-foreground mt-1 text-xs">
-                                    {[
-                                      ...(unit.relatedCharacterRefs ?? []).map(
-                                        (r) =>
-                                          `${r.name}${r.matchedTsid ? `（${discoveryReviewUi.alreadyExists}）` : ""}`
-                                      ),
-                                      ...(unit.relatedLocationRefs ?? []).map(
-                                        (r) =>
-                                          `${r.name}${r.matchedTsid ? `（${discoveryReviewUi.alreadyExists}）` : ""}`
-                                      ),
-                                    ].join(" · ")}
-                                  </p>
-                                ) : null}
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                  <span className="font-medium">
+                                    {discoveryReviewUi.storyRelatedFromScenes}
+                                    ：
+                                  </span>
+                                  {acceptedRelatedLine ??
+                                    discoveryReviewUi.storyRelatedEmpty}
+                                </p>
                               </div>
                               <div className="flex shrink-0 flex-wrap gap-2">
                                 <Button
