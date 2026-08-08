@@ -1,11 +1,24 @@
 /**
- * IMPLEMENT-SCC-001-S1 — Editorial Scene staging → Scene Context association.
+ * IMPLEMENT-SCC-001-S1 / L2-A — Editorial Scene staging → Scene Context association.
+ *
+ * Appearance / location / narrative beat ownership lands on Scene Context.
+ * Optional archive enrichment is Context-scoped (name match) — never Story Route membership.
  */
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
+import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
 import { MINIMAL_RENDERER_EXPRESSION } from "@/lib/discovery/visual-contract";
 
-import type { SceneContextRecord } from "@/lib/scene-context/types";
+import type {
+  SceneContextAppearance,
+  SceneContextLocation,
+  SceneContextRecord,
+} from "@/lib/scene-context/types";
+
+export type SceneContextArchiveCatalog = {
+  characters: Array<{ name: string; tsid: string }>;
+  locations: Array<{ name: string; tsid: string }>;
+};
 
 function chapterNumber(value: number | string): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -26,6 +39,9 @@ export function contextIdForEditorialScene(sourceReviewId: string): string {
 /**
  * Build Runtime-authoritative Scene Context from accepted Editorial Scene staging.
  * Human acceptance is assumed already complete (staging exists).
+ *
+ * L2-A: When `archive` is provided, match Expression/Intent names to Work Archive
+ * for Context refs only — does not write Story/Route character_ids / location_id.
  */
 export function associateStagingToSceneContext(
   staging: AcceptedSceneCandidateStaging,
@@ -33,6 +49,7 @@ export function associateStagingToSceneContext(
     readingRouteTsid: string;
     frameIndex: number;
     now?: string;
+    archive?: SceneContextArchiveCatalog;
   }
 ): SceneContextRecord {
   const now = params.now ?? new Date().toISOString();
@@ -43,16 +60,36 @@ export function associateStagingToSceneContext(
       ...MINIMAL_RENDERER_EXPRESSION,
     } as typeof MINIMAL_RENDERER_EXPRESSION);
 
-  const appearance = (expr.characters ?? []).map((c) => {
-    const intentChar = intent?.characters?.find(
-      (ic) => ic.role.toLowerCase() === c.role.toLowerCase()
-    );
-    return {
-      role: c.role,
-      ...(intentChar?.name ? { name: intentChar.name } : {}),
-      ...(c.visual ? { visual: c.visual } : {}),
-    };
-  });
+  const appearance: SceneContextAppearance[] = (expr.characters ?? []).map(
+    (c) => {
+      const intentChar = intent?.characters?.find(
+        (ic) => ic.role.toLowerCase() === c.role.toLowerCase()
+      );
+      const name = intentChar?.name?.trim() || undefined;
+      const matched =
+        name && params.archive
+          ? findExistingByName(name, params.archive.characters)
+          : undefined;
+      return {
+        role: c.role,
+        ...(name ? { name } : {}),
+        ...(c.visual ? { visual: c.visual } : {}),
+        ...(matched ? { archiveTsid: matched.tsid } : {}),
+      };
+    }
+  );
+
+  const environment = expr.environment || "";
+  const locationContext: SceneContextLocation = {
+    environmentFromExpression: environment,
+  };
+  if (params.archive?.locations.length && environment.trim()) {
+    const locMatch = findExistingByName(environment, params.archive.locations);
+    if (locMatch) {
+      locationContext.archiveTsid = locMatch.tsid;
+      locationContext.archiveName = locMatch.name;
+    }
+  }
 
   return {
     contextId: contextIdForEditorialScene(staging.sourceReviewId),
@@ -74,9 +111,7 @@ export function associateStagingToSceneContext(
       chapter_title: staging.chapter_title?.trim() || null,
     },
     characterAppearanceContext: appearance,
-    locationContext: {
-      environmentFromExpression: expr.environment || "",
-    },
+    locationContext,
     creationFacingVisualExpression: staging.rendererExpression
       ? { ...staging.rendererExpression }
       : null,

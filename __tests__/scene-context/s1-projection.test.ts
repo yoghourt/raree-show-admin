@@ -90,6 +90,34 @@ describe("associateStagingToSceneContext", () => {
     expect(ctx.contextId).not.toBe("scene_route_1");
   });
 
+  it("L2-A: enriches Context archive refs from Work catalog by name (not Route)", () => {
+    const ctx = associateStagingToSceneContext(staging, {
+      readingRouteTsid: "scene_route_1",
+      frameIndex: 0,
+      now: "2026-08-08T00:00:00.000Z",
+      archive: {
+        characters: [
+          { name: "Fantine", tsid: "char_fantine" },
+          { name: "Cosette", tsid: "char_cosette" },
+          { name: "Javert", tsid: "char_javert" },
+        ],
+        locations: [
+          { name: "narrow Paris street at night", tsid: "loc_paris_street" },
+        ],
+      },
+    });
+
+    expect(ctx.characterAppearanceContext.map((c) => c.archiveTsid)).toEqual([
+      "char_fantine",
+      "char_cosette",
+    ]);
+    expect(ctx.locationContext.archiveTsid).toBe("loc_paris_street");
+    // Enrichment must not invent Route membership — associate has no characterIds
+    expect(
+      (ctx as { characterIds?: unknown }).characterIds
+    ).toBeUndefined();
+  });
+
   it("upserts by editorial sourceReviewId", () => {
     const a = associateStagingToSceneContext(staging, {
       readingRouteTsid: "scene_route_1",

@@ -13,6 +13,7 @@ import {
   associateStagingToSceneContext,
   removeSceneContextBySourceReviewId,
   upsertSceneContext,
+  type SceneContextArchiveCatalog,
 } from "@/lib/scene-context/associate";
 import { isSceneContextProjectionEnabledForWork } from "@/lib/scene-context/feature-flag";
 import { parseSceneContextsV1 } from "@/lib/scene-context/parse";
@@ -62,6 +63,27 @@ function frameFromStaging(staging: AcceptedSceneCandidateStaging): ReadingFrame 
 
 function locationIdFromRow(row: SceneRowWithProvenance): string | null {
   return row.location_id?.trim() ? row.location_id : null;
+}
+
+/** Work Archive names for Context-scoped enrichment only (ADR-012 L2-A). */
+async function loadWorkArchiveCatalog(
+  supabase: SupabaseClient,
+  workId: string
+): Promise<SceneContextArchiveCatalog> {
+  const [charactersRes, locationsRes] = await Promise.all([
+    supabase.from("characters").select("name, tsid").eq("work_id", workId),
+    supabase.from("locations").select("name, tsid").eq("work_id", workId),
+  ]);
+  return {
+    characters: (charactersRes.data ?? []) as Array<{
+      name: string;
+      tsid: string;
+    }>,
+    locations: (locationsRes.data ?? []) as Array<{
+      name: string;
+      tsid: string;
+    }>,
+  };
 }
 
 type ResolveParentResult =
@@ -165,9 +187,12 @@ async function persistViaContextPath(
   const nextFrame = frameFromStaging(staging);
   const frameIndex = existing?.frameIndex ?? frames.length;
 
+  // L2-A: Context-scoped archive enrichment (not Route membership).
+  const archive = await loadWorkArchiveCatalog(supabase, workId);
   const context = associateStagingToSceneContext(staging, {
     readingRouteTsid: parent.tsid,
     frameIndex,
+    archive,
   });
   contexts = upsertSceneContext(contexts, context);
 

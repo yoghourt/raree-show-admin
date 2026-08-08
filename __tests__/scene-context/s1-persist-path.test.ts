@@ -54,12 +54,20 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
     getWithContextsMock.mockResolvedValue(parent);
     updateMock.mockResolvedValue(parent);
 
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ data: [], error: null })),
+        })),
+      })),
+    };
+
     const { persistReadingFrameFromSceneStaging } = await import(
       "@/lib/rollout/reading-frame-persist"
     );
 
     const result = await persistReadingFrameFromSceneStaging(
-      {} as never,
+      supabase as never,
       "work-1",
       {
         workId: "work-1",

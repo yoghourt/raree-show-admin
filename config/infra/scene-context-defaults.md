@@ -2,6 +2,10 @@
 
 Deployment knobs for Context-aware projection. Not Architecture constants.
 
+**Authorization (2026-08-08):** Architect Option A — controlled Level 2 expansion authorized. Prefer Work allowlist when enabling in shared envs. Level 3 still forbidden.
+
+**Batch-attach pollution track:** See `docs/spikes/adr-012-batch-attach-pollution-resolution.md`. **L2-A GRANTED** (`docs/spikes/implement-scc-001-l2a-context-ownership-authority.md`) — Accept MUST NOT batch-fill Route `character_ids` / `location_id`; Context path may enrich appearance/location archive refs by name.
+
 | Env | Default | Meaning |
 | --- | ------- | ------- |
 | `SCENE_CONTEXT_PROJECTION_ENABLED` | unset / off | When `1`/`true`, Projection Accept uses Editorial Scene → Scene Context → Frame |

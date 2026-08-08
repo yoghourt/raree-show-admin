@@ -4,6 +4,7 @@ export {
   removeSceneContextBySourceReviewId,
   upsertSceneContext,
 } from "@/lib/scene-context/associate";
+export type { SceneContextArchiveCatalog } from "@/lib/scene-context/associate";
 export {
   getSceneContextWorkAllowlist,
   isSceneContextProjectionEnabledForWork,

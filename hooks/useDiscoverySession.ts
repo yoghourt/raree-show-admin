@@ -1081,7 +1081,7 @@ export function useDiscoverySession(
     ): Promise<AcceptReviewResult | AcceptReviewError> => {
       const target = findReviewItem(reviewItems, reviewId);
 
-      // Story confirm cascades to frames + related characters/locations.
+      // Story confirm cascades to child Scenes only (L2-A: no batch entity attach).
       if (target?.candidate.candidateType === "story") {
         let catalogs = { characters: [] as Array<{ name: string; tsid: string }>, locations: [] as Array<{ name: string; tsid: string }> };
         try {

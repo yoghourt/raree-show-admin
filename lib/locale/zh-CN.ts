@@ -305,10 +305,12 @@ export const zhCN = {
       accept: '确认',
       acceptWithScenes: '确认（含画面）',
       acceptWithStoryAttrs: '确认故事（含画面）',
-      storyCentricHint: '以故事为单位确认：其下画面会一并带入写入。角色/地点随故事写入时解析，不挡主线。',
-      entityAcceptsWithStory: '次要：已存在则选用，没有则写入时再建档。须先保证故事标题与画面说明可读。',
+      storyCentricHint:
+        '以故事为单位确认：其下画面会一并带入写入。角色/地点归作品库，出场与地点语境由场景语境承载，不再整批挂到故事投递路由。',
+      entityAcceptsWithStory:
+        '次要：角色/地点在作品库单独确认建档；不随故事批量写入投递路由。须先保证故事标题与画面说明可读。',
       alreadyExists: '已存在',
-      willCreateOnWrite: '写入时新建',
+      willCreateOnWrite: '确认后建档',
 
       sceneAcceptsWithStory: '无需单独确认；点上方「确认（含画面）」即可',
       orphanSceneHint:

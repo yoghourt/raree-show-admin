@@ -1,5 +1,10 @@
 /**
- * Hotfix — Story staging → Reading Route (scenes) persist / unpersist
+ * Hot Path — Story staging → Reading Route (scenes) persist / unpersist
+ *
+ * IMPLEMENT-SCC-001-L2-A / ADR-012:
+ * Route character_ids / location_id are non-authoritative migration debt.
+ * Delivery ownership only — narrative appearance/location live on Scene Context.
+ * Accept MUST NOT batch-fill these fields from the Work character/location batch.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -92,6 +97,8 @@ export async function persistReadingRouteFromStoryStaging(
     staging.sourceReviewId
   );
   if (existing) {
+    // Non-authoritative Route fields: write only explicit staging values.
+    // Empty arrays / null MUST NOT be refilled from Work-batch attach.
     const { data, error } = await supabase
       .from("scenes")
       .update({

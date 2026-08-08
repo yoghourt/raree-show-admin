@@ -1082,94 +1082,6 @@ export function DiscoveryReviewPanel({
                               }}
                             />
 
-                            {characterItems.length > 0 ? (
-                              <div className="ml-2 space-y-2 border-l pl-4">
-                                <div className="space-y-0.5">
-                                  <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                                    {DISCOVERY_CANDIDATE_TYPE_LABELS.character}
-                                  </h4>
-                                  {actionable ? (
-                                    <p className="text-muted-foreground text-xs">
-                                      {discoveryReviewUi.entityAcceptsWithStory}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <ul className="space-y-3">
-                                  {characterItems.map((item) => {
-                                    const itemActionable =
-                                      item.status === "pending" ||
-                                      item.status === "edited_pending_accept";
-                                    return (
-                                      <ReviewItemCard
-                                        key={`${story.reviewId}-${item.reviewId}`}
-                                        item={item}
-                                        busy={
-                                          isRegening &&
-                                          regenReviewId === item.reviewId
-                                        }
-                                        actionable={itemActionable}
-                                        showAccept={false}
-                                        existingBadge={entityBadge(item)}
-                                        onAccept={() => undefined}
-                                        onEdit={() => openEdit(item)}
-                                        onDiscard={() =>
-                                          discardCandidate(item.reviewId)
-                                        }
-                                        onRegen={() => {
-                                          setRegenItem(item);
-                                          setRegenFeedback("");
-                                        }}
-                                      />
-                                    );
-                                  })}
-                                </ul>
-                              </div>
-                            ) : null}
-
-                            {locationItems.length > 0 ? (
-                              <div className="ml-2 space-y-2 border-l pl-4">
-                                <div className="space-y-0.5">
-                                  <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                                    {DISCOVERY_CANDIDATE_TYPE_LABELS.location}
-                                  </h4>
-                                  {actionable ? (
-                                    <p className="text-muted-foreground text-xs">
-                                      {discoveryReviewUi.entityAcceptsWithStory}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <ul className="space-y-3">
-                                  {locationItems.map((item) => {
-                                    const itemActionable =
-                                      item.status === "pending" ||
-                                      item.status === "edited_pending_accept";
-                                    return (
-                                      <ReviewItemCard
-                                        key={`${story.reviewId}-${item.reviewId}`}
-                                        item={item}
-                                        busy={
-                                          isRegening &&
-                                          regenReviewId === item.reviewId
-                                        }
-                                        actionable={itemActionable}
-                                        showAccept={false}
-                                        existingBadge={entityBadge(item)}
-                                        onAccept={() => undefined}
-                                        onEdit={() => openEdit(item)}
-                                        onDiscard={() =>
-                                          discardCandidate(item.reviewId)
-                                        }
-                                        onRegen={() => {
-                                          setRegenItem(item);
-                                          setRegenFeedback("");
-                                        }}
-                                      />
-                                    );
-                                  })}
-                                </ul>
-                              </div>
-                            ) : null}
-
                             {childScenes.length > 0 ? (
                               <div className="ml-2 space-y-2 border-l pl-4">
                                 <div className="space-y-0.5">
@@ -1252,6 +1164,93 @@ export function DiscoveryReviewPanel({
                                 }}
                               />
                             ))}
+                          </ul>
+                        </li>
+                      ) : null}
+
+                      {/* L2-A: Work Archive entities — once, not under every Story */}
+                      {characterItems.length > 0 ? (
+                        <li className="space-y-2 rounded-xl border border-zinc-200 p-4">
+                          <div className="space-y-0.5">
+                            <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                              {DISCOVERY_CANDIDATE_TYPE_LABELS.character}
+                              （作品库）
+                            </h4>
+                            <p className="text-muted-foreground text-xs">
+                              {discoveryReviewUi.entityAcceptsWithStory}
+                            </p>
+                          </div>
+                          <ul className="space-y-3">
+                            {characterItems.map((item) => {
+                              const itemActionable =
+                                item.status === "pending" ||
+                                item.status === "edited_pending_accept";
+                              return (
+                                <ReviewItemCard
+                                  key={item.reviewId}
+                                  item={item}
+                                  busy={
+                                    isRegening &&
+                                    regenReviewId === item.reviewId
+                                  }
+                                  actionable={itemActionable}
+                                  showAccept={itemActionable}
+                                  existingBadge={entityBadge(item)}
+                                  onAccept={() => handleAccept(item)}
+                                  onEdit={() => openEdit(item)}
+                                  onDiscard={() =>
+                                    discardCandidate(item.reviewId)
+                                  }
+                                  onRegen={() => {
+                                    setRegenItem(item);
+                                    setRegenFeedback("");
+                                  }}
+                                />
+                              );
+                            })}
+                          </ul>
+                        </li>
+                      ) : null}
+
+                      {locationItems.length > 0 ? (
+                        <li className="space-y-2 rounded-xl border border-zinc-200 p-4">
+                          <div className="space-y-0.5">
+                            <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                              {DISCOVERY_CANDIDATE_TYPE_LABELS.location}
+                              （作品库）
+                            </h4>
+                            <p className="text-muted-foreground text-xs">
+                              {discoveryReviewUi.entityAcceptsWithStory}
+                            </p>
+                          </div>
+                          <ul className="space-y-3">
+                            {locationItems.map((item) => {
+                              const itemActionable =
+                                item.status === "pending" ||
+                                item.status === "edited_pending_accept";
+                              return (
+                                <ReviewItemCard
+                                  key={item.reviewId}
+                                  item={item}
+                                  busy={
+                                    isRegening &&
+                                    regenReviewId === item.reviewId
+                                  }
+                                  actionable={itemActionable}
+                                  showAccept={itemActionable}
+                                  existingBadge={entityBadge(item)}
+                                  onAccept={() => handleAccept(item)}
+                                  onEdit={() => openEdit(item)}
+                                  onDiscard={() =>
+                                    discardCandidate(item.reviewId)
+                                  }
+                                  onRegen={() => {
+                                    setRegenItem(item);
+                                    setRegenFeedback("");
+                                  }}
+                                />
+                              );
+                            })}
                           </ul>
                         </li>
                       ) : null}
