@@ -127,8 +127,20 @@ export function rowToReadingRoute(row: SceneRowWithProvenance): ReadingRoute {
 const SELECT_COLS =
   "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, location_id, character_ids, discovery_source_review_id, frame_provenance_v1";
 
-/** IMPLEMENT-SCC-001-S1 — requires docs/supabase/migrations/20260808000000_scene_contexts_v1.sql */
-const SELECT_COLS_WITH_CONTEXTS = `${SELECT_COLS}, scene_contexts_v1`;
+/**
+ * IMPLEMENT-SCC-001-S1 — requires docs/supabase/migrations/20260808000000_scene_contexts_v1.sql
+ * Typed as `string` so supabase-js does not parse the select list against generated
+ * Database types that may not yet include scene_contexts_v1 (avoids ParserError).
+ */
+const SELECT_COLS_WITH_CONTEXTS: string = `${SELECT_COLS}, scene_contexts_v1`;
+
+function asSceneRow(data: unknown): SceneRowWithProvenance {
+  return data as SceneRowWithProvenance;
+}
+
+function asSceneRowOrNull(data: unknown): SceneRowWithProvenance | null {
+  return (data as SceneRowWithProvenance | null) ?? null;
+}
 
 export async function getSceneRowByTsid(
   supabase: SupabaseClient,
@@ -143,7 +155,7 @@ export async function getSceneRowByTsid(
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return (data as SceneRowWithProvenance | null) ?? null;
+  return asSceneRowOrNull(data);
 }
 
 export async function getSceneRowByDiscoverySourceReviewId(
@@ -159,7 +171,7 @@ export async function getSceneRowByDiscoverySourceReviewId(
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return (data as SceneRowWithProvenance | null) ?? null;
+  return asSceneRowOrNull(data);
 }
 
 export async function listDiscoveryPersistedRoutes(
@@ -231,7 +243,7 @@ export async function insertReadingRouteWithProvenance(
     .single();
 
   if (error) throw new Error(error.message);
-  return data as SceneRowWithProvenance;
+  return asSceneRow(data);
 }
 
 export async function updateSceneFramesAndProvenance(
@@ -270,7 +282,7 @@ export async function updateSceneFramesAndProvenance(
     }
     throw new Error(error.message);
   }
-  return data as SceneRowWithProvenance;
+  return asSceneRow(data);
 }
 
 /** Load Route row including scene_contexts_v1 (S1). */
@@ -294,7 +306,7 @@ export async function getSceneRowWithContextsByTsid(
     }
     throw new Error(error.message);
   }
-  return (data as SceneRowWithProvenance | null) ?? null;
+  return asSceneRowOrNull(data);
 }
 
 export async function deleteSceneRow(
