@@ -89,7 +89,8 @@ export async function POST(request: Request) {
           ? 403
           : result.code === "SCENE_VALIDATION_FAILED" ||
               result.code === "STAGING_INVALID" ||
-              result.code === "PARENT_STORY_MISMATCH"
+              result.code === "PARENT_STORY_MISMATCH" ||
+              result.code === "RUNTIME_TRUTH_GATE_FAILED"
             ? 422
             : result.code === "ALREADY_PROJECTED" ||
                 result.code === "LINK_ALREADY_EXISTS"
@@ -116,6 +117,10 @@ export async function POST(request: Request) {
       sourceReviewId: result.sourceReviewId,
       approvedSceneUnitId: result.approvedSceneUnitId,
       sceneProjectionLinkId: result.sceneProjectionLinkId,
+      ...(result.contextId ? { contextId: result.contextId } : {}),
+      ...(result.contextPath !== undefined
+        ? { contextPath: result.contextPath }
+        : {}),
       ...(result.link ? { link: result.link } : {}),
     });
   } catch (e) {

@@ -1,13 +1,26 @@
 /**
  * Hotfix — Scene staging → Reading Frame on parent Reading Route
+ *
+ * IMPLEMENT-SCC-001-S1: when SCENE_CONTEXT_PROJECTION_ENABLED is on for the Work,
+ * association → Scene Context → Frame projection runs first; Route character/location
+ * fields are not written. Flag off restores legacy staging → Frame path.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
 import {
+  associateStagingToSceneContext,
+  removeSceneContextBySourceReviewId,
+  upsertSceneContext,
+} from "@/lib/scene-context/associate";
+import { isSceneContextProjectionEnabledForWork } from "@/lib/scene-context/feature-flag";
+import { parseSceneContextsV1 } from "@/lib/scene-context/parse";
+import { assertRuntimeTruthGate } from "@/lib/scene-context/runtime-truth-gate";
+import {
   getSceneRowByDiscoverySourceReviewId,
   getSceneRowByTsid,
+  getSceneRowWithContextsByTsid,
   parseFrameProvenance,
   parseStoryImagesV2,
   updateSceneFramesAndProvenance,
@@ -22,6 +35,9 @@ export type FramePersistResult =
       readingRouteTsid: string;
       frameIndex: number;
       sourceReviewId: string;
+      /** Present when IMPLEMENT-SCC-001-S1 Context path ran. */
+      contextId?: string;
+      contextPath?: boolean;
     }
   | {
       ok: false;
@@ -29,13 +45,12 @@ export type FramePersistResult =
         | "PARENT_STORY_NOT_PERSISTED"
         | "STAGING_INVALID"
         | "ALREADY_PROJECTED"
-        | "SCENE_NOT_FOUND";
+        | "SCENE_NOT_FOUND"
+        | "RUNTIME_TRUTH_GATE_FAILED";
       message: string;
     };
 
 function captionFromStaging(staging: AcceptedSceneCandidateStaging): string {
-  // Frame caption = scene summary for readers (never parent Story summary).
-  // Fallback to title only when summary is empty.
   const summary = staging.summary?.trim();
   if (summary) return summary;
   return staging.title.trim();
@@ -45,12 +60,24 @@ function frameFromStaging(staging: AcceptedSceneCandidateStaging): ReadingFrame 
   return { url: "", caption: captionFromStaging(staging) };
 }
 
-export async function persistReadingFrameFromSceneStaging(
+function locationIdFromRow(row: SceneRowWithProvenance): string | null {
+  return row.location_id?.trim() ? row.location_id : null;
+}
+
+type ResolveParentResult =
+  | { ok: true; parent: SceneRowWithProvenance }
+  | {
+      ok: false;
+      code: "PARENT_STORY_NOT_PERSISTED" | "STAGING_INVALID";
+      message: string;
+    };
+
+async function resolveParentRoute(
   supabase: SupabaseClient,
   workId: string,
   staging: AcceptedSceneCandidateStaging,
-  options?: { parentRouteTsid?: string }
-): Promise<FramePersistResult> {
+  options?: { parentRouteTsid?: string; withContexts?: boolean }
+): Promise<ResolveParentResult> {
   const parentReviewId = staging.parentStorySourceReviewId?.trim();
   if (!parentReviewId) {
     return {
@@ -60,17 +87,15 @@ export async function persistReadingFrameFromSceneStaging(
     };
   }
 
-  if (!staging.title?.trim()) {
-    return {
-      ok: false,
-      code: "STAGING_INVALID",
-      message: "Scene staging title is required for Frame caption",
-    };
-  }
-
   let parent: SceneRowWithProvenance | null = null;
   if (options?.parentRouteTsid) {
-    parent = await getSceneRowByTsid(supabase, workId, options.parentRouteTsid);
+    parent = options.withContexts
+      ? await getSceneRowWithContextsByTsid(
+          supabase,
+          workId,
+          options.parentRouteTsid
+        )
+      : await getSceneRowByTsid(supabase, workId, options.parentRouteTsid);
     if (
       parent &&
       parent.discovery_source_review_id &&
@@ -89,6 +114,11 @@ export async function persistReadingFrameFromSceneStaging(
       workId,
       parentReviewId
     );
+    if (parent && options?.withContexts) {
+      parent =
+        (await getSceneRowWithContextsByTsid(supabase, workId, parent.tsid)) ??
+        parent;
+    }
   }
 
   if (!parent?.discovery_source_review_id) {
@@ -99,6 +129,125 @@ export async function persistReadingFrameFromSceneStaging(
         "Parent Reading Route not persisted for parentStorySourceReviewId",
     };
   }
+
+  return { ok: true, parent };
+}
+
+async function persistViaContextPath(
+  supabase: SupabaseClient,
+  workId: string,
+  staging: AcceptedSceneCandidateStaging,
+  options?: { parentRouteTsid?: string }
+): Promise<FramePersistResult> {
+  const resolved = await resolveParentRoute(supabase, workId, staging, {
+    parentRouteTsid: options?.parentRouteTsid,
+    withContexts: true,
+  });
+  if (!resolved.ok) {
+    return {
+      ok: false,
+      code: resolved.code,
+      message: resolved.message,
+    };
+  }
+  const parent = resolved.parent;
+
+  const routeCharacterIdsBefore = [...(parent.character_ids ?? [])];
+  const routeLocationIdBefore = locationIdFromRow(parent);
+
+  const frames = parseStoryImagesV2(parent.story_images_v2);
+  let provenance = parseFrameProvenance(parent.frame_provenance_v1);
+  let contexts = parseSceneContextsV1(parent.scene_contexts_v1);
+  const existing = provenance.find(
+    (p) => p.sourceReviewId === staging.sourceReviewId
+  );
+
+  const nextFrame = frameFromStaging(staging);
+  const frameIndex = existing?.frameIndex ?? frames.length;
+
+  const context = associateStagingToSceneContext(staging, {
+    readingRouteTsid: parent.tsid,
+    frameIndex,
+  });
+  contexts = upsertSceneContext(contexts, context);
+
+  const provenanceFields: FrameProvenanceEntry = {
+    sourceReviewId: staging.sourceReviewId,
+    frameIndex,
+    sourceContextId: context.contextId,
+    // Dual-write Expression for Creator tools that still read provenance (Runtime gap coexistence).
+    ...(staging.rendererExpression
+      ? { rendererExpression: staging.rendererExpression }
+      : {}),
+    ...(staging.visualIntent ? { visualIntent: staging.visualIntent } : {}),
+  };
+
+  if (existing) {
+    frames[existing.frameIndex] = nextFrame;
+    provenance = provenance.map((p) =>
+      p.sourceReviewId === staging.sourceReviewId
+        ? { ...provenanceFields, frameIndex: existing.frameIndex }
+        : p
+    );
+  } else {
+    frames.push(nextFrame);
+    provenance = [...provenance, provenanceFields];
+  }
+
+  const gate = assertRuntimeTruthGate({
+    context,
+    frame: nextFrame,
+    routeCharacterIds: routeCharacterIdsBefore,
+    routeLocationId: routeLocationIdBefore,
+    routeCharacterIdsBefore,
+    routeLocationIdBefore,
+  });
+  if (!gate.ok) {
+    return {
+      ok: false,
+      code: "RUNTIME_TRUTH_GATE_FAILED",
+      message: `Runtime Truth Gate failed: ${gate.failures.join(", ")}`,
+    };
+  }
+
+  // Ownership rule: do not patch character_ids / location_id on Context path.
+  await updateSceneFramesAndProvenance(
+    supabase,
+    workId,
+    parent.tsid,
+    frames,
+    provenance,
+    { sceneContexts: contexts }
+  );
+
+  return {
+    ok: true,
+    readingRouteTsid: parent.tsid,
+    frameIndex,
+    sourceReviewId: staging.sourceReviewId,
+    contextId: context.contextId,
+    contextPath: true,
+  };
+}
+
+async function persistLegacyPath(
+  supabase: SupabaseClient,
+  workId: string,
+  staging: AcceptedSceneCandidateStaging,
+  options?: { parentRouteTsid?: string }
+): Promise<FramePersistResult> {
+  const resolved = await resolveParentRoute(supabase, workId, staging, {
+    parentRouteTsid: options?.parentRouteTsid,
+    withContexts: false,
+  });
+  if (!resolved.ok) {
+    return {
+      ok: false,
+      code: resolved.code,
+      message: resolved.message,
+    };
+  }
+  const parent = resolved.parent;
 
   const frames = parseStoryImagesV2(parent.story_images_v2);
   let provenance = parseFrameProvenance(parent.frame_provenance_v1);
@@ -136,15 +285,13 @@ export async function persistReadingFrameFromSceneStaging(
       readingRouteTsid: parent.tsid,
       frameIndex: existing.frameIndex,
       sourceReviewId: staging.sourceReviewId,
+      contextPath: false,
     };
   }
 
   const frameIndex = frames.length;
   frames.push(nextFrame);
-  provenance = [
-    ...provenance,
-    { ...provenanceFields, frameIndex },
-  ];
+  provenance = [...provenance, { ...provenanceFields, frameIndex }];
 
   await updateSceneFramesAndProvenance(
     supabase,
@@ -159,7 +306,38 @@ export async function persistReadingFrameFromSceneStaging(
     readingRouteTsid: parent.tsid,
     frameIndex,
     sourceReviewId: staging.sourceReviewId,
+    contextPath: false,
   };
+}
+
+export async function persistReadingFrameFromSceneStaging(
+  supabase: SupabaseClient,
+  workId: string,
+  staging: AcceptedSceneCandidateStaging,
+  options?: { parentRouteTsid?: string }
+): Promise<FramePersistResult> {
+  const parentReviewId = staging.parentStorySourceReviewId?.trim();
+  if (!parentReviewId) {
+    return {
+      ok: false,
+      code: "PARENT_STORY_NOT_PERSISTED",
+      message: "parentStorySourceReviewId is required",
+    };
+  }
+
+  if (!staging.title?.trim()) {
+    return {
+      ok: false,
+      code: "STAGING_INVALID",
+      message: "Scene staging title is required for Frame caption",
+    };
+  }
+
+  if (isSceneContextProjectionEnabledForWork(workId)) {
+    return persistViaContextPath(supabase, workId, staging, options);
+  }
+
+  return persistLegacyPath(supabase, workId, staging, options);
 }
 
 export async function unpersistReadingFrame(
@@ -185,11 +363,16 @@ export async function unpersistReadingFrame(
 
   let parent: SceneRowWithProvenance | null = null;
   if (params.readingRouteTsid) {
-    parent = await getSceneRowByTsid(supabase, workId, params.readingRouteTsid);
+    parent = isSceneContextProjectionEnabledForWork(workId)
+      ? await getSceneRowWithContextsByTsid(
+          supabase,
+          workId,
+          params.readingRouteTsid
+        )
+      : await getSceneRowByTsid(supabase, workId, params.readingRouteTsid);
   }
 
   if (!parent) {
-    // Scan discovery routes for provenance match
     const { data, error } = await supabase
       .from("scenes")
       .select(
@@ -206,6 +389,11 @@ export async function unpersistReadingFrame(
           (p) => p.sourceReviewId === sourceReviewId
         )
       ) ?? null;
+    if (parent && isSceneContextProjectionEnabledForWork(workId)) {
+      parent =
+        (await getSceneRowWithContextsByTsid(supabase, workId, parent.tsid)) ??
+        parent;
+    }
   }
 
   if (!parent) {
@@ -236,12 +424,26 @@ export async function unpersistReadingFrame(
       frameIndex: p.frameIndex > removeIndex ? p.frameIndex - 1 : p.frameIndex,
     }));
 
+  const useContexts = isSceneContextProjectionEnabledForWork(workId);
+  let nextContexts = parseSceneContextsV1(parent.scene_contexts_v1);
+  if (useContexts) {
+    nextContexts = removeSceneContextBySourceReviewId(
+      nextContexts,
+      sourceReviewId
+    ).map((c) =>
+      c.projectsToFrameIndex > removeIndex
+        ? { ...c, projectsToFrameIndex: c.projectsToFrameIndex - 1 }
+        : c
+    );
+  }
+
   await updateSceneFramesAndProvenance(
     supabase,
     workId,
     parent.tsid,
     nextFrames,
-    nextProvenance
+    nextProvenance,
+    useContexts ? { sceneContexts: nextContexts } : undefined
   );
 
   return {
@@ -260,6 +462,7 @@ export async function listFrameProjections(
     readingRouteTsid: string;
     frameIndex: number;
     caption: string;
+    contextId?: string;
   }>
 > {
   const { data, error } = await supabase
@@ -277,6 +480,7 @@ export async function listFrameProjections(
     readingRouteTsid: string;
     frameIndex: number;
     caption: string;
+    contextId?: string;
   }> = [];
 
   for (const row of rows) {
@@ -287,6 +491,7 @@ export async function listFrameProjections(
         readingRouteTsid: row.tsid,
         frameIndex: p.frameIndex,
         caption: frames[p.frameIndex]?.caption ?? "",
+        ...(p.sourceContextId ? { contextId: p.sourceContextId } : {}),
       });
     }
   }

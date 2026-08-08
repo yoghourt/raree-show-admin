@@ -1,0 +1,172 @@
+/**
+ * IMPLEMENT-SCC-001-S1 — associate + Runtime Truth Gate + feature flag
+ */
+
+import { describe, expect, it } from "vitest";
+
+import {
+  associateStagingToSceneContext,
+  upsertSceneContext,
+} from "@/lib/scene-context/associate";
+import {
+  getSceneContextWorkAllowlist,
+  isSceneContextProjectionEnabledForWork,
+  isSceneContextProjectionGloballyEnabled,
+} from "@/lib/scene-context/feature-flag";
+import { parseSceneContextsV1 } from "@/lib/scene-context/parse";
+import { assertRuntimeTruthGate } from "@/lib/scene-context/runtime-truth-gate";
+import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
+
+const staging: AcceptedSceneCandidateStaging = {
+  workId: "work-1",
+  sourceReviewId: "rev-scene-1",
+  parentStorySourceReviewId: "rev-story-1",
+  parentStoryTitle: "Arc",
+  chapter_number: 1,
+  chapter_title: "I",
+  title: "Moonlit Farewell",
+  summary: "Fantine holds Cosette before parting.",
+  visualIntent: {
+    characters: [
+      { role: "mother", name: "Fantine" },
+      { role: "child", name: "Cosette" },
+    ],
+    emotion: "tender dread",
+    purpose: "cost of survival",
+    relationship: "mother parting from child",
+  },
+  rendererExpression: {
+    environment: "narrow Paris street at night",
+    characters: [
+      { role: "mother", visual: "thin woman in worn shawl" },
+      { role: "child", visual: "small child clutched to chest" },
+    ],
+    action: "holding the child tightly",
+    composition: "medium wide shot",
+  },
+  acceptedAt: "2026-08-08T00:00:00.000Z",
+};
+
+describe("feature flag", () => {
+  it("defaults off", () => {
+    expect(isSceneContextProjectionGloballyEnabled({})).toBe(false);
+    expect(isSceneContextProjectionEnabledForWork("work-1", {})).toBe(false);
+  });
+
+  it("enables globally and respects allowlist", () => {
+    const env = {
+      SCENE_CONTEXT_PROJECTION_ENABLED: "1",
+      SCENE_CONTEXT_WORK_ALLOWLIST: "work-a, work-b",
+    };
+    expect(isSceneContextProjectionGloballyEnabled(env)).toBe(true);
+    expect(isSceneContextProjectionEnabledForWork("work-a", env)).toBe(true);
+    expect(isSceneContextProjectionEnabledForWork("work-c", env)).toBe(false);
+    expect(getSceneContextWorkAllowlist(env)?.has("work-b")).toBe(true);
+  });
+});
+
+describe("associateStagingToSceneContext", () => {
+  it("builds Context ownership without Route archive fields", () => {
+    const ctx = associateStagingToSceneContext(staging, {
+      readingRouteTsid: "scene_route_1",
+      frameIndex: 0,
+      now: "2026-08-08T00:00:00.000Z",
+    });
+
+    expect(ctx.contextId).toBe("ctx_rev-scene-1");
+    expect(ctx.editorialAssociation.editorialSceneSourceReviewId).toBe(
+      "rev-scene-1"
+    );
+    expect(ctx.narrativeMoment.title).toBe("Moonlit Farewell");
+    expect(ctx.characterAppearanceContext.map((c) => c.role)).toEqual([
+      "mother",
+      "child",
+    ]);
+    expect(ctx.locationContext.environmentFromExpression).toContain("Paris");
+    expect(ctx.creationFacingVisualExpression?.action).toBe(
+      "holding the child tightly"
+    );
+    expect(ctx.projectsToFrameIndex).toBe(0);
+    expect(ctx.contextId).not.toBe("scene_route_1");
+  });
+
+  it("upserts by editorial sourceReviewId", () => {
+    const a = associateStagingToSceneContext(staging, {
+      readingRouteTsid: "scene_route_1",
+      frameIndex: 0,
+      now: "2026-08-08T00:00:00.000Z",
+    });
+    const b = associateStagingToSceneContext(
+      { ...staging, summary: "Updated beat." },
+      {
+        readingRouteTsid: "scene_route_1",
+        frameIndex: 0,
+        now: "2026-08-08T01:00:00.000Z",
+      }
+    );
+    const list = upsertSceneContext(upsertSceneContext([], a), b);
+    expect(list).toHaveLength(1);
+    expect(list[0]?.readerFacingNarrativeContext.beatSummary).toBe(
+      "Updated beat."
+    );
+    expect(list[0]?.createdAt).toBe("2026-08-08T00:00:00.000Z");
+  });
+});
+
+describe("Runtime Truth Gate", () => {
+  it("passes for Context → Frame representation-only projection", () => {
+    const context = associateStagingToSceneContext(staging, {
+      readingRouteTsid: "scene_route_1",
+      frameIndex: 0,
+    });
+    const frame = {
+      url: "",
+      caption: context.readerFacingNarrativeContext.beatSummary,
+    };
+    const gate = assertRuntimeTruthGate({
+      context,
+      frame,
+      routeCharacterIds: [],
+      routeLocationId: null,
+      routeCharacterIdsBefore: [],
+      routeLocationIdBefore: null,
+    });
+    expect(gate.ok).toBe(true);
+    expect(gate.failures).toEqual([]);
+  });
+
+  it("fails when Context path mutates Route characterIds", () => {
+    const context = associateStagingToSceneContext(staging, {
+      readingRouteTsid: "scene_route_1",
+      frameIndex: 0,
+    });
+    const gate = assertRuntimeTruthGate({
+      context,
+      frame: { url: "", caption: "x" },
+      routeCharacterIds: ["char_1"],
+      routeLocationId: null,
+      routeCharacterIdsBefore: [],
+      routeLocationIdBefore: null,
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.failures).toContain(
+      "route_characterIds_mutated_by_context_path"
+    );
+  });
+});
+
+describe("parseSceneContextsV1", () => {
+  it("round-trips associate output", () => {
+    const context = associateStagingToSceneContext(staging, {
+      readingRouteTsid: "scene_route_1",
+      frameIndex: 2,
+    });
+    const parsed = parseSceneContextsV1([context]);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.contextId).toBe(context.contextId);
+    expect(parsed[0]?.projectsToFrameIndex).toBe(2);
+    expect(parsed[0]?.creationFacingVisualExpression?.environment).toBe(
+      "narrow Paris street at night"
+    );
+  });
+});

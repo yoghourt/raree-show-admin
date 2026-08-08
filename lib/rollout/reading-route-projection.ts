@@ -24,6 +24,9 @@ export type ReadingRouteProjectionResult =
       sceneTsid: string;
       frameIndex: number;
       sourceReviewId: string;
+      /** IMPLEMENT-SCC-001-S1 */
+      contextId?: string;
+      contextPath?: boolean;
       /** Soft-compat: empty / synthetic for older clients */
       approvedSceneUnitId: string;
       sceneProjectionLinkId: string;
@@ -62,6 +65,10 @@ export async function acceptReadingRouteProjection(
     sceneTsid: result.readingRouteTsid,
     frameIndex: result.frameIndex,
     sourceReviewId: result.sourceReviewId,
+    ...(result.contextId ? { contextId: result.contextId } : {}),
+    ...(result.contextPath !== undefined
+      ? { contextPath: result.contextPath }
+      : {}),
     // Compat placeholders — Hotfix does not create AS/SPL rows
     approvedSceneUnitId: result.sourceReviewId,
     sceneProjectionLinkId: `${result.readingRouteTsid}:${result.frameIndex}`,

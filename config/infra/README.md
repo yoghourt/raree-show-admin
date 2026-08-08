@@ -11,6 +11,7 @@ values here MUST NOT require amending ADR/SPEC Port shape.
 | [`pd-showcase-recommendation-v1.md`](./pd-showcase-recommendation-v1.md) | Public-domain showcase selection & canon subset counts |
 | [`media-admission-defaults.md`](./media-admission-defaults.md) | Media Admission Phase 1 providers (upload · paste URL) |
 | [`discovery-text-defaults.md`](./discovery-text-defaults.md) | Discovery propose text provider/model (gemini-3.5-flash-lite primary) |
+| [`scene-context-defaults.md`](./scene-context-defaults.md) | IMPLEMENT-SCC-001-S1 Context-aware projection env knobs + rollback |
 
 **Code bindings:** `lib/ai/image/deploymentConfig.ts` · `IMAGE_CREATOR_*` env · `lib/media-admission/`  
 **Authority docs (unchanged location):** `docs/adr/` · `docs/specs/` · `docs/spikes/`

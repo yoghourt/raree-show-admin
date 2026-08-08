@@ -1,0 +1,27 @@
+# Scene Context Deployment Defaults (IMPLEMENT-SCC-001-S1)
+
+Deployment knobs for Context-aware projection. Not Architecture constants.
+
+| Env | Default | Meaning |
+| --- | ------- | ------- |
+| `SCENE_CONTEXT_PROJECTION_ENABLED` | unset / off | When `1`/`true`, Projection Accept uses Editorial Scene → Scene Context → Frame |
+| `SCENE_CONTEXT_WORK_ALLOWLIST` | empty | Comma-separated Work UUIDs; empty = all Works when globally enabled |
+
+## Rollback
+
+```bash
+# unset or:
+SCENE_CONTEXT_PROJECTION_ENABLED=0
+```
+
+Legacy Hot Path (Scene staging → Frame) resumes. Existing `scene_contexts_v1` rows remain; not deleted.
+
+## Prerequisite
+
+Apply additive migration:
+
+```text
+docs/supabase/migrations/20260808000000_scene_contexts_v1.sql
+```
+
+before enabling the flag in an environment.
