@@ -97,18 +97,12 @@ export async function persistReadingRouteFromStoryStaging(
     staging.sourceReviewId
   );
   if (existing) {
-    // Non-authoritative Route fields: write only explicit staging values.
-    // Empty arrays / null MUST NOT be refilled from Work-batch attach.
+    // L3-A: do not write Route membership (character_ids / location_id) on update.
     const { data, error } = await supabase
       .from("scenes")
       .update({
         title: staging.title.trim(),
         summary: staging.summary?.trim() ?? "",
-        location_id:
-          staging.locationId != null
-            ? staging.locationId.trim()
-            : existing.location_id,
-        character_ids: staging.characterIds ?? existing.character_ids ?? [],
       })
       .eq("work_id", workId)
       .eq("tsid", existing.tsid)
@@ -124,14 +118,15 @@ export async function persistReadingRouteFromStoryStaging(
     typeof staging.chapter_number === "number" && staging.chapter_number >= 1
       ? staging.chapter_number
       : await nextChapterNumber(supabase, workId);
+  // L3-A: inserts always empty membership (columns remain until L3-C).
   const row = await insertReadingRouteWithProvenance(supabase, workId, {
     title: staging.title.trim(),
     summary: staging.summary?.trim() ?? "",
     chapterNumber,
     chapterTitle: staging.chapter_title ?? null,
     discoverySourceReviewId: staging.sourceReviewId,
-    locationId: staging.locationId ?? null,
-    characterIds: staging.characterIds ?? [],
+    locationId: null,
+    characterIds: [],
   });
   return rowToApprovedStoryUnit(row);
 }

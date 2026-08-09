@@ -9,6 +9,7 @@ Deployment knobs for Context-aware projection. Not Architecture constants.
 - **L2-A PASS · Verified** — Accept MUST NOT batch-fill Route `character_ids` / `location_id`; Context path may enrich appearance/location archive refs by name.
 - **L2-B PASS · Verified** (`docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md`) — Review/Rollout display = child Scene/Context union.
 - **L2-C PASS · Verified** (`docs/spikes/implement-scc-001-l2c-propose-context-signals.md`) — Propose → Context candidate signals.
+- **L3 GRANTED · L3-A PASS · Verified** (`docs/spikes/implement-scc-001-level3-route-ownership-sunset.md`) — Route membership demoted in Admin/persist; columns remain until L3-C.
 
 | Env | Default | Meaning |
 | --- | ------- | ------- |

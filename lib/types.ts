@@ -23,8 +23,20 @@ export type ReadingRoute = {
   tags: string[];
   /** 阅读帧序列（jsonb，唯一数据源；implementation column: story_images_v2） */
   story_images_v2: ReadingFrame[] | null;
+  /**
+   * @deprecated IMPLEMENT-SCC-001-L3-A — non-authoritative Route debt; not written on edit.
+   * Display related cast/place via `relatedFromContextsLine` / Scene Context.
+   */
   locationId: string | null;
+  /**
+   * @deprecated IMPLEMENT-SCC-001-L3-A — non-authoritative Route debt; not written on edit.
+   */
   characterIds: string[];
+  /**
+   * L3-A / L2-B: read-only aggregate of child Context / Frame provenance cues.
+   * Not Route ownership.
+   */
+  relatedFromContextsLine?: string | null;
   /**
    * Creator-only: per-frame Expression presence from frame_provenance_v1.
    * Index-aligned with story_images_v2. Not Reader Truth (ADR-011 A3).

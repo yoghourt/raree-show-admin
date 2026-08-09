@@ -114,7 +114,7 @@ Discovery Character/Location candidates = **Work Archive candidates**, not Story
 | Stop Accept batch-write as Route authority | **Done** · L2-A PASS · Verified |
 | Review/Rollout UI aggregate from Context/child scenes | **Done** · L2-B PASS · Verified |
 | Propose signals for Context (not Story membership) | **Done** · L2-C PASS · Verified |
-| Delete Route `character_ids` / `location_id` | Level 3 · **Not authorized** |
+| Delete Route `character_ids` / `location_id` | Level 3 · L3-A demotion **PASS · Verified** · column drop = L3-C pending → `implement-scc-001-level3-route-ownership-sunset.md` |
 
 ---
 

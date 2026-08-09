@@ -14,6 +14,7 @@ import {
   parseRendererExpression,
   parseVisualIntent,
 } from "@/lib/discovery/visual-contract";
+import { emptyRouteMembershipDb } from "@/lib/rollout/route-membership";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
 
@@ -47,11 +48,6 @@ export type SceneRowWithProvenance = {
   /** IMPLEMENT-SCC-001-S1: Scene Context ownership records (delivery host storage). */
   scene_contexts_v1?: unknown;
 };
-
-function locationIdToDb(locationId: string | null | undefined): string {
-  const trimmed = locationId?.trim();
-  return trimmed ? trimmed : "";
-}
 
 export function parseStoryImagesV2(raw: unknown): ReadingFrame[] {
   if (!Array.isArray(raw)) return [];
@@ -215,7 +211,9 @@ export async function insertReadingRouteWithProvenance(
     chapterNumber: number;
     chapterTitle?: string | null;
     discoverySourceReviewId: string;
+    /** @deprecated L3-A — ignored; inserts always empty membership */
     locationId?: string | null;
+    /** @deprecated L3-A — ignored; inserts always empty membership */
     characterIds?: string[];
   }
 ): Promise<SceneRowWithProvenance> {
@@ -230,8 +228,8 @@ export async function insertReadingRouteWithProvenance(
     summary: params.summary,
     tags: [] as string[],
     story_images_v2: [] as ReadingFrame[],
-    location_id: locationIdToDb(params.locationId ?? null),
-    character_ids: params.characterIds ?? [],
+    // L3-A: ignore caller membership; columns remain until L3-C.
+    ...emptyRouteMembershipDb(),
     discovery_source_review_id: params.discoverySourceReviewId,
     frame_provenance_v1: [] as FrameProvenanceEntry[],
   };

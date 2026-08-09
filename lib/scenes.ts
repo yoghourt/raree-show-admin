@@ -1,14 +1,14 @@
 import { supabase } from "@/lib/supabase";
+import { emptyRouteMembershipDb } from "@/lib/rollout/route-membership";
 import { parseFrameProvenance } from "@/lib/rollout/scenes-server";
+import {
+  aggregateStoryRelatedRefs,
+  formatStoryRelatedAggregateLine,
+} from "@/lib/scene-context/aggregate-story-refs";
+import { parseSceneContextsV1 } from "@/lib/scene-context/parse";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
 
 const TABLE = "scenes";
-
-/** scenes.location_id is NOT NULL in DB; empty string means "not yet assigned". */
-function locationIdToDb(locationId: string | null): string {
-  const trimmed = locationId?.trim();
-  return trimmed ? trimmed : "";
-}
 
 function locationIdFromDb(raw: string | null | undefined): string | null {
   const trimmed = raw?.trim();
@@ -28,7 +28,30 @@ type ReadingRouteRow = {
   location_id: string;
   character_ids: string[] | null;
   frame_provenance_v1?: unknown;
+  scene_contexts_v1?: unknown;
 };
+
+/** Display-only related cast/place from Contexts, else Frame provenance cues. */
+export function relatedLineFromRouteRow(row: {
+  scene_contexts_v1?: unknown;
+  frame_provenance_v1?: unknown;
+}): string | null {
+  const contexts = parseSceneContextsV1(row.scene_contexts_v1);
+  if (contexts.length > 0) {
+    return formatStoryRelatedAggregateLine(
+      aggregateStoryRelatedRefs({ contexts })
+    );
+  }
+  const provenance = parseFrameProvenance(row.frame_provenance_v1);
+  return formatStoryRelatedAggregateLine(
+    aggregateStoryRelatedRefs({
+      sceneSources: provenance.map((p) => ({
+        visualIntent: p.visualIntent,
+        rendererExpression: p.rendererExpression,
+      })),
+    })
+  );
+}
 
 function parseStoryImagesV2(raw: unknown): ReadingFrame[] | null {
   if (raw == null) return null;
@@ -89,6 +112,7 @@ function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
     story_images_v2: frames,
     locationId: locationIdFromDb(row.location_id),
     characterIds: row.character_ids ?? [],
+    relatedFromContextsLine: relatedLineFromRouteRow(row),
     frameHasRendererExpression,
     frameExpressionHasNarrativeCues,
   };
@@ -98,6 +122,7 @@ function toInsertRow(
   workId: string,
   data: Omit<ReadingRoute, "tsid" | "workId"> & { tsid: string }
 ): Record<string, unknown> {
+  // L3-A: never persist Route membership from Admin payloads.
   return {
     work_id: workId,
     tsid: data.tsid,
@@ -108,12 +133,14 @@ function toInsertRow(
     summary: data.summary,
     tags: data.tags,
     story_images_v2: data.story_images_v2 ?? [],
-    location_id: locationIdToDb(data.locationId),
-    character_ids: data.characterIds,
+    ...emptyRouteMembershipDb(),
   };
 }
 
-function toUpdateRow(data: Omit<ReadingRoute, "tsid" | "workId">): Record<string, unknown> {
+/** L3-A: update patch omits character_ids / location_id (no re-pollution; no column drop). */
+export function toUpdateRowWithoutMembership(
+  data: Omit<ReadingRoute, "tsid" | "workId">
+): Record<string, unknown> {
   return {
     title: data.title,
     chapter_number: data.chapter_number,
@@ -121,9 +148,13 @@ function toUpdateRow(data: Omit<ReadingRoute, "tsid" | "workId">): Record<string
     summary: data.summary,
     tags: data.tags,
     story_images_v2: data.story_images_v2 ?? [],
-    location_id: locationIdToDb(data.locationId),
-    character_ids: data.characterIds,
   };
+}
+
+function toUpdateRow(
+  data: Omit<ReadingRoute, "tsid" | "workId">
+): Record<string, unknown> {
+  return toUpdateRowWithoutMembership(data);
 }
 
 export async function getScenes(workId: string): Promise<ReadingRoute[]> {

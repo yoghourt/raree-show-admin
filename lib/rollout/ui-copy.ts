@@ -93,6 +93,9 @@ export const rolloutUi = {
   entitySectionDeferred: m.entitySectionDeferred,
   storyRelatedFromFrames: m.storyRelatedFromFrames,
   storyRelatedFromFramesEmpty: m.storyRelatedFromFramesEmpty,
+  storyRelatedFromContexts: m.storyRelatedFromContexts,
+  storyRelatedFromContextsEmpty: m.storyRelatedFromContextsEmpty,
+  routeMembershipDemotedHint: m.routeMembershipDemotedHint,
   openReaderVerify: m.openReaderVerify,
 } as const;
 

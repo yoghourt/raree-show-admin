@@ -13,9 +13,6 @@ import {
 } from "react-hook-form";
 import { z } from "zod";
 
-import { EntityMultiFuzzyPicker } from "@/components/entity/EntityMultiFuzzyPicker";
-import { FuzzyEntityCombobox } from "@/components/entity/FuzzyEntityCombobox";
-import type { EntityOption } from "@/components/entity/types";
 import { CopilotIcon } from "@/components/copilot/CopilotIcon";
 import { NarrativeRegenButton } from "@/components/copilot/NarrativeRegenButton";
 import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
@@ -32,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
+import { emptyRouteMembershipApp } from "@/lib/rollout/route-membership";
 import { createScene, updateScene } from "@/lib/scenes";
 import type { Character, Location, ReadingFrame, ReadingRoute } from "@/lib/types";
 
@@ -107,12 +105,6 @@ const sceneFormSchema = z.object({
       )
       .default([])
   ),
-  locationId: z.preprocess((v) => (v == null ? "" : String(v)), z.string()),
-  characterIdsTsids: z.array(z.string()).default([]),
-  characterIdsFallback: z.preprocess(
-    (v) => (v == null ? "" : String(v)),
-    z.string()
-  ),
 });
 
 export type ReadingRouteFormValues = {
@@ -122,9 +114,6 @@ export type ReadingRouteFormValues = {
   summary: string;
   tags: string;
   story_images_v2: ReadingFrame[];
-  locationId: string;
-  characterIdsTsids: string[];
-  characterIdsFallback: string;
 };
 
 function sceneToFormValues(scene: ReadingRoute): ReadingRouteFormValues {
@@ -137,20 +126,13 @@ function sceneToFormValues(scene: ReadingRoute): ReadingRouteFormValues {
     summary: scene.summary,
     tags: scene.tags.join(", "),
     story_images_v2,
-    locationId: scene.locationId ?? "",
-    characterIdsTsids: [...scene.characterIds],
-    characterIdsFallback: "",
   };
 }
 
 function formValuesToPayload(
-  values: ReadingRouteFormValues,
-  hasCharacterPicker: boolean
+  values: ReadingRouteFormValues
 ): Omit<ReadingRoute, "tsid" | "workId"> {
-  const characterIds = hasCharacterPicker
-    ? values.characterIdsTsids
-    : commaListToArray(values.characterIdsFallback);
-
+  // L3-A: Route membership never written from story edit.
   return {
     title: values.title.trim(),
     chapter_number: values.chapter_number,
@@ -158,8 +140,7 @@ function formValuesToPayload(
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
     story_images_v2: values.story_images_v2,
-    locationId: values.locationId.trim() || null,
-    characterIds,
+    ...emptyRouteMembershipApp(),
   };
 }
 
@@ -182,14 +163,17 @@ type ReadingRouteFormProps =
   | (ReadingRouteFormBase & { mode: "edit"; defaultValues: ReadingRoute });
 
 export function ReadingRouteForm(props: ReadingRouteFormProps) {
-  const { workId, characters, locations, entitiesLoading = false } = props;
+  // characters/locations retained for page API compatibility; L3-A does not edit Route membership.
+  const { workId } = props;
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = React.useState(false);
   const listHref = `/works/${encodeURIComponent(workId)}/reading-routes`;
 
-  const hasLocationPicker = locations.length > 0 || entitiesLoading;
-  const hasCharacterPicker = characters.length > 0 || entitiesLoading;
+  const relatedLine =
+    props.mode === "edit"
+      ? props.defaultValues.relatedFromContextsLine
+      : null;
 
   const defaultValues: ReadingRouteFormValues =
     props.mode === "edit"
@@ -201,9 +185,6 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
           summary: "",
           tags: "",
           story_images_v2: [],
-          locationId: "",
-          characterIdsTsids: [],
-          characterIdsFallback: "",
         };
 
   const form = useForm<ReadingRouteFormValues>({
@@ -213,39 +194,6 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
 
   const watchedTitle =
     useWatch({ control: form.control, name: "title" }) ?? "";
-  const watchedLocationId =
-    useWatch({ control: form.control, name: "locationId" }) ?? "";
-
-  const locationEntityOptions = React.useMemo((): EntityOption[] => {
-    const list = [...locations];
-    const base = list.map((l) => ({
-      id: l.tsid,
-      label: l.name,
-      aliases: [l.tsid],
-    }));
-    if (
-      watchedLocationId &&
-      !list.some((l) => l.tsid === watchedLocationId)
-    ) {
-      return [
-        {
-          id: watchedLocationId,
-          label: `${watchedLocationId}（不在当前地点库）`,
-          aliases: [watchedLocationId],
-        },
-        ...base,
-      ];
-    }
-    return base;
-  }, [locations, watchedLocationId]);
-
-  const characterEntityOptions = React.useMemo((): EntityOption[] => {
-    return characters.map((c) => ({
-      id: c.tsid,
-      label: c.name,
-      aliases: [c.tsid],
-    }));
-  }, [characters]);
 
   // ── Copilot session (scope field = title, §4.1) ───────────────────────────
 
@@ -278,7 +226,7 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
     async (values) => {
       setSubmitError(null);
       try {
-        const payload = formValuesToPayload(values, hasCharacterPicker);
+        const payload = formValuesToPayload(values);
         if (props.mode === "create") {
           await createScene(workId, payload);
         } else {
@@ -301,10 +249,7 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
               ?.url?.message ||
             errors.story_images_v2.find((e) => e?.caption?.message)?.caption
               ?.message
-          : undefined) ||
-        errors.locationId?.message ||
-        errors.characterIdsTsids?.message ||
-        errors.characterIdsFallback?.message;
+          : undefined);
       setSubmitError(
         typeof first === "string" && first.trim()
           ? first
@@ -327,9 +272,9 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
       chapter_number: v.chapter_number,
       chapter_title: v.chapter_title,
       summary: v.summary,
-      // reference and asset fields — excluded by registry (v1)
-      locationId: v.locationId,
-      characterIds: v.characterIdsTsids,
+      // Route membership demoted (L3-A) — excluded from Copilot / persist
+      locationId: null,
+      characterIds: [],
       story_images_v2: v.story_images_v2,
       tags: v.tags,
     };
@@ -508,105 +453,19 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
         ) : null}
       </div>
 
-      {/* ── Location (reference — excluded in v1, OQ-03) ── */}
-      <div className="space-y-2">
-        <Label>地点（可选）</Label>
-        {hasLocationPicker ? (
-          <Controller
-            name="locationId"
-            control={form.control}
-            render={({ field }) => (
-              <FuzzyEntityCombobox
-                value={field.value || undefined}
-                options={locationEntityOptions}
-                placeholder="选择地点"
-                loading={entitiesLoading}
-                disabled={form.formState.isSubmitting}
-                onSelect={(opt) => field.onChange(opt.id)}
-              />
-            )}
-          />
-        ) : (
-          <>
-            <p className="text-muted-foreground text-xs">
-              {messages.forms.noLocationDataHint}
-            </p>
-            <Input
-              id="locationId"
-              {...form.register("locationId")}
-              placeholder={messages.forms.locationIdPlaceholder}
-              aria-invalid={!!form.formState.errors.locationId}
-            />
-          </>
-        )}
-        {form.formState.errors.locationId && (
-          <p className="text-destructive text-sm">
-            {form.formState.errors.locationId.message}
-          </p>
-        )}
-      </div>
-
-      {/* ── Characters (reference — excluded in v1, OQ-03) ── */}
-      <div className="space-y-2">
-        <Label>角色</Label>
-        {hasCharacterPicker ? (
-          <Controller
-            name="characterIdsTsids"
-            control={form.control}
-            render={({ field }) => {
-              const orphans = field.value.filter(
-                (id) => !characters.some((c) => c.tsid === id)
-              );
-              return (
-                <div className="space-y-3">
-                  <EntityMultiFuzzyPicker
-                    options={characterEntityOptions}
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder={messages.forms.searchCharacters}
-                    loading={entitiesLoading}
-                    disabled={form.formState.isSubmitting}
-                  />
-                  {orphans.length > 0 ? (
-                    <div className="rounded-lg border border-border p-3 pt-2">
-                      <p className="text-muted-foreground mb-2 text-xs">
-                        {messages.works.orphanTsidWriteHint}
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {orphans.map((id) => (
-                          <button
-                            key={id}
-                            type="button"
-                            className="bg-muted inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-xs"
-                            onClick={() =>
-                              field.onChange(
-                                field.value.filter((x: string) => x !== id)
-                              )
-                            }
-                          >
-                            {id}
-                            <span className="text-destructive">×</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            }}
-          />
-        ) : (
-          <>
-            <p className="text-muted-foreground text-xs">
-              {messages.forms.noCharacterDataHint}
-            </p>
-            <Input
-              id="characterIdsFallback"
-              {...form.register("characterIdsFallback")}
-              placeholder={messages.forms.characterIdsPlaceholder}
-            />
-          </>
-        )}
+      {/* ── Related cast/place (L3-A: Context aggregate, not Route membership) ── */}
+      <div className="space-y-1 rounded-lg border border-dashed px-3 py-2">
+        <p className="text-xs font-medium">
+          {messages.rollout.storyRelatedFromContexts}
+        </p>
+        <p className="text-muted-foreground text-xs">
+          {messages.rollout.routeMembershipDemotedHint}
+        </p>
+        <p className="text-muted-foreground text-xs">
+          {relatedLine?.trim()
+            ? relatedLine
+            : messages.rollout.storyRelatedFromContextsEmpty}
+        </p>
       </div>
 
       {/* ── Suggestion Panel (right-side drawer) ── */}
