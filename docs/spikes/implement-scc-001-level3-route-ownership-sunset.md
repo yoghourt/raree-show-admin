@@ -1,8 +1,8 @@
 # IMPLEMENT-SCC-001-L3 — Route Ownership Sunset
 
-**Status:** **GRANTED** · L3-A **PASS · Verified** · L3-B **Implemented** (await verify) · 2026-08-09  
+**Status:** **COMPLETE** · L3-A/B/C all **PASS · Verified** · 2026-08-09  
 **Program grant:** L3 Program Charter approved · 2026-08-09  
-**Phase grants:** L3-A done · L3-B EXECUTE delivered · L3-C not authorized  
+**Phase grants:** L3-A · L3-B · L3-C all done  
 **Scope:** Level 3 migration program (beyond Option A Level 2 Controlled Expansion)  
 **Prerequisite:** S1 · L2-A · L2-B · L2-C all **PASS · Verified**  
 **Does not inherit:** Option A Level 2 grant alone — Level 3 requires separate Architect authorization
@@ -47,23 +47,23 @@ L3 retires **physical / consumer** debt on `scenes.character_ids` / `scenes.loca
 
 **Success gate:** New edits cannot re-pollute Route membership; operators see Context-derived related cast/place on story edit.
 
-### L3-B — Historical Context backfill (**Implemented** · await verify)
+### L3-B — Historical Context backfill (**PASS · Verified**)
 
 Additive provenance → `scene_contexts_v1` backfill.  
 Charter + delivery: `docs/spikes/implement-scc-001-l3b-historical-context-backfill.md`  
 CLI: `scripts/scene-context-backfill/run.ts`
 
-### L3-C — Schema sunset (not authorized)
+### L3-C — Schema sunset (**PASS · Verified**)
 
-Drop or permanently null columns — requires separate **GRANT** then **EXECUTE**.
+Hard drop `scenes.character_ids` / `scenes.location_id`.  
+Charter + delivery: `docs/spikes/implement-scc-001-l3c-schema-sunset.md`  
+Migration: `docs/supabase/migrations/20260809000000_drop_route_membership_columns.sql`
 
 ---
 
 ## 4. Explicit non-goals (until separately authorized)
 
 ```text
-❌ L3-B coding without EXECUTE GRANTED
-❌ L3-C without its own GRANT + EXECUTE
 ❌ Blindly copy polluted Route character_ids into Scene Context as “truth”
 ❌ Reader URL / Scene Context page identity (own ADR)
 ❌ Full Admin IA redesign beyond membership demotion
@@ -76,13 +76,12 @@ Drop or permanently null columns — requires separate **GRANT** then **EXECUTE*
 
 | Path | Role |
 | ---- | ---- |
-| `lib/rollout/route-membership.ts` | Empty membership helpers |
-| `lib/scenes.ts` | `toUpdateRowWithoutMembership` · related line from Contexts |
+| `lib/scenes.ts` | Delivery-only persist · related line from Contexts |
 | `lib/rollout/reading-route-persist.ts` · `scenes-server.ts` | No membership writes |
 | `components/reading-routes/ReadingRouteForm.tsx` | Aggregate display; no pickers |
 | `components/rollout/StoryWritePreviewCard.tsx` | Membership editors removed |
 | `lib/locale/zh-CN.ts` · `lib/rollout/ui-copy.ts` | Demotion copy |
-| `__tests__/rollout/route-membership-l3a.test.ts` | No re-pollution regression |
+| `__tests__/rollout/route-membership-l3c.test.ts` | Columns sunset / no membership mapping |
 
 ---
 
@@ -91,7 +90,7 @@ Drop or permanently null columns — requires separate **GRANT** then **EXECUTE*
 ```text
 1. Story edit / Discovery Route persist MUST NOT write character_ids / location_id
 2. Story edit shows related cast/place from Scene Context (or Frame provenance cues)
-3. Columns remain in schema (L3-C later); legacy values may persist unread for ownership
+3. L3-C: membership columns dropped (migration required in each env)
 4. Identity freeze unchanged: Editorial Scene ≠ Scene Context ≠ Frame ≠ Route ≠ Story
 ```
 
@@ -105,9 +104,10 @@ IMPLEMENT-SCC-001-L3
 Status: GRANTED
 Program: Route ownership sunset
 L3-A: PASS · Verified
-L3-B: EXECUTE GRANTED → Implemented (await human verification)
+L3-B: PASS · Verified
       → implement-scc-001-l3b-historical-context-backfill.md
-L3-C: PENDING
+L3-C: PASS · Verified
+      → implement-scc-001-l3c-schema-sunset.md
 ```
 
 ---
@@ -116,10 +116,10 @@ L3-C: PENDING
 
 | Phase | Status | Evidence |
 | ----- | ------ | -------- |
-| L3-A Consumer demotion | **PASS · Verified** | `route-membership-l3a.test.ts` + form/persist paths |
-| L3-B Historical backfill | **Implemented** · await verify | planner + CLI + `backfill-from-provenance.test.ts` |
-| L3-C Schema sunset | pending | — |
-| Human verification (L3-A) | **PASS** · 2026-08-09 | — |
+| L3-A Consumer demotion | **PASS · Verified** | form/persist paths |
+| L3-B Historical backfill | **PASS · Verified** | planner + CLI + `backfill-from-provenance.test.ts` |
+| L3-C Schema sunset | **PASS · Verified** | migration + `route-membership-l3c.test.ts` |
+| Human verification (L3-A / L3-B / L3-C) | **PASS** · 2026-08-09 | — |
 
 ---
 
@@ -132,6 +132,7 @@ docs/spikes/adr-012-batch-attach-pollution-resolution.md
 docs/spikes/implement-scc-001-level2-controlled-expansion.md
 docs/spikes/implement-scc-001-l2a-context-ownership-authority.md
 docs/spikes/implement-scc-001-l3b-historical-context-backfill.md
-lib/rollout/route-membership.ts
+docs/spikes/implement-scc-001-l3c-schema-sunset.md
+docs/supabase/migrations/20260809000000_drop_route_membership_columns.sql
 lib/scenes.ts
 ```

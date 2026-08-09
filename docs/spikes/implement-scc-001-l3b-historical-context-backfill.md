@@ -1,6 +1,6 @@
 # IMPLEMENT-SCC-001-L3-B — Historical Context Backfill
 
-**Status:** **Implemented** · awaiting human verification · 2026-08-09  
+**Status:** **PASS · Verified** · 2026-08-09  
 **Grant:** EXECUTE GRANTED (Historical Context backfill — additive only)  
 **Parent program:** `docs/spikes/implement-scc-001-level3-route-ownership-sunset.md`  
 **Prerequisite:** L3-A **PASS · Verified** · `scene_contexts_v1` migration in target envs  
@@ -99,7 +99,7 @@ Scope: Historical Context backfill (additive only)
 | Plan from provenance without Route cast ownership | `backfill-from-provenance.test.ts` |
 | Idempotent apply plan | same (second plan noop) |
 | No membership column writes | `replaceSceneContextsOnly` patches `scene_contexts_v1` only |
-| Human verification | pending |
+| Human verification | **PASS** · CLI dry-run / apply / idempotent · 2026-08-09 |
 
 ---
 

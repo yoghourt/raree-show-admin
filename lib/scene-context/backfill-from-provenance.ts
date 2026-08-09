@@ -2,7 +2,7 @@
  * IMPLEMENT-SCC-001-L3-B — Historical Scene Context backfill planner.
  *
  * Builds Context candidates from Frame provenance / caption.
- * MUST NOT use Route character_ids / location_id as ownership source.
+ * Route membership columns were dropped in L3-C — provenance / caption only.
  */
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
@@ -28,12 +28,6 @@ export type BackfillRouteInput = {
   story_images_v2: unknown;
   frame_provenance_v1: unknown;
   scene_contexts_v1?: unknown;
-  /**
-   * Present only so callers can prove we ignore them.
-   * MUST NOT feed Context appearance/location ownership.
-   */
-  character_ids?: string[] | null;
-  location_id?: string | null;
 };
 
 export type BackfillAction =
@@ -109,9 +103,6 @@ export function planSceneContextBackfill(input: {
   );
 
   const actions: BackfillAction[] = [];
-  // Intentionally unused — document anti-pollution: never read for ownership.
-  void input.route.character_ids;
-  void input.route.location_id;
 
   for (const entry of provenance) {
     const sourceReviewId = entry.sourceReviewId?.trim() ?? "";

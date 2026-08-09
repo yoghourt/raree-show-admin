@@ -1,5 +1,6 @@
 /**
  * SPEC-ROL-001 §4.6 — Reading Route staging → Runtime ReadingRoute create payload
+ * L3-C: no Route membership fields on create payload.
  */
 
 import { z } from "zod";
@@ -15,8 +16,6 @@ const readingRouteCreateSchema = z.object({
   summary: z.string(),
   tags: z.array(z.string()),
   story_images_v2: z.null(),
-  locationId: z.null(),
-  characterIds: z.array(z.string()),
 });
 
 export type ReadingRouteCreatePayload = Omit<ReadingRoute, "tsid" | "workId">;
@@ -46,8 +45,6 @@ export function mapSceneStagingToReadingRoutePayload(
     summary: staging.summary?.trim() ?? "",
     tags: [] as string[],
     story_images_v2: null,
-    locationId: null,
-    characterIds: [] as string[],
   };
 
   const parsed = readingRouteCreateSchema.safeParse(raw);

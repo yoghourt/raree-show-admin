@@ -2,7 +2,7 @@
 
 Additive backfill: `frame_provenance_v1` → `scene_contexts_v1`.
 
-**Does not** write Route `character_ids` / `location_id`.
+**Does not** write Route membership (columns dropped in L3-C).
 
 ## Prerequisites
 

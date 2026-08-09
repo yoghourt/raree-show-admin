@@ -1,20 +1,17 @@
 /**
- * IMPLEMENT-SCC-001-L3-A — edits MUST NOT write Route membership.
+ * IMPLEMENT-SCC-001-L3-C — Route membership columns sunset.
  */
 
 import { describe, expect, it } from "vitest";
 
 import {
-  emptyRouteMembershipApp,
-  emptyRouteMembershipDb,
-} from "@/lib/rollout/route-membership";
-import {
   relatedLineFromRouteRow,
   toUpdateRowWithoutMembership,
 } from "@/lib/scenes";
+import { rowToReadingRoute } from "@/lib/rollout/scenes-server";
 
-describe("L3-A Route membership demotion", () => {
-  it("update patch omits character_ids and location_id", () => {
+describe("L3-C Route membership schema sunset", () => {
+  it("update patch has no character_ids / location_id", () => {
     const patch = toUpdateRowWithoutMembership({
       title: "Arc",
       chapter_number: 1,
@@ -22,28 +19,42 @@ describe("L3-A Route membership demotion", () => {
       summary: "s",
       tags: [],
       story_images_v2: [{ url: "", caption: "beat" }],
-      locationId: "loc_pollute",
-      characterIds: ["char_pollute"],
     });
 
     expect(patch).not.toHaveProperty("character_ids");
     expect(patch).not.toHaveProperty("location_id");
-    expect(patch.title).toBe("Arc");
-    expect(patch.story_images_v2).toEqual([{ url: "", caption: "beat" }]);
+    expect(Object.keys(patch).sort()).toEqual(
+      [
+        "chapter_number",
+        "chapter_title",
+        "story_images_v2",
+        "summary",
+        "tags",
+        "title",
+      ].sort()
+    );
   });
 
-  it("insert membership helpers are empty", () => {
-    expect(emptyRouteMembershipDb()).toEqual({
-      location_id: "",
-      character_ids: [],
+  it("rowToReadingRoute does not map membership columns", () => {
+    const route = rowToReadingRoute({
+      work_id: "work-1",
+      tsid: "scene_1",
+      title: "Arc",
+      chapter_number: 1,
+      chapter_title: null,
+      summary: "s",
+      tags: [],
+      story_images_v2: [],
+      discovery_source_review_id: "rev-1",
+      frame_provenance_v1: [],
     });
-    expect(emptyRouteMembershipApp()).toEqual({
-      locationId: null,
-      characterIds: [],
-    });
+
+    expect(route).not.toHaveProperty("characterIds");
+    expect(route).not.toHaveProperty("locationId");
+    expect(route.tsid).toBe("scene_1");
   });
 
-  it("related line prefers Context aggregate over Route membership fields", () => {
+  it("related line still aggregates from Contexts", () => {
     const line = relatedLineFromRouteRow({
       scene_contexts_v1: [
         {

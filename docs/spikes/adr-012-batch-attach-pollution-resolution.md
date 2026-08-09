@@ -114,16 +114,15 @@ Discovery Character/Location candidates = **Work Archive candidates**, not Story
 | Stop Accept batch-write as Route authority | **Done** · L2-A PASS · Verified |
 | Review/Rollout UI aggregate from Context/child scenes | **Done** · L2-B PASS · Verified |
 | Propose signals for Context (not Story membership) | **Done** · L2-C PASS · Verified |
-| Delete Route `character_ids` / `location_id` | Level 3 · L3-A demotion **PASS · Verified** · L3-B backfill **implemented** · column drop = L3-C pending |
-| Historical Context backfill | **Implemented** · L3-B → `implement-scc-001-l3b-historical-context-backfill.md` |
+| Delete Route `character_ids` / `location_id` | **Done** · L3-A/B/C **PASS · Verified** → `implement-scc-001-l3c-schema-sunset.md` |
+| Historical Context backfill | **PASS · Verified** · L3-B → `implement-scc-001-l3b-historical-context-backfill.md` |
 
 ---
 
 ## 6. Explicit non-goals of this document
 
 * Does not authorize Accept heuristic filtering as the fix  
-* Does not authorize Level 3 column deletion  
-* Does not change Runtime Truth v1 Reader URL topology  
+* Does not change Runtime Truth v1 Reader URL topology (own ADR)  
 
 ---
 

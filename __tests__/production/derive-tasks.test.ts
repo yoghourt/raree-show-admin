@@ -36,8 +36,6 @@ const route = (overrides: Partial<ReadingRoute> = {}): ReadingRoute => ({
   summary: "",
   tags: [],
   story_images_v2: [{ url: "", caption: "hello" }],
-  locationId: null,
-  characterIds: [],
   ...overrides,
 });
 

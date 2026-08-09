@@ -65,8 +65,9 @@ Code expansion beyond S1 still requires a **named next slice** before non-allowl
 | **L2-A** Context ownership authority (stop Accept→Route batch attach) | `docs/spikes/implement-scc-001-l2a-context-ownership-authority.md` | **PASS · Verified** |
 | **L2-B** UI aggregate from Context / child scenes | `docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md` | **PASS · Verified** |
 | **L2-C** Propose→Context candidate signals | `docs/spikes/implement-scc-001-l2c-propose-context-signals.md` | **PASS · Verified** |
-| **L3** Route ownership sunset (program) | `docs/spikes/implement-scc-001-level3-route-ownership-sunset.md` | **GRANTED** · L3-A PASS · L3-B implemented · L3-C pending |
-| **L3-B** Historical Context backfill | `docs/spikes/implement-scc-001-l3b-historical-context-backfill.md` | **Implemented** · awaiting human verification |
+| **L3** Route ownership sunset (program) | `docs/spikes/implement-scc-001-level3-route-ownership-sunset.md` | **COMPLETE** · L3-A/B/C PASS |
+| **L3-B** Historical Context backfill | `docs/spikes/implement-scc-001-l3b-historical-context-backfill.md` | **PASS · Verified** |
+| **L3-C** Schema sunset | `docs/spikes/implement-scc-001-l3c-schema-sunset.md` | **PASS · Verified** |
 
 Rejected: Accept/UI heuristic filter that keeps Story/Route as ownership (short-term D1).
 

@@ -25,8 +25,7 @@ describe("mapSceneStagingToReadingRoutePayload", () => {
       expect(result.payload.chapter_title).toBe("Jon");
       expect(result.payload.summary).toBe("Night watch");
       expect(result.payload.tags).toEqual([]);
-      expect(result.payload.characterIds).toEqual([]);
-      expect(result.payload.locationId).toBeNull();
+      expect(result.payload.story_images_v2).toBeNull();
     }
   });
 

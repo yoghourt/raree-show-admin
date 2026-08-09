@@ -36,8 +36,6 @@ const baseRoute = {
     },
   ],
   scene_contexts_v1: [] as unknown[],
-  character_ids: ["char_pollution_should_not_appear"],
-  location_id: "loc_pollution_should_not_appear",
 };
 
 describe("planSceneContextBackfill (L3-B)", () => {
@@ -59,10 +57,6 @@ describe("planSceneContextBackfill (L3-B)", () => {
     expect(ctx.characterAppearanceContext.map((c) => c.name)).toEqual(["Arya"]);
     expect(ctx.characterAppearanceContext[0]!.archiveTsid).toBe("char_arya");
     expect(ctx.locationContext.environmentFromExpression).toContain("courtyard");
-    // Pollution membership must not become appearance
-    expect(
-      JSON.stringify(ctx.characterAppearanceContext)
-    ).not.toContain("char_pollution_should_not_appear");
     expect(ctx.locationContext.archiveTsid).toBeUndefined();
   });
 

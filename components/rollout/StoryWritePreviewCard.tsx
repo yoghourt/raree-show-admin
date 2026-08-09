@@ -16,7 +16,6 @@ import type {
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
 import { messages } from "@/lib/locale";
-import { emptyRouteMembershipApp } from "@/lib/rollout/route-membership";
 import { rolloutUi } from "@/lib/rollout/ui-copy";
 import {
   aggregateStoryRelatedRefs,
@@ -57,7 +56,7 @@ function valuesToStaging(
   staging: AcceptedStoryUnitStaging,
   values: StoryWritePreviewValues
 ): AcceptedStoryUnitStaging {
-  // L3-A: never stage Route membership for persist.
+  // L3-C: Route membership columns dropped — never stage cast/place ownership.
   return {
     ...staging,
     title: values.title.trim(),
@@ -66,7 +65,8 @@ function valuesToStaging(
     chapter_title: values.chapter_title.trim() || null,
     relatedCharacterRefs: [],
     relatedLocationRefs: [],
-    ...emptyRouteMembershipApp(),
+    characterIds: [],
+    locationId: null,
   };
 }
 

@@ -14,7 +14,6 @@ import {
   parseRendererExpression,
   parseVisualIntent,
 } from "@/lib/discovery/visual-contract";
-import { emptyRouteMembershipDb } from "@/lib/rollout/route-membership";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
 
@@ -41,8 +40,6 @@ export type SceneRowWithProvenance = {
   summary: string;
   tags: string[] | null;
   story_images_v2: unknown;
-  location_id: string;
-  character_ids: string[] | null;
   discovery_source_review_id: string | null;
   frame_provenance_v1: unknown;
   /** IMPLEMENT-SCC-001-S1: Scene Context ownership records (delivery host storage). */
@@ -114,14 +111,12 @@ export function rowToReadingRoute(row: SceneRowWithProvenance): ReadingRoute {
     summary: row.summary,
     tags: row.tags ?? [],
     story_images_v2: parseStoryImagesV2(row.story_images_v2),
-    locationId: row.location_id?.trim() ? row.location_id : null,
-    characterIds: row.character_ids ?? [],
   };
 }
 
-/** Base select — safe before scene_contexts_v1 migration is applied. */
+/** Base select — L3-C: no Route membership columns. */
 const SELECT_COLS =
-  "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, location_id, character_ids, discovery_source_review_id, frame_provenance_v1";
+  "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, discovery_source_review_id, frame_provenance_v1";
 
 /**
  * IMPLEMENT-SCC-001-S1 — requires docs/supabase/migrations/20260808000000_scene_contexts_v1.sql
@@ -211,10 +206,6 @@ export async function insertReadingRouteWithProvenance(
     chapterNumber: number;
     chapterTitle?: string | null;
     discoverySourceReviewId: string;
-    /** @deprecated L3-A — ignored; inserts always empty membership */
-    locationId?: string | null;
-    /** @deprecated L3-A — ignored; inserts always empty membership */
-    characterIds?: string[];
   }
 ): Promise<SceneRowWithProvenance> {
   const tsid = `scene_${Date.now()}`;
@@ -228,8 +219,6 @@ export async function insertReadingRouteWithProvenance(
     summary: params.summary,
     tags: [] as string[],
     story_images_v2: [] as ReadingFrame[],
-    // L3-A: ignore caller membership; columns remain until L3-C.
-    ...emptyRouteMembershipDb(),
     discovery_source_review_id: params.discoverySourceReviewId,
     frame_provenance_v1: [] as FrameProvenanceEntry[],
   };
@@ -326,11 +315,11 @@ export async function listSceneRowsWithContextsForWork(
     }
     throw new Error(error.message);
   }
-  return (data as SceneRowWithProvenance[] | null) ?? [];
+  return ((data as unknown) as SceneRowWithProvenance[] | null) ?? [];
 }
 
 /**
- * L3-B: write scene_contexts_v1 only — MUST NOT patch character_ids / location_id.
+ * L3-B: write scene_contexts_v1 only (delivery-host Context storage).
  */
 export async function replaceSceneContextsOnly(
   supabase: SupabaseClient,

@@ -29,7 +29,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
-import { emptyRouteMembershipApp } from "@/lib/rollout/route-membership";
 import { createScene, updateScene } from "@/lib/scenes";
 import type { Character, Location, ReadingFrame, ReadingRoute } from "@/lib/types";
 
@@ -132,7 +131,7 @@ function sceneToFormValues(scene: ReadingRoute): ReadingRouteFormValues {
 function formValuesToPayload(
   values: ReadingRouteFormValues
 ): Omit<ReadingRoute, "tsid" | "workId"> {
-  // L3-A: Route membership never written from story edit.
+  // L3-C: Route membership columns dropped — delivery fields only.
   return {
     title: values.title.trim(),
     chapter_number: values.chapter_number,
@@ -140,7 +139,6 @@ function formValuesToPayload(
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
     story_images_v2: values.story_images_v2,
-    ...emptyRouteMembershipApp(),
   };
 }
 

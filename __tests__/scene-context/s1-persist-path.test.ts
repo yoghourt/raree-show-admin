@@ -45,8 +45,6 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
       summary: "",
       tags: [],
       story_images_v2: [],
-      location_id: "",
-      character_ids: [],
       discovery_source_review_id: "rev-story-1",
       frame_provenance_v1: [],
       scene_contexts_v1: [],
@@ -114,8 +112,6 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
       summary: "",
       tags: [],
       story_images_v2: [],
-      location_id: "",
-      character_ids: [],
       discovery_source_review_id: "rev-story-1",
       frame_provenance_v1: [],
     };

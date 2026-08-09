@@ -1,10 +1,9 @@
 /**
  * Hot Path — Story staging → Reading Route (scenes) persist / unpersist
  *
- * IMPLEMENT-SCC-001-L2-A / ADR-012:
- * Route character_ids / location_id are non-authoritative migration debt.
- * Delivery ownership only — narrative appearance/location live on Scene Context.
- * Accept MUST NOT batch-fill these fields from the Work character/location batch.
+ * IMPLEMENT-SCC-001-L3-C / ADR-012:
+ * Route membership columns dropped. Delivery ownership only —
+ * narrative appearance/location live on Scene Context.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -97,7 +96,6 @@ export async function persistReadingRouteFromStoryStaging(
     staging.sourceReviewId
   );
   if (existing) {
-    // L3-A: do not write Route membership (character_ids / location_id) on update.
     const { data, error } = await supabase
       .from("scenes")
       .update({
@@ -107,7 +105,7 @@ export async function persistReadingRouteFromStoryStaging(
       .eq("work_id", workId)
       .eq("tsid", existing.tsid)
       .select(
-        "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, location_id, character_ids, discovery_source_review_id, frame_provenance_v1"
+        "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, discovery_source_review_id, frame_provenance_v1"
       )
       .single();
     if (error) throw new Error(error.message);
@@ -118,15 +116,12 @@ export async function persistReadingRouteFromStoryStaging(
     typeof staging.chapter_number === "number" && staging.chapter_number >= 1
       ? staging.chapter_number
       : await nextChapterNumber(supabase, workId);
-  // L3-A: inserts always empty membership (columns remain until L3-C).
   const row = await insertReadingRouteWithProvenance(supabase, workId, {
     title: staging.title.trim(),
     summary: staging.summary?.trim() ?? "",
     chapterNumber,
     chapterTitle: staging.chapter_title ?? null,
     discoverySourceReviewId: staging.sourceReviewId,
-    locationId: null,
-    characterIds: [],
   });
   return rowToApprovedStoryUnit(row);
 }
@@ -149,7 +144,7 @@ export async function updateReadingRouteAsStoryUnit(
     .eq("work_id", workId)
     .eq("tsid", routeTsid)
     .select(
-      "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, location_id, character_ids, discovery_source_review_id, frame_provenance_v1"
+      "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, discovery_source_review_id, frame_provenance_v1"
     )
     .single();
 
