@@ -9,6 +9,9 @@ Deployment knobs for Context-aware projection. Not Architecture constants.
 - **L2-A PASS · Verified** — Accept MUST NOT batch-fill Route `character_ids` / `location_id`; Context path may enrich appearance/location archive refs by name.
 - **L2-B PASS · Verified** (`docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md`) — Review/Rollout display = child Scene/Context union.
 - **L2-C PASS · Verified** (`docs/spikes/implement-scc-001-l2c-propose-context-signals.md`) — Propose → Context candidate signals.
+- **L3 COMPLETE · L3-A/B/C PASS · Verified** (`docs/spikes/implement-scc-001-level3-route-ownership-sunset.md`) — Route membership demoted, backfilled, columns dropped.
+- **L3-B PASS · Verified** (`docs/spikes/implement-scc-001-l3b-historical-context-backfill.md`) — Historical Context backfill CLI: `npx tsx scripts/scene-context-backfill/run.ts --workId=…` (dry-run default; `--apply` to write).
+- **L3-C PASS · Verified** (`docs/spikes/implement-scc-001-l3c-schema-sunset.md`) — Drop Route `character_ids` / `location_id` via `docs/supabase/migrations/20260809000000_drop_route_membership_columns.sql`.
 
 | Env | Default | Meaning |
 | --- | ------- | ------- |

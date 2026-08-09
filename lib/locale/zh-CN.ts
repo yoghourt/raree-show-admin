@@ -215,9 +215,14 @@ export const zhCN = {
     readingRouteLinkCount: (count: number, label: string) =>
       count > 0 ? ` · ${count} 个${label}` : '',
     entitySectionDeferred:
-      '投递路由角色/地点（非权威可选债务：须先保证故事标题与画面说明可读）',
+      '投递路由角色/地点已停写（L3-A：非权威债务，列保留至 L3-C）',
     storyRelatedFromFrames: '本故事相关（来自画面语境并集）',
     storyRelatedFromFramesEmpty: '画面暂无可聚合的出场/地点线索',
+    storyRelatedFromContexts: '本故事相关（来自场景语境 / 画面线索，只读）',
+    storyRelatedFromContextsEmpty:
+      '暂无场景语境聚合；相关出场以各画面语境为准，不再挂在投递路由上',
+    routeMembershipDemotedHint:
+      '地点/角色不再作为故事投递路由的可编辑成员。归属在场景语境；此处仅展示聚合线索。',
     openReaderVerify: '打开读者端验读',
     goScenesList: '打开故事列表',
   },

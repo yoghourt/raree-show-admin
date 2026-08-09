@@ -154,32 +154,26 @@ describe("Runtime Truth Gate", () => {
     const gate = assertRuntimeTruthGate({
       context,
       frame,
-      routeCharacterIds: [],
-      routeLocationId: null,
-      routeCharacterIdsBefore: [],
-      routeLocationIdBefore: null,
     });
     expect(gate.ok).toBe(true);
     expect(gate.failures).toEqual([]);
   });
 
-  it("fails when Context path mutates Route characterIds", () => {
+  it("fails when Frame carries archive ownership fields", () => {
     const context = associateStagingToSceneContext(staging, {
       readingRouteTsid: "scene_route_1",
       frameIndex: 0,
     });
     const gate = assertRuntimeTruthGate({
       context,
-      frame: { url: "", caption: "x" },
-      routeCharacterIds: ["char_1"],
-      routeLocationId: null,
-      routeCharacterIdsBefore: [],
-      routeLocationIdBefore: null,
+      frame: {
+        url: "",
+        caption: "x",
+        characterIds: ["char_1"],
+      } as { url: string; caption: string },
     });
     expect(gate.ok).toBe(false);
-    expect(gate.failures).toContain(
-      "route_characterIds_mutated_by_context_path"
-    );
+    expect(gate.failures).toContain("frame_owns_archive_fields");
   });
 });
 

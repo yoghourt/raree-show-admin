@@ -40,18 +40,11 @@ export type SceneRowWithProvenance = {
   summary: string;
   tags: string[] | null;
   story_images_v2: unknown;
-  location_id: string;
-  character_ids: string[] | null;
   discovery_source_review_id: string | null;
   frame_provenance_v1: unknown;
   /** IMPLEMENT-SCC-001-S1: Scene Context ownership records (delivery host storage). */
   scene_contexts_v1?: unknown;
 };
-
-function locationIdToDb(locationId: string | null | undefined): string {
-  const trimmed = locationId?.trim();
-  return trimmed ? trimmed : "";
-}
 
 export function parseStoryImagesV2(raw: unknown): ReadingFrame[] {
   if (!Array.isArray(raw)) return [];
@@ -118,14 +111,12 @@ export function rowToReadingRoute(row: SceneRowWithProvenance): ReadingRoute {
     summary: row.summary,
     tags: row.tags ?? [],
     story_images_v2: parseStoryImagesV2(row.story_images_v2),
-    locationId: row.location_id?.trim() ? row.location_id : null,
-    characterIds: row.character_ids ?? [],
   };
 }
 
-/** Base select — safe before scene_contexts_v1 migration is applied. */
+/** Base select — L3-C: no Route membership columns. */
 const SELECT_COLS =
-  "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, location_id, character_ids, discovery_source_review_id, frame_provenance_v1";
+  "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, discovery_source_review_id, frame_provenance_v1";
 
 /**
  * IMPLEMENT-SCC-001-S1 — requires docs/supabase/migrations/20260808000000_scene_contexts_v1.sql
@@ -215,8 +206,6 @@ export async function insertReadingRouteWithProvenance(
     chapterNumber: number;
     chapterTitle?: string | null;
     discoverySourceReviewId: string;
-    locationId?: string | null;
-    characterIds?: string[];
   }
 ): Promise<SceneRowWithProvenance> {
   const tsid = `scene_${Date.now()}`;
@@ -230,8 +219,6 @@ export async function insertReadingRouteWithProvenance(
     summary: params.summary,
     tags: [] as string[],
     story_images_v2: [] as ReadingFrame[],
-    location_id: locationIdToDb(params.locationId ?? null),
-    character_ids: params.characterIds ?? [],
     discovery_source_review_id: params.discoverySourceReviewId,
     frame_provenance_v1: [] as FrameProvenanceEntry[],
   };
@@ -307,6 +294,56 @@ export async function getSceneRowWithContextsByTsid(
     throw new Error(error.message);
   }
   return asSceneRowOrNull(data);
+}
+
+/** List Routes for a Work including scene_contexts_v1 (L3-B backfill). */
+export async function listSceneRowsWithContextsForWork(
+  supabase: SupabaseClient,
+  workId: string
+): Promise<SceneRowWithProvenance[]> {
+  const { data, error } = await supabase
+    .from("scenes")
+    .select(SELECT_COLS_WITH_CONTEXTS)
+    .eq("work_id", workId)
+    .order("chapter_number", { ascending: true });
+
+  if (error) {
+    if (/scene_contexts_v1/i.test(error.message)) {
+      throw new Error(
+        "scene_contexts_v1 missing — apply docs/supabase/migrations/20260808000000_scene_contexts_v1.sql before L3-B backfill"
+      );
+    }
+    throw new Error(error.message);
+  }
+  return ((data as unknown) as SceneRowWithProvenance[] | null) ?? [];
+}
+
+/**
+ * L3-B: write scene_contexts_v1 only (delivery-host Context storage).
+ */
+export async function replaceSceneContextsOnly(
+  supabase: SupabaseClient,
+  workId: string,
+  tsid: string,
+  sceneContexts: SceneContextRecord[]
+): Promise<SceneRowWithProvenance> {
+  const { data, error } = await supabase
+    .from("scenes")
+    .update({ scene_contexts_v1: sceneContexts })
+    .eq("work_id", workId)
+    .eq("tsid", tsid)
+    .select(SELECT_COLS_WITH_CONTEXTS)
+    .single();
+
+  if (error) {
+    if (/scene_contexts_v1/i.test(error.message)) {
+      throw new Error(
+        "scene_contexts_v1 missing — apply docs/supabase/migrations/20260808000000_scene_contexts_v1.sql before L3-B backfill"
+      );
+    }
+    throw new Error(error.message);
+  }
+  return asSceneRow(data);
 }
 
 export async function deleteSceneRow(

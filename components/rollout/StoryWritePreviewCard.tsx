@@ -7,9 +7,6 @@
 
 import * as React from "react";
 
-import { EntityMultiFuzzyPicker } from "@/components/entity/EntityMultiFuzzyPicker";
-import { FuzzyEntityCombobox } from "@/components/entity/FuzzyEntityCombobox";
-import type { EntityOption } from "@/components/entity/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,8 +28,6 @@ export type StoryWritePreviewValues = {
   chapter_number: number;
   chapter_title: string;
   summary: string;
-  locationId: string;
-  characterIds: string[];
   frames: Array<{ sourceReviewId: string; title: string; summary: string }>;
 };
 
@@ -41,7 +36,6 @@ function stagingToValues(
   frames: AcceptedSceneCandidateStaging[],
   defaultChapter: number
 ): StoryWritePreviewValues {
-  // L2-A/L2-B: Route membership is non-authoritative — do not backfill from related*Refs.
   return {
     title: staging.title,
     chapter_number:
@@ -50,8 +44,6 @@ function stagingToValues(
         : defaultChapter,
     chapter_title: staging.chapter_title ?? "",
     summary: staging.summary ?? "",
-    locationId: staging.locationId?.trim() || "",
-    characterIds: staging.characterIds ?? [],
     frames: frames.map((f) => ({
       sourceReviewId: f.sourceReviewId,
       title: f.title,
@@ -64,25 +56,17 @@ function valuesToStaging(
   staging: AcceptedStoryUnitStaging,
   values: StoryWritePreviewValues
 ): AcceptedStoryUnitStaging {
-  const relatedCharacterRefs = (staging.relatedCharacterRefs ?? []).map(
-    (ref) => ({
-      ...ref,
-      matchedTsid: values.characterIds.includes(ref.matchedTsid ?? "")
-        ? ref.matchedTsid
-        : ref.matchedTsid,
-    })
-  );
-
+  // L3-C: Route membership columns dropped — never stage cast/place ownership.
   return {
     ...staging,
     title: values.title.trim(),
     summary: values.summary.trim(),
     chapter_number: values.chapter_number,
     chapter_title: values.chapter_title.trim() || null,
-    locationId: values.locationId.trim() || null,
-    characterIds: values.characterIds,
-    relatedCharacterRefs,
-    relatedLocationRefs: staging.relatedLocationRefs,
+    relatedCharacterRefs: [],
+    relatedLocationRefs: [],
+    characterIds: [],
+    locationId: null,
   };
 }
 
@@ -120,61 +104,6 @@ export function StoryWritePreviewCard({
     setValues(stagingToValues(staging, frames, defaultChapterNumber));
   }, [staging, frames, defaultChapterNumber]);
 
-  const locationOptions = React.useMemo((): EntityOption[] => {
-    const list = [...locations];
-    for (const ref of staging.relatedLocationRefs ?? []) {
-      if (
-        ref.matchedTsid &&
-        !list.some((l) => l.tsid === ref.matchedTsid)
-      ) {
-        list.push({
-          id: "",
-          workId: staging.workId,
-          tsid: ref.matchedTsid,
-          name: ref.name,
-          region: ref.region ?? "",
-          description: ref.description ?? "",
-          createdAt: "",
-          map_focus_x: null,
-          map_focus_y: null,
-        });
-      }
-    }
-    return list.map((l) => ({
-      id: l.tsid,
-      label: l.name,
-      aliases: [l.tsid],
-    }));
-  }, [locations, staging]);
-
-  const characterOptions = React.useMemo((): EntityOption[] => {
-    const list = [...characters];
-    for (const ref of staging.relatedCharacterRefs ?? []) {
-      if (
-        ref.matchedTsid &&
-        !list.some((c) => c.tsid === ref.matchedTsid)
-      ) {
-        list.push({
-          id: "",
-          workId: staging.workId,
-          tsid: ref.matchedTsid,
-          name: ref.name,
-          house: ref.house ?? "",
-          description: ref.description ?? "",
-          signatureQuote: ref.signatureQuote ?? null,
-          portraitUrl: "",
-          createdAt: "",
-        });
-      }
-    }
-    // Pending create names (no tsid yet) — show as disabled hint chips via note below
-    return list.map((c) => ({
-      id: c.tsid,
-      label: c.name,
-      aliases: [c.tsid, c.house].filter(Boolean) as string[],
-    }));
-  }, [characters, staging]);
-
   const frameRelatedLine = React.useMemo(() => {
     const aggregate = aggregateStoryRelatedRefs({
       sceneStagings: frames,
@@ -201,6 +130,9 @@ export function StoryWritePreviewCard({
       <div className="space-y-1 rounded-lg border border-dashed px-3 py-2">
         <p className="text-xs font-medium">
           {rolloutUi.storyRelatedFromFrames}
+        </p>
+        <p className="text-muted-foreground text-xs">
+          {rolloutUi.routeMembershipDemotedHint}
         </p>
         <p className="text-muted-foreground text-xs">
           {frameRelatedLine ?? rolloutUi.storyRelatedFromFramesEmpty}
@@ -340,35 +272,6 @@ export function StoryWritePreviewCard({
           </ul>
         )}
       </div>
-
-      <details className="rounded-lg border border-dashed p-3">
-        <summary className="cursor-pointer text-sm font-medium">
-          {messages.rollout.entitySectionDeferred}
-        </summary>
-        <div className="mt-3 space-y-3">
-      <div className="space-y-2">
-        <Label>地点（可选 · 非权威）</Label>
-        <FuzzyEntityCombobox
-          value={values.locationId}
-          options={locationOptions}
-          placeholder={messages.common.search}
-          disabled={busy || locationOptions.length === 0}
-          onSelect={(opt) => patch({ locationId: opt.id })}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>角色（可选 · 非权威）</Label>
-        <EntityMultiFuzzyPicker
-          value={values.characterIds}
-          options={characterOptions}
-          placeholder={messages.forms.searchCharacters}
-          disabled={busy || characterOptions.length === 0}
-          onChange={(ids) => patch({ characterIds: ids })}
-        />
-      </div>
-        </div>
-      </details>
 
       <div className="flex flex-wrap gap-2 pt-1">
         <Button

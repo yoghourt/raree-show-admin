@@ -61,10 +61,6 @@ function frameFromStaging(staging: AcceptedSceneCandidateStaging): ReadingFrame 
   return { url: "", caption: captionFromStaging(staging) };
 }
 
-function locationIdFromRow(row: SceneRowWithProvenance): string | null {
-  return row.location_id?.trim() ? row.location_id : null;
-}
-
 /** Work Archive names for Context-scoped enrichment only (ADR-012 L2-A). */
 async function loadWorkArchiveCatalog(
   supabase: SupabaseClient,
@@ -174,9 +170,6 @@ async function persistViaContextPath(
   }
   const parent = resolved.parent;
 
-  const routeCharacterIdsBefore = [...(parent.character_ids ?? [])];
-  const routeLocationIdBefore = locationIdFromRow(parent);
-
   const frames = parseStoryImagesV2(parent.story_images_v2);
   let provenance = parseFrameProvenance(parent.frame_provenance_v1);
   let contexts = parseSceneContextsV1(parent.scene_contexts_v1);
@@ -222,10 +215,6 @@ async function persistViaContextPath(
   const gate = assertRuntimeTruthGate({
     context,
     frame: nextFrame,
-    routeCharacterIds: routeCharacterIdsBefore,
-    routeLocationId: routeLocationIdBefore,
-    routeCharacterIdsBefore,
-    routeLocationIdBefore,
   });
   if (!gate.ok) {
     return {
@@ -235,7 +224,6 @@ async function persistViaContextPath(
     };
   }
 
-  // Ownership rule: do not patch character_ids / location_id on Context path.
   await updateSceneFramesAndProvenance(
     supabase,
     workId,
@@ -401,7 +389,7 @@ export async function unpersistReadingFrame(
     const { data, error } = await supabase
       .from("scenes")
       .select(
-        "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, location_id, character_ids, discovery_source_review_id, frame_provenance_v1"
+        "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, discovery_source_review_id, frame_provenance_v1"
       )
       .eq("work_id", workId)
       .not("discovery_source_review_id", "is", null);
@@ -493,7 +481,7 @@ export async function listFrameProjections(
   const { data, error } = await supabase
     .from("scenes")
     .select(
-      "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, location_id, character_ids, discovery_source_review_id, frame_provenance_v1"
+      "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, discovery_source_review_id, frame_provenance_v1"
     )
     .eq("work_id", workId)
     .not("discovery_source_review_id", "is", null);

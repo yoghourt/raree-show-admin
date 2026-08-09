@@ -5,7 +5,7 @@
 **Scope:** Level 2 Controlled Expansion — Propose → Context candidate quality  
 **Parent grant:** Level 2 Controlled Expansion (Option A)  
 **Prerequisite:** L2-A **PASS · Verified** · L2-B **PASS · Verified**  
-**Does not authorize:** Level 3 · Reader identity redesign · full Admin IA redesign · D1 heuristic-as-ownership · Story-batch attach revival
+**Does not authorize:** Level 3 (see prepared `implement-scc-001-level3-route-ownership-sunset.md`) · Reader identity redesign · full Admin IA redesign · D1 heuristic-as-ownership · Story-batch attach revival
 
 ---
 

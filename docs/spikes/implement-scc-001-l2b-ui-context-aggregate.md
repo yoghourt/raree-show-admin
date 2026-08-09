@@ -92,7 +92,7 @@ Identity: Editorial Scene ≠ Scene Context ≠ Frame ≠ Route ≠ Story
 | Slice | Intent |
 | ----- | ------ |
 | **L2-C** | Propose signals for Context candidates — **PASS · Verified** · `implement-scc-001-l2c-propose-context-signals.md` |
-| **Level 3** | Sunset Route fields + historical cleanup — separate authorization |
+| **Level 3** | Sunset Route fields + historical cleanup — **Prepared** · `implement-scc-001-level3-route-ownership-sunset.md` · awaiting Grant |
 
 ---
 

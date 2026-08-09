@@ -1,5 +1,6 @@
 /**
  * IMPLEMENT-SCC-001-S1 — Runtime Truth Gate (acceptance evidence).
+ * L3-C: Route membership columns dropped — gate no longer compares Route cast fields.
  */
 
 import type { ReadingFrame } from "@/lib/types";
@@ -17,10 +18,6 @@ export type RuntimeTruthGateResult = {
 export function assertRuntimeTruthGate(params: {
   context: SceneContextRecord;
   frame: ReadingFrame;
-  routeCharacterIds: string[];
-  routeLocationId: string | null;
-  routeCharacterIdsBefore: string[];
-  routeLocationIdBefore: string | null;
 }): RuntimeTruthGateResult {
   const failures: string[] = [];
   const { context, frame } = params;
@@ -52,16 +49,6 @@ export function assertRuntimeTruthGate(params: {
 
   if ("characterIds" in (frame as object) || "locationId" in (frame as object)) {
     failures.push("frame_owns_archive_fields");
-  }
-
-  if (
-    JSON.stringify(params.routeCharacterIds) !==
-    JSON.stringify(params.routeCharacterIdsBefore)
-  ) {
-    failures.push("route_characterIds_mutated_by_context_path");
-  }
-  if (params.routeLocationId !== params.routeLocationIdBefore) {
-    failures.push("route_locationId_mutated_by_context_path");
   }
 
   if (
