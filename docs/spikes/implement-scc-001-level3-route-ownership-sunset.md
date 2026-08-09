@@ -1,8 +1,8 @@
 # IMPLEMENT-SCC-001-L3 — Route Ownership Sunset
 
-**Status:** **GRANTED** · L3-A **PASS · Verified** · 2026-08-09  
+**Status:** **GRANTED** · L3-A **PASS · Verified** · L3-B **Implemented** (await verify) · 2026-08-09  
 **Program grant:** L3 Program Charter approved · 2026-08-09  
-**Execution:** **L3-A only** (L3-B / L3-C not authorized for coding)  
+**Phase grants:** L3-A done · L3-B EXECUTE delivered · L3-C not authorized  
 **Scope:** Level 3 migration program (beyond Option A Level 2 Controlled Expansion)  
 **Prerequisite:** S1 · L2-A · L2-B · L2-C all **PASS · Verified**  
 **Does not inherit:** Option A Level 2 grant alone — Level 3 requires separate Architect authorization
@@ -47,20 +47,23 @@ L3 retires **physical / consumer** debt on `scenes.character_ids` / `scenes.loca
 
 **Success gate:** New edits cannot re-pollute Route membership; operators see Context-derived related cast/place on story edit.
 
-### L3-B — Historical Context backfill (not executed)
+### L3-B — Historical Context backfill (**Implemented** · await verify)
 
-Additive backfill job — requires separate **EXECUTE GRANTED**.
+Additive provenance → `scene_contexts_v1` backfill.  
+Charter + delivery: `docs/spikes/implement-scc-001-l3b-historical-context-backfill.md`  
+CLI: `scripts/scene-context-backfill/run.ts`
 
-### L3-C — Schema sunset (not executed)
+### L3-C — Schema sunset (not authorized)
 
-Drop or permanently null columns — requires separate **EXECUTE GRANTED**.
+Drop or permanently null columns — requires separate **GRANT** then **EXECUTE**.
 
 ---
 
 ## 4. Explicit non-goals (until separately authorized)
 
 ```text
-❌ L3-B / L3-C without their own EXECUTE
+❌ L3-B coding without EXECUTE GRANTED
+❌ L3-C without its own GRANT + EXECUTE
 ❌ Blindly copy polluted Route character_ids into Scene Context as “truth”
 ❌ Reader URL / Scene Context page identity (own ADR)
 ❌ Full Admin IA redesign beyond membership demotion
@@ -101,9 +104,10 @@ IMPLEMENT-SCC-001-L3
 
 Status: GRANTED
 Program: Route ownership sunset
-Execution: L3-A only
-
-L3-B / L3-C: still PENDING until separate EXECUTE GRANTED
+L3-A: PASS · Verified
+L3-B: EXECUTE GRANTED → Implemented (await human verification)
+      → implement-scc-001-l3b-historical-context-backfill.md
+L3-C: PENDING
 ```
 
 ---
@@ -113,7 +117,7 @@ L3-B / L3-C: still PENDING until separate EXECUTE GRANTED
 | Phase | Status | Evidence |
 | ----- | ------ | -------- |
 | L3-A Consumer demotion | **PASS · Verified** | `route-membership-l3a.test.ts` + form/persist paths |
-| L3-B Historical backfill | pending | — |
+| L3-B Historical backfill | **Implemented** · await verify | planner + CLI + `backfill-from-provenance.test.ts` |
 | L3-C Schema sunset | pending | — |
 | Human verification (L3-A) | **PASS** · 2026-08-09 | — |
 
@@ -127,6 +131,7 @@ docs/specs/spec-scc-001-scene-context-contract.md
 docs/spikes/adr-012-batch-attach-pollution-resolution.md
 docs/spikes/implement-scc-001-level2-controlled-expansion.md
 docs/spikes/implement-scc-001-l2a-context-ownership-authority.md
+docs/spikes/implement-scc-001-l3b-historical-context-backfill.md
 lib/rollout/route-membership.ts
 lib/scenes.ts
 ```

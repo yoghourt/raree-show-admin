@@ -114,7 +114,8 @@ Discovery Character/Location candidates = **Work Archive candidates**, not Story
 | Stop Accept batch-write as Route authority | **Done** · L2-A PASS · Verified |
 | Review/Rollout UI aggregate from Context/child scenes | **Done** · L2-B PASS · Verified |
 | Propose signals for Context (not Story membership) | **Done** · L2-C PASS · Verified |
-| Delete Route `character_ids` / `location_id` | Level 3 · L3-A demotion **PASS · Verified** · column drop = L3-C pending → `implement-scc-001-level3-route-ownership-sunset.md` |
+| Delete Route `character_ids` / `location_id` | Level 3 · L3-A demotion **PASS · Verified** · L3-B backfill **implemented** · column drop = L3-C pending |
+| Historical Context backfill | **Implemented** · L3-B → `implement-scc-001-l3b-historical-context-backfill.md` |
 
 ---
 
@@ -135,6 +136,7 @@ docs/spikes/implement-scc-001-s1-context-aware-projection.md
 docs/spikes/implement-scc-001-l2a-context-ownership-authority.md
 docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md
 docs/spikes/implement-scc-001-l2c-propose-context-signals.md
+docs/spikes/implement-scc-001-l3b-historical-context-backfill.md
 lib/discovery/review-state.ts          # L2-A demoted batch attach
 lib/discovery/propose-service.ts       # L2-C Propose → Context cues
 lib/discovery/scene-context-candidate-signals.ts

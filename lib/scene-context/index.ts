@@ -23,6 +23,15 @@ export {
   isSceneContextProjectionEnabledForWork,
   isSceneContextProjectionGloballyEnabled,
 } from "@/lib/scene-context/feature-flag";
+export {
+  isBackfillPlanNoop,
+  planSceneContextBackfill,
+} from "@/lib/scene-context/backfill-from-provenance";
+export type {
+  BackfillAction,
+  BackfillPlan,
+  BackfillRouteInput,
+} from "@/lib/scene-context/backfill-from-provenance";
 export { parseSceneContextsV1 } from "@/lib/scene-context/parse";
 export { assertRuntimeTruthGate } from "@/lib/scene-context/runtime-truth-gate";
 export type {

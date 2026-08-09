@@ -307,6 +307,56 @@ export async function getSceneRowWithContextsByTsid(
   return asSceneRowOrNull(data);
 }
 
+/** List Routes for a Work including scene_contexts_v1 (L3-B backfill). */
+export async function listSceneRowsWithContextsForWork(
+  supabase: SupabaseClient,
+  workId: string
+): Promise<SceneRowWithProvenance[]> {
+  const { data, error } = await supabase
+    .from("scenes")
+    .select(SELECT_COLS_WITH_CONTEXTS)
+    .eq("work_id", workId)
+    .order("chapter_number", { ascending: true });
+
+  if (error) {
+    if (/scene_contexts_v1/i.test(error.message)) {
+      throw new Error(
+        "scene_contexts_v1 missing — apply docs/supabase/migrations/20260808000000_scene_contexts_v1.sql before L3-B backfill"
+      );
+    }
+    throw new Error(error.message);
+  }
+  return (data as SceneRowWithProvenance[] | null) ?? [];
+}
+
+/**
+ * L3-B: write scene_contexts_v1 only — MUST NOT patch character_ids / location_id.
+ */
+export async function replaceSceneContextsOnly(
+  supabase: SupabaseClient,
+  workId: string,
+  tsid: string,
+  sceneContexts: SceneContextRecord[]
+): Promise<SceneRowWithProvenance> {
+  const { data, error } = await supabase
+    .from("scenes")
+    .update({ scene_contexts_v1: sceneContexts })
+    .eq("work_id", workId)
+    .eq("tsid", tsid)
+    .select(SELECT_COLS_WITH_CONTEXTS)
+    .single();
+
+  if (error) {
+    if (/scene_contexts_v1/i.test(error.message)) {
+      throw new Error(
+        "scene_contexts_v1 missing — apply docs/supabase/migrations/20260808000000_scene_contexts_v1.sql before L3-B backfill"
+      );
+    }
+    throw new Error(error.message);
+  }
+  return asSceneRow(data);
+}
+
 export async function deleteSceneRow(
   supabase: SupabaseClient,
   workId: string,

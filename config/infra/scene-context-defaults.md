@@ -10,6 +10,7 @@ Deployment knobs for Context-aware projection. Not Architecture constants.
 - **L2-B PASS · Verified** (`docs/spikes/implement-scc-001-l2b-ui-context-aggregate.md`) — Review/Rollout display = child Scene/Context union.
 - **L2-C PASS · Verified** (`docs/spikes/implement-scc-001-l2c-propose-context-signals.md`) — Propose → Context candidate signals.
 - **L3 GRANTED · L3-A PASS · Verified** (`docs/spikes/implement-scc-001-level3-route-ownership-sunset.md`) — Route membership demoted in Admin/persist; columns remain until L3-C.
+- **L3-B Implemented** (`docs/spikes/implement-scc-001-l3b-historical-context-backfill.md`) — Historical Context backfill CLI: `npx tsx scripts/scene-context-backfill/run.ts --workId=…` (dry-run default; `--apply` to write).
 
 | Env | Default | Meaning |
 | --- | ------- | ------- |
