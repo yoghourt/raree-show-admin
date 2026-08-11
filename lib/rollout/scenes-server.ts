@@ -37,6 +37,7 @@ export type SceneRowWithProvenance = {
   title: string;
   chapter_number: number;
   chapter_title: string | null;
+  order_index?: number;
   summary: string;
   tags: string[] | null;
   story_images_v2: unknown;
@@ -108,6 +109,7 @@ export function rowToReadingRoute(row: SceneRowWithProvenance): ReadingRoute {
     title: row.title,
     chapter_number: row.chapter_number,
     chapter_title: row.chapter_title ?? null,
+    order_index: row.order_index ?? 0,
     summary: row.summary,
     tags: row.tags ?? [],
     story_images_v2: parseStoryImagesV2(row.story_images_v2),
@@ -116,7 +118,7 @@ export function rowToReadingRoute(row: SceneRowWithProvenance): ReadingRoute {
 
 /** Base select — L3-C: no Route membership columns. */
 const SELECT_COLS =
-  "work_id, tsid, title, chapter_number, chapter_title, summary, tags, story_images_v2, discovery_source_review_id, frame_provenance_v1";
+  "work_id, tsid, title, chapter_number, chapter_title, order_index, summary, tags, story_images_v2, discovery_source_review_id, frame_provenance_v1";
 
 /**
  * IMPLEMENT-SCC-001-S1 — requires docs/supabase/migrations/20260808000000_scene_contexts_v1.sql
@@ -197,6 +199,25 @@ export async function nextChapterNumber(
   return typeof max === "number" && max >= 1 ? max + 1 : 1;
 }
 
+export async function nextOrderIndexInChapter(
+  supabase: SupabaseClient,
+  workId: string,
+  chapterNumber: number
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("scenes")
+    .select("order_index")
+    .eq("work_id", workId)
+    .eq("chapter_number", chapterNumber)
+    .order("order_index", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  const max = (data as { order_index?: number } | null)?.order_index;
+  return typeof max === "number" && Number.isFinite(max) ? max + 1 : 0;
+}
+
 export async function insertReadingRouteWithProvenance(
   supabase: SupabaseClient,
   workId: string,
@@ -209,13 +230,18 @@ export async function insertReadingRouteWithProvenance(
   }
 ): Promise<SceneRowWithProvenance> {
   const tsid = `scene_${Date.now()}`;
+  const order_index = await nextOrderIndexInChapter(
+    supabase,
+    workId,
+    params.chapterNumber
+  );
   const insertRow = {
     work_id: workId,
     tsid,
     title: params.title,
     chapter_number: params.chapterNumber,
     chapter_title: params.chapterTitle?.trim() || null,
-    order_index: 0,
+    order_index,
     summary: params.summary,
     tags: [] as string[],
     story_images_v2: [] as ReadingFrame[],

@@ -116,6 +116,18 @@ function frameAssetUrl(
   return typeof url === "string" && url.trim() ? url.trim() : null;
 }
 
+/** True when Asset URL is exactly this job's hosted result (not merely "frame has some url"). */
+function frameAssetMatchesJobUrl(
+  routes: ReadingRoute[],
+  sceneTsid: string,
+  frameIndex: number,
+  jobUrl: string | null | undefined
+): boolean {
+  const asset = frameAssetUrl(routes, sceneTsid, frameIndex);
+  const hosted = jobUrl?.trim() ?? "";
+  return Boolean(asset && hosted && asset === hosted);
+}
+
 function jobHasRendererExpression(job: GenerateJobRow): boolean {
   return Boolean(job.input_json?.renderer_expression);
 }
@@ -406,10 +418,12 @@ export function BatchFrameCompletion({
     if (frameIndex === null) {
       return { ok: false, reason: "input_json.frame_index 无效" };
     }
-    if (frameAssetUrl(routes, job.subject_id, frameIndex)) {
+    if (
+      frameAssetMatchesJobUrl(routes, job.subject_id, frameIndex, hosted.url)
+    ) {
       return {
         ok: false,
-        reason: `${job.subject_id} 帧 ${frameIndex + 1} 已有 Asset，已跳过`,
+        reason: `${job.subject_id} 帧 ${frameIndex + 1} 已与本 Job 结果一致`,
       };
     }
     const key = rowKey(job.subject_id, frameIndex);
@@ -417,6 +431,13 @@ export function BatchFrameCompletion({
       (r) => rowKey(r.routeTsid, r.frameIndex) === key
     );
     if (!pending) {
+      // Frame already has a different Asset — use 「Accept 并覆盖」 instead of candidate lane.
+      if (frameAssetUrl(routes, job.subject_id, frameIndex)) {
+        return {
+          ok: false,
+          reason: `${job.subject_id} 帧 ${frameIndex + 1} 已有 Asset；请用「Accept 并覆盖」写入本 Job 结果`,
+        };
+      }
       return {
         ok: false,
         reason: `找不到待补帧 ${job.subject_id} · 帧 ${frameIndex + 1}`,
@@ -457,19 +478,23 @@ export function BatchFrameCompletion({
       setWriteError("无法 Accept：frame_index 无效");
       return;
     }
-    if (frameAssetUrl(routes, job.subject_id, frameIndex)) {
-      setWriteError("该帧已有 Asset，无需再写");
+    const currentUrl = frameAssetUrl(routes, job.subject_id, frameIndex);
+    if (currentUrl && currentUrl === hosted.url) {
+      setWriteError("该 Job 结果已与 Asset 一致，无需再写");
       return;
     }
 
     setWriting(true);
     setWriteError(null);
     setAdmitHint(null);
-    const admit = admitJobAsCandidate(job);
-    if (!admit.ok) {
-      setWriting(false);
-      setWriteError(admit.reason);
-      return;
+    // Empty-frame candidate lane is optional; replace writes skip it.
+    if (!currentUrl) {
+      const admit = admitJobAsCandidate(job);
+      if (!admit.ok) {
+        setWriting(false);
+        setWriteError(admit.reason);
+        return;
+      }
     }
     try {
       await scenesApi.patchSceneFrameUrls(workId, job.subject_id, [
@@ -478,7 +503,9 @@ export function BatchFrameCompletion({
       onWrote();
       await refreshJobs();
       setAdmitHint(
-        `已 Accept 并写入 ${job.subject_id} · 帧 ${frameIndex + 1}`
+        currentUrl
+          ? `已 Accept 并覆盖 ${job.subject_id} · 帧 ${frameIndex + 1}`
+          : `已 Accept 并写入 ${job.subject_id} · 帧 ${frameIndex + 1}`
       );
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
@@ -1017,15 +1044,28 @@ export function BatchFrameCompletion({
               const frameLabel =
                 frameIndex !== null ? `帧 ${frameIndex + 1}` : "—";
               const hosted = jobHosted(job);
-              const alreadyWritten =
-                frameIndex !== null &&
-                job.subject_type === "scene" &&
-                Boolean(frameAssetUrl(routes, job.subject_id, frameIndex));
-              const canAdmit =
+              const currentAssetUrl =
+                frameIndex !== null && job.subject_type === "scene"
+                  ? frameAssetUrl(routes, job.subject_id, frameIndex)
+                  : null;
+              const alreadyWritten = Boolean(
+                hosted?.url &&
+                  currentAssetUrl &&
+                  currentAssetUrl === hosted.url
+              );
+              const isReplace = Boolean(
+                hosted?.url &&
+                  currentAssetUrl &&
+                  currentAssetUrl !== hosted.url
+              );
+              const canAcceptWrite =
                 Boolean(hosted) &&
                 job.subject_type === "scene" &&
                 frameIndex !== null &&
-                !alreadyWritten &&
+                !alreadyWritten;
+              const canAdmit =
+                canAcceptWrite &&
+                !isReplace &&
                 rows.some(
                   (r) =>
                     r.routeTsid === job.subject_id &&
@@ -1097,6 +1137,10 @@ export function BatchFrameCompletion({
                       </span>
                       {alreadyWritten ? (
                         <span className="text-emerald-700">已写入 Asset</span>
+                      ) : isReplace ? (
+                        <span className="text-amber-800">
+                          Asset 仍是旧图 · 可覆盖
+                        </span>
                       ) : pendingHasCandidate && hosted ? (
                         <span className="text-amber-700">已在候选</span>
                       ) : null}
@@ -1128,45 +1172,45 @@ export function BatchFrameCompletion({
                     ) : null}
                     <div className="flex flex-wrap gap-1.5">
                       {canAdmit ? (
-                        <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            disabled={
-                              writing ||
-                              enqueueBusy ||
-                              requeueingId === job.id
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={
+                            writing ||
+                            enqueueBusy ||
+                            requeueingId === job.id
+                          }
+                          onClick={() => {
+                            setWriteError(null);
+                            const result = admitJobAsCandidate(job);
+                            if (!result.ok) {
+                              setWriteError(result.reason);
+                              return;
                             }
-                            onClick={() => {
-                              setWriteError(null);
-                              const result = admitJobAsCandidate(job);
-                              if (!result.ok) {
-                                setWriteError(result.reason);
-                                return;
-                              }
-                              setAdmitHint(
-                                "已纳入候选；点下方「写入作品」才写 Asset"
-                              );
-                            }}
-                          >
-                            纳入候选
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            disabled={
-                              writing ||
-                              enqueueBusy ||
-                              requeueingId === job.id
-                            }
-                            onClick={() => void acceptAndWriteJob(job)}
-                          >
-                            Accept 并写入
-                          </Button>
-                        </>
+                            setAdmitHint(
+                              "已纳入候选；点下方「写入作品」才写 Asset"
+                            );
+                          }}
+                        >
+                          纳入候选
+                        </Button>
+                      ) : null}
+                      {canAcceptWrite ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={
+                            writing ||
+                            enqueueBusy ||
+                            requeueingId === job.id
+                          }
+                          onClick={() => void acceptAndWriteJob(job)}
+                        >
+                          {isReplace ? "Accept 并覆盖" : "Accept 并写入"}
+                        </Button>
                       ) : null}
                       {(job.status === "succeeded" ||
                         job.status === "failed") &&

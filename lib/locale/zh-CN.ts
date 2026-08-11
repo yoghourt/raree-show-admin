@@ -74,6 +74,9 @@ export const zhCN = {
     frameDrawerHint:
       '说明与图片属于阅读帧；出场人物与地点属于场景语境（非故事 Route 成员）。',
     frameImageLabel:         '画面图片',
+    imagePreviewTitle:       '画面预览',
+    enlargeImage:            '点击放大',
+    enlargeImageAria:        '放大查看画面图片',
     frameCastLabel:          '出场人物（场景语境）',
     frameCastHint:           '写入 Scene Context，不写入故事 Route。',
     frameLocationLabel:      '地点（场景语境）',
@@ -84,7 +87,17 @@ export const zhCN = {
     aiGenerateAvatar:        'AI 生成头像',
     aiGenerateFrame:         'AI 生图',
     generating:              '生成中…',
+    generatingQueued:        '已排队，等待本地出图…',
     generatingElapsed:       (seconds: number) => `已等待 ${seconds}s`,
+    frameGenerateSaveFirst:  '请先保存故事后再用本地 AI 生图（与制作看板同一条 Local Worker 队列）。',
+    frameGenerateEnqueueFail: '入队失败',
+    frameGenerateCancelled:  '生成任务已取消',
+    frameGenerateNoResult:   '本地出图完成但缺少结果地址',
+    frameImagePersisted:     '图片已写入作品（退出前不必再点保存）',
+    frameImagePersistFail:   (detail: string) =>
+      `图片已出图但写入作品失败：${detail}。请点页面「保存」，或到制作看板 Accept。`,
+    frameImageRecovered:     (count: number) =>
+      `已从本地出图结果恢复 ${count} 帧图片并写入作品。`,
     noLocationDataHint:    '当前作品暂无地点数据，请手动填写地点编号。',
     noCharacterDataHint:   '当前作品暂无角色数据，请用英文逗号分隔填写角色编号。',
     locationIdPlaceholder: '例如：loc_winterfell',
@@ -240,6 +253,14 @@ export const zhCN = {
       '投递路由角色/地点已停写（L3-A：非权威债务，列保留至 L3-C）',
     storyRelatedFromFrames: '本故事相关（来自画面语境并集）',
     storyRelatedFromFramesEmpty: '画面暂无可聚合的出场/地点线索',
+    frameContextWillWrite: '即将写入场景语境',
+    frameContextCast: '出场人物',
+    frameContextLocation: '地点',
+    frameContextEmpty: '暂无出场/地点线索（写入后该画面场景语境可为空）',
+    frameContextCastPlaceholder: '多人用顿号或逗号分隔，如：琼恩、山姆',
+    frameContextLocationPlaceholder: '如：长城、临冬城',
+    frameContextEditHint:
+      '写入该画面的场景语境（非故事 Route）。可改姓名/地点；能匹配作品档案的会自动挂上编号。',
     storyRelatedFromContexts: '本故事相关（来自场景语境 / 画面线索，只读）',
     storyRelatedFromContextsEmpty:
       '暂无场景语境聚合；相关出场以各画面语境为准，不再挂在投递路由上',

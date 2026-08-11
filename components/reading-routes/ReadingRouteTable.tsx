@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, Pencil, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Inbox, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -64,6 +64,7 @@ export type ReadingRouteTableProps = {
   error: string | null;
   onDelete: (tsid: string) => Promise<void>;
   onDeleteMany: (tsids: string[]) => Promise<void>;
+  onReorder: (tsid: string, direction: "up" | "down") => Promise<void>;
 };
 
 function TableSkeleton() {
@@ -93,12 +94,16 @@ export function ReadingRouteTable({
   error,
   onDelete,
   onDeleteMany,
+  onReorder,
 }: ReadingRouteTableProps) {
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [deleteDialog, setDeleteDialog] = React.useState<DeleteDialogState>(
     null
   );
   const [deleteSubmitting, setDeleteSubmitting] = React.useState(false);
+  const [reorderingTsid, setReorderingTsid] = React.useState<string | null>(
+    null
+  );
 
   const scenesBase = `/works/${encodeURIComponent(workId)}/reading-routes`;
   const allIds = React.useMemo(() => scenes.map((s) => s.tsid), [scenes]);
@@ -150,6 +155,20 @@ export function ReadingRouteTable({
       /* 错误由父级 error 展示 */
     } finally {
       setDeleteSubmitting(false);
+    }
+  };
+
+  const handleReorder = async (
+    tsid: string,
+    direction: "up" | "down"
+  ) => {
+    setReorderingTsid(tsid);
+    try {
+      await onReorder(tsid, direction);
+    } catch {
+      /* 错误由父级 error 展示 */
+    } finally {
+      setReorderingTsid(null);
     }
   };
 
@@ -282,8 +301,12 @@ export function ReadingRouteTable({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {group.scenes.map((scene) => {
+                        {group.scenes.map((scene, sceneIndex) => {
                           const isChecked = selected.has(scene.tsid);
+                          const isReordering = reorderingTsid === scene.tsid;
+                          const canMoveUp = sceneIndex > 0;
+                          const canMoveDown =
+                            sceneIndex < group.scenes.length - 1;
                           return (
                             <TableRow
                               key={scene.tsid}
@@ -338,6 +361,42 @@ export function ReadingRouteTable({
                               </TableCell>
                               <TableCell className="py-3 text-right whitespace-nowrap">
                                 <div className="flex justify-end gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-8"
+                                    disabled={
+                                      !canMoveUp || reorderingTsid !== null
+                                    }
+                                    onClick={() =>
+                                      void handleReorder(scene.tsid, "up")
+                                    }
+                                    aria-label={messages.forms.moveUp}
+                                  >
+                                    <ArrowUp
+                                      className="size-3.5"
+                                      aria-hidden
+                                    />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-8"
+                                    disabled={
+                                      !canMoveDown || reorderingTsid !== null
+                                    }
+                                    onClick={() =>
+                                      void handleReorder(scene.tsid, "down")
+                                    }
+                                    aria-label={messages.forms.moveDown}
+                                  >
+                                    <ArrowDown
+                                      className="size-3.5"
+                                      aria-hidden
+                                    />
+                                  </Button>
                                   <Button variant="ghost" size="sm" asChild>
                                     <Link
                                       href={`${scenesBase}/${encodeURIComponent(scene.tsid)}/edit`}
@@ -353,6 +412,7 @@ export function ReadingRouteTable({
                                     variant="destructive"
                                     size="sm"
                                     type="button"
+                                    disabled={isReordering}
                                     onClick={() =>
                                       setDeleteDialog({
                                         mode: "single",

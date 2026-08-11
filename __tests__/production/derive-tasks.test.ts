@@ -33,6 +33,7 @@ const route = (overrides: Partial<ReadingRoute> = {}): ReadingRoute => ({
   title: "R1",
   chapter_number: 1,
   chapter_title: null,
+  order_index: 0,
   summary: "",
   tags: [],
   story_images_v2: [{ url: "", caption: "hello" }],

@@ -6,7 +6,10 @@
  */
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
-import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
+import {
+  findExistingByName,
+  findLocationByEnvironmentCue,
+} from "@/lib/discovery/entity-catalog-match";
 import { MINIMAL_RENDERER_EXPRESSION } from "@/lib/discovery/visual-contract";
 
 import type {
@@ -84,7 +87,10 @@ export function associateStagingToSceneContext(
     environmentFromExpression: environment,
   };
   if (params.archive?.locations.length && environment.trim()) {
-    const locMatch = findExistingByName(environment, params.archive.locations);
+    const locMatch = findLocationByEnvironmentCue(
+      environment,
+      params.archive.locations
+    );
     if (locMatch) {
       locationContext.archiveTsid = locMatch.tsid;
       locationContext.archiveName = locMatch.name;

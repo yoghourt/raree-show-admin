@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Pencil, Plus, X } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { ImageLightboxDialog } from "@/components/ui/ImageLightboxDialog";
 import { messages } from "@/lib/locale";
 import type { ReadingFrame } from "@/lib/types";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
@@ -28,6 +29,11 @@ export function FrameListPanel({
   onAdd,
   onOpen,
 }: FrameListPanelProps) {
+  const [preview, setPreview] = React.useState<{
+    url: string;
+    title: string;
+  } | null>(null);
+
   return (
     <div className="space-y-3">
       {frames.length === 0 ? (
@@ -44,43 +50,48 @@ export function FrameListPanel({
             ctx?.locationContext.environmentFromExpression?.trim() ||
             "";
           const caption = frame.caption.trim() || messages.forms.frameUntitled;
+          const title = messages.forms.frameListItem(index + 1, caption);
           return (
             <li
               key={`frame-${index}`}
               className="flex items-stretch gap-2 rounded-lg border border-border p-2"
             >
-              <button
-                type="button"
-                className="min-w-0 flex-1 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/50"
-                onClick={() => onOpen(index)}
-              >
-                <div className="flex items-start gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3 rounded-md px-2 py-1.5">
+                {frame.url ? (
+                  <button
+                    type="button"
+                    className="bg-muted/40 group relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded border border-dashed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                    onClick={() => setPreview({ url: frame.url, title })}
+                    aria-label={messages.forms.enlargeImageAria}
+                    title={messages.forms.enlargeImage}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={frame.url}
+                      alt=""
+                      className="size-full object-cover transition group-hover:opacity-90"
+                    />
+                  </button>
+                ) : (
                   <div className="bg-muted/40 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded border border-dashed">
-                    {frame.url ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={frame.url}
-                        alt=""
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-muted-foreground text-[10px]">
-                        {index + 1}
-                      </span>
-                    )}
+                    <span className="text-muted-foreground text-[10px]">
+                      {index + 1}
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {messages.forms.frameListItem(index + 1, caption)}
-                    </p>
-                    <p className="text-muted-foreground mt-0.5 truncate text-xs">
-                      {castCount > 0 || place
-                        ? messages.forms.frameListContextHint(castCount, place)
-                        : messages.forms.frameListNoContext}
-                    </p>
-                  </div>
-                </div>
-              </button>
+                )}
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 rounded-md text-left transition-colors hover:bg-muted/50"
+                  onClick={() => onOpen(index)}
+                >
+                  <p className="truncate text-sm font-medium">{title}</p>
+                  <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                    {castCount > 0 || place
+                      ? messages.forms.frameListContextHint(castCount, place)
+                      : messages.forms.frameListNoContext}
+                  </p>
+                </button>
+              </div>
               <div className="flex shrink-0 flex-col justify-center gap-0.5">
                 <Button
                   type="button"
@@ -141,6 +152,14 @@ export function FrameListPanel({
         <Plus className="size-4" aria-hidden />
         {messages.forms.addSegment}
       </Button>
+      <ImageLightboxDialog
+        open={preview !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
+        imageUrl={preview?.url ?? null}
+        title={preview?.title}
+      />
     </div>
   );
 }

@@ -26,6 +26,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
 import {
+  listGenerateJobsForWork,
+} from "@/lib/generate-jobs";
+import { collectEmptyFrameUrlPatchesFromJobs } from "@/lib/generate-jobs/recoverSceneFrameUrls";
+import {
   aggregateStoryRelatedRefs,
   formatStoryRelatedAggregateLine,
 } from "@/lib/scene-context/aggregate-story-refs";
@@ -35,7 +39,7 @@ import {
   swapFramesWithContexts,
 } from "@/lib/scene-context/frame-context-edit";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
-import { createScene, updateScene } from "@/lib/scenes";
+import { createScene, patchSceneFrameUrls, updateScene } from "@/lib/scenes";
 import type { Character, Location, ReadingFrame, ReadingRoute } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -139,7 +143,7 @@ function sceneToFormValues(scene: ReadingRoute): ReadingRouteFormValues {
 
 function formValuesToPayload(
   values: ReadingRouteFormValues
-): Omit<ReadingRoute, "tsid" | "workId"> {
+): Omit<ReadingRoute, "tsid" | "workId" | "order_index"> {
   // L3-C: no Route membership. L4-A: frames + hosted Contexts.
   return {
     title: values.title.trim(),
@@ -175,6 +179,7 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
   const { workId, characters, locations } = props;
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [recoverHint, setRecoverHint] = React.useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = React.useState(false);
   const [drawerIndex, setDrawerIndex] = React.useState<number | null>(null);
   const listHref = `/works/${encodeURIComponent(workId)}/reading-routes`;
@@ -222,6 +227,49 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
   // Teardown on unmount (RT-INV-07)
   useEffect(() => {
     return () => copilot.teardown();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recover frame images that were generated but never saved (job succeeded, Asset empty).
+  useEffect(() => {
+    if (props.mode !== "edit") return;
+    const tsid = props.defaultValues.tsid;
+    let cancelled = false;
+
+    void (async () => {
+      const currentFrames = form.getValues("story_images_v2") ?? [];
+      if (!currentFrames.some((f) => !f.url?.trim())) return;
+
+      try {
+        const jobs = await listGenerateJobsForWork(workId, { limit: 80 });
+        if (cancelled) return;
+        const patches = collectEmptyFrameUrlPatchesFromJobs({
+          sceneTsid: tsid,
+          frames: currentFrames,
+          jobs,
+        });
+        if (patches.length === 0) return;
+
+        await patchSceneFrameUrls(workId, tsid, patches);
+        if (cancelled) return;
+
+        const next = [...(form.getValues("story_images_v2") ?? [])];
+        for (const patch of patches) {
+          const frame = next[patch.frameIndex];
+          if (!frame) continue;
+          next[patch.frameIndex] = { ...frame, url: patch.url };
+        }
+        form.setValue("story_images_v2", next, { shouldDirty: false });
+        setRecoverHint(messages.forms.frameImageRecovered(patches.length));
+      } catch (e) {
+        console.warn("[ReadingRouteForm] recover frame urls failed", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Once per edit mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -376,6 +424,11 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
           role="alert"
         >
           {submitError}
+        </div>
+      ) : null}
+      {recoverHint ? (
+        <div className="bg-muted/40 text-muted-foreground rounded-lg border px-3 py-2 text-sm">
+          {recoverHint}
         </div>
       ) : null}
 

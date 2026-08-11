@@ -21,6 +21,8 @@ export type ReadingRoute = {
   title: string;
   chapter_number: number;
   chapter_title: string | null;
+  /** Chapter-local sort key (same chapter_number). */
+  order_index: number;
   summary: string;
   tags: string[];
   /** 阅读帧序列（jsonb，唯一数据源；implementation column: story_images_v2） */
