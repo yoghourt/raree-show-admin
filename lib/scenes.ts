@@ -100,6 +100,7 @@ function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
     title: row.title,
     chapter_number: row.chapter_number,
     chapter_title: row.chapter_title ?? null,
+    order_index: row.order_index ?? 0,
     summary: row.summary,
     tags: row.tags ?? [],
     story_images_v2: frames,
@@ -110,9 +111,12 @@ function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
   };
 }
 
+/** Write input — order_index is assigned by create / reorder, not by forms. */
+export type ReadingRouteWriteInput = Omit<ReadingRoute, "tsid" | "workId" | "order_index">;
+
 function toInsertRow(
   workId: string,
-  data: Omit<ReadingRoute, "tsid" | "workId"> & { tsid: string }
+  data: ReadingRouteWriteInput & { tsid: string; order_index: number }
 ): Record<string, unknown> {
   // L3-C: Route membership columns removed — never write character_ids / location_id.
   return {
@@ -121,7 +125,7 @@ function toInsertRow(
     title: data.title,
     chapter_number: data.chapter_number,
     chapter_title: data.chapter_title ?? null,
-    order_index: 0,
+    order_index: data.order_index,
     summary: data.summary,
     tags: data.tags,
     story_images_v2: data.story_images_v2 ?? [],
@@ -131,7 +135,7 @@ function toInsertRow(
 
 /** Update patch for Reading Route delivery fields + hosted Contexts (no membership columns). */
 export function toUpdateRowWithoutMembership(
-  data: Omit<ReadingRoute, "tsid" | "workId">
+  data: ReadingRouteWriteInput
 ): Record<string, unknown> {
   return {
     title: data.title,
@@ -144,10 +148,97 @@ export function toUpdateRowWithoutMembership(
   };
 }
 
-function toUpdateRow(
-  data: Omit<ReadingRoute, "tsid" | "workId">
-): Record<string, unknown> {
+function toUpdateRow(data: ReadingRouteWriteInput): Record<string, unknown> {
   return toUpdateRowWithoutMembership(data);
+}
+
+export async function nextOrderIndexInChapter(
+  workId: string,
+  chapterNumber: number
+): Promise<number> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("order_index")
+    .eq("work_id", workId)
+    .eq("chapter_number", chapterNumber)
+    .order("order_index", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const max = (data as { order_index?: number } | null)?.order_index;
+  return typeof max === "number" && Number.isFinite(max) ? max + 1 : 0;
+}
+
+async function patchSceneOrderIndex(
+  workId: string,
+  tsid: string,
+  orderIndex: number
+): Promise<void> {
+  const { error } = await supabase
+    .from(TABLE)
+    .update({ order_index: orderIndex })
+    .eq("work_id", workId)
+    .eq("tsid", tsid);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Swap adjacent stories within a chapter. If order_index values collide
+ * (legacy all-0 rows), renumber by current list order then swap.
+ */
+export async function reorderScenesInChapter(
+  workId: string,
+  chapterNumber: number,
+  fromTsid: string,
+  direction: "up" | "down"
+): Promise<void> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("tsid, order_index")
+    .eq("work_id", workId)
+    .eq("chapter_number", chapterNumber)
+    .order("order_index", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data as Array<{ tsid: string; order_index: number }> | null) ?? [];
+  const index = rows.findIndex((r) => r.tsid === fromTsid);
+  if (index < 0) {
+    throw new Error(`故事不在第 ${chapterNumber} 章：${fromTsid}`);
+  }
+
+  const swapWith = direction === "up" ? index - 1 : index + 1;
+  if (swapWith < 0 || swapWith >= rows.length) {
+    return;
+  }
+
+  const orders = rows.map((r) => r.order_index);
+  const hasCollision = new Set(orders).size !== orders.length;
+  const normalized = hasCollision
+    ? rows.map((r, i) => ({ ...r, order_index: i }))
+    : rows.map((r) => ({ ...r }));
+
+  if (hasCollision) {
+    for (const row of normalized) {
+      await patchSceneOrderIndex(workId, row.tsid, row.order_index);
+    }
+  }
+
+  const a = normalized[index]!;
+  const b = normalized[swapWith]!;
+  const aOrder = a.order_index;
+  const bOrder = b.order_index;
+  await patchSceneOrderIndex(workId, a.tsid, bOrder);
+  await patchSceneOrderIndex(workId, b.tsid, aOrder);
 }
 
 export async function getScenes(workId: string): Promise<ReadingRoute[]> {
@@ -203,21 +294,27 @@ export async function getScene(
 
 export async function createScene(
   workId: string,
-  data: Omit<ReadingRoute, "tsid" | "workId"> & { tsid?: string }
+  data: ReadingRouteWriteInput & { tsid?: string }
 ): Promise<ReadingRoute> {
   try {
     const { tsid: optionalTsid, ...rest } = data;
     const tsid = optionalTsid?.trim() || `scene_${Date.now()}`;
-    const full: Omit<ReadingRoute, "tsid" | "workId"> & { tsid: string } = {
-      tsid,
-      title: rest.title,
-      chapter_number: rest.chapter_number,
-      chapter_title: rest.chapter_title ?? null,
-      summary: rest.summary,
-      tags: rest.tags,
-      story_images_v2: rest.story_images_v2 ?? [],
-      sceneContexts: rest.sceneContexts ?? [],
-    };
+    const order_index = await nextOrderIndexInChapter(
+      workId,
+      rest.chapter_number
+    );
+    const full: ReadingRouteWriteInput & { tsid: string; order_index: number } =
+      {
+        tsid,
+        title: rest.title,
+        chapter_number: rest.chapter_number,
+        chapter_title: rest.chapter_title ?? null,
+        order_index,
+        summary: rest.summary,
+        tags: rest.tags,
+        story_images_v2: rest.story_images_v2 ?? [],
+        sceneContexts: rest.sceneContexts ?? [],
+      };
 
     const insertRow = toInsertRow(workId, full);
     console.log("[scenes] createScene Supabase insert payload", insertRow);
@@ -244,7 +341,7 @@ export async function createScene(
 export async function updateScene(
   workId: string,
   tsid: string,
-  data: Omit<ReadingRoute, "tsid" | "workId">
+  data: ReadingRouteWriteInput
 ): Promise<void> {
   try {
     const updateRow = toUpdateRow(data);

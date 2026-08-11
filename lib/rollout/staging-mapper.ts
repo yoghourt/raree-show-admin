@@ -18,7 +18,10 @@ const readingRouteCreateSchema = z.object({
   story_images_v2: z.null(),
 });
 
-export type ReadingRouteCreatePayload = Omit<ReadingRoute, "tsid" | "workId">;
+export type ReadingRouteCreatePayload = Omit<
+  ReadingRoute,
+  "tsid" | "workId" | "order_index"
+>;
 
 export type ReadingRouteMappingResult =
   | { ok: true; payload: ReadingRouteCreatePayload }

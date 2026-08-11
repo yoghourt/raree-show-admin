@@ -100,7 +100,7 @@ export default function WorkReadingRoutesPage() {
     };
   }, []);
 
-  const { scenes, loading, error, deleteScene, deleteScenes } =
+  const { scenes, loading, error, deleteScene, deleteScenes, reorderInChapter } =
     useScenes(workId);
 
   const pendingCount = useRolloutPendingCount(workId, operatorId);
@@ -185,6 +185,7 @@ export default function WorkReadingRoutesPage() {
         error={error}
         onDelete={deleteScene}
         onDeleteMany={deleteScenes}
+        onReorder={reorderInChapter}
       />
     </div>
   );

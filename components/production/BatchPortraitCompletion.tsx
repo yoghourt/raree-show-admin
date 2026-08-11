@@ -283,8 +283,9 @@ export function BatchPortraitCompletion({
       setWriteError(`找不到角色 ${job.subject_id}`);
       return;
     }
-    if (!isMissingPortraitUrl(character.portraitUrl)) {
-      setWriteError("该角色已有肖像 Asset，无需再写");
+    const currentPortrait = character.portraitUrl?.trim() || null;
+    if (currentPortrait && currentPortrait === hosted.url) {
+      setWriteError("该 Job 结果已与肖像 Asset 一致，无需再写");
       return;
     }
 
@@ -301,7 +302,11 @@ export function BatchPortraitCompletion({
       });
       onWrote();
       await refreshJobs();
-      setHint(`已 Accept 并写入 ${character.name} 肖像`);
+      setHint(
+        currentPortrait
+          ? `已 Accept 并覆盖 ${character.name} 肖像`
+          : `已 Accept 并写入 ${character.name} 肖像`
+      );
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -566,8 +571,17 @@ export function BatchPortraitCompletion({
             const hosted = jobHosted(job);
             const name = characterName(characters, job.subject_id);
             const character = characters.find((c) => c.tsid === job.subject_id);
-            const alreadyWritten =
-              character != null && !isMissingPortraitUrl(character.portraitUrl);
+            const currentPortrait = character?.portraitUrl?.trim() || null;
+            const alreadyWritten = Boolean(
+              hosted?.url &&
+                currentPortrait &&
+                currentPortrait === hosted.url
+            );
+            const isReplace = Boolean(
+              hosted?.url &&
+                currentPortrait &&
+                currentPortrait !== hosted.url
+            );
             const canAccept =
               Boolean(hosted) &&
               job.status === "succeeded" &&
@@ -640,7 +654,9 @@ export function BatchPortraitCompletion({
                       >
                         {writingId === job.id
                           ? "写入中…"
-                          : "Accept 并写入肖像"}
+                          : isReplace
+                            ? "Accept 并覆盖肖像"
+                            : "Accept 并写入肖像"}
                       </Button>
                     ) : null}
                     {canRequeue ? (
@@ -703,6 +719,11 @@ export function BatchPortraitCompletion({
                     {alreadyWritten && hosted ? (
                       <span className="inline-flex h-7 items-center text-emerald-700">
                         已写入 Asset
+                      </span>
+                    ) : null}
+                    {isReplace && hosted ? (
+                      <span className="inline-flex h-7 items-center text-amber-800">
+                        Asset 仍是旧图 · 可覆盖
                       </span>
                     ) : null}
                   </div>

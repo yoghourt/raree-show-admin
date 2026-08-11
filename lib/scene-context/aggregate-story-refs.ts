@@ -8,6 +8,8 @@
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
 import {
   findExistingByName,
+  findLocationByEnvironmentCue,
+  isPlaceholderEnvironment,
   normalizeEntityName,
 } from "@/lib/discovery/entity-catalog-match";
 import type {
@@ -121,11 +123,16 @@ function collectFromSceneSource(
   }
 
   const environment = expr?.environment?.trim() ?? "";
-  if (environment) {
+  if (environment && !isPlaceholderEnvironment(environment)) {
     const matched = archive
-      ? findExistingByName(environment, archive.locations)
+      ? findLocationByEnvironmentCue(environment, archive.locations)
       : undefined;
-    addLocation(locations, environment, matched?.tsid);
+    // Prefer archive display name when matched so the picker can select it.
+    addLocation(
+      locations,
+      matched?.name ?? environment,
+      matched?.tsid
+    );
   }
 }
 

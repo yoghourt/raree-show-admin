@@ -6,7 +6,9 @@ import {
   createScene as createSceneApi,
   deleteScene as deleteSceneApi,
   getScenes,
+  reorderScenesInChapter as reorderScenesInChapterApi,
   updateScene as updateSceneApi,
+  type ReadingRouteWriteInput,
 } from "@/lib/scenes";
 import type { ReadingRoute } from "@/lib/types";
 
@@ -55,7 +57,7 @@ export function useScenes(workId: string) {
   }, [load]);
 
   const createScene = React.useCallback(
-    async (data: Omit<ReadingRoute, "tsid" | "workId"> & { tsid?: string }) => {
+    async (data: ReadingRouteWriteInput & { tsid?: string }) => {
       try {
         await createSceneApi(workId, data);
         await refresh();
@@ -68,7 +70,7 @@ export function useScenes(workId: string) {
   );
 
   const updateScene = React.useCallback(
-    async (tsid: string, data: Omit<ReadingRoute, "tsid" | "workId">) => {
+    async (tsid: string, data: ReadingRouteWriteInput) => {
       try {
         await updateSceneApi(workId, tsid, data);
         await refresh();
@@ -78,6 +80,31 @@ export function useScenes(workId: string) {
       }
     },
     [workId, refresh]
+  );
+
+  const reorderInChapter = React.useCallback(
+    async (tsid: string, direction: "up" | "down") => {
+      const scene = scenes.find((s) => s.tsid === tsid);
+      if (!scene) {
+        const msg = `故事不存在：${tsid}`;
+        setError(msg);
+        throw new Error(msg);
+      }
+      try {
+        setError(null);
+        await reorderScenesInChapterApi(
+          workId,
+          scene.chapter_number,
+          tsid,
+          direction
+        );
+        await refresh();
+      } catch (e) {
+        setError(toErrorMessage(e));
+        throw e;
+      }
+    },
+    [workId, scenes, refresh]
   );
 
   const deleteScene = React.useCallback(
@@ -123,6 +150,7 @@ export function useScenes(workId: string) {
     updateScene,
     deleteScene,
     deleteScenes,
+    reorderInChapter,
     refresh,
   };
 }

@@ -9,7 +9,10 @@
 import Link from "next/link";
 import * as React from "react";
 
-import { StoryWritePreviewCard } from "@/components/rollout/StoryWritePreviewCard";
+import {
+  FrameContextWriteFields,
+  StoryWritePreviewCard,
+} from "@/components/rollout/StoryWritePreviewCard";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,6 +41,12 @@ import type {
 } from "@/lib/discovery/review-types";
 import * as locationsApi from "@/lib/locations";
 import { messages } from "@/lib/locale";
+import { readerWorkUrl } from "@/lib/reader-origin";
+import { loadRolloutQueue } from "@/lib/rollout/rollout-queue-storage";
+import {
+  applySceneStagingContextEditsFromArchive,
+  frameContextArchiveSelectionFromStaging,
+} from "@/lib/rollout/scene-staging-context-edit";
 import { rolloutUi } from "@/lib/rollout/ui-copy";
 import type { ApprovedStoryUnit } from "@/lib/rollout/types";
 import type { Character, Location } from "@/lib/types";
@@ -275,7 +284,11 @@ export function RolloutPanel({
 
   const handleWriteStory = React.useCallback(
     async (staging: AcceptedStoryUnitStaging) => {
-      const childFrames = rollout.queue.readingRouteStaging.filter(
+      // Read storage (not React state) so flushAndWrite context edits are included.
+      const childFrames = loadRolloutQueue(
+        workId,
+        rollout.operatorId
+      ).readingRouteStaging.filter(
         (s) => s.parentStorySourceReviewId === staging.sourceReviewId
       );
       const storyUnitId = await rollout.persistStoryUnit(staging);
@@ -298,7 +311,7 @@ export function RolloutPanel({
       );
       if (!evidenceOk) return;
     },
-    [rollout]
+    [rollout, workId]
   );
 
   return (
@@ -417,11 +430,33 @@ export function RolloutPanel({
                                 (s) => s.sourceReviewId === sourceReviewId
                               );
                             if (!frame) return;
-                            rollout.updateSceneStaging({
+                            const withText = {
                               ...frame,
                               title: patch.title.trim() || frame.title,
                               summary: patch.summary.trim() || undefined,
-                            });
+                            };
+                            rollout.updateSceneStaging(
+                              applySceneStagingContextEditsFromArchive(
+                                withText,
+                                {
+                                  characterTsids: patch.characterTsids,
+                                  locationTsid: patch.locationTsid || null,
+                                  unmatchedCastNames: patch.unmatchedCastNames,
+                                  unmatchedLocationLabel:
+                                    patch.unmatchedLocationLabel,
+                                },
+                                {
+                                  characters: characters.map((c) => ({
+                                    name: c.name,
+                                    tsid: c.tsid,
+                                  })),
+                                  locations: locations.map((l) => ({
+                                    name: l.name,
+                                    tsid: l.tsid,
+                                  })),
+                                }
+                              )
+                            );
                           }}
                           onWrite={handleWriteStory}
                           onDismiss={() =>
@@ -447,43 +482,91 @@ export function RolloutPanel({
                   <div className="space-y-3">
                     {orphanFrameStaging.map((staging) => {
                       const canWrite = rollout.canProjectScene(staging);
+                      const sel = frameContextArchiveSelectionFromStaging(
+                        staging,
+                        {
+                          characters: characters.map((c) => ({
+                            name: c.name,
+                            tsid: c.tsid,
+                          })),
+                          locations: locations.map((l) => ({
+                            name: l.name,
+                            tsid: l.tsid,
+                          })),
+                        }
+                      );
                       return (
                         <div
                           key={staging.sourceReviewId}
-                          className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                          className="space-y-2 rounded-lg border p-3"
                         >
-                          <div className="min-w-0 text-sm">
-                            <p className="font-medium">{staging.title}</p>
-                            <p className="text-muted-foreground text-xs">
-                              {staging.parentStoryTitle
-                                ? `所属故事：${staging.parentStoryTitle}`
-                                : "缺少所属故事"}
-                              {!canWrite && staging.parentStorySourceReviewId
-                                ? " · 所属故事尚未保存"
-                                : ""}
-                            </p>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0 text-sm">
+                              <p className="font-medium">{staging.title}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {staging.parentStoryTitle
+                                  ? `所属故事：${staging.parentStoryTitle}`
+                                  : "缺少所属故事"}
+                                {!canWrite && staging.parentStorySourceReviewId
+                                  ? " · 所属故事尚未保存"
+                                  : ""}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 gap-2">
+                              <Button
+                                size="sm"
+                                disabled={rollout.busy || !canWrite}
+                                onClick={() => setFrameStaging(staging)}
+                              >
+                                {rolloutUi.projectCreate}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={rollout.busy}
+                                onClick={() =>
+                                  rollout.dismissSceneStaging(
+                                    staging.sourceReviewId
+                                  )
+                                }
+                              >
+                                {rolloutUi.dismissStaging}
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex shrink-0 gap-2">
-                            <Button
-                              size="sm"
-                              disabled={rollout.busy || !canWrite}
-                              onClick={() => setFrameStaging(staging)}
-                            >
-                              {rolloutUi.projectCreate}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={rollout.busy}
-                              onClick={() =>
-                                rollout.dismissSceneStaging(
-                                  staging.sourceReviewId
+                          <FrameContextWriteFields
+                            characterTsids={sel.characterTsids}
+                            locationTsid={sel.locationTsid}
+                            unmatchedCastNames={sel.unmatchedCastNames}
+                            unmatchedLocationLabel={sel.unmatchedLocationLabel}
+                            characters={characters}
+                            locations={locations}
+                            disabled={rollout.busy}
+                            onChange={(next) => {
+                              rollout.updateSceneStaging(
+                                applySceneStagingContextEditsFromArchive(
+                                  staging,
+                                  {
+                                    characterTsids: next.characterTsids,
+                                    locationTsid: next.locationTsid || null,
+                                    unmatchedCastNames: next.unmatchedCastNames,
+                                    unmatchedLocationLabel:
+                                      next.unmatchedLocationLabel,
+                                  },
+                                  {
+                                    characters: characters.map((c) => ({
+                                      name: c.name,
+                                      tsid: c.tsid,
+                                    })),
+                                    locations: locations.map((l) => ({
+                                      name: l.name,
+                                      tsid: l.tsid,
+                                    })),
+                                  }
                                 )
-                              }
-                            >
-                              {rolloutUi.dismissStaging}
-                            </Button>
-                          </div>
+                              );
+                            }}
+                          />
                         </div>
                       );
                     })}
@@ -659,7 +742,7 @@ export function RolloutPanel({
               <div className="flex flex-wrap gap-2 pt-2">
                 <Button variant="outline" size="sm" asChild>
                   <a
-                    href={`${(process.env.NEXT_PUBLIC_READER_ORIGIN ?? "http://localhost:3001").replace(/\/$/, "")}/works/${encodeURIComponent(workId)}`}
+                    href={readerWorkUrl(workId)}
                     target="_blank"
                     rel="noreferrer"
                   >

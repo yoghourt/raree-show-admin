@@ -69,6 +69,8 @@ export interface UseRolloutReturn {
   loading: boolean;
   error: string | null;
   queue: RolloutQueueSnapshot;
+  /** Auth user id used for sessionStorage queue keys */
+  operatorId: string;
   storyUnits: ApprovedStoryUnit[];
   approvedSceneUnits: ApprovedSceneUnit[];
   sceneProjectionLinks: SceneProjectionLink[];
@@ -872,6 +874,7 @@ export function useRollout({
     loading,
     error,
     queue,
+    operatorId,
     storyUnits,
     approvedSceneUnits,
     sceneProjectionLinks,
