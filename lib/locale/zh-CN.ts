@@ -47,7 +47,7 @@ export const zhCN = {
   forms: {
     readingFrameLabel:       '画面页',
     readingFrameHint:
-      '每一段是一页画面。先填写说明，再添加图片。',
+      '列表可排序；点开右侧抽屉编辑说明、图片与场景语境（出场/地点）。',
     summaryOptional:         '摘要（可选）',
     captionRequired:         '说明文字不能为空',
     captionPlaceholder:      '这一页发生了什么？',
@@ -58,6 +58,28 @@ export const zhCN = {
     moveUp:                  '上移',
     moveDown:                '下移',
     removeSegment:           '移除画面',
+    editFrame:               '编辑画面',
+    frameListEmpty:          '暂无画面。可新增后在抽屉中编辑。',
+    frameUntitled:           '（未填写说明）',
+    frameListItem:           (n: number, caption: string) => `画面 ${n} · ${caption}`,
+    frameListNoContext:      '尚未设置出场/地点语境',
+    frameListContextHint:    (castCount: number, place: string) =>
+      [
+        castCount > 0 ? `${castCount} 位出场` : null,
+        place ? `地点：${place}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') || '尚未设置出场/地点语境',
+    frameDrawerTitle:        (n: number) => `编辑画面 ${n}`,
+    frameDrawerHint:
+      '说明与图片属于阅读帧；出场人物与地点属于场景语境（非故事 Route 成员）。',
+    frameImageLabel:         '画面图片',
+    frameCastLabel:          '出场人物（场景语境）',
+    frameCastHint:           '写入 Scene Context，不写入故事 Route。',
+    frameLocationLabel:      '地点（场景语境）',
+    frameLocationHint:       '写入 Scene Context location，不写入故事 Route。',
+    prevFrame:               '上一画面',
+    nextFrame:               '下一画面',
     searchCharacters:        '搜索角色…',
     aiGenerateAvatar:        'AI 生成头像',
     aiGenerateFrame:         'AI 生图',

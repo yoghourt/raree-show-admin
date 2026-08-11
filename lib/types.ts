@@ -1,3 +1,5 @@
+import type { SceneContextRecord } from "@/lib/scene-context/types";
+
 export type Work = {
   id: string;
   tsid: string;
@@ -23,6 +25,11 @@ export type ReadingRoute = {
   tags: string[];
   /** 阅读帧序列（jsonb，唯一数据源；implementation column: story_images_v2） */
   story_images_v2: ReadingFrame[] | null;
+  /**
+   * L4-A / S1: Scene Context ownership records hosted on the Route row.
+   * Not Route ownership — appearance/location live here.
+   */
+  sceneContexts?: SceneContextRecord[];
   /**
    * L2-B / L3-A: read-only aggregate of child Context / Frame provenance cues.
    * Not Route ownership. (Route character_ids / location_id dropped in L3-C.)

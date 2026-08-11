@@ -32,6 +32,15 @@ export type {
   BackfillPlan,
   BackfillRouteInput,
 } from "@/lib/scene-context/backfill-from-provenance";
+export {
+  appearancesFromCharacterTsids,
+  contextAtFrameIndex,
+  ensureContextForFrame,
+  removeFrameWithContexts,
+  rewriteContextsReadingRouteTsid,
+  swapFramesWithContexts,
+  upsertContextById,
+} from "@/lib/scene-context/frame-context-edit";
 export { parseSceneContextsV1 } from "@/lib/scene-context/parse";
 export { assertRuntimeTruthGate } from "@/lib/scene-context/runtime-truth-gate";
 export type {

@@ -5,6 +5,7 @@ import {
   formatStoryRelatedAggregateLine,
 } from "@/lib/scene-context/aggregate-story-refs";
 import { parseSceneContextsV1 } from "@/lib/scene-context/parse";
+import type { SceneContextRecord } from "@/lib/scene-context/types";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
 
 const TABLE = "scenes";
@@ -102,6 +103,7 @@ function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
     summary: row.summary,
     tags: row.tags ?? [],
     story_images_v2: frames,
+    sceneContexts: parseSceneContextsV1(row.scene_contexts_v1),
     relatedFromContextsLine: relatedLineFromRouteRow(row),
     frameHasRendererExpression,
     frameExpressionHasNarrativeCues,
@@ -123,10 +125,11 @@ function toInsertRow(
     summary: data.summary,
     tags: data.tags,
     story_images_v2: data.story_images_v2 ?? [],
+    scene_contexts_v1: (data.sceneContexts ?? []) as SceneContextRecord[],
   };
 }
 
-/** Update patch for Reading Route delivery fields only (no membership columns). */
+/** Update patch for Reading Route delivery fields + hosted Contexts (no membership columns). */
 export function toUpdateRowWithoutMembership(
   data: Omit<ReadingRoute, "tsid" | "workId">
 ): Record<string, unknown> {
@@ -137,6 +140,7 @@ export function toUpdateRowWithoutMembership(
     summary: data.summary,
     tags: data.tags,
     story_images_v2: data.story_images_v2 ?? [],
+    scene_contexts_v1: data.sceneContexts ?? [],
   };
 }
 
@@ -212,6 +216,7 @@ export async function createScene(
       summary: rest.summary,
       tags: rest.tags,
       story_images_v2: rest.story_images_v2 ?? [],
+      sceneContexts: rest.sceneContexts ?? [],
     };
 
     const insertRow = toInsertRow(workId, full);
@@ -299,6 +304,7 @@ export async function patchSceneFrameUrls(
     summary: scene.summary,
     tags: scene.tags,
     story_images_v2: frames,
+    sceneContexts: scene.sceneContexts,
   });
 }
 
