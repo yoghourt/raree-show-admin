@@ -12,6 +12,7 @@ Deployment knobs for Context-aware projection. Not Architecture constants.
 - **L3 COMPLETE · L3-A/B/C PASS · Verified** (`docs/spikes/implement-scc-001-level3-route-ownership-sunset.md`) — Route membership demoted, backfilled, columns dropped.
 - **L3-B PASS · Verified** (`docs/spikes/implement-scc-001-l3b-historical-context-backfill.md`) — Historical Context backfill CLI: `npx tsx scripts/scene-context-backfill/run.ts --workId=…` (dry-run default; `--apply` to write).
 - **L3-C PASS · Verified** (`docs/spikes/implement-scc-001-l3c-schema-sunset.md`) — Drop Route `character_ids` / `location_id` via `docs/supabase/migrations/20260809000000_drop_route_membership_columns.sql`.
+- **L4-A PASS · Verified** (`docs/spikes/implement-scc-001-l4a-admin-frame-context-edit.md`) — Story edit hosts frame list/reorder; Frame+Context edits in right drawer (no separate frame route).
 
 | Env | Default | Meaning |
 | --- | ------- | ------- |

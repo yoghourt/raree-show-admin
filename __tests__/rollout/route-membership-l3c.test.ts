@@ -27,6 +27,7 @@ describe("L3-C Route membership schema sunset", () => {
       [
         "chapter_number",
         "chapter_title",
+        "scene_contexts_v1",
         "story_images_v2",
         "summary",
         "tags",

@@ -5,19 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useEffect } from "react";
-import {
-  Controller,
-  type Resolver,
-  useForm,
-  useWatch,
-} from "react-hook-form";
+import { type Resolver, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { CopilotIcon } from "@/components/copilot/CopilotIcon";
 import { NarrativeRegenButton } from "@/components/copilot/NarrativeRegenButton";
 import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
 import { messages } from "@/lib/locale";
-import { MultiImageUploader } from "@/components/reading-routes/MultiImageUploader";
+import { FrameContextDrawer } from "@/components/reading-routes/FrameContextDrawer";
+import { FrameListPanel } from "@/components/reading-routes/FrameListPanel";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -29,6 +25,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
+import {
+  aggregateStoryRelatedRefs,
+  formatStoryRelatedAggregateLine,
+} from "@/lib/scene-context/aggregate-story-refs";
+import {
+  removeFrameWithContexts,
+  rewriteContextsReadingRouteTsid,
+  swapFramesWithContexts,
+} from "@/lib/scene-context/frame-context-edit";
+import type { SceneContextRecord } from "@/lib/scene-context/types";
 import { createScene, updateScene } from "@/lib/scenes";
 import type { Character, Location, ReadingFrame, ReadingRoute } from "@/lib/types";
 
@@ -104,6 +110,7 @@ const sceneFormSchema = z.object({
       )
       .default([])
   ),
+  sceneContexts: z.array(z.any()).default([]),
 });
 
 export type ReadingRouteFormValues = {
@@ -113,6 +120,7 @@ export type ReadingRouteFormValues = {
   summary: string;
   tags: string;
   story_images_v2: ReadingFrame[];
+  sceneContexts: SceneContextRecord[];
 };
 
 function sceneToFormValues(scene: ReadingRoute): ReadingRouteFormValues {
@@ -125,13 +133,14 @@ function sceneToFormValues(scene: ReadingRoute): ReadingRouteFormValues {
     summary: scene.summary,
     tags: scene.tags.join(", "),
     story_images_v2,
+    sceneContexts: scene.sceneContexts ?? [],
   };
 }
 
 function formValuesToPayload(
   values: ReadingRouteFormValues
 ): Omit<ReadingRoute, "tsid" | "workId"> {
-  // L3-C: Route membership columns dropped — delivery fields only.
+  // L3-C: no Route membership. L4-A: frames + hosted Contexts.
   return {
     title: values.title.trim(),
     chapter_number: values.chapter_number,
@@ -139,6 +148,7 @@ function formValuesToPayload(
     summary: values.summary.trim(),
     tags: commaListToArray(values.tags),
     story_images_v2: values.story_images_v2,
+    sceneContexts: values.sceneContexts,
   };
 }
 
@@ -161,17 +171,13 @@ type ReadingRouteFormProps =
   | (ReadingRouteFormBase & { mode: "edit"; defaultValues: ReadingRoute });
 
 export function ReadingRouteForm(props: ReadingRouteFormProps) {
-  // characters/locations retained for page API compatibility; L3-A does not edit Route membership.
-  const { workId } = props;
+  // characters/locations: L4-A Frame+Context drawer Archive pickers (not Route membership).
+  const { workId, characters, locations } = props;
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = React.useState(false);
+  const [drawerIndex, setDrawerIndex] = React.useState<number | null>(null);
   const listHref = `/works/${encodeURIComponent(workId)}/reading-routes`;
-
-  const relatedLine =
-    props.mode === "edit"
-      ? props.defaultValues.relatedFromContextsLine
-      : null;
 
   const defaultValues: ReadingRouteFormValues =
     props.mode === "edit"
@@ -183,6 +189,7 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
           summary: "",
           tags: "",
           story_images_v2: [],
+          sceneContexts: [],
         };
 
   const form = useForm<ReadingRouteFormValues>({
@@ -220,13 +227,40 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
 
   // ── Form submission ────────────────────────────────────────────────────────
 
+  const frames = useWatch({ control: form.control, name: "story_images_v2" }) ?? [];
+  const sceneContexts =
+    useWatch({ control: form.control, name: "sceneContexts" }) ?? [];
+
+  const relatedLine = formatStoryRelatedAggregateLine(
+    aggregateStoryRelatedRefs({ contexts: sceneContexts })
+  );
+
+  const readingRouteTsid =
+    props.mode === "edit" ? props.defaultValues.tsid : "new";
+
+  const setFramesAndContexts = (next: {
+    frames: ReadingFrame[];
+    contexts: SceneContextRecord[];
+  }) => {
+    form.setValue("story_images_v2", next.frames, { shouldDirty: true });
+    form.setValue("sceneContexts", next.contexts, { shouldDirty: true });
+  };
+
   const onSubmit = form.handleSubmit(
     async (values) => {
       setSubmitError(null);
       try {
         const payload = formValuesToPayload(values);
         if (props.mode === "create") {
-          await createScene(workId, payload);
+          const tsid = `scene_${Date.now()}`;
+          await createScene(workId, {
+            ...payload,
+            tsid,
+            sceneContexts: rewriteContextsReadingRouteTsid(
+              payload.sceneContexts ?? [],
+              tsid
+            ),
+          });
         } else {
           await updateScene(workId, props.defaultValues.tsid, payload);
         }
@@ -424,23 +458,42 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
         />
       </div>
 
-      {/* ── Reading Frame (asset — excluded from Copilot, FC-03) ── */}
+      {/* ── Frame list + drawer (L4-A; Context owns cast/place) ── */}
       <div className="space-y-2">
         <Label>{messages.domain.readingFrame}</Label>
         <p className="text-muted-foreground text-xs">
           {messages.forms.readingFrameHint}
         </p>
-        <Controller
-          name="story_images_v2"
-          control={form.control}
-          render={({ field }) => (
-            <MultiImageUploader
-              value={field.value}
-              onChange={field.onChange}
-              onUploadingChange={setUploadingImages}
-              routeTitle={titleStr}
-            />
-          )}
+        <FrameListPanel
+          frames={frames}
+          contexts={sceneContexts}
+          onMoveUp={(i) => {
+            const next = swapFramesWithContexts(frames, sceneContexts, i, i - 1);
+            setFramesAndContexts(next);
+            if (drawerIndex === i) setDrawerIndex(i - 1);
+            else if (drawerIndex === i - 1) setDrawerIndex(i);
+          }}
+          onMoveDown={(i) => {
+            const next = swapFramesWithContexts(frames, sceneContexts, i, i + 1);
+            setFramesAndContexts(next);
+            if (drawerIndex === i) setDrawerIndex(i + 1);
+            else if (drawerIndex === i + 1) setDrawerIndex(i);
+          }}
+          onRemove={(i) => {
+            const next = removeFrameWithContexts(frames, sceneContexts, i);
+            setFramesAndContexts(next);
+            if (drawerIndex == null) return;
+            if (drawerIndex === i) setDrawerIndex(null);
+            else if (drawerIndex > i) setDrawerIndex(drawerIndex - 1);
+          }}
+          onAdd={() => {
+            setFramesAndContexts({
+              frames: [...frames, { url: "", caption: "" }],
+              contexts: sceneContexts,
+            });
+            setDrawerIndex(frames.length);
+          }}
+          onOpen={(i) => setDrawerIndex(i)}
         />
         {form.formState.errors.story_images_v2 ? (
           <p className="text-destructive text-sm">
@@ -451,7 +504,27 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
         ) : null}
       </div>
 
-      {/* ── Related cast/place (L3-A: Context aggregate, not Route membership) ── */}
+      <FrameContextDrawer
+        open={drawerIndex !== null}
+        onOpenChange={(open) => {
+          if (!open) setDrawerIndex(null);
+        }}
+        workId={workId}
+        readingRouteTsid={readingRouteTsid}
+        routeTitle={titleStr}
+        chapter_number={form.watch("chapter_number") || 1}
+        chapter_title={form.watch("chapter_title")}
+        frameIndex={drawerIndex}
+        frames={frames}
+        contexts={sceneContexts}
+        characters={characters}
+        locations={locations}
+        onChange={setFramesAndContexts}
+        onUploadingChange={setUploadingImages}
+        onNavigate={setDrawerIndex}
+      />
+
+      {/* ── Related cast/place aggregate (read-only overview) ── */}
       <div className="space-y-1 rounded-lg border border-dashed px-3 py-2">
         <p className="text-xs font-medium">
           {messages.rollout.storyRelatedFromContexts}
