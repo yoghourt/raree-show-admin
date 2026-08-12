@@ -78,6 +78,14 @@ Scope: Frame list/reorder on story edit; Frame+Context edit in right drawer
 
 ---
 
+## Follow-on
+
+| Slice | Status |
+| ----- | ------ |
+| **L4-B** Reader Scene Context-aware cast · place | **EXECUTE GRANTED** · `implement-scc-001-l4b-reader-context-aware-cast-place.md` |
+
+---
+
 ## Refs
 
 ```text
