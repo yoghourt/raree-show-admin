@@ -69,6 +69,7 @@ Code expansion beyond S1 still requires a **named next slice** before non-allowl
 | **L3-B** Historical Context backfill | `docs/spikes/implement-scc-001-l3b-historical-context-backfill.md` | **PASS · Verified** |
 | **L3-C** Schema sunset | `docs/spikes/implement-scc-001-l3c-schema-sunset.md` | **PASS · Verified** |
 | **L4-A** Admin Frame+Context edit (story list + drawer) | `docs/spikes/implement-scc-001-l4a-admin-frame-context-edit.md` | **PASS · Verified** |
+| **L4-B** Reader Scene Context-aware cast · place | `docs/spikes/implement-scc-001-l4b-reader-context-aware-cast-place.md` | **EXECUTE GRANTED · Implemented** (human verify pending) |
 
 Rejected: Accept/UI heuristic filter that keeps Story/Route as ownership (short-term D1).
 
@@ -86,6 +87,7 @@ docs/spikes/implement-scc-001-l2c-propose-context-signals.md
 docs/spikes/implement-scc-001-level3-route-ownership-sunset.md
 docs/spikes/implement-scc-001-l3b-historical-context-backfill.md
 docs/spikes/implement-scc-001-l4a-admin-frame-context-edit.md
+docs/spikes/implement-scc-001-l4b-reader-context-aware-cast-place.md
 docs/adr/012-scene-context-runtime-boundary.md
 docs/specs/spec-scc-001-scene-context-contract.md
 config/infra/scene-context-defaults.md
