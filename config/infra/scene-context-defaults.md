@@ -17,7 +17,7 @@ Deployment knobs for Context-aware projection. Not Architecture constants.
 | Env | Default | Meaning |
 | --- | ------- | ------- |
 | `SCENE_CONTEXT_PROJECTION_ENABLED` | unset / off | When `1`/`true`, Projection Accept uses Editorial Scene → Scene Context → Frame |
-| `SCENE_CONTEXT_WORK_ALLOWLIST` | empty | Comma-separated Work UUIDs; empty = all Works when globally enabled |
+| `SCENE_CONTEXT_WORK_ALLOWLIST` | empty | Comma-separated Work UUIDs; empty = all Works when globally enabled. **After L3/L4, prefer empty** — a non-empty allowlist skips `scene_contexts_v1` for other Works and leaves edit-page cast/place empty. |
 
 ## Rollback
 

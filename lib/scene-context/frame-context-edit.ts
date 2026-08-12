@@ -5,6 +5,10 @@
  */
 
 import type { ReadingFrame } from "@/lib/types";
+import {
+  findExistingByName,
+  findLocationByEnvironmentCue,
+} from "@/lib/discovery/entity-catalog-match";
 import type {
   SceneContextAppearance,
   SceneContextRecord,
@@ -150,6 +154,64 @@ export function appearancesFromCharacterTsids(
     });
   }
   return out;
+}
+
+/**
+ * Fill missing archiveTsid / archiveName from Work Archive by name cues.
+ * Used when associate wrote name-only appearance (Role 7 mismatch debt) so
+ * FrameContextDrawer pickers are not empty after write.
+ * Returns null when nothing changes.
+ */
+export function enrichContextArchiveRefsFromWork(
+  context: SceneContextRecord,
+  archive: {
+    characters: Array<{ tsid: string; name: string }>;
+    locations: Array<{ tsid: string; name: string }>;
+  }
+): SceneContextRecord | null {
+  let changed = false;
+
+  const characterAppearanceContext = context.characterAppearanceContext.map(
+    (a) => {
+      if (a.archiveTsid?.trim()) return a;
+      const cue = a.name?.trim() || a.role?.trim() || "";
+      if (!cue) return a;
+      const hit = findExistingByName(cue, archive.characters);
+      if (!hit) return a;
+      changed = true;
+      return {
+        ...a,
+        name: a.name?.trim() || hit.name,
+        archiveTsid: hit.tsid,
+      };
+    }
+  );
+
+  let locationContext = context.locationContext;
+  if (!locationContext.archiveTsid?.trim()) {
+    const cue =
+      locationContext.archiveName?.trim() ||
+      locationContext.environmentFromExpression.trim();
+    if (cue) {
+      const hit = findLocationByEnvironmentCue(cue, archive.locations);
+      if (hit) {
+        changed = true;
+        locationContext = {
+          ...locationContext,
+          archiveTsid: hit.tsid,
+          archiveName: hit.name,
+        };
+      }
+    }
+  }
+
+  if (!changed) return null;
+  return {
+    ...context,
+    characterAppearanceContext,
+    locationContext,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export function rewriteContextsReadingRouteTsid(

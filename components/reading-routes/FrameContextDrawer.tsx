@@ -28,6 +28,7 @@ import { messages } from "@/lib/locale";
 import {
   appearancesFromCharacterTsids,
   contextAtFrameIndex,
+  enrichContextArchiveRefsFromWork,
   ensureContextForFrame,
   upsertContextById,
 } from "@/lib/scene-context/frame-context-edit";
@@ -149,6 +150,23 @@ export function FrameContextDrawer({
     // Only when opening a frame that lacks Context.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, index]);
+
+  // Hydrate missing archiveTsid from Work Archive names (associate Rule-7 debt).
+  React.useEffect(() => {
+    if (!open || index < 0) return;
+    const ctx = contextAtFrameIndex(contexts, index);
+    if (!ctx) return;
+    const enriched = enrichContextArchiveRefsFromWork(ctx, {
+      characters: characters.map((c) => ({ tsid: c.tsid, name: c.name })),
+      locations: locations.map((l) => ({ tsid: l.tsid, name: l.name })),
+    });
+    if (!enriched) return;
+    onChange({
+      frames,
+      contexts: upsertContextById(contexts, enriched),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, index, characters, locations]);
 
   React.useEffect(() => {
     if (generatingFrames.size === 0) return;

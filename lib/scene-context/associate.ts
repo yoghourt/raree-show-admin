@@ -3,15 +3,17 @@
  *
  * Appearance / location / narrative beat ownership lands on Scene Context.
  * Optional archive enrichment is Context-scoped (name match) — never Story Route membership.
+ *
+ * Discovery Rule 7: Expression.characters[].role is often the *display name*, while
+ * Intent may use role="knight" + name="Ser Waymar Royce". Join must tolerate both.
  */
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
 import {
   findExistingByName,
   findLocationByEnvironmentCue,
+  normalizeEntityName,
 } from "@/lib/discovery/entity-catalog-match";
-import { MINIMAL_RENDERER_EXPRESSION } from "@/lib/discovery/visual-contract";
-
 import type {
   SceneContextAppearance,
   SceneContextLocation,
@@ -39,6 +41,118 @@ export function contextIdForEditorialScene(sourceReviewId: string): string {
   return `ctx_${sourceReviewId.trim()}`;
 }
 
+function namesEqual(a: string, b: string): boolean {
+  const na = normalizeEntityName(a);
+  const nb = normalizeEntityName(b);
+  return Boolean(na) && na === nb;
+}
+
+/**
+ * Align Intent character to Expression entry.
+ * Prefer role===role; else Intent.name ≈ Expression.role (Rule 7 display-name roles).
+ */
+function findIntentCharacterForExpressionRole(
+  intentCharacters:
+    | Array<{ role: string; name?: string }>
+    | undefined
+    | null,
+  expressionRole: string
+): { role: string; name?: string } | undefined {
+  if (!intentCharacters?.length) return undefined;
+  const roleKey = expressionRole.trim();
+  if (!roleKey) return undefined;
+
+  const byRole = intentCharacters.find((ic) => namesEqual(ic.role, roleKey));
+  if (byRole) return byRole;
+
+  return intentCharacters.find((ic) => {
+    const name = ic.name?.trim();
+    return name ? namesEqual(name, roleKey) : false;
+  });
+}
+
+function matchCharacterArchive(
+  candidates: string[],
+  archive?: SceneContextArchiveCatalog
+): { name: string; tsid: string } | undefined {
+  if (!archive?.characters.length) return undefined;
+  for (const raw of candidates) {
+    const name = raw.trim();
+    if (!name) continue;
+    const hit = findExistingByName(name, archive.characters);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+function buildAppearanceFromExpression(
+  staging: AcceptedSceneCandidateStaging,
+  archive?: SceneContextArchiveCatalog
+): SceneContextAppearance[] {
+  const intent = staging.visualIntent ?? null;
+  const exprChars = staging.rendererExpression?.characters ?? [];
+
+  if (exprChars.length > 0) {
+    return exprChars.map((c) => {
+      const intentChar = findIntentCharacterForExpressionRole(
+        intent?.characters,
+        c.role
+      );
+      const displayName =
+        intentChar?.name?.trim() || c.role.trim() || undefined;
+      const matched = matchCharacterArchive(
+        [displayName ?? "", c.role, intentChar?.name ?? ""],
+        archive
+      );
+      const name = matched?.name || displayName;
+      return {
+        role: c.role,
+        ...(name ? { name } : {}),
+        ...(c.visual ? { visual: c.visual } : {}),
+        ...(matched ? { archiveTsid: matched.tsid } : {}),
+      };
+    });
+  }
+
+  // Expression cast empty — fall back to named Intent cast (same as aggregate preview).
+  const intentChars = intent?.characters ?? [];
+  return intentChars.flatMap((ic) => {
+    const name = ic.name?.trim();
+    if (!name) return [];
+    const matched = matchCharacterArchive([name, ic.role], archive);
+    return [
+      {
+        role: ic.role,
+        name: matched?.name || name,
+        ...(matched ? { archiveTsid: matched.tsid } : {}),
+      },
+    ];
+  });
+}
+
+function buildLocationContext(
+  staging: AcceptedSceneCandidateStaging,
+  archive?: SceneContextArchiveCatalog
+): SceneContextLocation {
+  const environment = staging.rendererExpression?.environment || "";
+  const locationContext: SceneContextLocation = {
+    environmentFromExpression: environment,
+  };
+  if (!archive?.locations.length || !environment.trim()) {
+    return locationContext;
+  }
+
+  const locMatch = findLocationByEnvironmentCue(
+    environment,
+    archive.locations
+  );
+  if (locMatch) {
+    locationContext.archiveTsid = locMatch.tsid;
+    locationContext.archiveName = locMatch.name;
+  }
+  return locationContext;
+}
+
 /**
  * Build Runtime-authoritative Scene Context from accepted Editorial Scene staging.
  * Human acceptance is assumed already complete (staging exists).
@@ -57,45 +171,9 @@ export function associateStagingToSceneContext(
 ): SceneContextRecord {
   const now = params.now ?? new Date().toISOString();
   const intent = staging.visualIntent ?? null;
-  const expr =
-    staging.rendererExpression ??
-    ({
-      ...MINIMAL_RENDERER_EXPRESSION,
-    } as typeof MINIMAL_RENDERER_EXPRESSION);
 
-  const appearance: SceneContextAppearance[] = (expr.characters ?? []).map(
-    (c) => {
-      const intentChar = intent?.characters?.find(
-        (ic) => ic.role.toLowerCase() === c.role.toLowerCase()
-      );
-      const name = intentChar?.name?.trim() || undefined;
-      const matched =
-        name && params.archive
-          ? findExistingByName(name, params.archive.characters)
-          : undefined;
-      return {
-        role: c.role,
-        ...(name ? { name } : {}),
-        ...(c.visual ? { visual: c.visual } : {}),
-        ...(matched ? { archiveTsid: matched.tsid } : {}),
-      };
-    }
-  );
-
-  const environment = expr.environment || "";
-  const locationContext: SceneContextLocation = {
-    environmentFromExpression: environment,
-  };
-  if (params.archive?.locations.length && environment.trim()) {
-    const locMatch = findLocationByEnvironmentCue(
-      environment,
-      params.archive.locations
-    );
-    if (locMatch) {
-      locationContext.archiveTsid = locMatch.tsid;
-      locationContext.archiveName = locMatch.name;
-    }
-  }
+  const appearance = buildAppearanceFromExpression(staging, params.archive);
+  const locationContext = buildLocationContext(staging, params.archive);
 
   return {
     contextId: contextIdForEditorialScene(staging.sourceReviewId),

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   appearancesFromCharacterTsids,
+  enrichContextArchiveRefsFromWork,
   ensureContextForFrame,
   removeFrameWithContexts,
   swapFramesWithContexts,
@@ -118,5 +119,31 @@ describe("appearancesFromCharacterTsids", () => {
     expect(apps).toEqual([
       { role: "character", name: "Arya", archiveTsid: "char_a" },
     ]);
+  });
+});
+
+describe("enrichContextArchiveRefsFromWork", () => {
+  it("fills missing archiveTsid from name / environment cues", () => {
+    const bare = ctx(0, "ctx_bare");
+    bare.characterAppearanceContext = [
+      { role: "Ser Waymar Royce", name: "Ser Waymar Royce" },
+    ];
+    bare.locationContext = {
+      environmentFromExpression: "Winterfell courtyard",
+    };
+    const enriched = enrichContextArchiveRefsFromWork(bare, {
+      characters: [{ tsid: "char_waymar", name: "Ser Waymar Royce" }],
+      locations: [{ tsid: "loc_winterfell", name: "Winterfell" }],
+    });
+    expect(enriched?.characterAppearanceContext[0]?.archiveTsid).toBe(
+      "char_waymar"
+    );
+    expect(enriched?.locationContext.archiveTsid).toBe("loc_winterfell");
+    expect(
+      enrichContextArchiveRefsFromWork(enriched!, {
+        characters: [{ tsid: "char_waymar", name: "Ser Waymar Royce" }],
+        locations: [{ tsid: "loc_winterfell", name: "Winterfell" }],
+      })
+    ).toBeNull();
   });
 });

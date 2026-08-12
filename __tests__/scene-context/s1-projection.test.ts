@@ -118,6 +118,71 @@ describe("associateStagingToSceneContext", () => {
     ).toBeUndefined();
   });
 
+  it("joins Intent.name to Expression.role when roles diverge (Discovery Rule 7)", () => {
+    const rule7: AcceptedSceneCandidateStaging = {
+      ...staging,
+      visualIntent: {
+        characters: [
+          { role: "knight", name: "Ser Waymar Royce" },
+          { role: "ranger", name: "Will" },
+        ],
+      },
+      rendererExpression: {
+        environment: "haunted forest",
+        characters: [
+          { role: "Ser Waymar Royce", visual: "black cloak" },
+          { role: "Will", visual: "nervous ranger" },
+        ],
+        action: "watching",
+        composition: "wide",
+      },
+    };
+    const ctx = associateStagingToSceneContext(rule7, {
+      readingRouteTsid: "scene_route_1",
+      frameIndex: 0,
+      now: "2026-08-08T00:00:00.000Z",
+      archive: {
+        characters: [
+          { name: "Ser Waymar Royce", tsid: "char_waymar" },
+          { name: "Will", tsid: "char_will" },
+        ],
+        locations: [{ name: "Haunted Forest", tsid: "loc_forest" }],
+      },
+    });
+    expect(ctx.characterAppearanceContext.map((c) => c.archiveTsid)).toEqual([
+      "char_waymar",
+      "char_will",
+    ]);
+    expect(ctx.characterAppearanceContext.map((c) => c.name)).toEqual([
+      "Ser Waymar Royce",
+      "Will",
+    ]);
+    expect(ctx.locationContext.archiveTsid).toBe("loc_forest");
+  });
+
+  it("matches archive from Expression.role alone when Intent names missing", () => {
+    const exprOnly: AcceptedSceneCandidateStaging = {
+      ...staging,
+      visualIntent: null,
+      rendererExpression: {
+        environment: "Winterfell courtyard",
+        characters: [{ role: "Arya Stark", visual: "small figure" }],
+        action: "standing",
+        composition: "medium",
+      },
+    };
+    const ctx = associateStagingToSceneContext(exprOnly, {
+      readingRouteTsid: "scene_route_1",
+      frameIndex: 0,
+      archive: {
+        characters: [{ name: "Arya Stark", tsid: "char_arya" }],
+        locations: [{ name: "Winterfell", tsid: "loc_winterfell" }],
+      },
+    });
+    expect(ctx.characterAppearanceContext[0]?.archiveTsid).toBe("char_arya");
+    expect(ctx.locationContext.archiveTsid).toBe("loc_winterfell");
+  });
+
   it("upserts by editorial sourceReviewId", () => {
     const a = associateStagingToSceneContext(staging, {
       readingRouteTsid: "scene_route_1",
