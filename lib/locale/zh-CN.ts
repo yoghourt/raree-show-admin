@@ -166,6 +166,14 @@ export const zhCN = {
     noStoryStaging:      '暂时没有待保存的故事',
     writePreviewHint:
       '以下字段与故事编辑页一致。先保证标题与画面说明可读。故事相关出场/地点来自画面语境并集（只读）；投递路由上的角色/地点字段为非权威可选债务。',
+    characterStagingTitle: '待保存的角色',
+    noCharacterStaging: '暂时没有待保存的角色',
+    writeCharacterPreviewHint:
+      '以下字段与角色编辑页一致。核对后写入作品库；肖像请到制作页补齐。',
+    characterAlreadyExists: '作品库已有同名角色',
+    persistCharacter: '写入角色',
+    persistCharacterSkipExisting: '已有档案，移出队列',
+    characterPortraitDeferredHint: '肖像不在此写入。写入后可在制作页派生「补齐角色肖像」任务。',
     noLinks:             '暂无关联',
     noStoryUnits:        '作品中还没有故事',
     persistStory:        '写入故事',
@@ -358,12 +366,12 @@ export const zhCN = {
       storyCentricHint:
         '以故事为单位确认：其下画面会一并带入写入。故事相关角色/地点仅来自其子画面语境并集；作品库实体单独确认，不整批挂到投递路由。',
       entityAcceptsWithStory:
-        '次要：角色/地点在作品库单独确认建档；不随故事批量写入投递路由。须先保证故事标题与画面说明可读。',
+        '次要：角色确认后进入「写入作品」队列，预览表单再保存到作品库；不随故事批量写入投递路由。须先保证故事标题与画面说明可读。',
       storyRelatedFromScenes:
         '本故事相关（来自子画面语境，只读）',
       storyRelatedEmpty: '子画面暂无可聚合的出场/地点线索',
       alreadyExists: '已存在',
-      willCreateOnWrite: '确认后建档',
+      willCreateOnWrite: '确认后进入写入队列',
 
       sceneAcceptsWithStory: '无需单独确认；点上方「确认（含画面）」即可',
       orphanSceneHint:

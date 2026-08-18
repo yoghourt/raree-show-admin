@@ -47,6 +47,7 @@ import type {
 } from "@/lib/discovery/propose-types";
 import { discoveryComposerUi } from "@/lib/discovery/ui-copy";
 import type {
+  AcceptedCharacterStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
   AcceptReviewError,
@@ -69,20 +70,25 @@ import {
   revokeReviewAccept,
   saveReviewEdit,
   buildAcceptPrefill,
+  buildCharacterStaging,
   buildStoryStaging,
   buildSceneStaging,
   getChildSceneReviewIdsForStory,
   findAcceptedParentStory,
+  characterStagingFromAcceptedReviewItems,
   type ReviewEditPayload,
 } from "@/lib/discovery/review-state";
 import { storeDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
 import * as charactersApi from "@/lib/characters";
 import * as locationsApi from "@/lib/locations";
 import {
+  appendCharacterStagingToRolloutQueue,
   appendSceneStagingToRolloutQueue,
   appendStoryStagingToRolloutQueue,
+  removeCharacterStagingFromRolloutQueue,
   removeSceneStagingFromRolloutQueue,
   removeStoryStagingFromRolloutQueue,
+  updateCharacterStagingInRolloutQueue,
   updateSceneStagingInRolloutQueue,
   updateStoryStagingInRolloutQueue,
 } from "@/lib/rollout/sync-discovery-staging";
@@ -137,6 +143,7 @@ export interface UseDiscoverySessionReturn {
   activeReviewItems: DiscoveryReviewItem[];
   acceptedStoryUnits: AcceptedStoryUnitStaging[];
   acceptedSceneCandidates: AcceptedSceneCandidateStaging[];
+  acceptedCharacters: AcceptedCharacterStaging[];
   isRegening: boolean;
   regenReviewId: string | null;
   regenError: RegenError | null;
@@ -153,7 +160,7 @@ export interface UseDiscoverySessionReturn {
   discardCandidate: (reviewId: string) => void;
   revokeStagingAccept: (
     sourceReviewId: string,
-    kind: "story" | "scene"
+    kind: "story" | "scene" | "character"
   ) => void;
   saveCandidateEdit: (reviewId: string, edit: ReviewEditPayload) => void;
   saveStoryStagingEdit: (
@@ -223,6 +230,9 @@ export function useDiscoverySession(
   const [acceptedSceneCandidates, setAcceptedSceneCandidates] = useState<
     AcceptedSceneCandidateStaging[]
   >([]);
+  const [acceptedCharacters, setAcceptedCharacters] = useState<
+    AcceptedCharacterStaging[]
+  >([]);
   const [isRegening, setIsRegening] = useState(false);
   const [regenReviewId, setRegenReviewId] = useState<string | null>(null);
   const [regenError, setRegenError] = useState<RegenError | null>(null);
@@ -270,6 +280,11 @@ export function useDiscoverySession(
       setReviewItems(snapshot.reviewItems);
       setAcceptedStoryUnits(snapshot.acceptedStoryUnits);
       setAcceptedSceneCandidates(snapshot.acceptedSceneCandidates);
+      setAcceptedCharacters(
+        snapshot.acceptedCharacters && snapshot.acceptedCharacters.length > 0
+          ? snapshot.acceptedCharacters
+          : characterStagingFromAcceptedReviewItems(snapshot.reviewItems)
+      );
       setProposeError(snapshot.proposeError ?? null);
     } else {
       setSession(
@@ -279,6 +294,7 @@ export function useDiscoverySession(
       setReviewItems([]);
       setAcceptedStoryUnits([]);
       setAcceptedSceneCandidates([]);
+      setAcceptedCharacters([]);
       setProposeError(null);
     }
     setGateFlags({});
@@ -298,6 +314,7 @@ export function useDiscoverySession(
       session.state === "review_pending" ||
       acceptedStoryUnits.length > 0 ||
       acceptedSceneCandidates.length > 0 ||
+      acceptedCharacters.length > 0 ||
       (proposeError?.errors?.length ?? 0) > 0;
 
     if (!hasReviewProgress) {
@@ -314,6 +331,7 @@ export function useDiscoverySession(
       reviewItems,
       acceptedStoryUnits,
       acceptedSceneCandidates,
+      acceptedCharacters,
       proposeError,
       savedAt: new Date().toISOString(),
     });
@@ -325,6 +343,7 @@ export function useDiscoverySession(
     reviewItems,
     acceptedStoryUnits,
     acceptedSceneCandidates,
+    acceptedCharacters,
     proposeError,
   ]);
 
@@ -634,8 +653,20 @@ export function useDiscoverySession(
   }, []);
 
   const revokeStagingAccept = useCallback(
-    (sourceReviewId: string, kind: "story" | "scene") => {
+    (sourceReviewId: string, kind: "story" | "scene" | "character") => {
       setAcceptError(null);
+      if (kind === "character") {
+        setReviewItems((prev) => revokeReviewAccept(prev, sourceReviewId));
+        setAcceptedCharacters((prev) =>
+          prev.filter((item) => item.sourceReviewId !== sourceReviewId)
+        );
+        removeCharacterStagingFromRolloutQueue(
+          workId,
+          operatorId,
+          sourceReviewId
+        );
+        return;
+      }
       if (kind === "story") {
         const revokedStory = acceptedStoryUnits.find(
           (unit) => unit.sourceReviewId === sourceReviewId
@@ -718,7 +749,14 @@ export function useDiscoverySession(
         const item = findReviewItem(next, reviewId);
         if (item?.status === "accepted") {
           const candidateType = item.candidate.candidateType;
-          if (candidateType === "character" || candidateType === "location") {
+          if (candidateType === "character") {
+            const staging = buildCharacterStaging(item);
+            setAcceptedCharacters((units) => [
+              ...units.filter((unit) => unit.sourceReviewId !== reviewId),
+              staging,
+            ]);
+            updateCharacterStagingInRolloutQueue(workId, operatorId, staging);
+          } else if (candidateType === "location") {
             storeDiscoveryAcceptPrefill(
               buildAcceptPrefill(item, candidateType)
             );
@@ -1161,7 +1199,14 @@ export function useDiscoverySession(
       setAcceptError(null);
       setReviewItems((prev) => markReviewAccepted(prev, reviewId));
 
-      if (result.kind === "entity_prefill") {
+      if (result.kind === "character_staging") {
+        setAcceptedCharacters((prev) => [...prev, result.staging]);
+        appendCharacterStagingToRolloutQueue(
+          workId,
+          operatorId,
+          result.staging
+        );
+      } else if (result.kind === "entity_prefill") {
         storeDiscoveryAcceptPrefill(result.prefill);
       } else if (result.kind === "scene_staging") {
         setAcceptedSceneCandidates((prev) => [...prev, result.staging]);
@@ -1197,6 +1242,7 @@ export function useDiscoverySession(
     activeReviewItems,
     acceptedStoryUnits,
     acceptedSceneCandidates,
+    acceptedCharacters,
     isRegening,
     regenReviewId,
     regenError,

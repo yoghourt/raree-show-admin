@@ -13,6 +13,7 @@ import type {
 import type {
   AcceptReviewError,
   AcceptReviewResult,
+  AcceptedCharacterStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
   DiscoveryAcceptPrefill,
@@ -334,6 +335,29 @@ export function buildAcceptPrefill(
   };
 }
 
+export function buildCharacterStaging(
+  item: DiscoveryReviewItem
+): AcceptedCharacterStaging {
+  const fields = getEffectiveFields(item) as CharacterCandidateFields;
+  const displayName = getEffectiveDisplayName(item).trim();
+  return {
+    workId: item.candidate.workId,
+    sourceReviewId: item.reviewId,
+    sourceCandidateId: item.candidate.candidateId,
+    name:
+      displayName ||
+      (typeof fields.name === "string" ? fields.name.trim() : ""),
+    house: typeof fields.house === "string" ? fields.house.trim() : "",
+    description:
+      typeof fields.description === "string" ? fields.description.trim() : "",
+    signatureQuote:
+      typeof fields.signatureQuote === "string"
+        ? fields.signatureQuote.trim() || null
+        : null,
+    acceptedAt: new Date().toISOString(),
+  };
+}
+
 export function buildStoryStaging(
   item: DiscoveryReviewItem
 ): AcceptedStoryUnitStaging {
@@ -429,9 +453,8 @@ export function prepareAcceptReview(
       }
       return {
         ok: true,
-        kind: "entity_prefill",
-        path: buildEntityCreateHandoffPath(workId, item.reviewId, "character"),
-        prefill: buildAcceptPrefill(item, "character"),
+        kind: "character_staging",
+        staging: buildCharacterStaging(item),
       };
     }
     case "location": {
@@ -673,6 +696,18 @@ export function prepareAcceptStoryWithChildScenes(
     acceptedReviewIds,
     sceneErrors,
   };
+}
+
+export function characterStagingFromAcceptedReviewItems(
+  items: DiscoveryReviewItem[]
+): AcceptedCharacterStaging[] {
+  return items
+    .filter(
+      (item) =>
+        item.status === "accepted" &&
+        item.candidate.candidateType === "character"
+    )
+    .map(buildCharacterStaging);
 }
 
 export function characterPrefillToFormValues(

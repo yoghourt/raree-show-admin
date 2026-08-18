@@ -3,6 +3,7 @@
  */
 
 import type {
+  AcceptedCharacterStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
@@ -27,6 +28,7 @@ export function emptyRolloutQueue(
     workId,
     storyStaging: [],
     readingRouteStaging: [],
+    characterStaging: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -57,12 +59,16 @@ export function loadRolloutQueue(
       workId,
       storyStaging: parsed.storyStaging ?? [],
       readingRouteStaging: parsed.readingRouteStaging ?? parsed.sceneStaging ?? [],
+      characterStaging: parsed.characterStaging ?? [],
       processedStoryReviewIds: parsed.processedStoryReviewIds ?? [],
       processedReadingRouteReviewIds: parsed.processedReadingRouteReviewIds ?? parsed.processedSceneReviewIds ?? [],
+      processedCharacterReviewIds: parsed.processedCharacterReviewIds ?? [],
       dismissedStoryStaging: parsed.dismissedStoryStaging ?? [],
       dismissedReadingRouteStaging: parsed.dismissedReadingRouteStaging ?? parsed.dismissedSceneStaging ?? [],
+      dismissedCharacterStaging: parsed.dismissedCharacterStaging ?? [],
       dismissedStoryReviewIds: parsed.dismissedStoryReviewIds ?? [],
       dismissedReadingRouteReviewIds: parsed.dismissedReadingRouteReviewIds ?? parsed.dismissedSceneReviewIds ?? [],
+      dismissedCharacterReviewIds: parsed.dismissedCharacterReviewIds ?? [],
       projectedReadingRoutes: parsed.projectedReadingRoutes ?? parsed.projectedScenes ?? [],
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
@@ -130,11 +136,28 @@ function dedupeSceneStaging(
   return out;
 }
 
+function dedupeCharacterStaging(
+  items: AcceptedCharacterStaging[]
+): AcceptedCharacterStaging[] {
+  const seen = new Set<string>();
+  const out: AcceptedCharacterStaging[] = [];
+  for (const item of items) {
+    const key = `${item.sourceReviewId}:${item.name}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 export function mergeRolloutQueue(
   current: RolloutQueueSnapshot,
   incoming: {
     storyUnits?: AcceptedStoryUnitStaging[];
     sceneCandidates?: AcceptedSceneCandidateStaging[];
+    characterStaging?: AcceptedCharacterStaging[];
   }
 ): RolloutQueueSnapshot {
   return {
@@ -147,12 +170,19 @@ export function mergeRolloutQueue(
       ...current.readingRouteStaging,
       ...(incoming.sceneCandidates ?? []),
     ]),
+    characterStaging: dedupeCharacterStaging([
+      ...(current.characterStaging ?? []),
+      ...(incoming.characterStaging ?? []),
+    ]),
     processedStoryReviewIds: current.processedStoryReviewIds ?? [],
     processedReadingRouteReviewIds: current.processedReadingRouteReviewIds ?? [],
+    processedCharacterReviewIds: current.processedCharacterReviewIds ?? [],
     dismissedStoryStaging: current.dismissedStoryStaging ?? [],
     dismissedReadingRouteStaging: current.dismissedReadingRouteStaging ?? [],
+    dismissedCharacterStaging: current.dismissedCharacterStaging ?? [],
     dismissedStoryReviewIds: current.dismissedStoryReviewIds ?? [],
     dismissedReadingRouteReviewIds: current.dismissedReadingRouteReviewIds ?? [],
+    dismissedCharacterReviewIds: current.dismissedCharacterReviewIds ?? [],
     projectedReadingRoutes: current.projectedReadingRoutes ?? [],
     updatedAt: new Date().toISOString(),
   };
@@ -178,6 +208,19 @@ export function removeSceneStagingByReviewId(
   return {
     ...queue,
     readingRouteStaging: queue.readingRouteStaging.filter(
+      (s) => s.sourceReviewId !== sourceReviewId
+    ),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function removeCharacterStagingByReviewId(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  return {
+    ...queue,
+    characterStaging: (queue.characterStaging ?? []).filter(
       (s) => s.sourceReviewId !== sourceReviewId
     ),
     updatedAt: new Date().toISOString(),
@@ -219,6 +262,19 @@ export function markSceneReviewIdProcessed(
   };
 }
 
+export function markCharacterReviewIdProcessed(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  return {
+    ...removeCharacterStagingByReviewId(queue, sourceReviewId),
+    processedCharacterReviewIds: addProcessedReviewId(
+      queue.processedCharacterReviewIds,
+      sourceReviewId
+    ),
+  };
+}
+
 export function unmarkSceneReviewIdProcessed(
   queue: RolloutQueueSnapshot,
   sourceReviewId: string
@@ -243,6 +299,13 @@ function blockedSceneReviewIds(queue: RolloutQueueSnapshot): Set<string> {
   return new Set([
     ...(queue.processedReadingRouteReviewIds ?? []),
     ...(queue.dismissedReadingRouteReviewIds ?? []),
+  ]);
+}
+
+function blockedCharacterReviewIds(queue: RolloutQueueSnapshot): Set<string> {
+  return new Set([
+    ...(queue.processedCharacterReviewIds ?? []),
+    ...(queue.dismissedCharacterReviewIds ?? []),
   ]);
 }
 
@@ -344,6 +407,55 @@ export function restoreSceneStagingItem(
   );
 }
 
+export function dismissCharacterStagingItem(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  const item = (queue.characterStaging ?? []).find(
+    (staging) => staging.sourceReviewId === sourceReviewId
+  );
+  if (!item) {
+    return queue;
+  }
+
+  return {
+    ...removeCharacterStagingByReviewId(queue, sourceReviewId),
+    dismissedCharacterStaging: dedupeCharacterStaging([
+      ...(queue.dismissedCharacterStaging ?? []),
+      item,
+    ]),
+    dismissedCharacterReviewIds: addProcessedReviewId(
+      queue.dismissedCharacterReviewIds,
+      sourceReviewId
+    ),
+  };
+}
+
+export function restoreCharacterStagingItem(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  const item = (queue.dismissedCharacterStaging ?? []).find(
+    (staging) => staging.sourceReviewId === sourceReviewId
+  );
+  if (!item) {
+    return queue;
+  }
+
+  return mergeRolloutQueue(
+    {
+      ...queue,
+      dismissedCharacterStaging: (queue.dismissedCharacterStaging ?? []).filter(
+        (staging) => staging.sourceReviewId !== sourceReviewId
+      ),
+      dismissedCharacterReviewIds: (queue.dismissedCharacterReviewIds ?? []).filter(
+        (id) => id !== sourceReviewId
+      ),
+    },
+    { characterStaging: [item] }
+  );
+}
+
 export function recordProjectedScene(
   queue: RolloutQueueSnapshot,
   record: ProjectedReadingRouteRecord
@@ -406,9 +518,17 @@ export function shouldImportSceneStaging(
   return !blockedSceneReviewIds(queue).has(sourceReviewId);
 }
 
+export function shouldImportCharacterStaging(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): boolean {
+  return !blockedCharacterReviewIds(queue).has(sourceReviewId);
+}
+
 export function filterPendingStaging(queue: RolloutQueueSnapshot): RolloutQueueSnapshot {
   const processedStory = blockedStoryReviewIds(queue);
   const processedScene = blockedSceneReviewIds(queue);
+  const processedCharacter = blockedCharacterReviewIds(queue);
 
   return {
     ...queue,
@@ -417,6 +537,9 @@ export function filterPendingStaging(queue: RolloutQueueSnapshot): RolloutQueueS
     ),
     readingRouteStaging: queue.readingRouteStaging.filter(
       (item) => !processedScene.has(item.sourceReviewId)
+    ),
+    characterStaging: (queue.characterStaging ?? []).filter(
+      (item) => !processedCharacter.has(item.sourceReviewId)
     ),
     updatedAt: new Date().toISOString(),
   };

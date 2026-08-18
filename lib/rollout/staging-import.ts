@@ -3,9 +3,11 @@
  */
 
 import type {
+  AcceptedCharacterStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
+import { characterStagingFromAcceptedReviewItems } from "@/lib/discovery/review-state";
 import type { DiscoveryReviewSnapshot } from "@/lib/discovery/review-session-storage";
 
 const DISCOVERY_PREFIX = "discovery_review_snapshot:";
@@ -50,16 +52,24 @@ export function extractStagingFromDiscoverySnapshots(
 ): {
   storyUnits: AcceptedStoryUnitStaging[];
   sceneCandidates: AcceptedSceneCandidateStaging[];
+  characterStaging: AcceptedCharacterStaging[];
 } {
   const storyUnits: AcceptedStoryUnitStaging[] = [];
   const sceneCandidates: AcceptedSceneCandidateStaging[] = [];
+  const characterStaging: AcceptedCharacterStaging[] = [];
 
   for (const snap of snapshots) {
     storyUnits.push(...(snap.acceptedStoryUnits ?? []));
     sceneCandidates.push(...(snap.acceptedSceneCandidates ?? []));
+    const explicitCharacters = snap.acceptedCharacters ?? [];
+    characterStaging.push(
+      ...(explicitCharacters.length > 0
+        ? explicitCharacters
+        : characterStagingFromAcceptedReviewItems(snap.reviewItems ?? []))
+    );
   }
 
-  return { storyUnits, sceneCandidates };
+  return { storyUnits, sceneCandidates, characterStaging };
 }
 
 export function importStagingFromLatestDiscoverySnapshot(
@@ -68,6 +78,7 @@ export function importStagingFromLatestDiscoverySnapshot(
 ): {
   storyUnits: AcceptedStoryUnitStaging[];
   sceneCandidates: AcceptedSceneCandidateStaging[];
+  characterStaging: AcceptedCharacterStaging[];
 } | null {
   const snapshots = findDiscoverySnapshotsForWork(workId, operatorId);
   if (snapshots.length === 0) {

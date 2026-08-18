@@ -23,6 +23,7 @@ import {
   saveReviewEdit,
   getEffectiveDisplayName,
   validateCharacterAcceptFields,
+  characterStagingFromAcceptedReviewItems,
 } from "@/lib/discovery/review-state";
 
 function makeCandidate(
@@ -125,18 +126,35 @@ describe("review item lifecycle", () => {
 });
 
 describe("Accept handoff guards", () => {
-  it("character accept returns entity prefill path", () => {
+  it("character accept returns character staging for Rollout queue", () => {
     const items = createReviewItems([makeCandidate()]);
     const result = prepareAcceptReview(items, items[0]!.reviewId);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.kind).toBe("entity_prefill");
-      if (result.kind === "entity_prefill") {
-        expect(result.path).toContain("/characters/new");
-        expect(result.path).toContain("discoveryReviewId=");
-        expect(result.prefill.source).toBe("discovery_review");
+      expect(result.kind).toBe("character_staging");
+      if (result.kind === "character_staging") {
+        expect(result.staging.name).toBe("Jon Snow");
+        expect(result.staging.house).toBe("Stark");
+        expect(result.staging.sourceReviewId).toBe(items[0]!.reviewId);
       }
     }
+  });
+
+  it("rebuilds character staging from already-accepted review items", () => {
+    const pending = createReviewItems([
+      makeCandidate({
+        candidateId: "cand-liu",
+        displayName: "Liu Bei",
+        fields: { name: "Liu Bei", house: "Shu" },
+      }),
+    ]);
+    const reviewId = pending[0]!.reviewId;
+    const staged = characterStagingFromAcceptedReviewItems(
+      markReviewAccepted(pending, reviewId)
+    );
+    expect(staged).toHaveLength(1);
+    expect(staged[0]?.name).toBe("Liu Bei");
+    expect(staged[0]?.house).toBe("Shu");
   });
 
   it("story accept returns staging object with sourceCandidateId", () => {
