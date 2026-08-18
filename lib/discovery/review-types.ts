@@ -78,6 +78,18 @@ export interface AcceptedStoryUnitStaging {
   locationId?: string | null;
 }
 
+/** Catalog Character staging — Rollout preview then CRUD Save (not Discovery Accept). */
+export interface AcceptedCharacterStaging {
+  workId: string;
+  sourceReviewId: string;
+  sourceCandidateId?: string;
+  name: string;
+  house: string;
+  description: string;
+  signatureQuote: string | null;
+  acceptedAt: string;
+}
+
 export interface AcceptedSceneCandidateStaging {
   workId: string;
   sourceReviewId: string;
@@ -104,6 +116,11 @@ export type AcceptReviewResult =
       kind: "entity_prefill";
       path: string;
       prefill: DiscoveryAcceptPrefill;
+    }
+  | {
+      ok: true;
+      kind: "character_staging";
+      staging: AcceptedCharacterStaging;
     }
   | {
       ok: true;

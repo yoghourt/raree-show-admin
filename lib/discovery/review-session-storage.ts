@@ -12,6 +12,7 @@ import type {
   SceneCandidateFields,
 } from "@/lib/discovery/propose-types";
 import type {
+  AcceptedCharacterStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
   DiscoveryReviewItem,
@@ -29,6 +30,7 @@ export interface DiscoveryReviewSnapshot {
   reviewItems: DiscoveryReviewItem[];
   acceptedStoryUnits: AcceptedStoryUnitStaging[];
   acceptedSceneCandidates: AcceptedSceneCandidateStaging[];
+  acceptedCharacters?: AcceptedCharacterStaging[];
   proposeError?: ProposeError | null;
   savedAt: string;
 }
@@ -140,6 +142,7 @@ function normalizeSnapshot(
     reviewItems,
     acceptedStoryUnits,
     acceptedSceneCandidates,
+    acceptedCharacters: parsed.acceptedCharacters ?? [],
     proposeError,
   };
 }

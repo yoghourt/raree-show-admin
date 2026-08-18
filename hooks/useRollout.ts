@@ -7,22 +7,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
+  AcceptedCharacterStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
+import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
+import * as charactersApi from "@/lib/characters";
 import { messages } from "@/lib/locale";
 import {
+  dismissCharacterStagingItem,
   dismissSceneStagingItem,
   dismissStoryStagingItem,
   findProjectedScene,
   findProjectedSceneByTsid,
   loadRolloutQueue,
+  markCharacterReviewIdProcessed,
   markSceneReviewIdProcessed,
   markStoryReviewIdProcessed,
   mergeRolloutQueue,
   recordProjectedScene,
   reconcileStoryStagingWithPersistedUnits,
   removeProjectedScene,
+  restoreCharacterStagingItem,
   restoreSceneStagingItem,
   restoreStoryStagingItem,
   ROLLOUT_QUEUE_UPDATED_EVENT,
@@ -35,11 +41,13 @@ import {
   appendStoryStagingToRolloutQueue,
   removeSceneStagingFromRolloutQueue,
   removeStoryStagingFromRolloutQueue,
+  updateCharacterStagingInRolloutQueue,
   updateSceneStagingInRolloutQueue,
   updateStoryStagingInRolloutQueue,
   syncRolloutQueueFromDiscovery,
 } from "@/lib/rollout/sync-discovery-staging";
 import { resolveStoryRelatedEntities } from "@/lib/rollout/resolve-story-entities";
+import type { Character } from "@/lib/types";
 import type {
   ApprovedSceneUnit,
   ApprovedStoryUnit,
@@ -92,6 +100,9 @@ export interface UseRolloutReturn {
   persistStoryUnit: (
     staging: AcceptedStoryUnitStaging
   ) => Promise<string | null>;
+  persistCharacter: (
+    staging: AcceptedCharacterStaging
+  ) => Promise<Character | null>;
   projectSceneCreate: (
     staging: AcceptedSceneCandidateStaging,
     linkToStoryUnitId?: string
@@ -121,10 +132,13 @@ export interface UseRolloutReturn {
   unprojectSceneByTsid: (sceneTsid: string) => Promise<boolean>;
   dismissStoryStaging: (sourceReviewId: string) => void;
   dismissSceneStaging: (sourceReviewId: string) => void;
+  dismissCharacterStaging: (sourceReviewId: string) => void;
   restoreStoryStaging: (sourceReviewId: string) => void;
   restoreSceneStaging: (sourceReviewId: string) => void;
+  restoreCharacterStaging: (sourceReviewId: string) => void;
   updateStoryStaging: (staging: AcceptedStoryUnitStaging) => void;
   updateSceneStaging: (staging: AcceptedSceneCandidateStaging) => void;
+  updateCharacterStaging: (staging: AcceptedCharacterStaging) => void;
 }
 
 async function parseRolloutError(res: Response): Promise<RolloutActionError> {
@@ -315,7 +329,11 @@ export function useRollout({
     }
     const merged = syncRolloutQueueFromDiscovery(workId, operatorId);
     setQueue(merged);
-    return merged.storyStaging.length > 0 || merged.readingRouteStaging.length > 0;
+    return (
+      merged.storyStaging.length > 0 ||
+      merged.readingRouteStaging.length > 0 ||
+      (merged.characterStaging?.length ?? 0) > 0
+    );
   }, [workId, operatorId]);
 
   const persistStoryUnit = useCallback(
@@ -376,6 +394,57 @@ export function useRollout({
       }
     },
     [workId, operatorId, persistQueue, refresh]
+  );
+
+  const persistCharacter = useCallback(
+    async (staging: AcceptedCharacterStaging): Promise<Character | null> => {
+      setBusy(true);
+      setActionError(null);
+      try {
+        const name = staging.name.trim();
+        if (!name) {
+          setActionError({
+            code: "STAGING_INVALID",
+            message: "角色姓名不能为空",
+          });
+          return null;
+        }
+        const catalog = await charactersApi.getAll(workId);
+        const existing = findExistingByName(name, catalog);
+        if (existing) {
+          persistQueue(
+            markCharacterReviewIdProcessed(
+              loadRolloutQueue(workId, operatorId),
+              staging.sourceReviewId
+            )
+          );
+          return existing;
+        }
+        const created = await charactersApi.create(workId, {
+          name,
+          house: staging.house.trim(),
+          description: staging.description.trim(),
+          signatureQuote: staging.signatureQuote?.trim() || null,
+          portraitUrl: "",
+        });
+        persistQueue(
+          markCharacterReviewIdProcessed(
+            loadRolloutQueue(workId, operatorId),
+            staging.sourceReviewId
+          )
+        );
+        return created;
+      } catch (e) {
+        setActionError({
+          code: "CHARACTER_PERSIST_FAILED",
+          message: e instanceof Error ? e.message : String(e),
+        });
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [workId, operatorId, persistQueue]
   );
 
   const verifyReaderEvidence = useCallback(
@@ -834,6 +903,14 @@ export function useRollout({
     [workId, operatorId]
   );
 
+  const updateCharacterStaging = useCallback(
+    (staging: AcceptedCharacterStaging) => {
+      updateCharacterStagingInRolloutQueue(workId, operatorId, staging);
+      setQueue(loadRolloutQueue(workId, operatorId));
+    },
+    [workId, operatorId]
+  );
+
   const dismissSceneStaging = useCallback(
     (sourceReviewId: string) => {
       persistQueue(
@@ -870,6 +947,30 @@ export function useRollout({
     [workId, operatorId, persistQueue]
   );
 
+  const dismissCharacterStaging = useCallback(
+    (sourceReviewId: string) => {
+      persistQueue(
+        dismissCharacterStagingItem(
+          loadRolloutQueue(workId, operatorId),
+          sourceReviewId
+        )
+      );
+    },
+    [workId, operatorId, persistQueue]
+  );
+
+  const restoreCharacterStaging = useCallback(
+    (sourceReviewId: string) => {
+      persistQueue(
+        restoreCharacterStagingItem(
+          loadRolloutQueue(workId, operatorId),
+          sourceReviewId
+        )
+      );
+    },
+    [workId, operatorId, persistQueue]
+  );
+
   return {
     loading,
     error,
@@ -887,6 +988,7 @@ export function useRollout({
     refresh,
     importFromDiscovery,
     persistStoryUnit,
+    persistCharacter,
     projectSceneCreate,
     verifyReaderEvidence,
     projectSceneLinkExisting,
@@ -899,9 +1001,12 @@ export function useRollout({
     unprojectSceneByTsid,
     dismissStoryStaging,
     dismissSceneStaging,
+    dismissCharacterStaging,
     restoreStoryStaging,
     restoreSceneStaging,
+    restoreCharacterStaging,
     updateStoryStaging,
     updateSceneStaging,
+    updateCharacterStaging,
   };
 }

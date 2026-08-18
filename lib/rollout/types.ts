@@ -3,6 +3,7 @@
  */
 
 import type {
+  AcceptedCharacterStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
@@ -74,12 +75,16 @@ export interface RolloutQueueSnapshot {
   workId: string;
   storyStaging: AcceptedStoryUnitStaging[];
   readingRouteStaging: AcceptedSceneCandidateStaging[];
+  characterStaging?: AcceptedCharacterStaging[];
   processedStoryReviewIds?: string[];
   processedReadingRouteReviewIds?: string[];
+  processedCharacterReviewIds?: string[];
   dismissedStoryStaging?: AcceptedStoryUnitStaging[];
   dismissedReadingRouteStaging?: AcceptedSceneCandidateStaging[];
+  dismissedCharacterStaging?: AcceptedCharacterStaging[];
   dismissedStoryReviewIds?: string[];
   dismissedReadingRouteReviewIds?: string[];
+  dismissedCharacterReviewIds?: string[];
   projectedReadingRoutes?: ProjectedReadingRouteRecord[];
   updatedAt: string;
 }

@@ -51,6 +51,7 @@ describe("rollout queue storage", () => {
     const loaded = loadRolloutQueue("work-1", "op-1");
     expect(loaded.storyStaging).toHaveLength(1);
     expect(loaded.storyStaging[0].title).toBe("Story A");
+    expect(loaded.characterStaging).toEqual([]);
   });
 
   it("merges staging without duplicates", () => {

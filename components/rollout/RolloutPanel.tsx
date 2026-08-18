@@ -9,6 +9,7 @@
 import Link from "next/link";
 import * as React from "react";
 
+import { CharacterWritePreviewCard } from "@/components/rollout/CharacterWritePreviewCard";
 import {
   FrameContextWriteFields,
   StoryWritePreviewCard,
@@ -261,10 +262,13 @@ export function RolloutPanel({
   }, [rollout.frameProjections]);
 
   const pendingCount =
-    rollout.queue.storyStaging.length + rollout.queue.readingRouteStaging.length;
+    rollout.queue.storyStaging.length +
+    rollout.queue.readingRouteStaging.length +
+    (rollout.queue.characterStaging?.length ?? 0);
   const dismissedCount =
     (rollout.queue.dismissedStoryStaging?.length ?? 0) +
-    (rollout.queue.dismissedReadingRouteStaging?.length ?? 0);
+    (rollout.queue.dismissedReadingRouteStaging?.length ?? 0) +
+    (rollout.queue.dismissedCharacterStaging?.length ?? 0);
   const persistedCount = rollout.storyUnits.length;
 
   const pendingStoryIds = React.useMemo(
@@ -392,6 +396,50 @@ export function RolloutPanel({
 
             {/* ── 待处理 ── */}
             <TabsContent value="pending" className="min-h-72 space-y-8">
+              <section className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-medium">
+                    {rolloutUi.characterStagingTitle}
+                  </h3>
+                  <p className="text-muted-foreground text-xs">
+                    {rolloutUi.writeCharacterPreviewHint}
+                  </p>
+                </div>
+                {(rollout.queue.characterStaging?.length ?? 0) === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    {rolloutUi.noCharacterStaging}
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {(rollout.queue.characterStaging ?? []).map((staging) => (
+                      <CharacterWritePreviewCard
+                        key={staging.sourceReviewId}
+                        staging={staging}
+                        catalog={characters}
+                        busy={rollout.busy}
+                        onChange={(next) =>
+                          rollout.updateCharacterStaging(next)
+                        }
+                        onWrite={async (next) => {
+                          const written = await rollout.persistCharacter(next);
+                          if (!written) return;
+                          setCharacters((prev) => {
+                            if (prev.some((c) => c.tsid === written.tsid)) {
+                              return prev;
+                            }
+                            return [written, ...prev];
+                          });
+                        }}
+                        onDismiss={() =>
+                          rollout.dismissCharacterStaging(
+                            staging.sourceReviewId
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
               <section className="space-y-3">
                 <div>
                   <h3 className="text-sm font-medium">
@@ -587,6 +635,23 @@ export function RolloutPanel({
                   </button>
                   {showDismissed ? (
                     <div className="mt-3 space-y-2">
+                      {rollout.queue.dismissedCharacterStaging?.map((s) => (
+                        <div
+                          key={s.sourceReviewId}
+                          className="flex items-center justify-between rounded border border-dashed p-2 text-sm"
+                        >
+                          <span>{s.name}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              rollout.restoreCharacterStaging(s.sourceReviewId)
+                            }
+                          >
+                            {rolloutUi.restoreStaging}
+                          </Button>
+                        </div>
+                      ))}
                       {rollout.queue.dismissedStoryStaging?.map((s) => (
                         <div
                           key={s.sourceReviewId}

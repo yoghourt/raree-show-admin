@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DiscoveryReviewSnapshot } from "@/lib/discovery/review-session-storage";
 import {
+  appendCharacterStagingToRolloutQueue,
   appendSceneStagingToRolloutQueue,
   appendStoryStagingToRolloutQueue,
   syncRolloutQueueFromDiscovery,
@@ -70,6 +71,40 @@ describe("sync-discovery-staging", () => {
     const queue = syncRolloutQueueFromDiscovery("work-1", "op-1");
     expect(queue.storyStaging).toHaveLength(1);
     expect(queue.storyStaging[0].title).toBe("Northern arc");
+  });
+
+  it("recovers character staging from accepted review items when snapshot has no acceptedCharacters", () => {
+    const snapshot: DiscoveryReviewSnapshot = {
+      sessionId: "sess-1",
+      workId: "work-1",
+      operatorId: "op-1",
+      session: {} as DiscoveryReviewSnapshot["session"],
+      candidates: [],
+      reviewItems: [
+        {
+          reviewId: "rev-char-recover",
+          status: "accepted",
+          candidate: {
+            candidateId: "cand-char",
+            candidateType: "character",
+            workId: "work-1",
+            displayName: "Guan Yu",
+            summary: "Oath brother",
+            fields: { name: "Guan Yu", house: "Shu", description: "General" },
+          },
+        },
+      ],
+      acceptedStoryUnits: [],
+      acceptedSceneCandidates: [],
+      savedAt: "2026-07-05T00:00:00.000Z",
+    };
+    store.set(
+      "discovery_review_snapshot:work-1:op-1:sess-1",
+      JSON.stringify(snapshot)
+    );
+    const queue = syncRolloutQueueFromDiscovery("work-1", "op-1");
+    expect(queue.characterStaging).toHaveLength(1);
+    expect(queue.characterStaging?.[0]?.name).toBe("Guan Yu");
   });
 
   it("appends story staging immediately on accept path", () => {
@@ -184,6 +219,22 @@ describe("sync-discovery-staging", () => {
       "rev-story-1"
     );
     expect(queue.readingRouteStaging[0]?.parentStoryTitle).toBe("Northern arc");
+  });
+
+  it("appends character staging immediately on accept path", () => {
+    appendCharacterStagingToRolloutQueue("work-1", "op-1", {
+      workId: "work-1",
+      sourceReviewId: "rev-char-1",
+      sourceCandidateId: "cand-char-1",
+      name: "Liu Bei",
+      house: "Shu",
+      description: "Sworn brother",
+      signatureQuote: null,
+      acceptedAt: "2026-07-05T00:00:00.000Z",
+    });
+    const queue = loadRolloutQueue("work-1", "op-1");
+    expect(queue.characterStaging).toHaveLength(1);
+    expect(queue.characterStaging?.[0]?.name).toBe("Liu Bei");
   });
 
   it("reads legacy sceneStaging alias from storage", () => {
