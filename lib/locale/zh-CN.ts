@@ -360,6 +360,30 @@ export const zhCN = {
       pipelineBanner: '处理步骤',
       fullRePropose: '全部重新提炼',
       fullReProposing: '全部重新提炼中…',
+      granularityGateTitle: '故事与画面粒度未通过',
+      granularityGateDescription:
+        '当前建议无法形成可连续阅读的故事/画面结构，不能确认写入。请全部重新提炼。',
+      granularityGateBlocked:
+        '粒度校验未通过，不能确认。请全部重新提炼。',
+      granularityGateContextRequired:
+        '缺少正文上下文，不能确认故事或画面。请回到提炼会话后重试。',
+      informationEquivalenceTitle: '信息等价未通过',
+      informationEquivalenceDescription:
+        '画面说明未能保留必需要素，不能确认写入。可编辑画面说明，或全部重新提炼。',
+      informationEquivalenceBlocked:
+        '信息等价未通过，不能确认。请检查未保留的必需要素，或全部重新提炼。',
+      informationEquivalenceContextRequired:
+        '未提供作品 Canon 与故事绑定，不能确认故事或画面。信息等价无法在无权威标注时放行。',
+      informationEquivalenceUnitLine: (unitId: string, status: string, reason: string) =>
+        `${unitId}：${status}（${reason}）`,
+      informationEquivalenceFrames: (ids: string) => `相关画面：${ids}`,
+      informationEquivalencePass: '信息等价：通过',
+      authorityTitle: '必需要素权威',
+      authorityComplete: '权威：完整',
+      authorityIncomplete:
+        '权威：不完整。Canon 中的必需要素尚未按故事绑定完毕，不能确认。',
+      authorityBindIncomplete:
+        '故事绑定不完整，不能确认。请完成 Canon 到本故事的绑定后再试。',
       accept: '确认',
       acceptWithScenes: '确认（含画面）',
       acceptWithStoryAttrs: '确认故事（含画面）',

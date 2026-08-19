@@ -1,0 +1,68 @@
+{
+  "generatedAt": "2026-08-19T08:04:44.385Z",
+  "chokePoint": "prepareAcceptStoryWithChildScenes (hooks/useDiscoverySession.acceptCandidate)",
+  "passCandidate": {
+    "label": "B_KEEP",
+    "path": "Propose-shaped Candidate → Granularity → IE → prepareAcceptStoryWithChildScenes",
+    "granularity": "PASS",
+    "ie": {
+      "status": "PASS",
+      "failedUnits": []
+    },
+    "accept": {
+      "ok": true,
+      "sceneCount": 4
+    }
+  },
+  "failCandidate": {
+    "label": "B_LOSS",
+    "path": "Propose-shaped Candidate → Granularity → IE → prepareAcceptStoryWithChildScenes",
+    "granularity": "PASS",
+    "ie": {
+      "status": "FAIL",
+      "failedUnits": [
+        {
+          "unitId": "U-ATTEMPT",
+          "status": "LOST",
+          "reason": "ENTITY_OVERLAP_ONLY",
+          "supportingFrameIds": [
+            "f1",
+            "f3"
+          ]
+        },
+        {
+          "unitId": "U-PREVENT",
+          "status": "LOST",
+          "reason": "ENTITY_OVERLAP_ONLY",
+          "supportingFrameIds": [
+            "f1",
+            "f3"
+          ]
+        },
+        {
+          "unitId": "U-ATTEMPT-PREVENTED",
+          "status": "LOST",
+          "reason": "ENTITY_OVERLAP_ONLY",
+          "supportingFrameIds": [
+            "f1",
+            "f3"
+          ]
+        }
+      ]
+    },
+    "accept": {
+      "ok": false,
+      "code": "INFORMATION_EQUIVALENCE_BLOCKED",
+      "fieldErrors": [
+        "U-ATTEMPT LOST (ENTITY_OVERLAP_ONLY): expected “张飞大怒，提刀欲入帐斩杀董卓”; supportingFrames=f1, f3",
+        "U-PREVENT LOST (ENTITY_OVERLAP_ONLY): expected “刘备与关羽死死劝阻”; supportingFrames=f1, f3",
+        "U-ATTEMPT-PREVENTED LOST (ENTITY_OVERLAP_ONLY): expected “张飞欲杀董卓，但刘备和关羽阻止了他”; supportingFrames=f1, f3"
+      ]
+    }
+  },
+  "architectGate": {
+    "passCanAccept": true,
+    "lossCannotAccept": true,
+    "granularityDidNotBlockLoss": true
+  }
+}

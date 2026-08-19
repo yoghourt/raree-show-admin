@@ -71,7 +71,7 @@ describe("validateNarrativeGate — NG-01 empty input", () => {
 });
 
 describe("validateNarrativeGate — NG-02 excerpt_bundle min length", () => {
-  it("FAIL when total prose below 512", () => {
+  it("FAIL when total prose below 128", () => {
     const result = validateNarrativeGate(
       excerptBundle({
         excerpts: [{ text: "Too short.", orderIndex: 0 }],
@@ -81,7 +81,7 @@ describe("validateNarrativeGate — NG-02 excerpt_bundle min length", () => {
     expect(result.failures.some((f) => f.ruleId === "NG-02")).toBe(true);
   });
 
-  it("PASS when total prose meets 512", () => {
+  it("PASS when total prose meets 128", () => {
     const result = validateNarrativeGate(excerptBundle());
     expect(result.pass).toBe(true);
     expect(result.totalProse).toBeGreaterThanOrEqual(EXCERPT_BUNDLE_MIN_PROSE);

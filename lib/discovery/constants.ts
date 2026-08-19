@@ -2,7 +2,7 @@
  * SPEC-D3-001 §4.5 — resolved thresholds and gate rule identifiers
  */
 
-export const EXCERPT_BUNDLE_MIN_PROSE = 512;
+export const EXCERPT_BUNDLE_MIN_PROSE = 128;
 export const APPROVED_SUMMARY_MIN_PROSE = 768;
 
 export const NARRATIVE_GATE_RULE_IDS = [

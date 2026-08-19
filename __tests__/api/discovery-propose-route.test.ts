@@ -137,6 +137,9 @@ describe("POST /api/admin/discovery/propose", () => {
       (c: { candidateType: string }) => c.candidateType === "scene"
     );
     expect(scene.fields.parentStoryCandidateId).toBe(story.candidateId);
+    expect(body.granularityGate).toBeDefined();
+    expect(["PASS", "FAIL"]).toContain(body.granularityGate.status);
+    expect(Array.isArray(body.granularityGate.violations)).toBe(true);
   });
 
   it("does not call insert/update on Supabase (DISC-INV-01)", async () => {

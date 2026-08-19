@@ -9,7 +9,7 @@ import type { NarrativeInputBundle } from "@/lib/discovery/types";
 export const EVAL_WORK_ID = "discovery-provider-eval-work";
 export const EVAL_WORK_TITLE = "A Song of Ice and Fire — Prologue (eval fixture)";
 
-/** Chinese AGoT-prologue-style excerpt (≥512). Ground truth known for rubric. */
+/** Chinese AGoT-prologue-style excerpt (meets NG-02 min prose). Ground truth known for rubric. */
 export function buildZhPrologueNarrative(
   minLen = EXCERPT_BUNDLE_MIN_PROSE
 ): NarrativeInputBundle {

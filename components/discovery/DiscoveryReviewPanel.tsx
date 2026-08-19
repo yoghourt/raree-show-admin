@@ -344,6 +344,7 @@ function ReviewItemCard({
   busy,
   actionable,
   showAccept = true,
+  acceptDisabled = false,
   acceptLabel,
   existingBadge,
   onAccept,
@@ -355,6 +356,7 @@ function ReviewItemCard({
   busy: boolean;
   actionable: boolean;
   showAccept?: boolean;
+  acceptDisabled?: boolean;
   acceptLabel?: string;
   /** When set, show catalog match status (e.g. 已存在). */
   existingBadge?: string | null;
@@ -439,7 +441,7 @@ function ReviewItemCard({
               <Button
                 type="button"
                 size="sm"
-                disabled={busy}
+                disabled={busy || acceptDisabled}
                 onClick={onAccept}
               >
                 {acceptLabel ?? discoveryReviewUi.accept}
@@ -499,6 +501,8 @@ export function DiscoveryReviewPanel({
     regenReviewId,
     regenError,
     acceptError,
+    granularityGate,
+    informationEquivalence,
     discardCandidate,
     revokeStagingAccept,
     saveCandidateEdit,
@@ -912,7 +916,7 @@ export function DiscoveryReviewPanel({
               className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
               role="alert"
             >
-              {acceptError.code}: {acceptError.message}
+              {discoveryApiErrorText(acceptError)}
               {acceptError.fieldErrors?.length ? (
                 <ul className="mt-2 list-disc pl-5">
                   {acceptError.fieldErrors.map((err) => (
@@ -920,6 +924,155 @@ export function DiscoveryReviewPanel({
                   ))}
                 </ul>
               ) : null}
+            </div>
+          ) : null}
+
+          {granularityGate?.status === "FAIL" ? (
+            <div
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
+              <p className="font-medium">{discoveryReviewUi.granularityGateTitle}</p>
+              <p className="mt-1">{discoveryReviewUi.granularityGateDescription}</p>
+              <ul className="mt-2 list-disc pl-5">
+                {granularityGate.violations
+                  .filter((v) => v.severity === "error")
+                  .map((v, i) => (
+                    <li key={`${v.invariant}-${i}`}>
+                      {v.invariant}: {v.evidence[0]}
+                    </li>
+                  ))}
+              </ul>
+              <Button
+                type="button"
+                size="sm"
+                className="mt-3"
+                disabled={
+                  isProposing ||
+                  isRegening ||
+                  retryingType !== null ||
+                  session.state !== "review_pending"
+                }
+                onClick={() => {
+                  if (hasPendingReviewItems(activeReviewItems)) {
+                    setReProposeOpen(true);
+                    return;
+                  }
+                  void startFullRePropose();
+                }}
+              >
+                {isProposing
+                  ? discoveryReviewUi.fullReProposing
+                  : discoveryReviewUi.fullRePropose}
+              </Button>
+            </div>
+          ) : null}
+
+          {informationEquivalence?.status === "CONTEXT_REQUIRED" ? (
+            <div
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
+              <p className="font-medium">
+                {discoveryReviewUi.authorityTitle}
+              </p>
+              <p className="mt-1">
+                {discoveryReviewUi.informationEquivalenceContextRequired}
+              </p>
+            </div>
+          ) : null}
+
+          {informationEquivalence?.status === "NOT_RUN" ? (
+            <div
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
+              <p className="font-medium">
+                {discoveryReviewUi.authorityTitle}
+              </p>
+              <p className="mt-1">{discoveryReviewUi.authorityIncomplete}</p>
+              {informationEquivalence.authority.errors.length > 0 ? (
+                <ul className="mt-2 list-disc pl-5">
+                  {informationEquivalence.authority.errors.map((err) => (
+                    <li key={err}>{err}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          {informationEquivalence?.status === "PASS" ? (
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+              <p>
+                {discoveryReviewUi.authorityComplete}
+                {" · "}
+                {discoveryReviewUi.informationEquivalencePass}
+              </p>
+            </div>
+          ) : null}
+
+          {informationEquivalence?.status === "FAIL" ? (
+            <div
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
+              <p className="font-medium">
+                {discoveryReviewUi.authorityComplete}
+                {" · "}
+                {discoveryReviewUi.informationEquivalenceTitle}
+              </p>
+              <p className="mt-1">
+                {discoveryReviewUi.informationEquivalenceDescription}
+              </p>
+              <ul className="mt-2 list-disc pl-5">
+                {Object.entries(informationEquivalence.byStoryCandidateId).flatMap(
+                  ([storyId, result]) =>
+                    result.units
+                      .filter(
+                        (unit) =>
+                          unit.status === "LOST" || unit.status === "PARTIAL"
+                      )
+                      .map((unit) => (
+                        <li key={`${storyId}-${unit.unitId}`}>
+                          {discoveryReviewUi.informationEquivalenceUnitLine(
+                            unit.unitId,
+                            unit.status,
+                            unit.reason
+                          )}
+                          {": "}
+                          {unit.expected}
+                          {"; "}
+                          {discoveryReviewUi.informationEquivalenceFrames(
+                            unit.supportingFrameIds.length > 0
+                              ? unit.supportingFrameIds.join(", ")
+                              : "—"
+                          )}
+                        </li>
+                      ))
+                )}
+              </ul>
+              <Button
+                type="button"
+                size="sm"
+                className="mt-3"
+                disabled={
+                  isProposing ||
+                  isRegening ||
+                  retryingType !== null ||
+                  session.state !== "review_pending"
+                }
+                onClick={() => {
+                  if (hasPendingReviewItems(activeReviewItems)) {
+                    setReProposeOpen(true);
+                    return;
+                  }
+                  void startFullRePropose();
+                }}
+              >
+                {isProposing
+                  ? discoveryReviewUi.fullReProposing
+                  : discoveryReviewUi.fullRePropose}
+              </Button>
             </div>
           ) : null}
 
@@ -1112,6 +1265,15 @@ export function DiscoveryReviewPanel({
                               item={story}
                               busy={busy}
                               actionable={actionable}
+                              acceptDisabled={
+                                granularityGate?.status === "FAIL" ||
+                                informationEquivalence?.status ===
+                                  "CONTEXT_REQUIRED" ||
+                                informationEquivalence?.status === "NOT_RUN" ||
+                                informationEquivalence?.byStoryCandidateId[
+                                  story.candidate.candidateId
+                                ]?.status === "FAIL"
+                              }
                               acceptLabel={discoveryReviewUi.acceptWithStoryAttrs}
                               onAccept={() => handleAccept(story)}
                               onEdit={() => openEdit(story)}

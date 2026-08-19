@@ -26,6 +26,24 @@ import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
 import { buildEntityCreateHandoffPath } from "@/lib/discovery/accept-prefill";
 import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
 import { parseRendererExpression } from "@/lib/discovery/visual-contract";
+import {
+  framesForStoryCandidate,
+  informationEquivalenceAcceptBlock,
+  runInformationEquivalenceForAccept,
+} from "@/lib/discovery/information-equivalence";
+import {
+  inspectAuthority,
+  resolveStoryClaimedUnits,
+  type RequiredUnitAuthorityContext,
+} from "@/lib/discovery/required-unit-authority";
+import {
+  candidatesToGranularityInput,
+  granularityContextRequired,
+  granularityAcceptBlock,
+  granularityBlocksCandidateType,
+  runGranularityGate,
+  type GranularityAcceptContext,
+} from "@/lib/discovery/granularity-gate";
 
 export function createReviewId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -420,10 +438,136 @@ export function findAcceptedParentStory(
   return acceptedStories.find((s) => s.sourceReviewId === parentItem.reviewId);
 }
 
+export function evaluateGranularityForReviewItems(
+  narrative: GranularityAcceptContext["narrative"],
+  items: DiscoveryReviewItem[],
+  labels?: GranularityAcceptContext["labels"]
+) {
+  return runGranularityGate(
+    candidatesToGranularityInput(
+      narrative,
+      getActiveReviewItems(items).map(getEffectiveCandidate),
+      labels
+    )
+  );
+}
+
+function activeStoryCandidateIds(items: DiscoveryReviewItem[]): string[] {
+  return getActiveReviewItems(items)
+    .filter((item) => item.candidate.candidateType === "story")
+    .map((item) => item.candidate.candidateId);
+}
+
+export function evaluateInformationEquivalenceForStory(
+  items: DiscoveryReviewItem[],
+  storyCandidateId: string,
+  claimedRequiredUnits: Parameters<
+    typeof runInformationEquivalenceForAccept
+  >[1]
+) {
+  return runInformationEquivalenceForAccept(
+    framesForStoryCandidate(
+      storyCandidateId,
+      getActiveReviewItems(items).map(getEffectiveCandidate)
+    ),
+    claimedRequiredUnits
+  );
+}
+
+export type InformationEquivalenceReviewView = {
+  authority: ReturnType<typeof inspectAuthority>;
+  status: "PASS" | "FAIL" | "CONTEXT_REQUIRED" | "NOT_RUN";
+  byStoryCandidateId: Record<
+    string,
+    ReturnType<typeof evaluateInformationEquivalenceForStory>
+  >;
+};
+
+export function evaluateInformationEquivalenceReviewView(
+  items: DiscoveryReviewItem[],
+  authority: RequiredUnitAuthorityContext | undefined
+): InformationEquivalenceReviewView {
+  const batchStoryIds = activeStoryCandidateIds(items);
+  const inspection = inspectAuthority(authority, batchStoryIds);
+  if (inspection.status !== "COMPLETE") {
+    return {
+      authority: inspection,
+      status:
+        inspection.status === "CONTEXT_REQUIRED"
+          ? "CONTEXT_REQUIRED"
+          : "NOT_RUN",
+      byStoryCandidateId: {},
+    };
+  }
+
+  const byStoryCandidateId: InformationEquivalenceReviewView["byStoryCandidateId"] =
+    {};
+  let fail = false;
+  for (const storyId of batchStoryIds) {
+    const resolved = resolveStoryClaimedUnits(authority, storyId, batchStoryIds);
+    if (!resolved.ok) {
+      return {
+        authority: inspection,
+        status: "NOT_RUN",
+        byStoryCandidateId: {},
+      };
+    }
+    const result = evaluateInformationEquivalenceForStory(
+      items,
+      storyId,
+      resolved.claimedRequiredUnits
+    );
+    byStoryCandidateId[storyId] = result;
+    if (result.status === "FAIL") fail = true;
+  }
+  return {
+    authority: inspection,
+    status: fail ? "FAIL" : "PASS",
+    byStoryCandidateId,
+  };
+}
+
+function informationEquivalenceBlockForItem(
+  items: DiscoveryReviewItem[],
+  item: DiscoveryReviewItem,
+  authority: RequiredUnitAuthorityContext | undefined
+): AcceptReviewError | null {
+  if (!granularityBlocksCandidateType(item.candidate.candidateType)) {
+    return null;
+  }
+  const storyCandidateId =
+    item.candidate.candidateType === "story"
+      ? item.candidate.candidateId
+      : (getEffectiveFields(item) as SceneCandidateFields)
+          .parentStoryCandidateId;
+  const resolved = resolveStoryClaimedUnits(
+    authority,
+    storyCandidateId,
+    activeStoryCandidateIds(items)
+  );
+  if (!resolved.ok) {
+    return resolved;
+  }
+  const result = evaluateInformationEquivalenceForStory(
+    items,
+    storyCandidateId,
+    resolved.claimedRequiredUnits
+  );
+  return informationEquivalenceAcceptBlock(result);
+}
+
+/**
+ * Prepare a Review item for Accept.
+ * Story/Scene MUST pass Granularity Gate then Information Equivalence.
+ * Omitting narrative or Canon/Story Bind blocks Story/Frame Accept.
+ * Character/Location skip both validators.
+ */
 export function prepareAcceptReview(
   items: DiscoveryReviewItem[],
   reviewId: string,
-  acceptedStories: AcceptedStoryUnitStaging[] = []
+  acceptedStories: AcceptedStoryUnitStaging[] = [],
+  granularity?: GranularityAcceptContext,
+  authority?: RequiredUnitAuthorityContext
 ): AcceptReviewResult | AcceptReviewError {
   const item = findReviewItem(items, reviewId);
   if (!item) {
@@ -435,6 +579,26 @@ export function prepareAcceptReview(
       code: "REVIEW_ITEM_NOT_ACTIONABLE",
       message: "Review item cannot be accepted in its current state",
     };
+  }
+
+  if (granularityBlocksCandidateType(item.candidate.candidateType)) {
+    if (!granularity) {
+      return granularityContextRequired();
+    }
+    const blocked = granularityAcceptBlock(
+      evaluateGranularityForReviewItems(
+        granularity.narrative,
+        items,
+        granularity.labels
+      )
+    );
+    if (blocked) return blocked;
+    const ieBlocked = informationEquivalenceBlockForItem(
+      items,
+      item,
+      authority
+    );
+    if (ieBlocked) return ieBlocked;
   }
 
   const fields = getEffectiveFields(item);
@@ -616,6 +780,10 @@ export function buildStoryRelatedEntityRefs(
  * Character/Location Archive candidates remain Work-scoped (separate Accept).
  * Appearance/location context ownership is Scene Context (Projection / SCC-S1).
  *
+ * Story cascade Accept requires `granularity` then Information Equivalence
+ * (same sequence as prepareAcceptReview). Omitting either blocks Story/Frame
+ * Accept — there is no ungated compatibility path.
+ *
  * `catalogs` retained for API compatibility; unused for Route membership.
  */
 export function prepareAcceptStoryWithChildScenes(
@@ -625,7 +793,9 @@ export function prepareAcceptStoryWithChildScenes(
   _catalogs: {
     characters: Array<{ name: string; tsid: string }>;
     locations: Array<{ name: string; tsid: string }>;
-  } = { characters: [], locations: [] }
+  } = { characters: [], locations: [] },
+  granularity?: GranularityAcceptContext,
+  authority?: RequiredUnitAuthorityContext
 ):
   | {
       ok: true;
@@ -638,7 +808,9 @@ export function prepareAcceptStoryWithChildScenes(
   const storyResult = prepareAcceptReview(
     items,
     storyReviewId,
-    acceptedStories
+    acceptedStories,
+    granularity,
+    authority
   );
   if (!storyResult.ok) {
     return storyResult;
@@ -675,7 +847,9 @@ export function prepareAcceptStoryWithChildScenes(
     const childResult = prepareAcceptReview(
       workingItems,
       childId,
-      storiesForChildren
+      storiesForChildren,
+      granularity,
+      authority
     );
     if (!childResult.ok) {
       sceneErrors.push(childResult);

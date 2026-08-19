@@ -34,7 +34,7 @@ function loadEnvLocal(): void {
   }
 }
 
-/** Chinese AGoT-prologue-style excerpt (≥512) — matches live Discovery failure context. */
+/** Chinese AGoT-prologue-style excerpt (meets NG-02 min prose) — matches live Discovery failure context. */
 function chinesePrologueFixture(minLen: number): string {
   const unit = [
     "三名守夜人——经验丰富的年轻老兵威尔、谨慎的老兵盖雷德，以及年轻骑士威玛·罗伊斯——",
