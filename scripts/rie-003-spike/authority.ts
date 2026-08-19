@@ -98,7 +98,7 @@ export function assessAuthority(
   resolution: StoryClaimResolution,
   opts: {
     sourceRequiresCompound: boolean;
-    ieStatus: "PASS" | "FAIL";
+    ieStatus: "PASS" | "FAIL" | "CONTEXT_REQUIRED";
     storyOwnsOnlySubset: boolean;
   }
 ): CompletenessFinding {

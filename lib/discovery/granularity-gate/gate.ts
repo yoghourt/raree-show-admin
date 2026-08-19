@@ -13,6 +13,7 @@ import { coverageRatio } from "./text";
 import type {
   GranularityGateResult,
   GranularityInput,
+  GranularityInvariant,
   GranularityViolation,
 } from "./types";
 
@@ -172,7 +173,9 @@ export function runGranularityGate(input: GranularityInput): GranularityGateResu
   return { status, violations, analysis };
 }
 
-export function invariantSet(result: GranularityGateResult): Set<string> {
+export function invariantSet(
+  result: GranularityGateResult
+): Set<GranularityInvariant> {
   return new Set(
     result.violations.filter((v) => v.severity === "error").map((v) => v.invariant)
   );
