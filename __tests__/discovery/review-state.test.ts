@@ -8,6 +8,8 @@ import { describe, it, expect } from "vitest";
 
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import type { DiscoveryCandidate } from "@/lib/discovery/propose-types";
+import type { NarrativeInputBundle } from "@/lib/discovery/types";
+import { authorityForSingleStory, workCanonFromRequiredClaims } from "@/lib/discovery/required-unit-authority";
 import {
   createReviewItems,
   discardReviewItem,
@@ -42,6 +44,65 @@ function makeCandidate(
     },
     ...overrides,
   };
+}
+
+/** Authoritative narrative for Story/Frame Accept tests (Gate required). */
+const REVIEW_NARRATIVE: NarrativeInputBundle = {
+  excerpts: [
+    {
+      text: "A raven lands in the yard. Maester Luwin reads a one-line death notice: Jon Arryn is dead.",
+      orderIndex: 0,
+    },
+  ],
+  operatorSummary: null,
+  inputMode: "excerpt_bundle",
+};
+
+const GRANULARITY = { narrative: REVIEW_NARRATIVE };
+
+const TEST_CLAIM = {
+  unitId: "U-TEST",
+  kind: "event" as const,
+  expected: "caption present",
+  relationEvidence: [
+    [
+      "Arrival",
+      "Courtyard",
+      "Kept Courtyard",
+      "Bastard of Winterfell",
+      "Summary",
+      "Scene A",
+      "Scene B",
+    ],
+  ],
+};
+
+function storyAuthority(storyCandidateId: string) {
+  return authorityForSingleStory(storyCandidateId, [TEST_CLAIM]);
+}
+
+function courtyardScene(
+  parentStoryCandidateId: string,
+  overrides: Partial<DiscoveryCandidate> = {}
+): DiscoveryCandidate {
+  return makeCandidate({
+    candidateId: "scene-cand-1",
+    candidateType: "scene",
+    displayName: "Courtyard",
+    fields: {
+      parentStoryCandidateId,
+      chapter_number: 1,
+      title: "Courtyard",
+      summary: "Arrival",
+      rendererExpression: {
+        environment: "winter courtyard",
+        characters: [],
+        action: "household stands facing gate",
+        composition: "wide courtyard view",
+      },
+    },
+    ...overrides,
+  });
 }
 
 describe("review item lifecycle", () => {
@@ -168,8 +229,9 @@ describe("Accept handoff guards", () => {
           summary: "Robb's campaign ends at the Twins",
         },
       }),
+      courtyardScene("story-cand-1"),
     ]);
-    const result = prepareAcceptReview(items, items[0]!.reviewId);
+    const result = prepareAcceptReview(items, items[0]!.reviewId, [], GRANULARITY, storyAuthority("story-cand-1"));
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.kind).toBe("story_staging");
@@ -203,7 +265,7 @@ describe("Accept handoff guards", () => {
       },
     });
     const items = createReviewItems([story, scene]);
-    const result = prepareAcceptReview(items, items[1]!.reviewId, []);
+    const result = prepareAcceptReview(items, items[1]!.reviewId, [], GRANULARITY, storyAuthority("story-cand-1"));
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("PARENT_STORY_NOT_ACCEPTED");
@@ -235,7 +297,7 @@ describe("Accept handoff guards", () => {
       },
     });
     const items = createReviewItems([story, scene]);
-    const storyAccept = prepareAcceptReview(items, items[0]!.reviewId);
+    const storyAccept = prepareAcceptReview(items, items[0]!.reviewId, [], GRANULARITY, storyAuthority("story-cand-1"));
     expect(storyAccept.ok).toBe(true);
     if (!storyAccept.ok || storyAccept.kind !== "story_staging") {
       throw new Error("expected story staging");
@@ -244,7 +306,9 @@ describe("Accept handoff guards", () => {
     const sceneAccept = prepareAcceptReview(
       acceptedItems,
       items[1]!.reviewId,
-      [storyAccept.staging]
+      [storyAccept.staging],
+      GRANULARITY,
+      storyAuthority("story-cand-1")
     );
     expect(sceneAccept.ok).toBe(true);
     if (sceneAccept.ok && sceneAccept.kind === "scene_staging") {
@@ -311,7 +375,9 @@ describe("Accept handoff guards", () => {
       {
         characters: [{ name: "Arya", tsid: "char_arya" }],
         locations: [],
-      }
+      },
+      GRANULARITY,
+      storyAuthority("story-cand-1")
     );
     expect(cascade.ok).toBe(true);
     if (!cascade.ok) throw new Error("expected cascade ok");
@@ -412,6 +478,17 @@ describe("Accept handoff guards", () => {
       {
         characters: [{ name: "Arya", tsid: "char_arya" }],
         locations: [{ name: "Winterfell", tsid: "loc_winterfell" }],
+      },
+      GRANULARITY,
+      {
+        workCanon: workCanonFromRequiredClaims([
+          { ...TEST_CLAIM, unitId: "U-TEST-A" },
+          { ...TEST_CLAIM, unitId: "U-TEST-B" },
+        ]),
+        storyBinds: [
+          { storyCandidateId: "story-a", unitIds: ["U-TEST-A"] },
+          { storyCandidateId: "story-b", unitIds: ["U-TEST-B"] },
+        ],
       }
     );
     expect(cascadeA.ok).toBe(true);
@@ -438,13 +515,29 @@ describe("Accept handoff guards", () => {
       displayName: "Arc",
       fields: { title: "The Arc", summary: "Summary" },
     });
-    const scene = makeCandidate({
+    const sceneKeep = makeCandidate({
+      candidateId: "scene-keep",
+      candidateType: "scene",
+      displayName: "Kept Courtyard",
+      fields: {
+        parentStoryCandidateId: "story-cand-1",
+        chapter_number: 1,
+        title: "Kept Courtyard",
+        rendererExpression: {
+          environment: "winter courtyard",
+          characters: [],
+          action: "household stands facing gate",
+          composition: "wide courtyard view",
+        },
+      },
+    });
+    const sceneDiscard = makeCandidate({
       candidateId: "scene-cand-1",
       candidateType: "scene",
       displayName: "Courtyard",
       fields: {
         parentStoryCandidateId: "story-cand-1",
-        chapter_number: 1,
+        chapter_number: 2,
         title: "Courtyard",
         rendererExpression: {
           environment: "winter courtyard",
@@ -454,13 +547,24 @@ describe("Accept handoff guards", () => {
         },
       },
     });
-    let items = createReviewItems([story, scene]);
-    items = discardReviewItem(items, items[1]!.reviewId);
-    const cascade = prepareAcceptStoryWithChildScenes(items, items[0]!.reviewId);
+    let items = createReviewItems([story, sceneKeep, sceneDiscard]);
+    items = discardReviewItem(items, items[2]!.reviewId);
+    const cascade = prepareAcceptStoryWithChildScenes(
+      items,
+      items[0]!.reviewId,
+      [],
+      { characters: [], locations: [] },
+      GRANULARITY,
+      storyAuthority("story-cand-1")
+    );
     expect(cascade.ok).toBe(true);
     if (!cascade.ok) throw new Error("expected cascade ok");
-    expect(cascade.sceneStagings).toHaveLength(0);
-    expect(cascade.acceptedReviewIds).toEqual([items[0]!.reviewId]);
+    expect(cascade.sceneStagings).toHaveLength(1);
+    expect(cascade.sceneStagings[0]!.title).toBe("Kept Courtyard");
+    expect(cascade.acceptedReviewIds).toEqual([
+      items[0]!.reviewId,
+      items[1]!.reviewId,
+    ]);
   });
 
   it("requires parentStoryCandidateId on scene fields", () => {

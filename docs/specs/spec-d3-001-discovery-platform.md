@@ -169,7 +169,7 @@ Let `totalProse` = sum of trimmed `excerpt.text` lengths plus trimmed `operatorS
 | Rule ID | Condition | Result |
 | ------- | --------- | ------ |
 | NG-01 | No excerpts and no `operatorSummary` | FAIL |
-| NG-02 | `inputMode: excerpt_bundle` and `totalProse` < **512** | FAIL |
+| NG-02 | `inputMode: excerpt_bundle` and `totalProse` < **128** | FAIL |
 | NG-03 | `inputMode: approved_summary` without `summaryAttested === true` | FAIL |
 | NG-04 | `inputMode: approved_summary` and `totalProse` < **768** | FAIL |
 | NG-05 | Any single excerpt matches keyword-list heuristic (§4.3.1) | FAIL |
@@ -198,7 +198,7 @@ Normative requirements (not pixel spec):
 
 | Label | Example | Verdict |
 | ----- | ------- | ------- |
-| **Good** | Three excerpts from different chapters describing the Red Wedding (Catelyn POV arrival, betrayal beat, aftermath), reordered for Story reading order; total prose ≥ 512 chars | PASS |
+| **Good** | Three excerpts from different chapters describing the Red Wedding (Catelyn POV arrival, betrayal beat, aftermath), reordered for Story reading order; total prose ≥ 128 chars | PASS |
 | **Bad** | Single line `"Red Wedding, Robb, Walder Frey, Catelyn"` | FAIL (NG-05) |
 | **Bad** | Exported Scene table titles/chapter numbers only, no prose excerpts | FAIL (NG-06) |
 | **Bad** | Chapter Catalog spine (chapter_number + title list) pasted without narrative prose | FAIL (NG-06) |
@@ -208,7 +208,7 @@ Normative requirements (not pixel spec):
 
 | ID | Resolution |
 | -- | ---------- |
-| OQ-D3-001-01 | **N = 512** chars total prose for `excerpt_bundle`; **768** for `approved_summary` only |
+| OQ-D3-001-01 | **N = 128** chars total prose for `excerpt_bundle`; **768** for `approved_summary` only |
 | OQ-D3-001-02 | v1 **ephemeral client** session + optional `sessionId` for correlation; no server session store required |
 | OQ-D3-001-03 | `approved_summary` without excerpts **allowed** when attested and meets 768-char minimum |
 | OQ-D3-001-04 | v1 **one active session** per `(workId, operatorId)` |
@@ -287,7 +287,7 @@ Partial gate failures MUST NOT transition state to `narrative_locked`.
 - [x] D3-AC-05: State machine covers draft → locked → propose handoff → review_pending
 - [x] D3-AC-06: DISC-INV-01/04/07 reflected in platform contracts
 - [x] D3-AC-07: §2 Out of Scope excludes D3-002 Review and D3-003 Proposals without overlap
-- [x] D3-AC-08: Min length N resolved (512 / 768) in §4.5
+- [x] D3-AC-08: Min length N resolved (128 / 768) in §4.5
 
 ### 8.2 Implementation criteria (verified — Implemented)
 

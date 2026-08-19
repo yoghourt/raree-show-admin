@@ -66,5 +66,20 @@ export function discoveryApiErrorText(error: {
   if (error.code === "NARRATIVE_NOT_LOCKED") {
     return discoveryComposerUi.narrativeLockLost;
   }
+  if (error.code === "GRANULARITY_GATE_BLOCKED") {
+    return discoveryReviewUi.granularityGateBlocked;
+  }
+  if (error.code === "GRANULARITY_GATE_CONTEXT_REQUIRED") {
+    return discoveryReviewUi.granularityGateContextRequired;
+  }
+  if (error.code === "INFORMATION_EQUIVALENCE_BLOCKED") {
+    return discoveryReviewUi.informationEquivalenceBlocked;
+  }
+  if (error.code === "INFORMATION_EQUIVALENCE_CONTEXT_REQUIRED") {
+    return discoveryReviewUi.informationEquivalenceContextRequired;
+  }
+  if (error.code === "AUTHORITY_BIND_INCOMPLETE") {
+    return discoveryReviewUi.authorityBindIncomplete;
+  }
   return `${error.code}: ${error.message}`;
 }

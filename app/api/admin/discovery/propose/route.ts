@@ -14,6 +14,10 @@ import {
   requireDiscoveryAuth,
 } from "@/lib/discovery/discovery-route-helpers";
 import { proposeDiscoveryBodySchema } from "@/lib/discovery/propose-schemas";
+import {
+  candidatesToGranularityInput,
+  runGranularityGate,
+} from "@/lib/discovery/granularity-gate";
 import { proposeCandidateTypes } from "@/lib/discovery/propose-service";
 import { verifyProposeLock } from "@/lib/discovery/propose-verify";
 
@@ -101,10 +105,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const granularityGate = runGranularityGate(
+    candidatesToGranularityInput(narrative, candidates)
+  );
+
   return NextResponse.json({
     sessionId,
     state: "review_pending" as const,
     candidates,
+    granularityGate,
     ...(errors.length > 0 ? { errors } : {}),
   });
 }

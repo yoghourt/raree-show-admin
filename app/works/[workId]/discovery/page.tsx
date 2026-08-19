@@ -98,6 +98,8 @@ export default function WorkDiscoveryPage() {
   const discovery = useDiscoverySession({
     workId,
     operatorId: operatorId ?? "",
+    // BLOCKER: no production Work Canon / Story Bind source exists.
+    // Spike catalogs must not be loaded as a substitute.
   });
 
   const rollout = useRollout({

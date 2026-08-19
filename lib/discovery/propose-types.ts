@@ -5,6 +5,7 @@
  * Candidate type "scene" is Editorial Scene (not Runtime Reading Route).
  */
 
+import type { GranularityGateResult } from "@/lib/discovery/granularity-gate/types";
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
 import type { CharacterArchive } from "@/lib/discovery/character-archive";
 import type {
@@ -118,6 +119,8 @@ export interface ProposeDiscoveryResponse {
   state: "review_pending";
   candidates: DiscoveryCandidate[];
   errors?: ProposeTypeError[];
+  /** Validator only. FAIL does not drop candidates; Accept is blocked in Review. */
+  granularityGate?: GranularityGateResult;
 }
 
 export interface RegenDiscoveryRequest {

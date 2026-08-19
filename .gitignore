@@ -62,6 +62,18 @@ next-env.d.ts
 # Discovery Visual Intent spike outputs
 /scripts/discovery-visual-intent-spike/results/
 
+# Granularity Gate spike evidence (SPIKE-GRANULARITY-GATE-001)
+/scripts/granularity-gate-spike/results/
+
+# Reader information equivalence spike evidence (SPIKE-RIE-001)
+/scripts/rie-spike/results/
+
+# Information Equivalence boundary spike (SPIKE-RIE-002)
+/scripts/rie-002-spike/results/
+
+# Required unit authority spike (SPIKE-RIE-003)
+/scripts/rie-003-spike/results/
+
 # Renderer boundary spike outputs
 /scripts/renderer-boundary-spike/results/
 

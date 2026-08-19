@@ -55,8 +55,15 @@ import type {
   DiscoveryReviewItem,
 } from "@/lib/discovery/review-types";
 import {
+  granularityContextRequired,
+  type GranularityGateResult,
+} from "@/lib/discovery/granularity-gate";
+import type { RequiredUnitAuthorityContext } from "@/lib/discovery/required-unit-authority";
+import {
   createReviewItems,
   discardReviewItem,
+  evaluateGranularityForReviewItems,
+  evaluateInformationEquivalenceReviewView,
   findReviewDuplicateCandidate,
   findReviewItem,
   getActiveReviewItems,
@@ -76,6 +83,7 @@ import {
   getChildSceneReviewIdsForStory,
   findAcceptedParentStory,
   characterStagingFromAcceptedReviewItems,
+  type InformationEquivalenceReviewView,
   type ReviewEditPayload,
 } from "@/lib/discovery/review-state";
 import { storeDiscoveryAcceptPrefill } from "@/lib/discovery/accept-prefill";
@@ -101,6 +109,13 @@ import {
 export interface UseDiscoverySessionConfig {
   workId: string;
   operatorId: string;
+  /**
+   * Caller-supplied Work Canon + per-Story Bind (SPIKE-RIE-003 D).
+   * Not selected by Work id. Not Propose claims.
+   * Omitting this blocks Story/Frame Accept (CONTEXT_REQUIRED).
+   * Incomplete bind blocks with AUTHORITY_BIND_INCOMPLETE.
+   */
+  requiredUnitAuthority?: RequiredUnitAuthorityContext;
 }
 
 export interface LockNarrativeError {
@@ -150,6 +165,8 @@ export interface UseDiscoverySessionReturn {
   retryingType: DiscoveryCandidateType | null;
   retryTypeError: RegenError | null;
   acceptError: AcceptReviewError | null;
+  granularityGate: GranularityGateResult | null;
+  informationEquivalence: InformationEquivalenceReviewView | null;
   minProseRequired: number;
   updateNarrative: (narrative: NarrativeInputBundle) => void;
   setInputMode: (mode: NarrativeInputBundle["inputMode"]) => void;
@@ -210,7 +227,7 @@ function createSessionId(): string {
 export function useDiscoverySession(
   config: UseDiscoverySessionConfig
 ): UseDiscoverySessionReturn {
-  const { workId, operatorId } = config;
+  const { workId, operatorId, requiredUnitAuthority } = config;
 
   const sessionIdRef = useRef(createSessionId());
   const [session, setSession] = useState<DiscoverySession>(() =>
@@ -1118,8 +1135,20 @@ export function useDiscoverySession(
       reviewId: string
     ): Promise<AcceptReviewResult | AcceptReviewError> => {
       const target = findReviewItem(reviewItems, reviewId);
+      const isStoryOrScene =
+        target?.candidate.candidateType === "story" ||
+        target?.candidate.candidateType === "scene";
 
-      // Story confirm cascades to child Scenes only (L2-A: no batch entity attach).
+      if (isStoryOrScene && !session.narrative) {
+        const blocked = granularityContextRequired();
+        setAcceptError(blocked);
+        return blocked;
+      }
+
+      // Production Story/Frame Accept always carries session.narrative into the Gate.
+      const granularity = { narrative: session.narrative };
+      const authority = requiredUnitAuthority;
+
       if (target?.candidate.candidateType === "story") {
         let catalogs = { characters: [] as Array<{ name: string; tsid: string }>, locations: [] as Array<{ name: string; tsid: string }> };
         try {
@@ -1136,7 +1165,9 @@ export function useDiscoverySession(
           reviewItems,
           reviewId,
           acceptedStoryUnits,
-          catalogs
+          catalogs,
+          granularity,
+          authority
         );
         if (!cascade.ok) {
           setAcceptError(cascade);
@@ -1189,7 +1220,9 @@ export function useDiscoverySession(
       const result = prepareAcceptReview(
         reviewItems,
         reviewId,
-        acceptedStoryUnits
+        acceptedStoryUnits,
+        granularity,
+        authority
       );
       if (!result.ok) {
         setAcceptError(result);
@@ -1215,13 +1248,37 @@ export function useDiscoverySession(
 
       return result;
     },
-    [reviewItems, acceptedStoryUnits, workId, operatorId]
+    [reviewItems, acceptedStoryUnits, workId, operatorId, session.narrative, requiredUnitAuthority]
   );
 
   const activeReviewItems = useMemo(
     () => getActiveReviewItems(reviewItems),
     [reviewItems]
   );
+
+  const granularityGate = useMemo((): GranularityGateResult | null => {
+    const hasStoryOrScene = activeReviewItems.some(
+      (item) =>
+        item.candidate.candidateType === "story" ||
+        item.candidate.candidateType === "scene"
+    );
+    if (!hasStoryOrScene) return null;
+    return evaluateGranularityForReviewItems(session.narrative, reviewItems);
+  }, [activeReviewItems, reviewItems, session.narrative]);
+
+  const informationEquivalence = useMemo((): InformationEquivalenceReviewView | null => {
+    const hasStoryOrScene = activeReviewItems.some(
+      (item) =>
+        item.candidate.candidateType === "story" ||
+        item.candidate.candidateType === "scene"
+    );
+    if (!hasStoryOrScene) return null;
+    if (granularityGate?.status === "FAIL") return null;
+    return evaluateInformationEquivalenceReviewView(
+      reviewItems,
+      requiredUnitAuthority
+    );
+  }, [activeReviewItems, reviewItems, requiredUnitAuthority, granularityGate]);
 
   return {
     workId,
@@ -1249,6 +1306,8 @@ export function useDiscoverySession(
     retryingType,
     retryTypeError,
     acceptError,
+    granularityGate,
+    informationEquivalence,
     minProseRequired,
     updateNarrative,
     setInputMode,
