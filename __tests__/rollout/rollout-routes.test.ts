@@ -129,15 +129,22 @@ describe("POST /api/admin/rollout/story-units (persist Reading Route)", () => {
       }
       if (table === "scenes") {
         const emptyMaybe = vi.fn().mockResolvedValue({ data: null, error: null });
-        const eqSecond = vi.fn().mockReturnValue({ maybeSingle: emptyMaybe });
-        const eqFirst = vi.fn().mockReturnValue({
-          eq: eqSecond,
-          order: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({ maybeSingle: emptyMaybe }),
-          }),
-        });
+        const query: {
+          eq: ReturnType<typeof vi.fn>;
+          order: ReturnType<typeof vi.fn>;
+          limit: ReturnType<typeof vi.fn>;
+          maybeSingle: typeof emptyMaybe;
+        } = {
+          eq: vi.fn(),
+          order: vi.fn(),
+          limit: vi.fn(),
+          maybeSingle: emptyMaybe,
+        };
+        query.eq.mockReturnValue(query);
+        query.order.mockReturnValue(query);
+        query.limit.mockReturnValue(query);
         return {
-          select: vi.fn().mockReturnValue({ eq: eqFirst }),
+          select: vi.fn().mockReturnValue(query),
           insert,
         };
       }

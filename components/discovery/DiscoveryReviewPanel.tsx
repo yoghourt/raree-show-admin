@@ -968,49 +968,6 @@ export function DiscoveryReviewPanel({
             </div>
           ) : null}
 
-          {informationEquivalence?.status === "CONTEXT_REQUIRED" ? (
-            <div
-              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-              role="alert"
-            >
-              <p className="font-medium">
-                {discoveryReviewUi.authorityTitle}
-              </p>
-              <p className="mt-1">
-                {discoveryReviewUi.informationEquivalenceContextRequired}
-              </p>
-            </div>
-          ) : null}
-
-          {informationEquivalence?.status === "NOT_RUN" ? (
-            <div
-              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-              role="alert"
-            >
-              <p className="font-medium">
-                {discoveryReviewUi.authorityTitle}
-              </p>
-              <p className="mt-1">{discoveryReviewUi.authorityIncomplete}</p>
-              {informationEquivalence.authority.errors.length > 0 ? (
-                <ul className="mt-2 list-disc pl-5">
-                  {informationEquivalence.authority.errors.map((err) => (
-                    <li key={err}>{err}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-
-          {informationEquivalence?.status === "PASS" ? (
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-              <p>
-                {discoveryReviewUi.authorityComplete}
-                {" · "}
-                {discoveryReviewUi.informationEquivalencePass}
-              </p>
-            </div>
-          ) : null}
-
           {informationEquivalence?.status === "FAIL" ? (
             <div
               className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
@@ -1267,9 +1224,6 @@ export function DiscoveryReviewPanel({
                               actionable={actionable}
                               acceptDisabled={
                                 granularityGate?.status === "FAIL" ||
-                                informationEquivalence?.status ===
-                                  "CONTEXT_REQUIRED" ||
-                                informationEquivalence?.status === "NOT_RUN" ||
                                 informationEquivalence?.byStoryCandidateId[
                                   story.candidate.candidateId
                                 ]?.status === "FAIL"

@@ -29,7 +29,7 @@ export type FrameNode = {
   id: string;
   parentStoryId: string;
   title: string;
-  /** Reader-facing caption (Discovery scene fields.summary). */
+  /** Discovery Scene prose used by the topology gate — not Runtime Frame Narrative. */
   caption: string;
 };
 

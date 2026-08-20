@@ -55,10 +55,8 @@ function parseStoryImagesV2(raw: unknown): ReadingFrame[] | null {
     const rec = item as { url?: unknown; caption?: unknown };
     const url = typeof rec.url === "string" ? rec.url : "";
     const caption = typeof rec.caption === "string" ? rec.caption : "";
-    // Keep caption-only frames (Discovery / Rollout write url:"")
-    if (url.trim() || caption.trim()) {
-      out.push({ url, caption });
-    }
+    // Keep empty slots so Human can author Frame Narrative independently.
+    out.push({ url, caption });
   }
   return out;
 }

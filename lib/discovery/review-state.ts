@@ -29,6 +29,7 @@ import { parseRendererExpression } from "@/lib/discovery/visual-contract";
 import {
   framesForStoryCandidate,
   informationEquivalenceAcceptBlock,
+  INFORMATION_EQUIVALENCE_CONTEXT_REQUIRED,
   runInformationEquivalenceForAccept,
 } from "@/lib/discovery/information-equivalence";
 import {
@@ -546,6 +547,11 @@ function informationEquivalenceBlockForItem(
     activeStoryCandidateIds(items)
   );
   if (!resolved.ok) {
+    // IMPLEMENT-RFN-001: Work Canon is not a production Accept prerequisite.
+    // Missing Canon → skip IE (Human Accept + Granularity remain).
+    if (resolved.code === INFORMATION_EQUIVALENCE_CONTEXT_REQUIRED) {
+      return null;
+    }
     return resolved;
   }
   const result = evaluateInformationEquivalenceForStory(
@@ -558,9 +564,9 @@ function informationEquivalenceBlockForItem(
 
 /**
  * Prepare a Review item for Accept.
- * Story/Scene MUST pass Granularity Gate then Information Equivalence.
- * Omitting narrative or Canon/Story Bind blocks Story/Frame Accept.
- * Character/Location skip both validators.
+ * Story/Scene MUST pass Granularity Gate. Information Equivalence runs only
+ * when a caller supplies Work Canon + Story Bind (not a production prerequisite).
+ * Omitting narrative blocks Story/Frame Accept. Character/Location skip both.
  */
 export function prepareAcceptReview(
   items: DiscoveryReviewItem[],
@@ -781,8 +787,8 @@ export function buildStoryRelatedEntityRefs(
  * Appearance/location context ownership is Scene Context (Projection / SCC-S1).
  *
  * Story cascade Accept requires `granularity` then Information Equivalence
- * (same sequence as prepareAcceptReview). Omitting either blocks Story/Frame
- * Accept — there is no ungated compatibility path.
+ * (same sequence as prepareAcceptReview). Omitting Granularity blocks
+ * Story/Frame Accept. Missing Work Canon does not block Accept.
  *
  * `catalogs` retained for API compatibility; unused for Route membership.
  */

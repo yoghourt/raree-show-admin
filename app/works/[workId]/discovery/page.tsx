@@ -98,8 +98,8 @@ export default function WorkDiscoveryPage() {
   const discovery = useDiscoverySession({
     workId,
     operatorId: operatorId ?? "",
-    // BLOCKER: no production Work Canon / Story Bind source exists.
-    // Spike catalogs must not be loaded as a substitute.
+    // IMPLEMENT-RFN-001: no production Work Canon. Accept uses Human Review +
+    // Granularity. Spike catalogs must not be loaded as Canon.
   });
 
   const rollout = useRollout({

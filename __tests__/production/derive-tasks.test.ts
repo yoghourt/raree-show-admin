@@ -71,4 +71,47 @@ describe("deriveProductionPlan", () => {
     expect(plan.tasks).toHaveLength(0);
     expect(plan.progressPercent).toBe(100);
   });
+
+  it("does not treat Story + 0 Frame Narrative as complete", () => {
+    const plan = deriveProductionPlan({
+      work: work(),
+      characters: [
+        character({ portraitUrl: "https://res.cloudinary.com/x/image.jpg" }),
+      ],
+      routes: [
+        route({
+          summary: "Editorial synopsis is not Reader narrative",
+          story_images_v2: [],
+        }),
+      ],
+    });
+    expect(plan.tasks.some((t) => t.kind === "missing_frame_narrative")).toBe(
+      true
+    );
+    expect(plan.progressPercent).toBeLessThan(100);
+    expect(
+      plan.checklist.find((c) => c.id === "frame_narrative")?.done
+    ).toBe(false);
+  });
+
+  it("Story → N Frames with captions is narratively complete", () => {
+    const plan = deriveProductionPlan({
+      work: work(),
+      characters: [
+        character({ portraitUrl: "https://res.cloudinary.com/x/image.jpg" }),
+      ],
+      routes: [
+        route({
+          story_images_v2: [
+            { url: "https://res.cloudinary.com/x/a.jpg", caption: "Beat one" },
+            { url: "https://res.cloudinary.com/x/b.jpg", caption: "Beat two" },
+          ],
+        }),
+      ],
+    });
+    expect(plan.tasks.some((t) => t.kind === "missing_frame_narrative")).toBe(
+      false
+    );
+    expect(plan.progressPercent).toBe(100);
+  });
 });

@@ -282,8 +282,9 @@ ${TYPE_EXAMPLES[candidateType]}
 ${candidateType === "scene" ? `\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.
 
 Reader-facing prose (CRITICAL — not Expression):
-- fields.title, fields.summary, displayName, and top-level summary are for human readers.
-  Frame caption after write uses fields.summary (fallback to title if summary empty).
+- fields.title, fields.summary, displayName, and top-level summary are editorial prose.
+  They are NOT Reading Frame Narrative. Runtime Frame Narrative is story_images_v2[].caption,
+  authored on the Reading Frame after Human Accept (not copied from fields.summary).
 - Prefer proper names from the narrative (e.g. Will, Ser Waymar Royce, Gared) when the text supports them.
 - Do NOT shorten, role-genericize, or "minimize" reader prose for image-model constraints.
 - Expression authorship rules below apply ONLY to fields.rendererExpression — NEVER to title/summary/caption-bound fields.

@@ -12,7 +12,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   INFORMATION_EQUIVALENCE_BLOCKED,
-  INFORMATION_EQUIVALENCE_CONTEXT_REQUIRED,
   RIE_001_CLAIMED_REQUIRED_UNITS,
   evaluateInformationEquivalence,
   type ClaimedRequiredUnit,
@@ -152,12 +151,10 @@ describe("IMPLEMENT-RIE-001 production Accept boundary", () => {
     );
   });
 
-  it("3. IE CONTEXT_REQUIRED → Story Accept blocked", () => {
+  it("3. missing Work Canon does not block Story Accept", () => {
     expect(runGranularityGate(GRANULARITY_INPUTS.A_KEEP).status).toBe("PASS");
     const { result } = acceptStory(GRANULARITY_INPUTS.A_KEEP);
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error("expected block");
-    expect(result.code).toBe(INFORMATION_EQUIVALENCE_CONTEXT_REQUIRED);
+    expect(result.ok).toBe(true);
   });
 
   it("3b. Canon without Story Bind → AUTHORITY_BIND_INCOMPLETE", () => {
@@ -170,11 +167,9 @@ describe("IMPLEMENT-RIE-001 production Accept boundary", () => {
     expect(result.code).toBe(AUTHORITY_BIND_INCOMPLETE);
   });
 
-  it("3c. Propose-like claims are not an Accept field — missing Canon stays CONTEXT_REQUIRED", () => {
+  it("3c. Propose-like claims are not an Accept field — missing Canon still allows Accept", () => {
     const { result } = acceptStory(GRANULARITY_INPUTS.A_KEEP);
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error("expected block");
-    expect(result.code).toBe(INFORMATION_EQUIVALENCE_CONTEXT_REQUIRED);
+    expect(result.ok).toBe(true);
   });
 
   it("4. Granularity FAIL → IE does not bypass Granularity", () => {
@@ -317,9 +312,7 @@ describe("IMPLEMENT-RIE-001 production Accept boundary", () => {
       [],
       { narrative: narrativeFromSource(GRANULARITY_INPUTS.A_KEEP.sourceText) }
     );
-    expect(missingClaims.ok).toBe(false);
-    if (missingClaims.ok) throw new Error("expected block");
-    expect(missingClaims.code).toBe(INFORMATION_EQUIVALENCE_CONTEXT_REQUIRED);
+    expect(missingClaims.ok).toBe(true);
 
     const sceneMissingNarrative = prepareAcceptReview(items, scene.reviewId);
     expect(sceneMissingNarrative.ok).toBe(false);

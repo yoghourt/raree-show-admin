@@ -55,10 +55,9 @@ export function parseStoryImagesV2(raw: unknown): ReadingFrame[] {
     const rec = item as { url?: unknown; caption?: unknown };
     const url = typeof rec.url === "string" ? rec.url : "";
     const caption = typeof rec.caption === "string" ? rec.caption : "";
-    // Keep caption-only frames (empty url) for reader evidence after Discovery write
-    if (url.trim() || caption.trim()) {
-      out.push({ url, caption });
-    }
+    // Keep empty slots: Story → N Frames index alignment. Empty caption is not
+    // Reader-complete (IMPLEMENT-RFN-001); dropping slots would collapse cardinality.
+    out.push({ url, caption });
   }
   return out;
 }

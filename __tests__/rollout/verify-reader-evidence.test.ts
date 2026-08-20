@@ -85,4 +85,49 @@ describe("verifyReaderEvidence", () => {
       captionCount: 2,
     });
   });
+
+  it("fails when Story exists with 0 Frame Narratives (summary does not count)", async () => {
+    const result = await verifyReaderEvidence(
+      mockSupabase({
+        work_id: "work_1",
+        tsid: "scene_1",
+        title: "Merchant Patronage",
+        chapter_number: 1,
+        chapter_title: null,
+        summary: "A long editorial synopsis that is not Reader text.",
+        tags: null,
+        story_images_v2: [],
+        discovery_source_review_id: "r1",
+        frame_provenance_v1: [],
+      }),
+      "work_1",
+      "scene_1"
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("NARRATIVE_MISSING");
+  });
+
+  it("fails when frames exist but captions are empty", async () => {
+    const result = await verifyReaderEvidence(
+      mockSupabase({
+        work_id: "work_1",
+        tsid: "scene_1",
+        title: "Arc",
+        chapter_number: 1,
+        chapter_title: null,
+        summary: "not caption",
+        tags: null,
+        story_images_v2: [
+          { url: "", caption: "" },
+          { url: "", caption: "   " },
+        ],
+        discovery_source_review_id: "r1",
+        frame_provenance_v1: [],
+      }),
+      "work_1",
+      "scene_1"
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("NARRATIVE_MISSING");
+  });
 });

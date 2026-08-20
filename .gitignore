@@ -110,6 +110,9 @@ next-env.d.ts
 # Scene Context runtime materialization spike outputs
 /scripts/scene-context-spike/results/
 
+# Discovery → Scene information loss spike (SPIKE-DISCOVERY-SCENE-001)
+/scripts/discovery-scene-spike/results/
+
 # Python virtualenvs (local image spike / Diffusers)
 .venv/
 **/.venv/

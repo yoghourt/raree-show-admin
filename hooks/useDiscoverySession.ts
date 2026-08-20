@@ -110,10 +110,9 @@ export interface UseDiscoverySessionConfig {
   workId: string;
   operatorId: string;
   /**
-   * Caller-supplied Work Canon + per-Story Bind (SPIKE-RIE-003 D).
-   * Not selected by Work id. Not Propose claims.
-   * Omitting this blocks Story/Frame Accept (CONTEXT_REQUIRED).
-   * Incomplete bind blocks with AUTHORITY_BIND_INCOMPLETE.
+   * Optional caller-supplied Work Canon + per-Story Bind (spike / tests).
+   * Production Discovery does not pass this. Omitting it does not block Accept.
+   * Incomplete bind still blocks with AUTHORITY_BIND_INCOMPLETE if Canon is supplied.
    */
   requiredUnitAuthority?: RequiredUnitAuthorityContext;
 }
