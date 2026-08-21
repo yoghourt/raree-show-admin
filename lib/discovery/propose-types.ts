@@ -65,7 +65,8 @@ export interface SceneCandidateFields {
   chapter_title?: string | null;
   chapter_number: number | string;
   title: string;
-  summary?: string;
+  /** Frame Narrative draft — Human confirms this into story_images_v2[].caption */
+  summary: string;
   /**
    * Narrative meaning (audit). Optional by scene; not Renderer input.
    * ADR-011 A3 / SPEC-DVE-001.

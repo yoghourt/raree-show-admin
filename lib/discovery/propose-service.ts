@@ -29,6 +29,16 @@ import {
 } from "@/lib/discovery/expression-capability-rules";
 import { parseCandidateArray } from "@/lib/discovery/propose-parse";
 import {
+  canDraftScenesFromSourceHeadings,
+  expectedSceneCount,
+  formatRequiredSceneStepsBlock,
+  requiredSceneStepsFromStories,
+  resolveParentStoryCandidateId,
+  sceneCandidatesFromRequiredSteps,
+} from "@/lib/discovery/frame-narrative-drafts";
+import { narrativeSourceText } from "@/lib/discovery/granularity-gate/from-candidates";
+import { MINIMAL_RENDERER_EXPRESSION } from "@/lib/discovery/visual-contract";
+import {
   DISCOVERY_CANDIDATE_TYPES,
   type CharacterCandidateFields,
   type DiscoveryCandidate,
@@ -78,6 +88,8 @@ const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
   story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
   scene: `{"candidates":[{"displayName":"Moonlit Duel","summary":"Ser Waymar Royce faces the Other under the trees.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Prologue","title":"Moonlit Duel","summary":"Ser Waymar Royce confronts a White Walker in a fatal duel; Will watches from cover.","visualIntent":{"characters":[{"role":"knight","name":"Ser Waymar Royce"},{"role":"watcher","name":"Will"}],"relationship":"knight confronts white walker","purpose":"establish lethal threat","emotion":"defiance"},"rendererExpression":${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}}}]}`,
 };
+
+const SCENE_NARRATIVE_ONLY_EXAMPLE = `{"candidates":[{"displayName":"Peach Garden Oath","summary":"Liu Bei, Guan Yu, and Zhang Fei swear brotherhood in the peach garden and vow to serve the Han.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"title":"Peach Garden Oath","summary":"Liu Bei, Guan Yu, and Zhang Fei swear brotherhood in the peach garden and vow to serve the Han."}},{"displayName":"Merchant Arms","summary":"Zhang Shiping and Su Shuang fund horses and metal; the three brothers forge their weapons.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"title":"Merchant Arms","summary":"Zhang Shiping and Su Shuang fund horses and metal; the three brothers forge their weapons."}}]}`;
 
 function mockCandidatesForType(
   workId: string,
@@ -212,6 +224,9 @@ export function buildProposePrompt(params: {
   storyCandidates?: DiscoveryCandidate[];
   /** Role candidates (character) for SPEC-CHAR-001 scene Expression fold. */
   characterCandidates?: DiscoveryCandidate[];
+  /** Scene propose: Frame Narrative drafts only (Expression attached after parse). */
+  sceneNarrativeOnly?: boolean;
+  requiredSceneSteps?: ReturnType<typeof requiredSceneStepsFromStories>;
 }): string {
   const {
     workTitle,
@@ -222,6 +237,8 @@ export function buildProposePrompt(params: {
     excludeCandidates,
     storyCandidates = [],
     characterCandidates = [],
+    sceneNarrativeOnly = false,
+    requiredSceneSteps = [],
   } = params;
   const hints = REGISTRY_FIELD_HINTS[candidateType].join(", ");
 
@@ -268,8 +285,10 @@ Generation rules (critical):
   Use established English spellings from the work when known; otherwise use standard English transliteration.
 - Include ONLY ${candidateType} entities explicitly supported by the narrative prose above.
 - Do NOT invent background cast, generic extras, or inferred entities not grounded in the text.
-- Do NOT pad the list to reach the cap. Prefer fewer accurate candidates.
-- For a single chapter excerpt, typical counts are: character 2-5, location 1-3, story 1-2, scene 1-4 — use what the text actually supports.
+- Do NOT pad the list to reach the cap.
+- For a single chapter excerpt, typical counts are: character 2-5, location 1-3.
+- Stories: one Story per continuous reading arc (Mental Model Transition), NOT one Story per outline heading. A chapter excerpt is often 1 Story, sometimes 2. Do not slice one arc into many singleton Stories.
+- Scenes: one Scene per Reader step under that Story. If the arc has multiple required turns (outcome, attempt, prevention, cause), emit multiple Scenes with the SAME parentStoryCandidateId. Use as many Scenes as the prose supports, up to the hard cap. Do NOT compress a multi-turn Story into 1–4 stills.
 - If the narrative supports zero distinct ${candidateType} units, return {"candidates":[]}.
 
 Return ONLY valid JSON — a single object {"candidates":[...]}. No markdown fences, no commentary.
@@ -278,16 +297,27 @@ Allowed field names in "fields": ${hints}
 Optional per item: confidence ("green"|"yellow"|"red"), evidence ([{sourceLabel, excerpt?}]).
 
 Example shape for type "${candidateType}":
-${TYPE_EXAMPLES[candidateType]}
-${candidateType === "scene" ? `\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required; optional summary.
+${sceneNarrativeOnly ? SCENE_NARRATIVE_ONLY_EXAMPLE : TYPE_EXAMPLES[candidateType]}
+${candidateType === "scene" && sceneNarrativeOnly ? `\nScene Frame Narrative drafts only (no Expression in this call).
+fields MUST include parentStoryCandidateId (from the Story list), chapter_number INTEGER ≥ 1, title, and summary.
+Do NOT include rendererExpression or visualIntent.
+${formatRequiredSceneStepsBlock(requiredSceneSteps)}
+- One Scene per required step. Same parentStoryCandidateId. Do not merge two steps.
+- fields.summary IS the Reading Frame Narrative DRAFT Human confirms into caption.
+- The draft MUST carry that step's turn (event, outcome, attempt, prevention, cause) — not still geometry.
+- Prefer proper names from the narrative. English Latin script only.
+\n` : ""}
+${candidateType === "scene" && !sceneNarrativeOnly ? `\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required. fields.summary is REQUIRED.
 
-Reader-facing prose (CRITICAL — not Expression):
-- fields.title, fields.summary, displayName, and top-level summary are editorial prose.
-  They are NOT Reading Frame Narrative. Runtime Frame Narrative is story_images_v2[].caption,
-  authored on the Reading Frame after Human Accept (not copied from fields.summary).
-- Prefer proper names from the narrative (e.g. Will, Ser Waymar Royce, Gared) when the text supports them.
-- Do NOT shorten, role-genericize, or "minimize" reader prose for image-model constraints.
-- Expression authorship rules below apply ONLY to fields.rendererExpression — NEVER to title/summary/caption-bound fields.
+Frame Narrative draft (CRITICAL — this is what Human confirms into Reader text):
+- fields.summary (and matching top-level summary) IS the Reading Frame Narrative DRAFT for this step.
+  After Human Confirm it is written to story_images_v2[].caption. Empty summary is not a valid Scene candidate.
+- One Scene = one Reader step. Split the parent Story into as many Scenes as required turns. Same parentStoryCandidateId.
+- The draft MUST let a Reader recover this step's turn: event, outcome, attempted action, prevented action, causal turn, relationship change — when that is the beat.
+- Prefer proper names from the narrative when the text supports them.
+- FORBIDDEN in fields.summary: still-only geometry that drops the turn (e.g. "confront on horseback" when the Source beat is that they slay the commanders; pose/lighting-only prose).
+- Do NOT shorten, role-genericize, or minimize this prose for image-model constraints.
+- Expression authorship rules below apply ONLY to fields.rendererExpression — NEVER to title/summary.
 
 Visualization (ADR-011 A5 / SPEC-DVE-001 v1.4 — required):
 - fields.rendererExpression is REQUIRED Canonical Visual Expression:
@@ -312,10 +342,37 @@ ${formatRoleArchiveListForPrompt(characterCandidates)}
 \n` : ""}
 ${candidateType === "character" ? `\n${CHARACTER_ARCHIVE_PROPOSE_RULES}\n` : ""}
 ${candidateType === "location" ? '\nLocation fields MUST use fields.name (place name). Do NOT return prose paragraphs as the only value.\n' : ""}
-${candidateType === "story" ? '\nStory fields MUST use fields.title and fields.summary (editorial story unit). Optional boundaryHint. Return {"candidates":[...]} — each item needs displayName, summary, and fields with title + summary.\n' : ""}
+${candidateType === "story" ? '\nStory fields MUST use fields.title and fields.summary (editorial story unit — NOT Reader Frame text). Optional boundaryHint. One Story = one continuous reading arc; child Scenes carry the ordered Frame Narrative drafts. Return {"candidates":[...]} — each item needs displayName, summary, and fields with title + summary.\n' : ""}
 
 Do NOT include asset fields (portraitUrl, map coordinates, story_images_v2, tags, locationId, characterIds).
 Candidates are proposals only — not canonical entities.`;
+}
+
+function prepareSceneRawItem(
+  item: unknown,
+  storyCandidates: DiscoveryCandidate[]
+): unknown {
+  if (!item || typeof item !== "object") return item;
+  const obj = item as Record<string, unknown>;
+  const fieldsRaw =
+    obj.fields && typeof obj.fields === "object" && !Array.isArray(obj.fields)
+      ? { ...(obj.fields as Record<string, unknown>) }
+      : {};
+  const title = String(fieldsRaw.title ?? obj.displayName ?? "");
+  const summary = String(fieldsRaw.summary ?? obj.summary ?? "");
+  const parent = resolveParentStoryCandidateId(
+    typeof fieldsRaw.parentStoryCandidateId === "string"
+      ? fieldsRaw.parentStoryCandidateId
+      : undefined,
+    storyCandidates,
+    title,
+    summary
+  );
+  if (parent) fieldsRaw.parentStoryCandidateId = parent;
+  if (!fieldsRaw.rendererExpression) {
+    fieldsRaw.rendererExpression = { ...MINIMAL_RENDERER_EXPRESSION };
+  }
+  return { ...obj, fields: fieldsRaw };
 }
 
 async function generateForType(params: {
@@ -369,37 +426,61 @@ async function generateForType(params: {
   const timingOn = process.env.DISCOVERY_PROPOSE_TIMING === "1";
   const t0 = timingOn ? Date.now() : 0;
 
-  try {
-    const prompt = buildProposePrompt(params);
-    const raw = await callDiscoveryTextLlm(prompt, { geminiJsonObject: true });
-    const llmMs = timingOn ? Date.now() - t0 : 0;
-    if (process.env.DISCOVERY_PROPOSE_DEBUG === "1") {
-      console.info(
-        "[discovery-propose] type=%s raw_len=%d preview=%s",
-        candidateType,
-        raw.length,
-        raw.slice(0, 400).replace(/\s+/g, " ")
-      );
-    }
-    const items = parseCandidateArray(raw, candidateType);
+  const sourceText = narrativeSourceText(narrative);
+  const requiredSceneSteps =
+    candidateType === "scene"
+      ? requiredSceneStepsFromStories(storyCandidates, sourceText)
+      : [];
 
-    if (items.length === 0) {
-      if (timingOn) {
+  const finishScenes = (rows: DiscoveryCandidate[]) => ({
+    candidates: rows.map((c) =>
+      applyCharacterArchivesToSceneCandidate(c, characterCandidates)
+    ),
+  });
+
+  if (
+    candidateType === "scene" &&
+    canDraftScenesFromSourceHeadings(storyCandidates, sourceText)
+  ) {
+    const fromSource = capCandidatesByType(
+      dedupeCandidates(
+        sceneCandidatesFromRequiredSteps({
+          workId,
+          bundles: requiredSceneSteps,
+          sourceText,
+        })
+      )
+    );
+    if (fromSource.length >= 2) {
+      if (process.env.DISCOVERY_PROPOSE_DEBUG === "1") {
         console.info(
-          "[discovery-propose] type=%s timing_ms=%d candidates=0 (empty)",
-          candidateType,
-          Date.now() - t0
+          "[discovery-propose] type=scene from_source_headings=%d",
+          fromSource.length
         );
       }
-      return { candidates: [] };
+      if (timingOn) {
+        console.info(
+          "[discovery-propose] type=scene timing_ms=%d candidates=%d source_headings",
+          Date.now() - t0,
+          fromSource.length
+        );
+      }
+      return finishScenes(fromSource);
     }
+  }
 
+  const ingestItems = (
+    items: unknown[]
+  ): { capped: DiscoveryCandidate[]; validationErrors: string[] } => {
     const candidates: DiscoveryCandidate[] = [];
     const validationErrors: string[] = [];
     const storyIds = new Set(storyCandidates.map((c) => c.candidateId));
-
     for (const item of items) {
-      const normalized = normalizeRawCandidate(item, candidateType, workId);
+      const prepared =
+        candidateType === "scene"
+          ? prepareSceneRawItem(item, storyCandidates)
+          : item;
+      const normalized = normalizeRawCandidate(prepared, candidateType, workId);
       if (normalized.ok) {
         if (candidateType === "scene") {
           const parentId = (normalized.candidate.fields as SceneCandidateFields)
@@ -416,8 +497,105 @@ async function generateForType(params: {
         validationErrors.push(...normalized.errors);
       }
     }
+    return {
+      capped: capCandidatesByType(dedupeCandidates(candidates)),
+      validationErrors,
+    };
+  };
 
-    const capped = capCandidatesByType(dedupeCandidates(candidates));
+  const fillFromRequiredSteps = (): DiscoveryCandidate[] => {
+    if (
+      candidateType !== "scene" ||
+      expectedSceneCount(requiredSceneSteps) < 2
+    ) {
+      return [];
+    }
+    return capCandidatesByType(
+      dedupeCandidates(
+        sceneCandidatesFromRequiredSteps({
+          workId,
+          bundles: requiredSceneSteps,
+          sourceText,
+        })
+      )
+    );
+  };
+
+  try {
+    const prompt = buildProposePrompt({
+      ...params,
+      ...(candidateType === "scene"
+        ? { sceneNarrativeOnly: true, requiredSceneSteps }
+        : {}),
+    });
+    const raw = await callDiscoveryTextLlm(prompt, { geminiJsonObject: true });
+    const llmMs = timingOn ? Date.now() - t0 : 0;
+    if (process.env.DISCOVERY_PROPOSE_DEBUG === "1") {
+      console.info(
+        "[discovery-propose] type=%s raw_len=%d preview=%s",
+        candidateType,
+        raw.length,
+        raw.slice(0, 400).replace(/\s+/g, " ")
+      );
+    }
+    const items = parseCandidateArray(raw, candidateType);
+
+    if (items.length === 0) {
+      const filled = fillFromRequiredSteps();
+      if (filled.length >= 2) {
+        return finishScenes(filled);
+      }
+      if (timingOn) {
+        console.info(
+          "[discovery-propose] type=%s timing_ms=%d candidates=0 (empty)",
+          candidateType,
+          Date.now() - t0
+        );
+      }
+      return { candidates: [] };
+    }
+
+    let { capped, validationErrors } = ingestItems(items);
+    const expectedScenes = expectedSceneCount(requiredSceneSteps);
+    if (
+      candidateType === "scene" &&
+      expectedScenes >= 2 &&
+      capped.length < expectedScenes
+    ) {
+      const missing = requiredSceneSteps
+        .flatMap((b) => b.steps)
+        .slice(capped.length);
+      const retryPrompt = buildProposePrompt({
+        ...params,
+        sceneNarrativeOnly: true,
+        requiredSceneSteps,
+        feedback: `You MUST output ${expectedScenes} Scene objects (one per listed step). Previous output had ${capped.length}. Remaining steps each need their own Scene:\n${missing.map((s) => `- ${s}`).join("\n")}`,
+      });
+      try {
+        const retryRaw = await callDiscoveryTextLlm(retryPrompt, {
+          geminiJsonObject: true,
+        });
+        const retryItems = parseCandidateArray(retryRaw, "scene");
+        const retryIngested = ingestItems(retryItems);
+        if (retryIngested.capped.length > capped.length) {
+          capped = retryIngested.capped;
+          validationErrors = retryIngested.validationErrors;
+        }
+      } catch {
+        /* keep first parse */
+      }
+    }
+
+    if (
+      candidateType === "scene" &&
+      expectedScenes >= 2 &&
+      capped.length < expectedScenes
+    ) {
+      const filled = fillFromRequiredSteps();
+      if (filled.length > capped.length) {
+        capped = filled;
+      }
+    }
 
     if (capped.length === 0) {
       const parseFailMessage =
@@ -465,13 +643,9 @@ async function generateForType(params: {
         capped.length
       );
     }
-    const withArchives =
-      candidateType === "scene"
-        ? capped.map((c) =>
-            applyCharacterArchivesToSceneCandidate(c, characterCandidates)
-          )
-        : capped;
-    return { candidates: withArchives };
+    return candidateType === "scene"
+      ? finishScenes(capped)
+      : { candidates: capped };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Generation failed";
     // parseCandidateArray throw — not provider envelope / network errors
@@ -479,6 +653,16 @@ async function generateForType(params: {
       /not a JSON array of candidates|LLM output is not a JSON array/i.test(
         message
       );
+    const filled = fillFromRequiredSteps();
+    if (isParseThrow && filled.length >= 2) {
+      console.warn(
+        "[discovery-propose] type=%s PARSE_FAILED recovered via required steps count=%d: %s",
+        candidateType,
+        filled.length,
+        message
+      );
+      return finishScenes(filled);
+    }
     console.error(
       "[discovery-propose] type=%s %s: %s",
       candidateType,

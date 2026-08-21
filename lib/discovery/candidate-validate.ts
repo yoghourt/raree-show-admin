@@ -220,6 +220,14 @@ function validateSceneFields(
   if (!isNonEmptyString(fields.title)) {
     return { ok: false, errors: ["Scene fields require non-empty title"] };
   }
+  if (!isNonEmptyString(fields.summary)) {
+    return {
+      ok: false,
+      errors: [
+        "Scene fields require non-empty summary (Frame Narrative draft)",
+      ],
+    };
+  }
 
   const expressionResult = parseRendererExpression(fields.rendererExpression);
   if (!expressionResult.ok) {
@@ -287,10 +295,10 @@ function validateSceneFields(
         ? Math.trunc(chapterNumber)
         : parsedChapter,
     title: fields.title.trim(),
+    summary: fields.summary.trim(),
     ...(fields.chapter_title === null || isNonEmptyString(fields.chapter_title)
       ? { chapter_title: fields.chapter_title ?? null }
       : {}),
-    ...(isNonEmptyString(fields.summary) ? { summary: fields.summary.trim() } : {}),
     ...(intentResult.value ? { visualIntent: intentResult.value } : {}),
     rendererExpression: authoredExpression,
   };

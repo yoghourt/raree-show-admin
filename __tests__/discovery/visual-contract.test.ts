@@ -124,6 +124,7 @@ describe("A4 capability adaptation", () => {
           parentStoryCandidateId: "story-1",
           chapter_number: 1,
           title: "Choke",
+          summary: "Reader step draft",
           rendererExpression: {
             ...SAMPLE_EXPRESSION,
             action: "undead lifts ranger by the throat",
@@ -148,6 +149,7 @@ describe("A4 capability adaptation", () => {
           parentStoryCandidateId: "story-1",
           chapter_number: 1,
           title: "Camp",
+          summary: "Reader step draft",
           rendererExpression: {
             environment: "snowy pine forest",
             characters: [
@@ -177,6 +179,7 @@ describe("A4 capability adaptation", () => {
           parentStoryCandidateId: "story-1",
           chapter_number: 1,
           title: "Camp",
+          summary: "Reader step draft",
           rendererExpression: {
             environment: "snowy pine forest",
             characters: [
@@ -239,6 +242,7 @@ describe("Rule 6 Face Safety", () => {
           parentStoryCandidateId: "story-1",
           chapter_number: 1,
           title: "Close Face",
+          summary: "Reader step draft",
           rendererExpression: {
             environment: "snowy roadside",
             characters: [{ role: "boy", visual: "young boy" }],
@@ -346,6 +350,7 @@ describe("Rule 6 Face Safety", () => {
           parentStoryCandidateId: "story-1",
           chapter_number: 1,
           title: "Patrol",
+          summary: "Reader step draft",
           rendererExpression: {
             environment: "snow forest beyond the Wall",
             characters: [
@@ -558,6 +563,7 @@ describe("normalizeRawCandidate scene Expression", () => {
           parentStoryCandidateId: "story-1",
           chapter_number: 1,
           title: "Courtyard",
+          summary: "Reader step draft",
           visualIntent: { relationship: "household greets king" },
           rendererExpression: SAMPLE_EXPRESSION,
         },

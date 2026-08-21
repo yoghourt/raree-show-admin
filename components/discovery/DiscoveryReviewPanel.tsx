@@ -1666,7 +1666,9 @@ export function DiscoveryReviewPanel({
             </div>
             <div className="space-y-1">
               <Label htmlFor="edit-summary">
-                {candidateFieldLabel("summary")}
+                {editItem?.candidate.candidateType === "scene"
+                  ? candidateFieldLabel("sceneSummary")
+                  : candidateFieldLabel("summary")}
               </Label>
               <Textarea
                 id="edit-summary"

@@ -29,7 +29,7 @@ export type FrameNode = {
   id: string;
   parentStoryId: string;
   title: string;
-  /** Discovery Scene prose used by the topology gate — not Runtime Frame Narrative. */
+  /** Discovery Scene prose = Frame Narrative draft (Gate input; Confirm writes caption). */
   caption: string;
 };
 

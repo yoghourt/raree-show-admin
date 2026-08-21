@@ -81,24 +81,40 @@ export function normalizeWs(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-export function extractHeadings(sourceText: string): Array<{ index: number; title: string }> {
-  const headings: Array<{ index: number; title: string }> = [];
-  const re =
-    /^\s*(\d+)\s*[.、.)．]\s*(?:\*\*)?([^\n*]+?)(?:\*\*)?\s*$/gm;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(sourceText)) !== null) {
+const HEADING_LINE_PATTERN =
+  "^\\s*(\\d+)\\s*[.、.)．]\\s*(?:\\*\\*)?([^\\n*]+?)(?:\\*\\*)?\\s*$";
+
+export function headingBlocksFromSource(
+  sourceText: string
+): Array<{ index: number; title: string; body: string }> {
+  const re = new RegExp(HEADING_LINE_PATTERN, "gm");
+  const matches = [...sourceText.matchAll(re)];
+  const seen = new Set<number>();
+  const blocks: Array<{ index: number; title: string; body: string }> = [];
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i]!;
     const index = Number(m[1]);
     const title = normalizeWs(m[2] ?? "");
-    if (!title || !Number.isFinite(index)) continue;
-    headings.push({ index, title });
+    if (!title || !Number.isFinite(index) || seen.has(index)) continue;
+    seen.add(index);
+    const start = (m.index ?? 0) + m[0].length;
+    const end = matches[i + 1]?.index ?? sourceText.length;
+    blocks.push({
+      index,
+      title,
+      body: sourceText.slice(start, end).trim(),
+    });
   }
-  headings.sort((a, b) => a.index - b.index);
-  const seen = new Set<number>();
-  return headings.filter((h) => {
-    if (seen.has(h.index)) return false;
-    seen.add(h.index);
-    return true;
-  });
+  return blocks.sort((a, b) => a.index - b.index);
+}
+
+export function extractHeadings(
+  sourceText: string
+): Array<{ index: number; title: string }> {
+  return headingBlocksFromSource(sourceText).map(({ index, title }) => ({
+    index,
+    title,
+  }));
 }
 
 export function splitSentences(text: string): string[] {

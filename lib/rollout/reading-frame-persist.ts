@@ -28,7 +28,10 @@ import {
   type FrameProvenanceEntry,
   type SceneRowWithProvenance,
 } from "@/lib/rollout/scenes-server";
-import { projectFrameSlot } from "@/lib/rollout/frame-narrative";
+import {
+  frameNarrativeDraftFromStaging,
+  projectFrameSlot,
+} from "@/lib/rollout/frame-narrative";
 
 export type FramePersistResult =
   | {
@@ -51,7 +54,7 @@ export type FramePersistResult =
       message: string;
     };
 
-/** Scene staging never authors Frame Narrative. Preserve existing caption/url. */
+/** First persist: confirmed Scene draft → caption. Re-project: preserve existing. */
 
 /** Work Archive names for Context-scoped enrichment only (ADR-012 L2-A). */
 async function loadWorkArchiveCatalog(
@@ -170,7 +173,8 @@ async function persistViaContextPath(
   );
 
   const nextFrame = projectFrameSlot(
-    existing ? frames[existing.frameIndex] : undefined
+    existing ? frames[existing.frameIndex] : undefined,
+    frameNarrativeDraftFromStaging(staging)
   );
   const frameIndex = existing?.frameIndex ?? frames.length;
 
@@ -263,7 +267,8 @@ async function persistLegacyPath(
   );
 
   const nextFrame = projectFrameSlot(
-    existing ? frames[existing.frameIndex] : undefined
+    existing ? frames[existing.frameIndex] : undefined,
+    frameNarrativeDraftFromStaging(staging)
   );
 
   const provenanceFields: FrameProvenanceEntry = {

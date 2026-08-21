@@ -324,6 +324,7 @@ export const zhCN = {
     candidateFields: {
       displayName: '显示名称',
       summary: '摘要',
+      sceneSummary: '画面说明草稿（确认后写入读者文案）',
       fields: '字段',
       evidence: '依据',
       name: '名称',
@@ -353,7 +354,7 @@ export const zhCN = {
       tabReview: '确认',
       tabPendingConfirm: '待确认',
       tabAccepted: '已确认',
-      flowHintReview: '确认故事后，切换到「已确认」，再去写入作品；写完请打开读者端验读',
+      flowHintReview: '确认故事与画面说明草稿后，切换到「已确认」，再去写入作品。画面说明是读者文案草稿，确认后写入画面页；请核对转折是否齐全。',
       flowHintReviewDone: '没有待确认条目',
       nextStepAccepted: '已确认',
       noReviewItems: '暂无待确认条目',

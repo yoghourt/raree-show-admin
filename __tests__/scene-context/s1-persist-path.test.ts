@@ -92,8 +92,7 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
     expect(result.contextId).toBe("ctx_rev-scene-1");
     expect(updateMock).toHaveBeenCalledTimes(1);
     const [, , , frames, provenance, options] = updateMock.mock.calls[0]!;
-    expect(frames).toEqual([{ url: "", caption: "" }]);
-    expect(frames[0].caption).not.toBe("Household faces the gate.");
+    expect(frames).toEqual([{ url: "", caption: "Household faces the gate." }]);
     expect(provenance[0].sourceContextId).toBe("ctx_rev-scene-1");
     expect(options.sceneContexts).toHaveLength(1);
     expect(options.sceneContexts[0].contextId).toBe("ctx_rev-scene-1");
@@ -203,7 +202,7 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
         parentStoryTitle: "Arc",
         chapter_number: 1,
         title: "Second beat",
-        summary: "Must not become frame two caption",
+        summary: "Zhang Fei slays Deng Mao; Guan Yu beheads Cheng Yuanzhi.",
         rendererExpression: {
           environment: "hall",
           characters: [],
@@ -221,7 +220,7 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
     const frames = updateMock.mock.calls[0]![3] as Array<{ caption: string }>;
     expect(frames).toHaveLength(2);
     expect(frames[0]!.caption).toBe("Frame one narrative");
-    expect(frames[1]!.caption).toBe("");
+    expect(frames[1]!.caption).toBe("Zhang Fei slays Deng Mao; Guan Yu beheads Cheng Yuanzhi.");
   });
 
   it("keeps two empty Frame slots (does not collapse Story → N)", async () => {
@@ -263,7 +262,7 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
         parentStoryTitle: "Arc",
         chapter_number: 1,
         title: "Second beat",
-        summary: "Also not a caption",
+        summary: "Liu Bei and Guan Yu restrain Zhang Fei before he can kill Dong Zhuo.",
         rendererExpression: {
           environment: "hall",
           characters: [],
@@ -281,7 +280,9 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
     const frames = updateMock.mock.calls[0]![3] as Array<{ caption: string }>;
     expect(frames).toHaveLength(2);
     expect(frames[0]!.caption).toBe("");
-    expect(frames[1]!.caption).toBe("");
+    expect(frames[1]!.caption).toBe(
+      "Liu Bei and Guan Yu restrain Zhang Fei before he can kill Dong Zhuo."
+    );
   });
 
   it("uses legacy path when flag off", async () => {

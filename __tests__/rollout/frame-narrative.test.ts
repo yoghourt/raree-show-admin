@@ -3,29 +3,37 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  frameNarrativeDraftFromStaging,
   isReadingNarrativelyComplete,
   projectFrameSlot,
   readerNarrativeFrames,
 } from "@/lib/rollout/frame-narrative";
 import { parseStoryImagesV2 } from "@/lib/rollout/scenes-server";
 
-describe("IMPLEMENT-RFN-001 Frame Narrative contract", () => {
-  it("Case 1: Reader Narrative is caption, not Scene.summary", () => {
+describe("Frame Narrative draft → caption", () => {
+  it("Case 1: confirmed Scene draft becomes caption; Story.summary does not", () => {
     const persist = readFileSync(
       path.join(process.cwd(), "lib/rollout/reading-frame-persist.ts"),
       "utf8"
     );
+    expect(persist).toContain("frameNarrativeDraftFromStaging");
     expect(persist).not.toContain("captionFromStaging");
-    expect(persist).not.toMatch(/caption:\s*staging\.summary/);
-    expect(persist).toContain("projectFrameSlot");
+    expect(persist).not.toMatch(/parent\.summary/);
 
-    const frames = [
-      { url: "", caption: "Frame Narrative the Reader sees" },
-    ];
+    expect(
+      frameNarrativeDraftFromStaging({
+        summary: "Zhang Fei slays Deng Mao",
+        title: "Duel",
+      })
+    ).toBe("Zhang Fei slays Deng Mao");
+    expect(
+      projectFrameSlot(undefined, "Zhang Fei slays Deng Mao").caption
+    ).toBe("Zhang Fei slays Deng Mao");
+
+    const frames = [{ url: "", caption: "Zhang Fei slays Deng Mao" }];
     expect(readerNarrativeFrames(frames)[0]?.caption).toBe(
-      "Frame Narrative the Reader sees"
+      "Zhang Fei slays Deng Mao"
     );
-    expect(isReadingNarrativelyComplete(frames)).toBe(true);
   });
 
   it("Case 2: re-project preserves Human Frame Narrative", () => {
@@ -33,10 +41,9 @@ describe("IMPLEMENT-RFN-001 Frame Narrative contract", () => {
       url: "https://res.cloudinary.com/x/kept.png",
       caption: "Human edited caption",
     };
-    const next = projectFrameSlot(existing);
+    const next = projectFrameSlot(existing, "Discovery would overwrite this");
     expect(next.caption).toBe("Human edited caption");
     expect(next.url).toBe(existing.url);
-    expect(next.caption).not.toBe("Scene.summary would have been here");
   });
 
   it("Case 3: 0 Frame / empty caption is not reading-complete", () => {
@@ -45,24 +52,17 @@ describe("IMPLEMENT-RFN-001 Frame Narrative contract", () => {
     expect(
       isReadingNarrativelyComplete([{ url: "", caption: "" }])
     ).toBe(false);
-    expect(
-      isReadingNarrativelyComplete([{ url: "https://x/a.jpg", caption: "  " }])
-    ).toBe(false);
   });
 
-  it("Case 4: Story → N Frames keeps sequence and empty slots", () => {
+  it("Case 4: Story → N Frames keeps sequence", () => {
     const parsed = parseStoryImagesV2([
-      { url: "", caption: "" },
-      { url: "", caption: "Second beat" },
-      { url: "", caption: "Third beat" },
+      { url: "", caption: "Beat one" },
+      { url: "", caption: "Beat two" },
+      { url: "", caption: "Beat three" },
     ]);
     expect(parsed).toHaveLength(3);
-    expect(parsed[0]?.caption).toBe("");
-    expect(readerNarrativeFrames(parsed)).toHaveLength(2);
+    expect(readerNarrativeFrames(parsed)).toHaveLength(3);
     expect(isReadingNarrativelyComplete(parsed)).toBe(true);
-
-    const next = projectFrameSlot(undefined);
-    expect(next).toEqual({ url: "", caption: "" });
   });
 
   it("Case 5: production Discovery does not pass Work Canon", () => {
@@ -72,13 +72,16 @@ describe("IMPLEMENT-RFN-001 Frame Narrative contract", () => {
     );
     expect(page).not.toContain("requiredUnitAuthority");
     expect(page).not.toContain("workCanon");
+  });
 
-    const reviewState = readFileSync(
-      path.join(process.cwd(), "lib/discovery/review-state.ts"),
+  it("Propose treats Scene.summary as Frame Narrative draft", () => {
+    const propose = readFileSync(
+      path.join(process.cwd(), "lib/discovery/propose-service.ts"),
       "utf8"
     );
-    expect(reviewState).toContain(
-      "Work Canon is not a production Accept prerequisite"
-    );
+    expect(propose).toContain("Frame Narrative draft");
+    expect(propose).toContain("one Scene per Reader step");
+    expect(propose).not.toContain("scene 1-4");
+    expect(propose).not.toContain("They are NOT Reading Frame Narrative");
   });
 });

@@ -3,7 +3,7 @@
 **Status:** **PASS**  
 **Date:** 2026-08-20  
 **Parent Architecture Closure:** Reading Frame Narrative Authority — PASS  
-**Acceptance basis:** Runtime Truth + Architecture Closure (not documentation completeness)
+**Supersedes (partial):** empty-caption first persist. Discovery now drafts Frame Narrative; Human Confirm writes it to `caption`. Runtime authority remains `caption`. See `discovery-frame-narrative-draft-closure.md`.
 
 ```text
 Reading Frame Narrative (story_images_v2[].caption)
@@ -14,14 +14,14 @@ Reading Frame Narrative (story_images_v2[].caption)
 
 ## Runtime Truth
 
-### A — `caption := Scene.summary` decoupled
+### A — first persist writes confirmed draft; re-project does not overwrite
 
-Production Hot Path `lib/rollout/reading-frame-persist.ts` no longer contains `captionFromStaging`. Both Context and legacy persist use `projectFrameSlot`:
+Production persist uses `projectFrameSlot` + `frameNarrativeDraftFromStaging`:
 
-- new slot → `{ url: "", caption: "" }`
+- new slot → confirmed Scene.summary (else title) as caption
 - existing slot → preserve `url` + `caption`
 
-Scene.summary still feeds Scene Context `beatSummary` (Context, not Reader). That is not Frame Narrative.
+`Story.summary` never becomes caption. Scene.summary is the **draft** Human confirmed, not a lingering Runtime identity.
 
 ### B — Frame Narrative is an independent Reader artifact
 

@@ -1,11 +1,22 @@
 /**
- * IMPLEMENT-RFN-001 — Reading Frame Narrative contract.
+ * Reading Frame Narrative contract (RFN-001 + Discovery draft grant).
  *
- * caption = Frame Narrative = Reader text authority.
- * Scene.summary / Story.summary / Discovery MUST NOT fill or replace it.
+ * Runtime authority: story_images_v2[].caption.
+ * Discovery Scene.summary is the Human-confirmable DRAFT of that caption.
+ * Story.summary is never Reader authority.
  */
 
 import type { ReadingFrame } from "@/lib/types";
+
+/** Confirmed Scene staging → caption draft (summary, else title). Not Story.summary. */
+export function frameNarrativeDraftFromStaging(staging: {
+  summary?: string | null;
+  title?: string | null;
+}): string {
+  const summary = staging.summary?.trim() ?? "";
+  if (summary) return summary;
+  return staging.title?.trim() ?? "";
+}
 
 export function isReaderNarrativeFrame(frame: ReadingFrame): boolean {
   return Boolean(frame.caption?.trim());
@@ -26,11 +37,12 @@ export function isReadingNarrativelyComplete(
 
 /**
  * Scene projection Frame slot.
- * - New slot: empty Frame Narrative (Human authors caption later).
- * - Existing slot: preserve url + caption — never copy Scene.summary, never overwrite.
+ * - New slot: confirmed Frame Narrative draft (Human already accepted/edited it).
+ * - Existing slot: preserve url + caption — never overwrite Human edits.
  */
 export function projectFrameSlot(
-  existing?: ReadingFrame | null
+  existing?: ReadingFrame | null,
+  draftCaption?: string
 ): ReadingFrame {
   if (existing) {
     return {
@@ -38,5 +50,8 @@ export function projectFrameSlot(
       caption: typeof existing.caption === "string" ? existing.caption : "",
     };
   }
-  return { url: "", caption: "" };
+  return {
+    url: "",
+    caption: typeof draftCaption === "string" ? draftCaption : "",
+  };
 }
