@@ -326,7 +326,7 @@ function sceneStagingToReviewItem(
           ? { chapter_title: scene.chapter_title }
           : {}),
         title: scene.title,
-        ...(scene.summary ? { summary: scene.summary } : {}),
+        summary: scene.summary?.trim() || scene.title,
         ...(scene.visualIntent ? { visualIntent: scene.visualIntent } : {}),
         rendererExpression: scene.rendererExpression ?? {
           environment: "unspecified place",
@@ -718,11 +718,12 @@ export function DiscoveryReviewPanel({
           : {}),
         title:
           typeof parsedRecord.title === "string" ? parsedRecord.title : "",
-        ...(typeof parsedRecord.summary === "string" && parsedRecord.summary
-          ? { summary: parsedRecord.summary }
-          : editSummary.trim()
-            ? { summary: editSummary.trim() }
-            : {}),
+        summary:
+          (typeof parsedRecord.summary === "string" && parsedRecord.summary.trim()
+            ? parsedRecord.summary.trim()
+            : editSummary.trim()) ||
+          original.summary ||
+          (typeof parsedRecord.title === "string" ? parsedRecord.title : ""),
         ...(original.visualIntent
           ? { visualIntent: original.visualIntent }
           : {}),

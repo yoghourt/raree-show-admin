@@ -93,7 +93,7 @@ const sceneFieldsSchema = z.object({
   chapter_title: z.string().nullable().optional(),
   chapter_number: z.union([z.number(), z.string()]),
   title: z.string(),
-  summary: z.string().optional(),
+  summary: z.string().min(1),
   visualIntent: visualIntentSchema,
   rendererExpression: rendererExpressionSchema,
 });
