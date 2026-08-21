@@ -261,4 +261,31 @@ describe("normalizeRawCandidate optional fields", () => {
       });
     }
   });
+
+  it("rejects scene candidates without Frame Narrative draft summary", () => {
+    const result = normalizeRawCandidate(
+      {
+        displayName: "Courtyard",
+        summary: "still only",
+        fields: {
+          parentStoryCandidateId: "story-1",
+          chapter_number: 1,
+          title: "Courtyard",
+          rendererExpression: {
+            environment: "winter courtyard",
+            characters: [],
+            action: "household stands facing gate",
+            composition: "wide courtyard view",
+          },
+        },
+      },
+      "scene",
+      "work-1"
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected reject");
+    expect(result.errors.some((e) => e.includes("Frame Narrative draft"))).toBe(
+      true
+    );
+  });
 });

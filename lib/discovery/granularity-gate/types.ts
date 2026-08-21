@@ -29,7 +29,7 @@ export type FrameNode = {
   id: string;
   parentStoryId: string;
   title: string;
-  /** Reader-facing caption (Discovery scene fields.summary). */
+  /** Discovery Scene prose = Frame Narrative draft (Gate input; Confirm writes caption). */
   caption: string;
 };
 

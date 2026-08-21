@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 /**
- * Mirrors ReadingRouteForm story_images_v2 preprocess — caption-only frames
- * from Discovery/Rollout must survive edit/save.
+ * Mirrors ReadingRouteForm story_images_v2 preprocess — caption-only and empty
+ * Frame slots from persist must survive edit/save (IMPLEMENT-RFN-001).
  */
 const storyImagesSchema = z.preprocess(
   (v) => {
@@ -17,7 +17,6 @@ const storyImagesSchema = z.preprocess(
           caption: typeof rec.caption === "string" ? rec.caption : "",
         };
       })
-      .filter((item) => item.url.trim() !== "" || item.caption.trim() !== "");
   },
   z
     .array(
@@ -43,12 +42,13 @@ describe("story_images_v2 form normalize", () => {
     ]);
   });
 
-  it("drops fully blank segments only", () => {
+  it("keeps empty Frame slots (Story → N persist placeholders)", () => {
     const parsed = storyImagesSchema.parse([
       { url: "", caption: "" },
       { url: "https://cdn.example.com/a.jpg", caption: "ok" },
     ]);
     expect(parsed).toEqual([
+      { url: "", caption: "" },
       { url: "https://cdn.example.com/a.jpg", caption: "ok" },
     ]);
   });

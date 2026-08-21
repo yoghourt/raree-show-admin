@@ -119,7 +119,7 @@ export function logStep(msg: string, extra?: Record<string, unknown>): void {
   else console.info(`[discovery-vi-spike] ${msg}`)
 }
 
-/** Mirror production captionFromStaging — summary only; title fallback. */
+/** Spike-only image prompt seed. Production Frame Narrative is not Scene.summary. */
 export function captionFromSceneFields(scene: {
   title: string
   summary: string

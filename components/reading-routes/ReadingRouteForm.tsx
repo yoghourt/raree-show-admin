@@ -87,8 +87,8 @@ const sceneFormSchema = z.object({
     z.string().optional().default("")
   ),
   tags: z.preprocess((v) => (v == null ? "" : String(v)), z.string()),
-  // Keep caption-only frames (Discovery→Assets). Drop only fully blank segments
-  // so character-only edits can still save without forcing image upload.
+  // Keep empty Frame slots (Story → N persist placeholders). Caption is authored
+  // independently; blank caption is not Reader-complete.
   story_images_v2: z.preprocess(
     (v) => {
       if (!Array.isArray(v)) return [];
@@ -100,10 +100,7 @@ const sceneFormSchema = z.object({
             url: typeof rec.url === "string" ? rec.url : "",
             caption: typeof rec.caption === "string" ? rec.caption : "",
           };
-        })
-        .filter(
-          (item) => item.url.trim() !== "" || item.caption.trim() !== ""
-        );
+        });
     },
     z
       .array(

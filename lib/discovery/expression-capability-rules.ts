@@ -22,8 +22,8 @@ type ExpressionLike = {
 export const EXPRESSION_CAPABILITY_RULES = `
 Renderer Expression — Canonical Visual Expression authorship (required):
 These rules apply ONLY to fields.rendererExpression (canonical visible form for image execution).
-They MUST NOT change fields.title, fields.summary, displayName, or other reader-facing prose
-(those become frame caption for readers and MUST keep proper names when the narrative supports them).
+They MUST NOT change fields.title, fields.summary, displayName, or other Frame Narrative draft prose.
+fields.summary is the Reader-step draft Human confirms into caption — keep the story turn, not still geometry.
 
 Answer: if the best renderer existed, what should appear?
 Discovery converts narrative meaning into visible geometry + optional narrative-visible cues.

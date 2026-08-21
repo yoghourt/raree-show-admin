@@ -20,6 +20,7 @@ import {
   proposeAllCandidateTypes,
   regenCandidate,
   proposeCandidateTypes,
+  buildProposePrompt,
 } from "@/lib/discovery/propose-service";
 import { verifyProposeLock } from "@/lib/discovery/propose-verify";
 import {
@@ -326,5 +327,40 @@ describe("regenCandidate (mock)", () => {
 
     expect(result.candidate).toBeUndefined();
     expect(result.error?.code).toBe("REGEN_DUPLICATE");
+  });
+});
+
+describe("buildProposePrompt scene narrative-only", () => {
+  it("lists required Reader steps and omits Expression authorship rules", () => {
+    const prompt = buildProposePrompt({
+      workTitle: "Romance of the Three Kingdoms",
+      narrative: validNarrative,
+      candidateType: "scene",
+      sceneNarrativeOnly: true,
+      storyCandidates: [
+        {
+          candidateId: "story-1",
+          candidateType: "story",
+          workId: "work-1",
+          displayName: "Arc",
+          summary: "s",
+          fields: { title: "Arc", summary: "s" },
+        },
+      ],
+      requiredSceneSteps: [
+        {
+          storyCandidateId: "story-1",
+          storyTitle: "Arc",
+          steps: ["Peach Garden Oath", "Merchant Arms", "Daxing Victory"],
+        },
+      ],
+    });
+
+    expect(prompt).toContain("REQUIRED Reader steps");
+    expect(prompt).toContain("Merchant Arms");
+    expect(prompt).toContain("Do NOT include rendererExpression");
+    expect(prompt).not.toContain(
+      "Renderer Expression — Canonical Visual Expression authorship"
+    );
   });
 });

@@ -67,6 +67,7 @@ describe("normalizeSceneContextCandidateSignals", () => {
         parentStoryCandidateId: "story-1",
         chapter_number: 1,
         title: "Courtyard",
+        summary: "Arya draws a blade in the courtyard",
         rendererExpression: {
           environment: "Winterfell courtyard",
           characters: [
@@ -113,6 +114,7 @@ describe("L2-C non-membership + signal quality", () => {
           parentStoryCandidateId: "story-1",
           chapter_number: 1,
           title: "Courtyard",
+          summary: "Household greets the king",
           characterIds: ["char_x"],
           locationId: "loc_y",
           rendererExpression: {
@@ -158,6 +160,7 @@ describe("L2-C non-membership + signal quality", () => {
           parentStoryCandidateId: "story-1",
           chapter_number: 1,
           title: "Strike",
+          summary: "Arya strikes in the courtyard",
           rendererExpression: {
             environment: "Winterfell courtyard",
             characters: [

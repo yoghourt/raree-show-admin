@@ -1,3 +1,4 @@
+import { isReadingNarrativelyComplete } from "@/lib/rollout/frame-narrative";
 import {
   isEmptyFrameUrl,
   isMissingPortraitUrl,
@@ -71,8 +72,19 @@ export function deriveProductionPlan(
 
   let framesNeedingUrl = 0;
   let framesWithCaption = 0;
+  let routesMissingNarrative = 0;
   for (const route of routes) {
     const frames = route.story_images_v2 ?? [];
+    if (!isReadingNarrativelyComplete(frames)) {
+      routesMissingNarrative += 1;
+      tasks.push({
+        id: `narrative:${route.tsid}`,
+        kind: "missing_frame_narrative",
+        label: `补齐 Reader 叙事帧：${route.title || route.tsid}`,
+        href: `${workBase}/reading-routes/${encodeURIComponent(route.tsid)}/edit`,
+        target: { routeTsid: route.tsid },
+      });
+    }
     frames.forEach((frame, frameIndex) => {
       const caption = frame.caption?.trim() ?? "";
       if (!caption) return;
@@ -123,6 +135,13 @@ export function deriveProductionPlan(
       done: routes.length > 0,
       total: 1,
       complete: routes.length > 0 ? 1 : 0,
+    },
+    {
+      id: "frame_narrative",
+      label: "Reader 叙事帧（Frame Narrative）",
+      done: routes.length > 0 && routesMissingNarrative === 0,
+      total: Math.max(routes.length, 0),
+      complete: Math.max(routes.length - routesMissingNarrative, 0),
     },
     {
       id: "frame_urls",

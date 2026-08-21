@@ -7,7 +7,8 @@ export type ProductionTaskKind =
   | "missing_cover"
   | "complete_character_portrait"
   | "fill_frame_url"
-  | "missing_reading_route";
+  | "missing_reading_route"
+  | "missing_frame_narrative";
 
 export type DerivedProductionTask = {
   /** Stable projection id for UI keys only — not a durable authority id */

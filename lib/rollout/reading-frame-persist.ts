@@ -28,7 +28,10 @@ import {
   type FrameProvenanceEntry,
   type SceneRowWithProvenance,
 } from "@/lib/rollout/scenes-server";
-import type { ReadingFrame } from "@/lib/types";
+import {
+  frameNarrativeDraftFromStaging,
+  projectFrameSlot,
+} from "@/lib/rollout/frame-narrative";
 
 export type FramePersistResult =
   | {
@@ -51,15 +54,7 @@ export type FramePersistResult =
       message: string;
     };
 
-function captionFromStaging(staging: AcceptedSceneCandidateStaging): string {
-  const summary = staging.summary?.trim();
-  if (summary) return summary;
-  return staging.title.trim();
-}
-
-function frameFromStaging(staging: AcceptedSceneCandidateStaging): ReadingFrame {
-  return { url: "", caption: captionFromStaging(staging) };
-}
+/** First persist: confirmed Scene draft → caption. Re-project: preserve existing. */
 
 /** Work Archive names for Context-scoped enrichment only (ADR-012 L2-A). */
 async function loadWorkArchiveCatalog(
@@ -177,7 +172,10 @@ async function persistViaContextPath(
     (p) => p.sourceReviewId === staging.sourceReviewId
   );
 
-  const nextFrame = frameFromStaging(staging);
+  const nextFrame = projectFrameSlot(
+    existing ? frames[existing.frameIndex] : undefined,
+    frameNarrativeDraftFromStaging(staging)
+  );
   const frameIndex = existing?.frameIndex ?? frames.length;
 
   // L2-A: Context-scoped archive enrichment (not Route membership).
@@ -268,7 +266,10 @@ async function persistLegacyPath(
     (p) => p.sourceReviewId === staging.sourceReviewId
   );
 
-  const nextFrame = frameFromStaging(staging);
+  const nextFrame = projectFrameSlot(
+    existing ? frames[existing.frameIndex] : undefined,
+    frameNarrativeDraftFromStaging(staging)
+  );
 
   const provenanceFields: FrameProvenanceEntry = {
     sourceReviewId: staging.sourceReviewId,
@@ -342,7 +343,7 @@ export async function persistReadingFrameFromSceneStaging(
     return {
       ok: false,
       code: "STAGING_INVALID",
-      message: "Scene staging title is required for Frame caption",
+      message: "Scene staging title is required",
     };
   }
 
