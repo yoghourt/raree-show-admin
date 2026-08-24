@@ -5,6 +5,7 @@ import {
   applySceneStagingContextEdits,
   applySceneStagingContextEditsFromArchive,
   frameContextArchiveSelectionFromStaging,
+  seedSceneStagingCastPlaceFromNames,
 } from "@/lib/rollout/scene-staging-context-edit";
 
 const base: AcceptedSceneCandidateStaging = {
@@ -98,5 +99,36 @@ describe("scene-staging-context-edit", () => {
       locationLabel: "临冬城",
     });
     expect(next.rendererExpression?.characters[0]?.visual).toBe("cloaked");
+  });
+
+  it("seeds empty cast/place from Discovery names", () => {
+    const empty: AcceptedSceneCandidateStaging = {
+      ...base,
+      visualIntent: undefined,
+      rendererExpression: {
+        environment: "unspecified place",
+        characters: [],
+        action: "standing",
+        composition: "wide view",
+      },
+    };
+    const seeded = seedSceneStagingCastPlaceFromNames(empty, {
+      characters: ["琼恩"],
+      locations: ["临冬城"],
+    });
+    expect(seeded.visualIntent?.characters?.map((c) => c.name)).toEqual(["琼恩"]);
+    expect(seeded.rendererExpression?.environment).toBe("临冬城");
+  });
+
+  it("does not overwrite existing cast or place when seeding", () => {
+    const seeded = seedSceneStagingCastPlaceFromNames(base, {
+      characters: ["山姆"],
+      locations: ["临冬城"],
+    });
+    expect(seeded.visualIntent?.characters?.map((c) => c.name)).toEqual([
+      "琼恩",
+      "守夜人",
+    ]);
+    expect(seeded.rendererExpression?.environment).toBe("长城");
   });
 });

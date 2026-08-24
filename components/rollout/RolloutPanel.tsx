@@ -10,6 +10,7 @@ import Link from "next/link";
 import * as React from "react";
 
 import { CharacterWritePreviewCard } from "@/components/rollout/CharacterWritePreviewCard";
+import { LocationWritePreviewCard } from "@/components/rollout/LocationWritePreviewCard";
 import {
   FrameContextWriteFields,
   StoryWritePreviewCard,
@@ -66,6 +67,39 @@ function CountBadge({ count }: { count: number }) {
     <span className="bg-primary/10 text-primary ml-1 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-normal tabular-nums">
       {count}
     </span>
+  );
+}
+
+function DismissedStagingRow({
+  label,
+  onRestore,
+  onDelete,
+}: {
+  label: string;
+  onRestore: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded border border-dashed p-2 text-sm">
+      <span className="min-w-0 truncate">{label}</span>
+      <div className="flex shrink-0 flex-wrap gap-1">
+        <Button size="sm" variant="ghost" onClick={onRestore}>
+          {rolloutUi.restoreStaging}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            if (!window.confirm(rolloutUi.confirmDeleteDismissedStaging)) {
+              return;
+            }
+            onDelete();
+          }}
+        >
+          {rolloutUi.deleteDismissedStaging}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -264,11 +298,13 @@ export function RolloutPanel({
   const pendingCount =
     rollout.queue.storyStaging.length +
     rollout.queue.readingRouteStaging.length +
-    (rollout.queue.characterStaging?.length ?? 0);
+    (rollout.queue.characterStaging?.length ?? 0) +
+    (rollout.queue.locationStaging?.length ?? 0);
   const dismissedCount =
     (rollout.queue.dismissedStoryStaging?.length ?? 0) +
     (rollout.queue.dismissedReadingRouteStaging?.length ?? 0) +
-    (rollout.queue.dismissedCharacterStaging?.length ?? 0);
+    (rollout.queue.dismissedCharacterStaging?.length ?? 0) +
+    (rollout.queue.dismissedLocationStaging?.length ?? 0);
   const persistedCount = rollout.storyUnits.length;
 
   const pendingStoryIds = React.useMemo(
@@ -432,6 +468,50 @@ export function RolloutPanel({
                         }}
                         onDismiss={() =>
                           rollout.dismissCharacterStaging(
+                            staging.sourceReviewId
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+              <section className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-medium">
+                    {rolloutUi.locationStagingTitle}
+                  </h3>
+                  <p className="text-muted-foreground text-xs">
+                    {rolloutUi.writeLocationPreviewHint}
+                  </p>
+                </div>
+                {(rollout.queue.locationStaging?.length ?? 0) === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    {rolloutUi.noLocationStaging}
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {(rollout.queue.locationStaging ?? []).map((staging) => (
+                      <LocationWritePreviewCard
+                        key={staging.sourceReviewId}
+                        staging={staging}
+                        catalog={locations}
+                        busy={rollout.busy}
+                        onChange={(next) =>
+                          rollout.updateLocationStaging(next)
+                        }
+                        onWrite={async (next) => {
+                          const written = await rollout.persistLocation(next);
+                          if (!written) return;
+                          setLocations((prev) => {
+                            if (prev.some((l) => l.tsid === written.tsid)) {
+                              return prev;
+                            }
+                            return [written, ...prev];
+                          });
+                        }}
+                        onDismiss={() =>
+                          rollout.dismissLocationStaging(
                             staging.sourceReviewId
                           )
                         }
@@ -636,55 +716,60 @@ export function RolloutPanel({
                   {showDismissed ? (
                     <div className="mt-3 space-y-2">
                       {rollout.queue.dismissedCharacterStaging?.map((s) => (
-                        <div
+                        <DismissedStagingRow
                           key={s.sourceReviewId}
-                          className="flex items-center justify-between rounded border border-dashed p-2 text-sm"
-                        >
-                          <span>{s.name}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              rollout.restoreCharacterStaging(s.sourceReviewId)
-                            }
-                          >
-                            {rolloutUi.restoreStaging}
-                          </Button>
-                        </div>
+                          label={s.name}
+                          onRestore={() =>
+                            rollout.restoreCharacterStaging(s.sourceReviewId)
+                          }
+                          onDelete={() =>
+                            rollout.deleteDismissedCharacterStaging(
+                              s.sourceReviewId
+                            )
+                          }
+                        />
+                      ))}
+                      {rollout.queue.dismissedLocationStaging?.map((s) => (
+                        <DismissedStagingRow
+                          key={s.sourceReviewId}
+                          label={s.name}
+                          onRestore={() =>
+                            rollout.restoreLocationStaging(s.sourceReviewId)
+                          }
+                          onDelete={() =>
+                            rollout.deleteDismissedLocationStaging(
+                              s.sourceReviewId
+                            )
+                          }
+                        />
                       ))}
                       {rollout.queue.dismissedStoryStaging?.map((s) => (
-                        <div
+                        <DismissedStagingRow
                           key={s.sourceReviewId}
-                          className="flex items-center justify-between rounded border border-dashed p-2 text-sm"
-                        >
-                          <span>{s.title}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              rollout.restoreStoryStaging(s.sourceReviewId)
-                            }
-                          >
-                            {rolloutUi.restoreStaging}
-                          </Button>
-                        </div>
+                          label={s.title}
+                          onRestore={() =>
+                            rollout.restoreStoryStaging(s.sourceReviewId)
+                          }
+                          onDelete={() =>
+                            rollout.deleteDismissedStoryStaging(
+                              s.sourceReviewId
+                            )
+                          }
+                        />
                       ))}
                       {rollout.queue.dismissedReadingRouteStaging?.map((s) => (
-                        <div
+                        <DismissedStagingRow
                           key={s.sourceReviewId}
-                          className="flex items-center justify-between rounded border border-dashed p-2 text-sm"
-                        >
-                          <span>{s.title}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              rollout.restoreSceneStaging(s.sourceReviewId)
-                            }
-                          >
-                            {rolloutUi.restoreStaging}
-                          </Button>
-                        </div>
+                          label={s.title}
+                          onRestore={() =>
+                            rollout.restoreSceneStaging(s.sourceReviewId)
+                          }
+                          onDelete={() =>
+                            rollout.deleteDismissedSceneStaging(
+                              s.sourceReviewId
+                            )
+                          }
+                        />
                       ))}
                     </div>
                   ) : null}

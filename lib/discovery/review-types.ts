@@ -90,6 +90,17 @@ export interface AcceptedCharacterStaging {
   acceptedAt: string;
 }
 
+/** Catalog Location staging — Rollout preview then CRUD Save (not Discovery Accept). */
+export interface AcceptedLocationStaging {
+  workId: string;
+  sourceReviewId: string;
+  sourceCandidateId?: string;
+  name: string;
+  region: string;
+  description: string;
+  acceptedAt: string;
+}
+
 export interface AcceptedSceneCandidateStaging {
   workId: string;
   sourceReviewId: string;
@@ -121,6 +132,11 @@ export type AcceptReviewResult =
       ok: true;
       kind: "character_staging";
       staging: AcceptedCharacterStaging;
+    }
+  | {
+      ok: true;
+      kind: "location_staging";
+      staging: AcceptedLocationStaging;
     }
   | {
       ok: true;

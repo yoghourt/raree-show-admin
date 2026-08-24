@@ -290,7 +290,7 @@ describe("IMPLEMENT-RIE-001 production Accept boundary", () => {
     const result = prepareAcceptReview(items, location.reviewId);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("expected location accept");
-    expect(result.kind).toBe("entity_prefill");
+    expect(result.kind).toBe("location_staging");
   });
 
   it("12. no ungated Story/Frame Accept path", () => {

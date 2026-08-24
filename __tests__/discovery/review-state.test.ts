@@ -26,6 +26,7 @@ import {
   getEffectiveDisplayName,
   validateCharacterAcceptFields,
   characterStagingFromAcceptedReviewItems,
+  locationStagingFromAcceptedReviewItems,
 } from "@/lib/discovery/review-state";
 
 function makeCandidate(
@@ -216,6 +217,116 @@ describe("Accept handoff guards", () => {
     expect(staged).toHaveLength(1);
     expect(staged[0]?.name).toBe("Liu Bei");
     expect(staged[0]?.house).toBe("Shu");
+  });
+
+  it("location accept returns location staging for Rollout queue", () => {
+    const items = createReviewItems([
+      makeCandidate({
+        candidateId: "loc-1",
+        candidateType: "location",
+        displayName: "Zhuozhou",
+        fields: {
+          name: "Zhuozhou",
+          region: "Youzhou",
+          description: "Commandery town",
+        },
+      }),
+    ]);
+    const result = prepareAcceptReview(items, items[0]!.reviewId);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.kind).toBe("location_staging");
+      if (result.kind === "location_staging") {
+        expect(result.staging.name).toBe("Zhuozhou");
+        expect(result.staging.region).toBe("Youzhou");
+        expect(result.staging.sourceReviewId).toBe(items[0]!.reviewId);
+      }
+    }
+  });
+
+  it("rebuilds location staging from already-accepted review items", () => {
+    const pending = createReviewItems([
+      makeCandidate({
+        candidateId: "cand-zhuo",
+        candidateType: "location",
+        displayName: "Zhuozhou",
+        fields: { name: "Zhuozhou", region: "Youzhou" },
+      }),
+    ]);
+    const reviewId = pending[0]!.reviewId;
+    const staged = locationStagingFromAcceptedReviewItems(
+      markReviewAccepted(pending, reviewId)
+    );
+    expect(staged).toHaveLength(1);
+    expect(staged[0]?.name).toBe("Zhuozhou");
+    expect(staged[0]?.region).toBe("Youzhou");
+  });
+
+  it("seeds empty scene cast/place from batch character and location names", () => {
+    const items = createReviewItems([
+      makeCandidate({
+        candidateId: "story-cand-1",
+        candidateType: "story",
+        displayName: "Arc",
+        fields: { title: "Arc", summary: "Summary" },
+      }),
+      makeCandidate({
+        candidateId: "scene-empty",
+        candidateType: "scene",
+        displayName: "Gate",
+        fields: {
+          parentStoryCandidateId: "story-cand-1",
+          chapter_number: 1,
+          title: "Liu Bei at Zhuozhou",
+          summary: "Arrival at the commandery",
+          rendererExpression: {
+            environment: "unspecified place",
+            characters: [],
+            action: "standing",
+            composition: "wide view",
+          },
+        },
+      }),
+      makeCandidate({
+        candidateId: "char-liu",
+        candidateType: "character",
+        displayName: "Liu Bei",
+        fields: { name: "Liu Bei", house: "Han" },
+      }),
+      makeCandidate({
+        candidateId: "loc-zhuo",
+        candidateType: "location",
+        displayName: "Zhuozhou",
+        fields: { name: "Zhuozhou", region: "Youzhou" },
+      }),
+    ]);
+    const storyResult = prepareAcceptReview(
+      items,
+      items[0]!.reviewId,
+      [],
+      GRANULARITY,
+      storyAuthority("story-cand-1")
+    );
+    expect(storyResult.ok).toBe(true);
+    if (!storyResult.ok || storyResult.kind !== "story_staging") {
+      throw new Error("expected story staging");
+    }
+    const accepted = markReviewAccepted(items, items[0]!.reviewId);
+    const sceneResult = prepareAcceptReview(
+      accepted,
+      items[1]!.reviewId,
+      [storyResult.staging],
+      GRANULARITY,
+      storyAuthority("story-cand-1")
+    );
+    expect(sceneResult.ok).toBe(true);
+    if (!sceneResult.ok || sceneResult.kind !== "scene_staging") {
+      throw new Error("expected scene staging");
+    }
+    expect(
+      sceneResult.staging.visualIntent?.characters?.map((c) => c.name)
+    ).toContain("Liu Bei");
+    expect(sceneResult.staging.rendererExpression?.environment).toBe("Zhuozhou");
   });
 
   it("story accept returns staging object with sourceCandidateId", () => {

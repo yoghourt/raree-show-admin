@@ -496,6 +496,7 @@ export function DiscoveryReviewPanel({
     acceptedStoryUnits,
     acceptedSceneCandidates,
     acceptedCharacters,
+    acceptedLocations,
     isProposing,
     isRegening,
     regenReviewId,
@@ -579,6 +580,10 @@ export function DiscoveryReviewPanel({
     () => new Set(rolloutQueue.processedCharacterReviewIds ?? []),
     [rolloutQueue.processedCharacterReviewIds]
   );
+  const processedLocationIds = React.useMemo(
+    () => new Set(rolloutQueue.processedLocationReviewIds ?? []),
+    [rolloutQueue.processedLocationReviewIds]
+  );
 
   const visibleAcceptedStoryUnits = React.useMemo(
     () =>
@@ -601,6 +606,13 @@ export function DiscoveryReviewPanel({
         (item) => !processedCharacterIds.has(item.sourceReviewId)
       ),
     [acceptedCharacters, processedCharacterIds]
+  );
+  const visibleAcceptedLocations = React.useMemo(
+    () =>
+      acceptedLocations.filter(
+        (item) => !processedLocationIds.has(item.sourceReviewId)
+      ),
+    [acceptedLocations, processedLocationIds]
   );
 
   const reviewListItems = React.useMemo(
@@ -788,12 +800,14 @@ export function DiscoveryReviewPanel({
   const acceptedCount =
     visibleAcceptedStoryUnits.length +
     visibleAcceptedSceneCandidates.length +
-    visibleAcceptedCharacters.length;
+    visibleAcceptedCharacters.length +
+    visibleAcceptedLocations.length;
 
   const rolloutPendingCount = rollout
     ? rollout.queue.storyStaging.length +
       rollout.queue.readingRouteStaging.length +
-      (rollout.queue.characterStaging?.length ?? 0)
+      (rollout.queue.characterStaging?.length ?? 0) +
+      (rollout.queue.locationStaging?.length ?? 0)
     : 0;
 
   const hasRolloutSurface =
@@ -1431,7 +1445,8 @@ export function DiscoveryReviewPanel({
 
                 <TabsContent value="accepted" className="space-y-4">
                   {visibleAcceptedStoryUnits.length === 0 &&
-                  visibleAcceptedCharacters.length === 0 ? (
+                  visibleAcceptedCharacters.length === 0 &&
+                  visibleAcceptedLocations.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
                       {discoveryReviewUi.flowHintAcceptedEmpty}
                     </p>
@@ -1480,6 +1495,60 @@ export function DiscoveryReviewPanel({
                                       revokeStagingAccept(
                                         item.sourceReviewId,
                                         "character"
+                                      );
+                                    }}
+                                  >
+                                    {discoveryReviewUi.revokeAccept}
+                                  </Button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ) : null}
+                      {visibleAcceptedLocations.length > 0 ? (
+                        <li className="space-y-2">
+                          <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                            {DISCOVERY_CANDIDATE_TYPE_LABELS.location}
+                          </h4>
+                          <ul className="space-y-2">
+                            {visibleAcceptedLocations.map((item) => (
+                              <li
+                                key={item.sourceReviewId}
+                                className="flex flex-col gap-2 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div className="min-w-0">
+                                  <div className="font-medium">{item.name}</div>
+                                  {item.region ? (
+                                    <p className="text-muted-foreground">
+                                      {item.region}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="flex shrink-0 flex-wrap gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setActiveTab("rollout")}
+                                  >
+                                    {discoveryReviewUi.goRollout}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      if (
+                                        !window.confirm(
+                                          discoveryReviewUi.confirmRevokeAccept
+                                        )
+                                      ) {
+                                        return;
+                                      }
+                                      revokeStagingAccept(
+                                        item.sourceReviewId,
+                                        "location"
                                       );
                                     }}
                                   >

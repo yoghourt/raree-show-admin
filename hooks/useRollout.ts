@@ -8,27 +8,37 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   AcceptedCharacterStaging,
+  AcceptedLocationStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
 import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
 import * as charactersApi from "@/lib/characters";
+import * as locationsApi from "@/lib/locations";
 import { messages } from "@/lib/locale";
 import {
+  deleteDismissedCharacterStagingItem,
+  deleteDismissedLocationStagingItem,
+  deleteDismissedSceneStagingItem,
+  deleteDismissedStoryStagingItem,
   dismissCharacterStagingItem,
+  dismissLocationStagingItem,
   dismissSceneStagingItem,
   dismissStoryStagingItem,
   findProjectedScene,
   findProjectedSceneByTsid,
   loadRolloutQueue,
   markCharacterReviewIdProcessed,
+  markLocationReviewIdProcessed,
   markSceneReviewIdProcessed,
   markStoryReviewIdProcessed,
   mergeRolloutQueue,
   recordProjectedScene,
   reconcileStoryStagingWithPersistedUnits,
   removeProjectedScene,
+  rematchQueueSceneStagingToArchive,
   restoreCharacterStagingItem,
+  restoreLocationStagingItem,
   restoreSceneStagingItem,
   restoreStoryStagingItem,
   ROLLOUT_QUEUE_UPDATED_EVENT,
@@ -42,12 +52,13 @@ import {
   removeSceneStagingFromRolloutQueue,
   removeStoryStagingFromRolloutQueue,
   updateCharacterStagingInRolloutQueue,
+  updateLocationStagingInRolloutQueue,
   updateSceneStagingInRolloutQueue,
   updateStoryStagingInRolloutQueue,
   syncRolloutQueueFromDiscovery,
 } from "@/lib/rollout/sync-discovery-staging";
 import { resolveStoryRelatedEntities } from "@/lib/rollout/resolve-story-entities";
-import type { Character } from "@/lib/types";
+import type { Character, Location } from "@/lib/types";
 import type {
   ApprovedSceneUnit,
   ApprovedStoryUnit,
@@ -103,6 +114,9 @@ export interface UseRolloutReturn {
   persistCharacter: (
     staging: AcceptedCharacterStaging
   ) => Promise<Character | null>;
+  persistLocation: (
+    staging: AcceptedLocationStaging
+  ) => Promise<Location | null>;
   projectSceneCreate: (
     staging: AcceptedSceneCandidateStaging,
     linkToStoryUnitId?: string
@@ -133,12 +147,19 @@ export interface UseRolloutReturn {
   dismissStoryStaging: (sourceReviewId: string) => void;
   dismissSceneStaging: (sourceReviewId: string) => void;
   dismissCharacterStaging: (sourceReviewId: string) => void;
+  dismissLocationStaging: (sourceReviewId: string) => void;
   restoreStoryStaging: (sourceReviewId: string) => void;
   restoreSceneStaging: (sourceReviewId: string) => void;
   restoreCharacterStaging: (sourceReviewId: string) => void;
+  restoreLocationStaging: (sourceReviewId: string) => void;
+  deleteDismissedStoryStaging: (sourceReviewId: string) => void;
+  deleteDismissedSceneStaging: (sourceReviewId: string) => void;
+  deleteDismissedCharacterStaging: (sourceReviewId: string) => void;
+  deleteDismissedLocationStaging: (sourceReviewId: string) => void;
   updateStoryStaging: (staging: AcceptedStoryUnitStaging) => void;
   updateSceneStaging: (staging: AcceptedSceneCandidateStaging) => void;
   updateCharacterStaging: (staging: AcceptedCharacterStaging) => void;
+  updateLocationStaging: (staging: AcceptedLocationStaging) => void;
 }
 
 async function parseRolloutError(res: Response): Promise<RolloutActionError> {
@@ -158,6 +179,21 @@ async function parseRolloutError(res: Response): Promise<RolloutActionError> {
   } catch {
     return { code: "UNKNOWN", message: res.statusText };
   }
+}
+
+async function rematchScenesAfterEntityWrite(
+  workId: string,
+  operatorId: string,
+  queue: RolloutQueueSnapshot
+): Promise<RolloutQueueSnapshot> {
+  const [chars, locs] = await Promise.all([
+    charactersApi.getAll(workId),
+    locationsApi.getAll(workId),
+  ]);
+  return rematchQueueSceneStagingToArchive(queue, {
+    characters: chars.map((c) => ({ name: c.name, tsid: c.tsid })),
+    locations: locs.map((l) => ({ name: l.name, tsid: l.tsid })),
+  });
 }
 
 export function useRollout({
@@ -332,7 +368,8 @@ export function useRollout({
     return (
       merged.storyStaging.length > 0 ||
       merged.readingRouteStaging.length > 0 ||
-      (merged.characterStaging?.length ?? 0) > 0
+      (merged.characterStaging?.length ?? 0) > 0 ||
+      (merged.locationStaging?.length ?? 0) > 0
     );
   }, [workId, operatorId]);
 
@@ -413,9 +450,13 @@ export function useRollout({
         const existing = findExistingByName(name, catalog);
         if (existing) {
           persistQueue(
-            markCharacterReviewIdProcessed(
-              loadRolloutQueue(workId, operatorId),
-              staging.sourceReviewId
+            await rematchScenesAfterEntityWrite(
+              workId,
+              operatorId,
+              markCharacterReviewIdProcessed(
+                loadRolloutQueue(workId, operatorId),
+                staging.sourceReviewId
+              )
             )
           );
           return existing;
@@ -428,15 +469,76 @@ export function useRollout({
           portraitUrl: "",
         });
         persistQueue(
-          markCharacterReviewIdProcessed(
-            loadRolloutQueue(workId, operatorId),
-            staging.sourceReviewId
+          await rematchScenesAfterEntityWrite(
+            workId,
+            operatorId,
+            markCharacterReviewIdProcessed(
+              loadRolloutQueue(workId, operatorId),
+              staging.sourceReviewId
+            )
           )
         );
         return created;
       } catch (e) {
         setActionError({
           code: "CHARACTER_PERSIST_FAILED",
+          message: e instanceof Error ? e.message : String(e),
+        });
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [workId, operatorId, persistQueue]
+  );
+
+  const persistLocation = useCallback(
+    async (staging: AcceptedLocationStaging): Promise<Location | null> => {
+      setBusy(true);
+      setActionError(null);
+      try {
+        const name = staging.name.trim();
+        if (!name) {
+          setActionError({
+            code: "STAGING_INVALID",
+            message: "地点名称不能为空",
+          });
+          return null;
+        }
+        const catalog = await locationsApi.getAll(workId);
+        const existing = findExistingByName(name, catalog);
+        if (existing) {
+          persistQueue(
+            await rematchScenesAfterEntityWrite(
+              workId,
+              operatorId,
+              markLocationReviewIdProcessed(
+                loadRolloutQueue(workId, operatorId),
+                staging.sourceReviewId
+              )
+            )
+          );
+          return existing;
+        }
+        const created = await locationsApi.create(workId, {
+          name,
+          region: staging.region.trim(),
+          description: staging.description.trim(),
+        });
+        persistQueue(
+          await rematchScenesAfterEntityWrite(
+            workId,
+            operatorId,
+            markLocationReviewIdProcessed(
+              loadRolloutQueue(workId, operatorId),
+              staging.sourceReviewId
+            )
+          )
+        );
+        return created;
+      } catch (e) {
+        setActionError({
+          code: "LOCATION_PERSIST_FAILED",
           message: e instanceof Error ? e.message : String(e),
         });
         return null;
@@ -911,6 +1013,14 @@ export function useRollout({
     [workId, operatorId]
   );
 
+  const updateLocationStaging = useCallback(
+    (staging: AcceptedLocationStaging) => {
+      updateLocationStagingInRolloutQueue(workId, operatorId, staging);
+      setQueue(loadRolloutQueue(workId, operatorId));
+    },
+    [workId, operatorId]
+  );
+
   const dismissSceneStaging = useCallback(
     (sourceReviewId: string) => {
       persistQueue(
@@ -971,6 +1081,78 @@ export function useRollout({
     [workId, operatorId, persistQueue]
   );
 
+  const dismissLocationStaging = useCallback(
+    (sourceReviewId: string) => {
+      persistQueue(
+        dismissLocationStagingItem(
+          loadRolloutQueue(workId, operatorId),
+          sourceReviewId
+        )
+      );
+    },
+    [workId, operatorId, persistQueue]
+  );
+
+  const restoreLocationStaging = useCallback(
+    (sourceReviewId: string) => {
+      persistQueue(
+        restoreLocationStagingItem(
+          loadRolloutQueue(workId, operatorId),
+          sourceReviewId
+        )
+      );
+    },
+    [workId, operatorId, persistQueue]
+  );
+
+  const deleteDismissedStoryStaging = useCallback(
+    (sourceReviewId: string) => {
+      persistQueue(
+        deleteDismissedStoryStagingItem(
+          loadRolloutQueue(workId, operatorId),
+          sourceReviewId
+        )
+      );
+    },
+    [workId, operatorId, persistQueue]
+  );
+
+  const deleteDismissedSceneStaging = useCallback(
+    (sourceReviewId: string) => {
+      persistQueue(
+        deleteDismissedSceneStagingItem(
+          loadRolloutQueue(workId, operatorId),
+          sourceReviewId
+        )
+      );
+    },
+    [workId, operatorId, persistQueue]
+  );
+
+  const deleteDismissedCharacterStaging = useCallback(
+    (sourceReviewId: string) => {
+      persistQueue(
+        deleteDismissedCharacterStagingItem(
+          loadRolloutQueue(workId, operatorId),
+          sourceReviewId
+        )
+      );
+    },
+    [workId, operatorId, persistQueue]
+  );
+
+  const deleteDismissedLocationStaging = useCallback(
+    (sourceReviewId: string) => {
+      persistQueue(
+        deleteDismissedLocationStagingItem(
+          loadRolloutQueue(workId, operatorId),
+          sourceReviewId
+        )
+      );
+    },
+    [workId, operatorId, persistQueue]
+  );
+
   return {
     loading,
     error,
@@ -989,6 +1171,7 @@ export function useRollout({
     importFromDiscovery,
     persistStoryUnit,
     persistCharacter,
+    persistLocation,
     projectSceneCreate,
     verifyReaderEvidence,
     projectSceneLinkExisting,
@@ -1002,11 +1185,18 @@ export function useRollout({
     dismissStoryStaging,
     dismissSceneStaging,
     dismissCharacterStaging,
+    dismissLocationStaging,
     restoreStoryStaging,
     restoreSceneStaging,
     restoreCharacterStaging,
+    restoreLocationStaging,
+    deleteDismissedStoryStaging,
+    deleteDismissedSceneStaging,
+    deleteDismissedCharacterStaging,
+    deleteDismissedLocationStaging,
     updateStoryStaging,
     updateSceneStaging,
     updateCharacterStaging,
+    updateLocationStaging,
   };
 }

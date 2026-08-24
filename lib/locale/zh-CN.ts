@@ -174,6 +174,13 @@ export const zhCN = {
     persistCharacter: '写入角色',
     persistCharacterSkipExisting: '已有档案，移出队列',
     characterPortraitDeferredHint: '肖像不在此写入。写入后可在制作页派生「补齐角色肖像」任务。',
+    locationStagingTitle: '待保存的地点',
+    noLocationStaging: '暂时没有待保存的地点',
+    writeLocationPreviewHint:
+      '以下字段与地点编辑页一致。核对后写入作品库。',
+    locationAlreadyExists: '作品库已有同名地点',
+    persistLocation: '写入地点',
+    persistLocationSkipExisting: '已有档案，移出队列',
     noLinks:             '暂无关联',
     noStoryUnits:        '作品中还没有故事',
     persistStory:        '写入故事',
@@ -181,6 +188,9 @@ export const zhCN = {
     projectLink:         '添加到指定故事',
     dismissStaging:      '稍后再说',
     restoreStaging:      '放回待写入',
+    deleteDismissedStaging: '删除',
+    confirmDeleteDismissedStaging:
+      '确定删除这条已移出的条目？删除后不会再出现在待写入中。',
     dismissedStoryTitle: '已移出的故事',
     dismissedTitle:      '已移出的画面',
     noDismissedStoryStaging: '没有已移出的故事',
