@@ -60,7 +60,7 @@ describe("parseCharacterArchive", () => {
 });
 
 describe("selectActiveCharacterCues (budget)", () => {
-  it("caps costume ≤1, prop ≤1, total ≤2", () => {
+  it("caps costume ≤1, standing prop ≤1, and keeps Ned extras out", () => {
     const parsed = parseCharacterArchive(NED_ARCHIVE);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok || !parsed.value) return;
@@ -76,6 +76,41 @@ describe("selectActiveCharacterCues (budget)", () => {
     expect(active.activeCues).toContain("ancestral greatsword");
     expect(active.activeCues).not.toContain("extra unused costume");
     expect(active.activeCues).not.toContain("wool noble attire");
+  });
+
+  it("keeps Tier-1 identity cues and skips unused costume extras", () => {
+    const parsed = parseCharacterArchive({
+      identityCues: ["red face", "long beard", "Green Dragon Crescent Blade"],
+      costumeCues: ["green battle robe", "extra unused costume"],
+      propCues: [],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok || !parsed.value) return;
+    const active = selectActiveCharacterCues(parsed.value);
+    expect(active.identityCues).toEqual([
+      "red face",
+      "long beard",
+      "Green Dragon Crescent Blade",
+    ]);
+    expect(active.costumeCues).toEqual(["green battle robe"]);
+    expect(active.activeCues).toContain("red face");
+    expect(active.activeCues).not.toContain("extra unused costume");
+  });
+
+  it("does not inject a letter into a scene that never names a document", () => {
+    const parsed = parseCharacterArchive({
+      costumeCues: ["southern noble gown"],
+      propCues: ["sealed letter"],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok || !parsed.value) return;
+    const active = selectActiveCharacterCues(
+      parsed.value,
+      CHARACTER_ARCHIVE_CUE_BUDGET,
+      "grove dark pool two figures standing"
+    );
+    expect(active.propCues).not.toContain("sealed letter");
+    expect(active.costumeCues).toContain("southern noble gown");
   });
 });
 

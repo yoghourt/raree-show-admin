@@ -4,11 +4,13 @@
 
 import { describe, expect, it } from "vitest";
 
+import { foldCharacterArchivesIntoExpression } from "@/lib/discovery/character-archive";
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import {
   expressionToPrompt,
   projectExpressionForDeployment,
 } from "@/lib/discovery/execution-projection";
+import { FRAMES } from "../../scripts/evg-001-cross-work-visual/fixtures";
 import {
   adaptSceneExpressionForLocalCapability,
   assessSceneFaceSafety,
@@ -284,10 +286,11 @@ describe("Rule 6 Face Safety", () => {
       action: "woman handing parchment to man across table",
       composition: "two-shot framing figures from waist up indoors",
     });
-    expect(adapted.action).toMatch(/letter on table/i);
+    expect(adapted.action).toMatch(/parchment/i);
     expect(adapted.action).not.toMatch(/handing/i);
-    expect(adapted.composition).toMatch(/both figures fully visible/i);
-    expect(adapted.composition).toMatch(/profiles or looking down/i);
+    expect(adapted.action).not.toMatch(/\bletter\b/i);
+    expect(adapted.composition).toMatch(/both visible/i);
+    expect(adapted.composition).toMatch(/identity weapons in frame/i);
     expect(adapted.action).toMatch(/left/i);
     expect(adapted.action).toMatch(/right/i);
     const safety = assessSceneFaceSafety(adapted);
@@ -319,9 +322,10 @@ describe("Rule 6 Face Safety", () => {
       },
       "local"
     );
-    expect(prompt.length).toBeLessThan(520);
+    expect(prompt.length).toBeLessThan(600);
     expect(prompt).not.toMatch(/exactly two figures/i);
-    expect(prompt).toMatch(/both figures fully visible/i);
+    expect(prompt).toMatch(/both visible/i);
+    expect(prompt).toMatch(/identity weapons in frame/i);
     expect(prompt).not.toMatch(/Atmosphere:/i);
   });
 
@@ -399,38 +403,90 @@ describe("Rule 6 Face Safety", () => {
     expect(remapped.characters[1].role).toBe("Eddard Stark");
   });
 
-  it("sharpens godswood landmark and costume mutex", () => {
+  it("preserves authored location identity instead of substituting a place", () => {
     const sharpened = sharpenExpressionAnchors({
-      environment: "ancient forest with dark water and mist",
+      environment: "Han military tent, campaign table, hanging maps",
+      characters: [
+        {
+          role: "Guan Yu",
+          visual:
+            "Green Dragon Crescent Blade, red face, long beard, green robe, back-three-quarter",
+        },
+      ],
+      action: "looking down at campaign maps on the table",
+      composition: "medium wide shot",
+    });
+    expect(sharpened.environment).toMatch(/tent/i);
+    expect(sharpened.environment).not.toMatch(/winterfell|stone chamber/i);
+    expect(sharpened.characters[0].visual).toMatch(/crescent blade/i);
+    expect(sharpened.characters[0].visual).toMatch(/red face/i);
+    expect(sharpened.characters[0].visual).toMatch(/beard/i);
+    expect(sharpened.characters[0].visual).not.toMatch(/back-three-quarter/i);
+  });
+
+  it("keeps named identity symbols over action phrases in the same visual budget", () => {
+    const sharpened = sharpenExpressionAnchors({
+      environment: "Han felt command tent, campaign map on wooden table",
+      characters: [
+        {
+          role: "Guan Yu",
+          visual:
+            "Green Dragon Crescent Blade, red face, long beard, green robe, looking down at map",
+        },
+      ],
+      action: "looking down at campaign maps on the table",
+      composition: "medium wide shot",
+    });
+    const visual = sharpened.characters[0].visual;
+    expect(visual).toMatch(/Green Dragon Crescent Blade/);
+    expect(visual).toMatch(/red face/i);
+    expect(visual).toMatch(/long beard/i);
+    expect(visual).toMatch(/green robe/i);
+    expect(visual).not.toMatch(/looking down/i);
+    expect(visual).not.toMatch(/\b(sword|weapon)\b/i);
+  });
+
+  it("applies the same action-vs-identity ranking on a northern character", () => {
+    const sharpened = sharpenExpressionAnchors({
+      environment: "Winterfell solar, granite chamber, timber table",
       characters: [
         {
           role: "Eddard Stark",
           visual:
-            "dark northern tunic, heavy fur cloak, Valyrian steel sword Ice",
-        },
-        {
-          role: "Catelyn Stark",
-          visual: "southern noble gown, fur-trimmed winter cloak, letter scroll",
+            "greatsword Ice, northern fur cloak, bearded, head bowed profile, looking down at letter",
         },
       ],
-      action: "two figures standing near dark pool",
+      action: "looking down at sealed letter on wooden table",
       composition: "medium wide shot",
     });
-    expect(sharpened.environment).toMatch(/weirwood face/i);
-    expect(sharpened.environment).not.toMatch(/mist forest|ancient forest/i);
-    expect(sharpened.characters[0].visual.toLowerCase()).toMatch(/ice/);
-    expect(sharpened.characters[0].visual).not.toMatch(/gown/i);
-    expect(sharpened.characters[1].visual).toMatch(/gown/i);
-    expect(sharpened.characters[1].visual).not.toMatch(/fur-trimmed|fur mantle|heavy fur/i);
-    expect(sharpened.characters[0].visual.split(",").length).toBeLessThanOrEqual(
-      2
-    );
-    expect(sharpened.characters[1].visual.split(",").length).toBeLessThanOrEqual(
-      2
-    );
+    const visual = sharpened.characters[0].visual;
+    expect(visual).toMatch(/greatsword Ice/i);
+    expect(visual).toMatch(/fur cloak/i);
+    expect(visual).toMatch(/bearded/i);
+    expect(visual).not.toMatch(/looking down/i);
+    expect(visual).not.toMatch(/^(?:.*\b)?(?:sword|blade)\b(?!.*greatsword)/i);
   });
 
-  it("adapt dual-cast names left/right and strips exactly-N", () => {
+  it("does not rewrite a named map into a letter", () => {
+    const adapted = adaptSceneExpressionForLocalCapability({
+      environment: "Han command tent, campaign map on wooden table",
+      characters: [
+        { role: "Liu Bei", visual: "plain Han robe, twin swords" },
+        { role: "Guan Yu", visual: "Green Dragon Crescent Blade, green robe" },
+      ],
+      action: "Liu Bei and Guan Yu looking down at a campaign map on the table",
+      composition: "medium wide shot, faces secondary",
+    });
+    expect(adapted.environment).toMatch(/tent/i);
+    expect(adapted.environment).toMatch(/map/i);
+    expect(adapted.environment).not.toMatch(/winterfell/i);
+    expect(adapted.action).toMatch(/map/i);
+    expect(adapted.action).not.toMatch(/letter|parchment/i);
+    expect(adapted.action).toMatch(/left/i);
+    expect(adapted.action).toMatch(/right/i);
+  });
+
+  it("adapt dual-cast names left/right and strips exactly-N without changing place", () => {
     const adapted = adaptSceneExpressionForLocalCapability({
       environment: "Winterfell chamber",
       characters: [
@@ -445,8 +501,9 @@ describe("Rule 6 Face Safety", () => {
     expect(adapted.action).toMatch(/Catelyn/i);
     expect(adapted.action).toMatch(/left/i);
     expect(adapted.action).toMatch(/right/i);
-    expect(adapted.composition).toMatch(/both figures fully visible/i);
-    expect(adapted.environment).toMatch(/Winterfell|stone|table/i);
+    expect(adapted.action).toMatch(/letter/i);
+    expect(adapted.composition).toMatch(/both visible/i);
+    expect(adapted.environment).toBe("Winterfell chamber");
   });
 });
 
@@ -470,8 +527,8 @@ describe("rendererExpressionToPrompt", () => {
     const prompt = expressionToPrompt(SAMPLE_EXPRESSION, "local");
     expect(prompt).toContain("Action: knight left kneeling");
     expect(prompt).toContain("Environment: castle hall");
-    expect(prompt).toContain("both figures fully visible");
-    expect(prompt).toContain("profiles or looking down");
+    expect(prompt).toContain("both visible");
+    expect(prompt).toContain("identity weapons in frame");
     expect(prompt).toContain("knight: armor, sword raised");
     expect(prompt).not.toContain("protects");
     expect(prompt).toContain("Frozen still");
@@ -486,7 +543,8 @@ describe("rendererExpressionToPrompt", () => {
 
   it("local projectExpressionForDeployment applies dual-cast rewrite", () => {
     const projected = projectExpressionForDeployment(SAMPLE_EXPRESSION, "local");
-    expect(projected.composition).toMatch(/both figures fully visible/i);
+    expect(projected.composition).toMatch(/both visible/i);
+    expect(projected.composition).toMatch(/identity weapons in frame/i);
     const cloud = projectExpressionForDeployment(SAMPLE_EXPRESSION, "cloud");
     expect(cloud.composition).toBe(SAMPLE_EXPRESSION.composition);
   });
@@ -596,5 +654,49 @@ describe("parseFrameProvenance Expression round-trip", () => {
     expect(parsed).toHaveLength(1);
     expect(parsed[0]!.rendererExpression?.action).toContain("kneeling");
     expect(parsed[0]!.visualIntent?.purpose).toBe("establish tension");
+  });
+});
+
+describe("EVG-001-R3 identity slots on cross-work fixtures", () => {
+  function projectFrame(id: string) {
+    const frame = FRAMES.find((f) => f.id === id);
+    if (!frame) throw new Error(`missing fixture ${id}`);
+    const folded = foldCharacterArchivesIntoExpression(
+      frame.expression,
+      frame.roles.map((r) => ({ name: r.name, archive: r.archive }))
+    );
+    return projectExpressionForDeployment(folded, "local");
+  }
+
+  it("tk-campaign-document keeps Guan Yu identity over looking-down-at-map", () => {
+    const projected = projectFrame("tk-campaign-document");
+    const guanyu = projected.characters.find((c) => /guan/i.test(c.role));
+    expect(guanyu).toBeTruthy();
+    expect(guanyu!.visual).toMatch(/Green Dragon Crescent Blade/);
+    expect(guanyu!.visual).toMatch(/red face/i);
+    expect(guanyu!.visual).toMatch(/beard/i);
+    expect(guanyu!.visual).toMatch(/green robe/i);
+    expect(guanyu!.visual).not.toMatch(/looking down/i);
+    expect(projected.environment).toMatch(/tent/i);
+    expect(projected.environment).not.toMatch(/winterfell/i);
+    expect(`${projected.environment} ${projected.action}`).toMatch(/map/i);
+    expect(`${projected.environment} ${projected.action}`).not.toMatch(
+      /letter|parchment/i
+    );
+    expect(projected.composition).toMatch(/identity weapons in frame/i);
+  });
+
+  it("as-indoor-counsel uses the same ranking without work-specific rules", () => {
+    const projected = projectFrame("as-indoor-counsel");
+    const ned = projected.characters.find((c) => /eddard/i.test(c.role));
+    const catelyn = projected.characters.find((c) => /catelyn/i.test(c.role));
+    expect(ned).toBeTruthy();
+    expect(catelyn).toBeTruthy();
+    expect(ned!.visual).toMatch(/fur cloak/i);
+    expect(catelyn!.visual).toMatch(/gown/i);
+    expect(`${projected.environment} ${projected.action}`).toMatch(/letter/i);
+    expect(projected.environment).toMatch(/winterfell|solar|granite/i);
+    expect(projected.environment).not.toMatch(/\bhan\b|peach|felt tent/i);
+    expect(projected.composition).toMatch(/identity weapons in frame/i);
   });
 });

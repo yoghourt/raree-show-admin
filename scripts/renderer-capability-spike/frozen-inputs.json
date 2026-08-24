@@ -1,0 +1,81 @@
+{
+  "grant": "SPIKE-RCS-001",
+  "source": "EVG-001-R3",
+  "sourceSummary": "scripts/evg-001-cross-work-visual/results/r3/summary.json",
+  "seed": 42,
+  "size": 512,
+  "provider": "localai",
+  "note": "Frozen Local prompts and projected Renderer Expressions from EVG-001-R3. Do not retune per model.",
+  "cases": [
+    {
+      "id": "tk-campaign-document",
+      "workId": "three-kingdoms",
+      "label": "Case A — Three Kingdoms / Guanyu campaign map",
+      "caption": "刘备与关羽俯看军帐中的征讨地图。",
+      "castCount": 2,
+      "localPrompt": "Setting: Han command tent. Characters: Liu Bei: plain Han robe, twin swords, looking down at map; Guan Yu: Green Dragon Crescent Blade, red face, long beard, green robe. Action: campaign map between figures, Liu left, Guan right, both looking toward campaign map. Environment: Han felt command tent, campaign map on wooden table, oil lamps. Composition: medium-wide, both visible, identity weapons in frame, profiles. Visual emphasis: felt tent, campaign map, Green Dragon Crescent Blade. No extra people. Frozen still, no text, no watermark.",
+      "rendererExpression": {
+        "environment": "Han felt command tent, campaign map on wooden table, oil lamps",
+        "characters": [
+          {
+            "role": "Liu Bei",
+            "visual": "plain Han robe, twin swords, looking down at map"
+          },
+          {
+            "role": "Guan Yu",
+            "visual": "Green Dragon Crescent Blade, red face, long beard, green robe"
+          }
+        ],
+        "action": "campaign map between figures, Liu left, Guan right, both looking toward campaign map",
+        "composition": "medium-wide, both visible, identity weapons in frame, profiles",
+        "visualEmphasis": "felt tent, campaign map, Green Dragon Crescent Blade"
+      },
+      "baselinePng": "scripts/evg-001-cross-work-visual/results/r3/tk-campaign-document.png"
+    },
+    {
+      "id": "as-indoor-counsel",
+      "workId": "asoiaf",
+      "label": "Case B — ASOIAF indoor letter",
+      "caption": "Catelyn delivers grave news of Jon Arryn's death; she and Ned look down at the sealed letter.",
+      "castCount": 2,
+      "localPrompt": "Setting: Winterfell solar. Characters: Catelyn Stark: southern noble gown, sealed letter, standing in profile, auburn hair; Eddard Stark: northern fur cloak, seated looking down at parchment, ancestral greatsword Ice. Action: sealed letter between figures, Catelyn left, Eddard right, both looking toward sealed letter. Environment: Winterfell solar, granite chamber, timber table, tallow candles. Composition: medium-wide, both visible, identity weapons in frame, profiles. Visual emphasis: sealed parchment between husband and wife. No extra people. Frozen still, no text, no watermark.",
+      "rendererExpression": {
+        "environment": "Winterfell solar, granite chamber, timber table, tallow candles",
+        "characters": [
+          {
+            "role": "Catelyn Stark",
+            "visual": "southern noble gown, sealed letter, standing in profile, auburn hair"
+          },
+          {
+            "role": "Eddard Stark",
+            "visual": "northern fur cloak, seated looking down at parchment, ancestral greatsword Ice,"
+          }
+        ],
+        "action": "sealed letter between figures, Catelyn left, Eddard right, both looking toward sealed letter",
+        "composition": "medium-wide, both visible, identity weapons in frame, profiles",
+        "visualEmphasis": "sealed parchment between husband and wife"
+      },
+      "baselinePng": "scripts/evg-001-cross-work-visual/results/r3/as-indoor-counsel.png"
+    }
+  ],
+  "models": [
+    {
+      "id": "sd35",
+      "label": "SD3.5 Medium",
+      "modelId": "sd-3.5-medium-ggml",
+      "reuseR3Baseline": true
+    },
+    {
+      "id": "z-image",
+      "label": "Z-Image-Turbo",
+      "modelId": "Z-Image-Turbo",
+      "reuseR3Baseline": false
+    },
+    {
+      "id": "flux2-klein",
+      "label": "FLUX.2 Klein 4B",
+      "modelId": "flux.2-klein-4b",
+      "reuseR3Baseline": false
+    }
+  ]
+}

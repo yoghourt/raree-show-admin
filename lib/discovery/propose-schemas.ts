@@ -29,6 +29,7 @@ const evidenceRefSchema = z.object({
 const characterArchiveSchema = z
   .object({
     visualSummary: z.string().optional(),
+    identityCues: z.array(z.string()).optional(),
     costumeCues: z.array(z.string()),
     propCues: z.array(z.string()),
   })

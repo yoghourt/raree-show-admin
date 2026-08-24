@@ -113,6 +113,18 @@ next-env.d.ts
 # Discovery → Scene information loss spike (SPIKE-DISCOVERY-SCENE-001)
 /scripts/discovery-scene-spike/results/
 
+# EVG-001 cross-work visual experience evidence (PNGs + per-run meta)
+/scripts/evg-001-cross-work-visual/results/
+
+# SPIKE-RCS-001 local renderer capability comparison
+/scripts/renderer-capability-spike/results/
+
+# CREATOR-RENDERER-QUAL-001
+/scripts/creator-renderer-qualification/results/
+
+# Z-IMAGE-BLOCKER-CHECK-001
+/scripts/z-image-blocker-check/results/
+
 # Python virtualenvs (local image spike / Diffusers)
 .venv/
 **/.venv/

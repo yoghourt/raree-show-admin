@@ -1,7 +1,7 @@
 # Deployment Defaults — Image Runtime & Content Showcase
 
 **Status:** Current recommendations (replaceable)  
-**Last Updated:** 2026-07-23  
+**Last Updated:** 2026-08-24  
 **Path:** `config/infra/deployment-defaults.md`  
 **Layer:** **Deployment only**  
 **Authority:** MUST remain compatible with ADR-010 (incl. **A3**) · SPEC-IMG-001 · `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC`
@@ -34,7 +34,7 @@ Deployment Adapter
 | `creator_draft_provider` | Local **or** free-tier draft (e.g. Pollinations) | Replaceable |
 | `creator_accept_provider` | **Local** (Production Default) | A3 Constraint F; env `IMAGE_CREATOR_ACCEPT_PROVIDER` (default `local`) |
 | `creator_accept_fallback` | **Cloud** hosted accept (SiliconFlow by default) | env `IMAGE_CREATOR_ACCEPT_FALLBACK` (default `siliconflow`) |
-| `accept_model` | Local model id **or** Cloud T2I model (deployment-selected) | `IMAGE_CREATOR_ACCEPT_MODEL` / `IMAGE_CREATOR_FALLBACK_MODEL` (default Cloud T2I: `FLUX.1-dev`; Kontext only when reference image is present) |
+| `accept_model` | **LocalAI Creator Default:** `Z-Image-Turbo` (RSD-002). Rollback: `sd-3.5-medium-ggml`. Cloud T2I unchanged. | `IMAGE_CREATOR_ACCEPT_MODEL` / `IMAGE_CREATOR_FALLBACK_MODEL` (default Cloud T2I: `FLUX.1-dev`; Kontext only when reference image is present). Provider unchanged. |
 | Local endpoint | Operator HTTP portrait server | `IMAGE_CREATOR_LOCAL_BASE` (e.g. `http://127.0.0.1:8191`) |
 
 **A3 Constraint F:** Creator Production Default = Local via Deployment Adapter; Cloud remains Fallback / Accept Baseline. MUST NOT freeze Local vendor/model. MUST remain replaceable without amending ADR-010 Contract / SPEC-IMG-001 Port shape. Reader Runtime is unaffected.
