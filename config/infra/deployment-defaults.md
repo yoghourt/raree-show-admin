@@ -33,7 +33,7 @@ Deployment Adapter
 | -------------- | ---------------------- | ----- |
 | `creator_draft_provider` | Local **or** free-tier draft (e.g. Pollinations) | Replaceable |
 | `creator_accept_provider` | **Local** (Production Default) | A3 Constraint F; env `IMAGE_CREATOR_ACCEPT_PROVIDER` (default `local`) |
-| `creator_accept_fallback` | **Cloud** hosted accept (SiliconFlow by default) | env `IMAGE_CREATOR_ACCEPT_FALLBACK` (default `siliconflow`) |
+| `creator_accept_fallback` | **Opt-in Cloud** (SiliconFlow when set) | env `IMAGE_CREATOR_ACCEPT_FALLBACK` — **unset / none = no fallback** (do not silently hit Cloud). Set `siliconflow` to enable. |
 | `accept_model` | **LocalAI Creator Default:** `Z-Image-Turbo` (RSD-002). Rollback: `sd-3.5-medium-ggml`. Cloud T2I unchanged. | `IMAGE_CREATOR_ACCEPT_MODEL` / `IMAGE_CREATOR_FALLBACK_MODEL` (default Cloud T2I: `FLUX.1-dev`; Kontext only when reference image is present). Provider unchanged. |
 | Local endpoint | Operator HTTP portrait server | `IMAGE_CREATOR_LOCAL_BASE` (e.g. `http://127.0.0.1:8191`) |
 

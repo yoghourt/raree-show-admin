@@ -22,8 +22,10 @@ const inputSchema = z.object({
 })
 
 /**
- * Operator discard of a terminal portrait/frame job (succeeded|failed → cancelled).
- * Does not write Assets. Cancelled jobs are hidden from default Admin lists.
+ * Operator cancel/discard of a generate job → cancelled.
+ * - queued/running: abort stuck or unwanted in-flight work (e.g. Worker killed)
+ * - succeeded/failed: hide terminal result from Admin lists
+ * Does not write Assets.
  */
 export async function discardGenerateJob(input: {
   workId: string
@@ -55,15 +57,26 @@ export async function discardGenerateJob(input: {
   if (!row || row.work_id !== parsed.data.workId) {
     return { ok: false, message: "任务不存在或不属于当前作品。" }
   }
-  if (row.status !== "succeeded" && row.status !== "failed") {
+
+  const status = String(row.status)
+  const abortable = status === "queued" || status === "running"
+  const discardable = status === "succeeded" || status === "failed"
+  if (!abortable && !discardable) {
     return {
       ok: false,
-      message: `仅可丢弃 succeeded/failed 任务（当前 ${row.status}）。`,
+      message: `无法取消该任务（当前 ${status}）。`,
     }
   }
 
+  const reason =
+    parsed.data.reason !== "operator_discarded"
+      ? parsed.data.reason
+      : abortable
+        ? "operator_aborted"
+        : "operator_discarded"
+
   try {
-    await cancelGenerateJob(parsed.data.jobId, parsed.data.reason, supabase)
+    await cancelGenerateJob(parsed.data.jobId, reason, supabase)
     return { ok: true }
   } catch (e) {
     return {

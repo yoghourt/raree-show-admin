@@ -168,6 +168,17 @@ export function formatActiveCuesForVisual(active: ActiveCharacterCues): string {
   return active.activeCues.join(", ");
 }
 
+/**
+ * Budgeted archive cues for a portrait prompt (standing identity props included).
+ * Renderer still receives a prompt string only — never the Archive object.
+ */
+export function formatArchiveForPortrait(
+  archive: CharacterArchive | null | undefined
+): string {
+  if (!archive) return "";
+  return formatActiveCuesForVisual(selectActiveCharacterCues(archive));
+}
+
 type ExpressionCharacter = { role: string; visual: string };
 type ExpressionLike = {
   environment: string;

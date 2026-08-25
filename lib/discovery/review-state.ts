@@ -3,6 +3,11 @@
  */
 
 import { getCandidateDedupeKey } from "@/lib/discovery/candidate-validate";
+import {
+  formatArchiveForPortrait,
+  parseCharacterArchive,
+} from "@/lib/discovery/character-archive";
+import { mergeAppearanceIntoDescription } from "@/lib/prompts/avatar";
 import type {
   DiscoveryCandidate,
   CharacterCandidateFields,
@@ -375,6 +380,19 @@ export function buildLocationStaging(
   };
 }
 
+function foldArchiveAppearanceIntoStagingDescription(
+  fields: CharacterCandidateFields
+): string {
+  const description =
+    typeof fields.description === "string" ? fields.description.trim() : "";
+  const parsed = parseCharacterArchive(fields.characterArchive);
+  if (!parsed.ok || !parsed.value) return description;
+  return mergeAppearanceIntoDescription(
+    description,
+    formatArchiveForPortrait(parsed.value)
+  );
+}
+
 export function buildCharacterStaging(
   item: DiscoveryReviewItem
 ): AcceptedCharacterStaging {
@@ -388,8 +406,7 @@ export function buildCharacterStaging(
       displayName ||
       (typeof fields.name === "string" ? fields.name.trim() : ""),
     house: typeof fields.house === "string" ? fields.house.trim() : "",
-    description:
-      typeof fields.description === "string" ? fields.description.trim() : "",
+    description: foldArchiveAppearanceIntoStagingDescription(fields),
     signatureQuote:
       typeof fields.signatureQuote === "string"
         ? fields.signatureQuote.trim() || null

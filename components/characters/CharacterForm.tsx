@@ -31,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PortraitJobResultDialog } from "@/components/generate-jobs/PortraitJobResultDialog";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
 import { formatGenerateJobErrorForOperator } from "@/lib/ai/image/operatorErrorCopy";
+import { descriptionWithArchiveAppearance } from "@/lib/discovery/portrait-appearance";
 import { messages } from "@/lib/locale";
 import * as charactersApi from "@/lib/characters";
 import {
@@ -251,7 +252,11 @@ export function CharacterForm(props: CharacterFormProps) {
     setPortraitJobHint(null);
     try {
       const existingPortrait = form.getValues("portraitUrl")?.trim();
-      const baseDescription = form.getValues("description")?.trim() ?? "";
+      const baseDescription = descriptionWithArchiveAppearance(
+        props.workId,
+        form.getValues("name"),
+        form.getValues("description")?.trim() ?? ""
+      );
       const note = portraitRevisionNote.trim();
       const description =
         opts?.withRevision && note
@@ -585,6 +590,45 @@ export function CharacterForm(props: CharacterFormProps) {
                   刷新任务
                 </Button>
               ) : null}
+              {props.mode === "edit" &&
+              (activePortraitJob?.status === "queued" ||
+                activePortraitJob?.status === "running") ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-zinc-500"
+                  disabled={portraitEnqueueBusy}
+                  onClick={() => {
+                    void (async () => {
+                      if (!activePortraitJob) return;
+                      setPortraitEnqueueBusy(true);
+                      setPortraitJobHint(null);
+                      try {
+                        const result = await discardGenerateJob({
+                          workId: props.workId,
+                          jobId: activePortraitJob.id,
+                          reason: "operator_aborted",
+                        });
+                        if (!result.ok) {
+                          setPortraitJobHint(result.message);
+                          return;
+                        }
+                        setPortraitJobHint("已取消进行中任务。");
+                        await refreshPortraitJobs();
+                      } catch (e) {
+                        setPortraitJobHint(
+                          e instanceof Error ? e.message : String(e)
+                        );
+                      } finally {
+                        setPortraitEnqueueBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  取消任务
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="secondary"
@@ -595,7 +639,14 @@ export function CharacterForm(props: CharacterFormProps) {
                 onClick={() => {
                   const fd = new FormData();
                   fd.append("name", watchedName);
-                  fd.append("description", watchedDescription);
+                  fd.append(
+                    "description",
+                    descriptionWithArchiveAppearance(
+                      props.workId,
+                      watchedName,
+                      watchedDescription
+                    )
+                  );
                   if (props.mode === "edit") {
                     fd.append("characterTsid", props.defaultValues.tsid);
                   }

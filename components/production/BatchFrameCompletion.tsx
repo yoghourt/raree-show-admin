@@ -1284,6 +1284,23 @@ export function BatchFrameCompletion({
                           </Button>
                         </>
                       ) : null}
+                      {(job.status === "queued" || job.status === "running") &&
+                      job.subject_type === "scene" ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-zinc-500"
+                          disabled={
+                            writing ||
+                            enqueueBusy ||
+                            requeueingId === job.id
+                          }
+                          onClick={() => void discardFrameJob(job)}
+                        >
+                          {requeueingId === job.id ? "处理中…" : "取消"}
+                        </Button>
+                      ) : null}
                     </div>
                     {retryPanelJobId === job.id ? (
                       <div className="mt-1 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">

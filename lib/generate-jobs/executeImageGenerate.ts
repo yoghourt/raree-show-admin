@@ -16,7 +16,11 @@ import type {
   SceneFrameJobInput,
 } from "@/lib/generate-jobs";
 import { buildHostedImageResultReference } from "@/lib/generate-jobs/resultReference";
-import { buildAvatarPrompt, buildAvatarNegativePrompt } from "@/lib/prompts/avatar";
+import {
+  buildAvatarPrompt,
+  buildAvatarNegativePrompt,
+  PORTRAIT_IMAGE_SIZE,
+} from "@/lib/prompts/avatar";
 import {
   buildFrameDraftPrompt,
   buildFrameNegativePrompt,
@@ -216,21 +220,29 @@ export async function executePortraitImageGenerate(input: {
 
   const description = input.description?.trim() ?? "";
   const prompt = buildAvatarPrompt(name, description);
+  const negativePrompt = buildAvatarNegativePrompt(description);
   const referenceUrl = input.referenceUrl?.trim();
+
+  console.info("[executePortraitImageGenerate] prompt", {
+    name,
+    promptLen: prompt.length,
+    negativeLen: negativePrompt.length,
+    size: PORTRAIT_IMAGE_SIZE,
+  });
 
   try {
     const candidate = await imageGenerate({
       surface: "creator",
       assetSlot: "portrait",
       prompt,
-      negativePrompt: buildAvatarNegativePrompt(description),
+      negativePrompt,
       referenceImages:
         referenceUrl &&
         (referenceUrl.startsWith("http://") ||
           referenceUrl.startsWith("https://"))
           ? [{ url: referenceUrl }]
           : undefined,
-      size: { width: 512, height: 512 },
+      size: { ...PORTRAIT_IMAGE_SIZE },
     });
     let url: string;
     try {

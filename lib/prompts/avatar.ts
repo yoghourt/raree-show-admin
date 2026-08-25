@@ -8,19 +8,71 @@
  */
 
 export const AVATAR_REVISION_MARKER = "[操作员修改意见]";
+/** Budgeted Character Archive visual cues folded into portrait description. */
+export const AVATAR_APPEARANCE_MARKER = "[视觉身份]";
+
+/**
+ * Local Z-Image throughput size (square matches LocalAI UI defaults).
+ * Waist-up framing is prompt-driven; revisit 3:4 after Local is stable.
+ */
+export const PORTRAIT_IMAGE_SIZE = { width: 512, height: 512 } as const;
+
+/** Cap bio / archive text so Local turbo stays reliable. */
+export const AVATAR_BIO_MAX_CHARS = 160;
+export const AVATAR_APPEARANCE_MAX_CHARS = 220;
+
+function clipPromptChunk(text: string, maxChars: number): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length <= maxChars) return t;
+  const slice = t.slice(0, maxChars);
+  const cut = Math.max(slice.lastIndexOf(","), slice.lastIndexOf(" "), 0);
+  return `${(cut > maxChars * 0.5 ? slice.slice(0, cut) : slice).trim()}…`;
+}
 
 export function splitAvatarDescription(description: string): {
   base: string;
   revisionNote: string;
+  appearance: string;
 } {
   const raw = description.trim();
-  if (!raw) return { base: "", revisionNote: "" };
-  const idx = raw.indexOf(AVATAR_REVISION_MARKER);
-  if (idx < 0) return { base: raw, revisionNote: "" };
+  if (!raw) return { base: "", revisionNote: "", appearance: "" };
+  const revIdx = raw.indexOf(AVATAR_REVISION_MARKER);
+  const revisionNote =
+    revIdx < 0
+      ? ""
+      : raw.slice(revIdx + AVATAR_REVISION_MARKER.length).trim();
+  const beforeRev = revIdx < 0 ? raw : raw.slice(0, revIdx).trim();
+  const appIdx = beforeRev.indexOf(AVATAR_APPEARANCE_MARKER);
+  if (appIdx < 0) {
+    return { base: beforeRev, revisionNote, appearance: "" };
+  }
   return {
-    base: raw.slice(0, idx).trim(),
-    revisionNote: raw.slice(idx + AVATAR_REVISION_MARKER.length).trim(),
+    base: beforeRev.slice(0, appIdx).trim(),
+    appearance: beforeRev
+      .slice(appIdx + AVATAR_APPEARANCE_MARKER.length)
+      .trim(),
+    revisionNote,
   };
+}
+
+/** Insert or replace the appearance block; keep bio and operator revision. */
+export function mergeAppearanceIntoDescription(
+  description: string,
+  appearance: string
+): string {
+  const visual = appearance.trim();
+  const { base, revisionNote, appearance: existing } =
+    splitAvatarDescription(description);
+  const nextAppearance = visual || existing;
+  const parts: string[] = [];
+  if (base) parts.push(base);
+  if (nextAppearance) {
+    parts.push(`${AVATAR_APPEARANCE_MARKER} ${nextAppearance}`);
+  }
+  if (revisionNote) {
+    parts.push(`${AVATAR_REVISION_MARKER} ${revisionNote}`);
+  }
+  return parts.join("\n\n");
 }
 
 type GenderCue = "male" | "female" | null;
@@ -101,25 +153,37 @@ export function scrubConflictingGenderTokens(
 
 export function buildAvatarPrompt(name: string, description: string): string {
   const n = name.trim();
-  const { base, revisionNote } = splitAvatarDescription(description);
+  const { base, revisionNote, appearance } = splitAvatarDescription(description);
   const revisionCue = detectGenderCue(revisionNote);
+  const appearanceCue = detectGenderCue(appearance);
   const baseCue = detectGenderCue(base);
   // Operator note wins over base description when they conflict.
-  const cue = revisionCue ?? baseCue;
+  const cue = revisionCue ?? appearanceCue ?? baseCue;
   const { positive: genderPos } = genderOverrideClauses(cue);
 
+  const scrubbedAppearance =
+    revisionCue != null
+      ? scrubConflictingGenderTokens(appearance, revisionCue)
+      : appearance;
   const scrubbedBase =
     revisionCue != null ? scrubConflictingGenderTokens(base, revisionCue) : base;
 
+  // Appearance (archive cues) outranks biographical description in the subject.
   const subjectParts = [n];
-  if (scrubbedBase) subjectParts.push(scrubbedBase);
+  if (scrubbedAppearance) {
+    subjectParts.push(
+      clipPromptChunk(scrubbedAppearance, AVATAR_APPEARANCE_MAX_CHARS)
+    );
+  }
+  if (scrubbedBase) {
+    subjectParts.push(clipPromptChunk(scrubbedBase, AVATAR_BIO_MAX_CHARS));
+  }
   const subject = subjectParts.join(", ");
 
   const parts: string[] = [];
   if (revisionNote) {
     parts.push(
-      `OPERATOR OVERRIDE (must follow): ${revisionNote}.`,
-      "Ignore conflicting gender or title words in any prior description."
+      `OPERATOR OVERRIDE (must follow): ${clipPromptChunk(revisionNote, 120)}.`
     );
   }
   parts.push(...genderPos);
@@ -129,91 +193,49 @@ export function buildAvatarPrompt(name: string, description: string): string {
   } else if (cue === "female") {
     parts.push(`Female character portrait of ${subject}.`);
   } else {
-    parts.push(`Clean character portrait of ${subject}.`);
+    parts.push(`Character portrait of ${subject}.`);
   }
+  // Keep positive short for Local Z-Image; rejects live in negative prompt.
   parts.push(
-    "Strictly one human only: one head, one neck, one face, one pair of eyes,",
-    "solo subject, single figure, centered head-and-shoulders bust,",
-    "facing camera, soft studio lighting,",
-    "soft neutral gray studio backdrop behind the subject,",
-    "subject fills most of the frame, clearly visible face and clothing,",
-    "digital illustration, sharp face details, high quality,",
-    "no text, no letters, no typography, no caption, no nameplate,",
-    "no watermark, no logo, no frame, no border, no ornate frame,",
-    "no UI, no card layout, no second head, no twin, no clone,",
-    "not a blank canvas, not a solid white fill, not an empty picture."
+    "waist-up portrait, head shoulders and torso with costume visible,",
+    "solo, one person, facing camera, soft studio light, gray backdrop,",
+    "digital illustration, sharp face."
   );
   return parts.join(" ");
 }
 
 /** Shared negative constraints for Local / Cloud adapters that accept them. */
 export const AVATAR_NEGATIVE_PROMPT = [
-  "blank",
-  "blank image",
   "blank canvas",
   "empty image",
-  "empty canvas",
   "solid white",
-  "solid white background only",
-  "all white",
-  "pure white",
-  "whiteout",
-  "overexposed wash",
-  "featureless",
   "no subject",
   "twins",
   "two people",
   "two faces",
-  "two heads",
-  "double head",
-  "extra head",
-  "duplicate",
-  "cloned",
-  "mirror double",
-  "conjoined",
-  "siamese",
-  "split screen",
-  "side by side",
-  "couple",
-  "group",
   "crowd",
-  "multiple characters",
-  "extra person",
   "deformed",
-  "mutated",
   "text",
-  "letters",
-  "typography",
-  "caption",
-  "title",
-  "nameplate",
-  "signature",
   "watermark",
   "logo",
-  "emblem",
-  "seal",
-  "stamp",
   "frame",
-  "border",
-  "ornate frame",
-  "picture frame",
-  "decorative border",
-  "scrollwork",
-  "filigree",
-  "UI",
-  "HUD",
-  "card",
-  "trading card",
-  "character sheet",
-  "poster",
-  "comic panel",
+  "floating head",
+  "disembodied head",
+  "head only",
+  "cropped at neck",
+  "decapitated",
+  "close-up face only",
 ].join(", ");
 
 /** Negatives for portrait slot, optionally extended from description cues. */
 export function buildAvatarNegativePrompt(description?: string): string {
-  const { base, revisionNote } = splitAvatarDescription(description ?? "");
+  const { base, revisionNote, appearance } = splitAvatarDescription(
+    description ?? ""
+  );
   const cue =
-    detectGenderCue(revisionNote) ?? detectGenderCue(base);
+    detectGenderCue(revisionNote) ??
+    detectGenderCue(appearance) ??
+    detectGenderCue(base);
   const { negativeExtra } = genderOverrideClauses(cue);
   if (negativeExtra.length === 0) return AVATAR_NEGATIVE_PROMPT;
   return `${AVATAR_NEGATIVE_PROMPT}, ${negativeExtra.join(", ")}`;

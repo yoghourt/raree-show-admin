@@ -13,13 +13,14 @@ import {
 } from "@/lib/prompts/avatar";
 
 describe("buildAvatarPrompt", () => {
-  it("avoids empty/plain empty wording that collapses turbo to blank", () => {
+  it("keeps a short Local-friendly prompt without blank-canvas filler in positive", () => {
     const prompt = buildAvatarPrompt("Jean", "tall soldier");
     expect(prompt).toMatch(/Jean/);
     expect(prompt).toMatch(/tall soldier/);
     expect(prompt.toLowerCase()).not.toMatch(/plain empty/);
     expect(prompt.toLowerCase()).not.toMatch(/seamless backdrop/);
-    expect(prompt).toMatch(/not a blank canvas/i);
+    expect(prompt.toLowerCase()).not.toMatch(/not a blank canvas/);
+    expect(prompt.length).toBeLessThan(400);
   });
 
   it("promotes operator revision and scrubs Lady from subject when male", () => {
@@ -33,6 +34,32 @@ describe("buildAvatarPrompt", () => {
     expect(prompt).toMatch(/adult male man/i);
     expect(prompt.toLowerCase()).not.toMatch(/\blady\b/);
     expect(prompt).toMatch(/House Stark/);
+  });
+
+  it("asks for waist-up body and costume, not a lone floating head", () => {
+    const prompt = buildAvatarPrompt("Jean", "tall soldier");
+    expect(prompt).toMatch(/waist-up/i);
+    expect(prompt).toMatch(/costume visible/i);
+    expect(prompt.toLowerCase()).not.toMatch(/one head, one neck/);
+    expect(prompt.toLowerCase()).not.toMatch(/head-and-shoulders bust/);
+  });
+
+  it("puts archive appearance ahead of biographical description", () => {
+    const prompt = buildAvatarPrompt(
+      "Guan Yu",
+      "Sworn brother of Liu Bei.\n\n[视觉身份] red face, long beard, green battle robe, Green Dragon Crescent Blade"
+    );
+    const appearanceIdx = prompt.indexOf("red face");
+    const bioIdx = prompt.indexOf("Sworn brother");
+    expect(appearanceIdx).toBeGreaterThan(0);
+    expect(bioIdx).toBeGreaterThan(appearanceIdx);
+  });
+
+  it("truncates long biographical description", () => {
+    const longBio = `${"He served the realm for many years. ".repeat(20)}ENDMARK`;
+    const prompt = buildAvatarPrompt("Ned", longBio);
+    expect(prompt).not.toMatch(/ENDMARK/);
+    expect(prompt).toMatch(/…/);
   });
 });
 
@@ -64,6 +91,12 @@ describe("AVATAR_NEGATIVE_PROMPT", () => {
   it("includes blank-canvas rejects", () => {
     expect(AVATAR_NEGATIVE_PROMPT).toMatch(/blank canvas/);
     expect(AVATAR_NEGATIVE_PROMPT).toMatch(/solid white/);
+  });
+
+  it("rejects floating-head crops", () => {
+    expect(AVATAR_NEGATIVE_PROMPT).toMatch(/floating head/);
+    expect(AVATAR_NEGATIVE_PROMPT).toMatch(/head only/);
+    expect(AVATAR_NEGATIVE_PROMPT).toMatch(/cropped at neck/);
   });
 });
 

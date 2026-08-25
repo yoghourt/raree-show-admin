@@ -202,6 +202,31 @@ describe("Accept handoff guards", () => {
     }
   });
 
+  it("folds Character Archive visual cues into character staging description", () => {
+    const items = createReviewItems([
+      makeCandidate({
+        displayName: "Guan Yu",
+        fields: {
+          name: "Guan Yu",
+          house: "Shu",
+          description: "Sworn brother of Liu Bei.",
+          characterArchive: {
+            identityCues: ["red face", "long beard"],
+            costumeCues: ["green battle robe"],
+            propCues: ["Green Dragon Crescent Blade"],
+          },
+        },
+      }),
+    ]);
+    const result = prepareAcceptReview(items, items[0]!.reviewId);
+    expect(result.ok).toBe(true);
+    if (result.ok && result.kind === "character_staging") {
+      expect(result.staging.description).toMatch(/\[视觉身份\]/);
+      expect(result.staging.description).toContain("green battle robe");
+      expect(result.staging.description).toContain("Sworn brother");
+    }
+  });
+
   it("rebuilds character staging from already-accepted review items", () => {
     const pending = createReviewItems([
       makeCandidate({

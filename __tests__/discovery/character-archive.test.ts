@@ -11,6 +11,7 @@ import {
 import {
   CHARACTER_ARCHIVE_CUE_BUDGET,
   foldCharacterArchivesIntoExpression,
+  formatArchiveForPortrait,
   parseCharacterArchive,
   selectActiveCharacterCues,
 } from "@/lib/discovery/character-archive";
@@ -95,6 +96,20 @@ describe("selectActiveCharacterCues (budget)", () => {
     expect(active.costumeCues).toEqual(["green battle robe"]);
     expect(active.activeCues).toContain("red face");
     expect(active.activeCues).not.toContain("extra unused costume");
+  });
+
+  it("joins budgeted cues for portrait prompts including standing weapons", () => {
+    const parsed = parseCharacterArchive({
+      identityCues: ["red face", "long beard"],
+      costumeCues: ["green battle robe"],
+      propCues: ["Green Dragon Crescent Blade"],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok || !parsed.value) return;
+    const line = formatArchiveForPortrait(parsed.value);
+    expect(line).toContain("red face");
+    expect(line).toContain("green battle robe");
+    expect(line).toContain("Green Dragon Crescent Blade");
   });
 
   it("does not inject a letter into a scene that never names a document", () => {

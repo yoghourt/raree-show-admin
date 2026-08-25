@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import * as charactersApi from "@/lib/characters";
 import { formatGenerateJobErrorForOperator } from "@/lib/ai/image/operatorErrorCopy";
+import { descriptionWithArchiveAppearance } from "@/lib/discovery/portrait-appearance";
 import {
   listGenerateJobsForWork,
   parseCharacterPortraitJobInput,
@@ -67,6 +68,7 @@ function mergeRevisionNote(
 }
 
 function portraitEnqueuePayloadFromJob(
+  workId: string,
   job: GenerateJobRow,
   character: Character | undefined,
   revisionNote: string
@@ -106,7 +108,14 @@ function portraitEnqueuePayloadFromJob(
   return {
     characterTsid: job.subject_id,
     name,
-    description: mergeRevisionNote(description, note),
+    description: mergeRevisionNote(
+      descriptionWithArchiveAppearance(
+        workId,
+        name,
+        description ?? ""
+      ),
+      note
+    ),
     ...(referenceUrl ? { referenceUrl } : {}),
     ...(note ? { operatorRevision: note } : {}),
   };
@@ -191,7 +200,11 @@ export function BatchPortraitCompletion({
           {
             characterTsid: focusCharacter.tsid,
             name: focusCharacter.name,
-            description: focusCharacter.description,
+            description: descriptionWithArchiveAppearance(
+              workId,
+              focusCharacter.name,
+              focusCharacter.description
+            ),
             referenceUrl:
               focusCharacter.portraitUrl?.startsWith("http://") ||
               focusCharacter.portraitUrl?.startsWith("https://")
@@ -245,7 +258,11 @@ export function BatchPortraitCompletion({
         characters: missingPortraits.map((c) => ({
           characterTsid: c.tsid,
           name: c.name,
-          description: c.description,
+          description: descriptionWithArchiveAppearance(
+            workId,
+            c.name,
+            c.description
+          ),
           referenceUrl:
             c.portraitUrl?.startsWith("http://") ||
             c.portraitUrl?.startsWith("https://")
@@ -321,7 +338,12 @@ export function BatchPortraitCompletion({
     }
     const character = characters.find((c) => c.tsid === job.subject_id);
     const note = revisionNotes[job.id] ?? "";
-    const payload = portraitEnqueuePayloadFromJob(job, character, note);
+    const payload = portraitEnqueuePayloadFromJob(
+      workId,
+      job,
+      character,
+      note
+    );
     if (!payload) {
       setWriteError("重新排队失败：缺少角色姓名");
       return;
@@ -390,7 +412,11 @@ export function BatchPortraitCompletion({
         return next;
       });
       await refreshJobs();
-      setHint("已丢弃该任务（不写入 Asset）。");
+      setHint(
+        job.status === "queued" || job.status === "running"
+          ? "已取消该进行中任务。"
+          : "已丢弃该任务（不写入 Asset）。"
+      );
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -590,8 +616,15 @@ export function BatchPortraitCompletion({
             // Discard must stay available even when another job is in-flight —
             // otherwise superseded white-screen rows become stuck with no actions.
             const canDiscard =
-              job.status === "succeeded" || job.status === "failed";
-            const canRequeue = canDiscard && !hasInFlightFor(job.subject_id);
+              job.status === "succeeded" ||
+              job.status === "failed" ||
+              job.status === "queued" ||
+              job.status === "running";
+            const isInFlight =
+              job.status === "queued" || job.status === "running";
+            const canRequeue =
+              (job.status === "succeeded" || job.status === "failed") &&
+              !hasInFlightFor(job.subject_id);
             const panelOpen = retryPanelJobId === job.id;
 
             return (
@@ -706,7 +739,11 @@ export function BatchPortraitCompletion({
                         }
                         onClick={() => void discardPortraitJob(job)}
                       >
-                        丢弃
+                        {requeueingId === job.id
+                          ? "处理中…"
+                          : isInFlight
+                            ? "取消"
+                            : "丢弃"}
                       </Button>
                     ) : null}
                     {!canRequeue &&

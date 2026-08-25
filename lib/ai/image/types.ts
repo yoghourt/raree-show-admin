@@ -69,7 +69,7 @@ export type SpikeImageConfig = ImageAdapterEnv & {
 
 /**
  * Creator Runtime Deployment bindings (ADR-010 A3 Constraint F).
- * Defaults: Local primary · Cloud fallback. Replaceable via env.
+ * Default: Local primary. Cloud fallback is opt-in via IMAGE_CREATOR_ACCEPT_FALLBACK.
  */
 export type CreatorImageDeploymentConfig = ImageAdapterEnv & {
   acceptProviderId: string
