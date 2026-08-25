@@ -13,6 +13,7 @@ import type {
 } from "@/lib/discovery/propose-types";
 import type {
   AcceptedCharacterStaging,
+  AcceptedLocationStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
   DiscoveryReviewItem,
@@ -31,6 +32,7 @@ export interface DiscoveryReviewSnapshot {
   acceptedStoryUnits: AcceptedStoryUnitStaging[];
   acceptedSceneCandidates: AcceptedSceneCandidateStaging[];
   acceptedCharacters?: AcceptedCharacterStaging[];
+  acceptedLocations?: AcceptedLocationStaging[];
   proposeError?: ProposeError | null;
   savedAt: string;
 }
@@ -143,6 +145,7 @@ function normalizeSnapshot(
     acceptedStoryUnits,
     acceptedSceneCandidates,
     acceptedCharacters: parsed.acceptedCharacters ?? [],
+    acceptedLocations: parsed.acceptedLocations ?? [],
     proposeError,
   };
 }
@@ -195,4 +198,29 @@ export function clearDiscoveryReviewSnapshot(
     return;
   }
   sessionStorage.removeItem(storageKey(workId, operatorId, sessionId));
+}
+
+/** All Review snapshots for a work still in this browser tab (sessionStorage). */
+export function listDiscoveryReviewSnapshotsForWork(
+  workId: string
+): DiscoveryReviewSnapshot[] {
+  if (typeof sessionStorage === "undefined") {
+    return [];
+  }
+  const prefix = `${PREFIX}${workId}:`;
+  const out: DiscoveryReviewSnapshot[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (!key?.startsWith(prefix)) continue;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw) as DiscoveryReviewSnapshot;
+      if (parsed?.workId !== workId) continue;
+      out.push(normalizeSnapshot(parsed));
+    } catch {
+      // skip corrupt snapshot
+    }
+  }
+  return out;
 }

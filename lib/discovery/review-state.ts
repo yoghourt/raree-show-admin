@@ -3,6 +3,11 @@
  */
 
 import { getCandidateDedupeKey } from "@/lib/discovery/candidate-validate";
+import {
+  formatArchiveForPortrait,
+  parseCharacterArchive,
+} from "@/lib/discovery/character-archive";
+import { mergeAppearanceIntoDescription } from "@/lib/prompts/avatar";
 import type {
   DiscoveryCandidate,
   CharacterCandidateFields,
@@ -14,6 +19,7 @@ import type {
   AcceptReviewError,
   AcceptReviewResult,
   AcceptedCharacterStaging,
+  AcceptedLocationStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
   DiscoveryAcceptPrefill,
@@ -23,6 +29,7 @@ import type {
   StoryRelatedLocationRef,
 } from "@/lib/discovery/review-types";
 import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
+import { seedSceneStagingCastPlaceFromNames } from "@/lib/rollout/scene-staging-context-edit";
 import { buildEntityCreateHandoffPath } from "@/lib/discovery/accept-prefill";
 import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
 import { parseRendererExpression } from "@/lib/discovery/visual-contract";
@@ -354,6 +361,38 @@ export function buildAcceptPrefill(
   };
 }
 
+export function buildLocationStaging(
+  item: DiscoveryReviewItem
+): AcceptedLocationStaging {
+  const fields = getEffectiveFields(item) as LocationCandidateFields;
+  const displayName = getEffectiveDisplayName(item).trim();
+  return {
+    workId: item.candidate.workId,
+    sourceReviewId: item.reviewId,
+    sourceCandidateId: item.candidate.candidateId,
+    name:
+      displayName ||
+      (typeof fields.name === "string" ? fields.name.trim() : ""),
+    region: typeof fields.region === "string" ? fields.region.trim() : "",
+    description:
+      typeof fields.description === "string" ? fields.description.trim() : "",
+    acceptedAt: new Date().toISOString(),
+  };
+}
+
+function foldArchiveAppearanceIntoStagingDescription(
+  fields: CharacterCandidateFields
+): string {
+  const description =
+    typeof fields.description === "string" ? fields.description.trim() : "";
+  const parsed = parseCharacterArchive(fields.characterArchive);
+  if (!parsed.ok || !parsed.value) return description;
+  return mergeAppearanceIntoDescription(
+    description,
+    formatArchiveForPortrait(parsed.value)
+  );
+}
+
 export function buildCharacterStaging(
   item: DiscoveryReviewItem
 ): AcceptedCharacterStaging {
@@ -367,8 +406,7 @@ export function buildCharacterStaging(
       displayName ||
       (typeof fields.name === "string" ? fields.name.trim() : ""),
     house: typeof fields.house === "string" ? fields.house.trim() : "",
-    description:
-      typeof fields.description === "string" ? fields.description.trim() : "",
+    description: foldArchiveAppearanceIntoStagingDescription(fields),
     signatureQuote:
       typeof fields.signatureQuote === "string"
         ? fields.signatureQuote.trim() || null
@@ -396,10 +434,11 @@ export function buildStoryStaging(
 
 export function buildSceneStaging(
   item: DiscoveryReviewItem,
-  parentStory: AcceptedStoryUnitStaging
+  parentStory: AcceptedStoryUnitStaging,
+  batchItems: DiscoveryReviewItem[] = []
 ): AcceptedSceneCandidateStaging {
   const fields = getEffectiveFields(item) as SceneCandidateFields;
-  return {
+  const staging: AcceptedSceneCandidateStaging = {
     workId: item.candidate.workId,
     sourceReviewId: item.reviewId,
     parentStorySourceReviewId: parentStory.sourceReviewId,
@@ -414,6 +453,10 @@ export function buildSceneStaging(
     rendererExpression: fields.rendererExpression,
     acceptedAt: new Date().toISOString(),
   };
+  return seedSceneStagingCastPlaceFromNames(
+    staging,
+    reviewBatchEntityNames(batchItems.length > 0 ? batchItems : [item])
+  );
 }
 
 export function findAcceptedParentStory(
@@ -639,9 +682,8 @@ export function prepareAcceptReview(
       }
       return {
         ok: true,
-        kind: "entity_prefill",
-        path: buildEntityCreateHandoffPath(workId, item.reviewId, "location"),
-        prefill: buildAcceptPrefill(item, "location"),
+        kind: "location_staging",
+        staging: buildLocationStaging(item),
       };
     }
     case "story": {
@@ -687,7 +729,7 @@ export function prepareAcceptReview(
       return {
         ok: true,
         kind: "scene_staging",
-        staging: buildSceneStaging(item, parentStory),
+        staging: buildSceneStaging(item, parentStory, items),
       };
     }
   }
@@ -888,6 +930,36 @@ export function characterStagingFromAcceptedReviewItems(
         item.candidate.candidateType === "character"
     )
     .map(buildCharacterStaging);
+}
+
+export function locationStagingFromAcceptedReviewItems(
+  items: DiscoveryReviewItem[]
+): AcceptedLocationStaging[] {
+  return items
+    .filter(
+      (item) =>
+        item.status === "accepted" &&
+        item.candidate.candidateType === "location"
+    )
+    .map(buildLocationStaging);
+}
+
+export function reviewBatchEntityNames(items: DiscoveryReviewItem[]): {
+  characters: string[];
+  locations: string[];
+} {
+  const characters: string[] = [];
+  const locations: string[] = [];
+  for (const item of items) {
+    if (item.status === "discarded") continue;
+    const type = item.candidate.candidateType;
+    if (type !== "character" && type !== "location") continue;
+    const name = getEffectiveDisplayName(item).trim();
+    if (!name) continue;
+    if (type === "character") characters.push(name);
+    else locations.push(name);
+  }
+  return { characters, locations };
 }
 
 export function characterPrefillToFormValues(

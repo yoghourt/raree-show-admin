@@ -177,3 +177,81 @@ export function applySceneStagingContextEditsFromArchive(
   }
   return applySceneStagingContextEdits(staging, { castNames, locationLabel });
 }
+
+function haystackContainsName(haystack: string, name: string): boolean {
+  const n = name.trim().toLowerCase();
+  return n.length > 0 && haystack.includes(n);
+}
+
+/**
+ * Fill empty scene cast/place from Discovery character/location names
+ * so 待写入 pickers are not blank before Archive persist.
+ */
+export function seedSceneStagingCastPlaceFromNames(
+  staging: AcceptedSceneCandidateStaging,
+  names: { characters: string[]; locations: string[] }
+): AcceptedSceneCandidateStaging {
+  const sel = frameContextArchiveSelectionFromStaging(staging);
+  const haystack = [
+    staging.title,
+    staging.summary ?? "",
+    staging.rendererExpression?.environment ?? "",
+  ]
+    .join("\n")
+    .toLowerCase();
+
+  const mentionedChars = names.characters.filter((n) =>
+    haystackContainsName(haystack, n)
+  );
+  const mentionedLocs = names.locations.filter((n) =>
+    haystackContainsName(haystack, n)
+  );
+
+  const hasCast =
+    sel.characterTsids.length > 0 || sel.unmatchedCastNames.length > 0;
+  const hasPlace = Boolean(sel.locationTsid || sel.unmatchedLocationLabel);
+
+  const existingCastNames = sel.aggregate.characters
+    .map((c) => c.name.trim())
+    .filter(Boolean);
+  const nextCast = hasCast
+    ? existingCastNames
+    : mentionedChars.length > 0
+      ? mentionedChars
+      : names.characters;
+  const existingPlace =
+    sel.unmatchedLocationLabel ||
+    sel.aggregate.locations.map((l) => l.label.trim()).find(Boolean) ||
+    "";
+  const nextPlace = hasPlace
+    ? existingPlace
+    : mentionedLocs[0] ?? names.locations[0] ?? "";
+
+  if (hasCast && hasPlace) return staging;
+  if (!hasCast && nextCast.length === 0 && !hasPlace && !nextPlace) {
+    return staging;
+  }
+
+  return applySceneStagingContextEdits(staging, {
+    castNames: nextCast,
+    locationLabel: nextPlace,
+  });
+}
+
+/** Re-bind scene staging to Work Archive after character/location persist. */
+export function bindSceneStagingCastPlaceToArchive(
+  staging: AcceptedSceneCandidateStaging,
+  archive: SceneStagingArchiveCatalog
+): AcceptedSceneCandidateStaging {
+  const sel = frameContextArchiveSelectionFromStaging(staging, archive);
+  return applySceneStagingContextEditsFromArchive(
+    staging,
+    {
+      characterTsids: sel.characterTsids,
+      locationTsid: sel.locationTsid || null,
+      unmatchedCastNames: sel.unmatchedCastNames,
+      unmatchedLocationLabel: sel.unmatchedLocationLabel,
+    },
+    archive
+  );
+}

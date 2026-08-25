@@ -4,6 +4,7 @@
 
 import type {
   AcceptedCharacterStaging,
+  AcceptedLocationStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
@@ -12,6 +13,11 @@ import type {
   ProjectedReadingRouteRecord,
   RolloutQueueSnapshot,
 } from "@/lib/rollout/types";
+import {
+  bindSceneStagingCastPlaceToArchive,
+  seedSceneStagingCastPlaceFromNames,
+  type SceneStagingArchiveCatalog,
+} from "@/lib/rollout/scene-staging-context-edit";
 
 const PREFIX = "rollout_queue:";
 export const ROLLOUT_QUEUE_UPDATED_EVENT = "rollout-queue-updated";
@@ -29,6 +35,7 @@ export function emptyRolloutQueue(
     storyStaging: [],
     readingRouteStaging: [],
     characterStaging: [],
+    locationStaging: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -60,15 +67,19 @@ export function loadRolloutQueue(
       storyStaging: parsed.storyStaging ?? [],
       readingRouteStaging: parsed.readingRouteStaging ?? parsed.sceneStaging ?? [],
       characterStaging: parsed.characterStaging ?? [],
+      locationStaging: parsed.locationStaging ?? [],
       processedStoryReviewIds: parsed.processedStoryReviewIds ?? [],
       processedReadingRouteReviewIds: parsed.processedReadingRouteReviewIds ?? parsed.processedSceneReviewIds ?? [],
       processedCharacterReviewIds: parsed.processedCharacterReviewIds ?? [],
+      processedLocationReviewIds: parsed.processedLocationReviewIds ?? [],
       dismissedStoryStaging: parsed.dismissedStoryStaging ?? [],
       dismissedReadingRouteStaging: parsed.dismissedReadingRouteStaging ?? parsed.dismissedSceneStaging ?? [],
       dismissedCharacterStaging: parsed.dismissedCharacterStaging ?? [],
+      dismissedLocationStaging: parsed.dismissedLocationStaging ?? [],
       dismissedStoryReviewIds: parsed.dismissedStoryReviewIds ?? [],
       dismissedReadingRouteReviewIds: parsed.dismissedReadingRouteReviewIds ?? parsed.dismissedSceneReviewIds ?? [],
       dismissedCharacterReviewIds: parsed.dismissedCharacterReviewIds ?? [],
+      dismissedLocationReviewIds: parsed.dismissedLocationReviewIds ?? [],
       projectedReadingRoutes: parsed.projectedReadingRoutes ?? parsed.projectedScenes ?? [],
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
@@ -152,15 +163,77 @@ function dedupeCharacterStaging(
   return out;
 }
 
+function dedupeLocationStaging(
+  items: AcceptedLocationStaging[]
+): AcceptedLocationStaging[] {
+  const seen = new Set<string>();
+  const out: AcceptedLocationStaging[] = [];
+  for (const item of items) {
+    const key = `${item.sourceReviewId}:${item.name}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+function uniqueEntityNames(items: Array<{ name: string }>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of items) {
+    const name = item.name.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+function seedScenesFromQueuedEntities(
+  queue: RolloutQueueSnapshot
+): RolloutQueueSnapshot {
+  const names = {
+    characters: uniqueEntityNames(queue.characterStaging ?? []),
+    locations: uniqueEntityNames(queue.locationStaging ?? []),
+  };
+  if (names.characters.length === 0 && names.locations.length === 0) {
+    return queue;
+  }
+  return {
+    ...queue,
+    readingRouteStaging: queue.readingRouteStaging.map((staging) =>
+      seedSceneStagingCastPlaceFromNames(staging, names)
+    ),
+  };
+}
+
+export function rematchQueueSceneStagingToArchive(
+  queue: RolloutQueueSnapshot,
+  archive: SceneStagingArchiveCatalog
+): RolloutQueueSnapshot {
+  return {
+    ...queue,
+    readingRouteStaging: queue.readingRouteStaging.map((staging) =>
+      bindSceneStagingCastPlaceToArchive(staging, archive)
+    ),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function mergeRolloutQueue(
   current: RolloutQueueSnapshot,
   incoming: {
     storyUnits?: AcceptedStoryUnitStaging[];
     sceneCandidates?: AcceptedSceneCandidateStaging[];
     characterStaging?: AcceptedCharacterStaging[];
+    locationStaging?: AcceptedLocationStaging[];
   }
 ): RolloutQueueSnapshot {
-  return {
+  return seedScenesFromQueuedEntities({
     workId: current.workId,
     storyStaging: dedupeStoryStaging([
       ...current.storyStaging,
@@ -174,18 +247,25 @@ export function mergeRolloutQueue(
       ...(current.characterStaging ?? []),
       ...(incoming.characterStaging ?? []),
     ]),
+    locationStaging: dedupeLocationStaging([
+      ...(current.locationStaging ?? []),
+      ...(incoming.locationStaging ?? []),
+    ]),
     processedStoryReviewIds: current.processedStoryReviewIds ?? [],
     processedReadingRouteReviewIds: current.processedReadingRouteReviewIds ?? [],
     processedCharacterReviewIds: current.processedCharacterReviewIds ?? [],
+    processedLocationReviewIds: current.processedLocationReviewIds ?? [],
     dismissedStoryStaging: current.dismissedStoryStaging ?? [],
     dismissedReadingRouteStaging: current.dismissedReadingRouteStaging ?? [],
     dismissedCharacterStaging: current.dismissedCharacterStaging ?? [],
+    dismissedLocationStaging: current.dismissedLocationStaging ?? [],
     dismissedStoryReviewIds: current.dismissedStoryReviewIds ?? [],
     dismissedReadingRouteReviewIds: current.dismissedReadingRouteReviewIds ?? [],
     dismissedCharacterReviewIds: current.dismissedCharacterReviewIds ?? [],
+    dismissedLocationReviewIds: current.dismissedLocationReviewIds ?? [],
     projectedReadingRoutes: current.projectedReadingRoutes ?? [],
     updatedAt: new Date().toISOString(),
-  };
+  });
 }
 
 export function removeStoryStagingByReviewId(
@@ -221,6 +301,19 @@ export function removeCharacterStagingByReviewId(
   return {
     ...queue,
     characterStaging: (queue.characterStaging ?? []).filter(
+      (s) => s.sourceReviewId !== sourceReviewId
+    ),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function removeLocationStagingByReviewId(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  return {
+    ...queue,
+    locationStaging: (queue.locationStaging ?? []).filter(
       (s) => s.sourceReviewId !== sourceReviewId
     ),
     updatedAt: new Date().toISOString(),
@@ -275,6 +368,19 @@ export function markCharacterReviewIdProcessed(
   };
 }
 
+export function markLocationReviewIdProcessed(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  return {
+    ...removeLocationStagingByReviewId(queue, sourceReviewId),
+    processedLocationReviewIds: addProcessedReviewId(
+      queue.processedLocationReviewIds,
+      sourceReviewId
+    ),
+  };
+}
+
 export function unmarkSceneReviewIdProcessed(
   queue: RolloutQueueSnapshot,
   sourceReviewId: string
@@ -306,6 +412,13 @@ function blockedCharacterReviewIds(queue: RolloutQueueSnapshot): Set<string> {
   return new Set([
     ...(queue.processedCharacterReviewIds ?? []),
     ...(queue.dismissedCharacterReviewIds ?? []),
+  ]);
+}
+
+function blockedLocationReviewIds(queue: RolloutQueueSnapshot): Set<string> {
+  return new Set([
+    ...(queue.processedLocationReviewIds ?? []),
+    ...(queue.dismissedLocationReviewIds ?? []),
   ]);
 }
 
@@ -456,6 +569,135 @@ export function restoreCharacterStagingItem(
   );
 }
 
+export function dismissLocationStagingItem(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  const item = (queue.locationStaging ?? []).find(
+    (staging) => staging.sourceReviewId === sourceReviewId
+  );
+  if (!item) {
+    return queue;
+  }
+
+  return {
+    ...removeLocationStagingByReviewId(queue, sourceReviewId),
+    dismissedLocationStaging: dedupeLocationStaging([
+      ...(queue.dismissedLocationStaging ?? []),
+      item,
+    ]),
+    dismissedLocationReviewIds: addProcessedReviewId(
+      queue.dismissedLocationReviewIds,
+      sourceReviewId
+    ),
+  };
+}
+
+export function restoreLocationStagingItem(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  const item = (queue.dismissedLocationStaging ?? []).find(
+    (staging) => staging.sourceReviewId === sourceReviewId
+  );
+  if (!item) {
+    return queue;
+  }
+
+  return mergeRolloutQueue(
+    {
+      ...queue,
+      dismissedLocationStaging: (queue.dismissedLocationStaging ?? []).filter(
+        (staging) => staging.sourceReviewId !== sourceReviewId
+      ),
+      dismissedLocationReviewIds: (queue.dismissedLocationReviewIds ?? []).filter(
+        (id) => id !== sourceReviewId
+      ),
+    },
+    { locationStaging: [item] }
+  );
+}
+
+export function deleteDismissedStoryStagingItem(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  const item = (queue.dismissedStoryStaging ?? []).find(
+    (staging) => staging.sourceReviewId === sourceReviewId
+  );
+  if (!item) {
+    return queue;
+  }
+
+  return {
+    ...queue,
+    dismissedStoryStaging: (queue.dismissedStoryStaging ?? []).filter(
+      (staging) => staging.sourceReviewId !== sourceReviewId
+    ),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function deleteDismissedSceneStagingItem(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  const item = (queue.dismissedReadingRouteStaging ?? []).find(
+    (staging) => staging.sourceReviewId === sourceReviewId
+  );
+  if (!item) {
+    return queue;
+  }
+
+  return {
+    ...queue,
+    dismissedReadingRouteStaging: (queue.dismissedReadingRouteStaging ?? []).filter(
+      (staging) => staging.sourceReviewId !== sourceReviewId
+    ),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function deleteDismissedCharacterStagingItem(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  const item = (queue.dismissedCharacterStaging ?? []).find(
+    (staging) => staging.sourceReviewId === sourceReviewId
+  );
+  if (!item) {
+    return queue;
+  }
+
+  return {
+    ...queue,
+    dismissedCharacterStaging: (queue.dismissedCharacterStaging ?? []).filter(
+      (staging) => staging.sourceReviewId !== sourceReviewId
+    ),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function deleteDismissedLocationStagingItem(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): RolloutQueueSnapshot {
+  const item = (queue.dismissedLocationStaging ?? []).find(
+    (staging) => staging.sourceReviewId === sourceReviewId
+  );
+  if (!item) {
+    return queue;
+  }
+
+  return {
+    ...queue,
+    dismissedLocationStaging: (queue.dismissedLocationStaging ?? []).filter(
+      (staging) => staging.sourceReviewId !== sourceReviewId
+    ),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function recordProjectedScene(
   queue: RolloutQueueSnapshot,
   record: ProjectedReadingRouteRecord
@@ -525,10 +767,18 @@ export function shouldImportCharacterStaging(
   return !blockedCharacterReviewIds(queue).has(sourceReviewId);
 }
 
+export function shouldImportLocationStaging(
+  queue: RolloutQueueSnapshot,
+  sourceReviewId: string
+): boolean {
+  return !blockedLocationReviewIds(queue).has(sourceReviewId);
+}
+
 export function filterPendingStaging(queue: RolloutQueueSnapshot): RolloutQueueSnapshot {
   const processedStory = blockedStoryReviewIds(queue);
   const processedScene = blockedSceneReviewIds(queue);
   const processedCharacter = blockedCharacterReviewIds(queue);
+  const processedLocation = blockedLocationReviewIds(queue);
 
   return {
     ...queue,
@@ -540,6 +790,9 @@ export function filterPendingStaging(queue: RolloutQueueSnapshot): RolloutQueueS
     ),
     characterStaging: (queue.characterStaging ?? []).filter(
       (item) => !processedCharacter.has(item.sourceReviewId)
+    ),
+    locationStaging: (queue.locationStaging ?? []).filter(
+      (item) => !processedLocation.has(item.sourceReviewId)
     ),
     updatedAt: new Date().toISOString(),
   };

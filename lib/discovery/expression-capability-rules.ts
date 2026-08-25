@@ -91,7 +91,7 @@ Good: "two figures looking down at dead wolf at reading distance" + hoods/profil
 Portrait rail (assetSlot=portrait) is OUT OF SCOPE for this rule — full faces remain allowed there.
 
 Rule 7 — Role names in characters[].role (SPEC-CHAR-001):
-characters[].role MUST be the Role display name (e.g. "Eddard Stark", "Catelyn Stark").
+characters[].role MUST be the Role display name from this Work's candidates.
 FORBIDDEN as role labels: woman, man, lady, lord, girl, boy, person, figure (alone).
 Proper names stay in reader title/summary; Expression role strings MUST match Role candidates
 so Character Archive cues can fold by name.
@@ -102,38 +102,38 @@ When characters[].length >= 2, composition SHOULD include medium-wide (or wide) 
 tight two-shot, head-and-shoulders framing.
 
 Rule 9 — Static object transfer (readable prop beats):
-Do NOT use handing / passing / exchanging letters or props hand-to-hand as the sole cue.
-Prefer static visible layout: object on table / on ground / resting against tree;
-figures looking at or standing near the object.
-Bad: "woman handing parchment to man".
-Good: "sealed letter on wooden table between two figures, both looking at letter".
+Do NOT use handing / passing / exchanging objects hand-to-hand as the sole cue.
+Prefer static visible layout: the SAME named object on a surface;
+figures looking at or standing near that object.
+Bad: "person handing the object to another".
+Good: "the named object on a table between two figures, both looking at it".
+MUST keep the object's narrative identity (map stays map; letter stays letter).
 Do NOT repeat "exactly N figures" in action (composition face-safety is enough).
 
-Rule 10 — Hard scene anchors (short, specific):
-environment MUST name ONE concrete landmark, ≤ ~12 words.
-Bad: "ancient forest with dark water and mist".
-Good: "Winterfell godswood, pale carved weirwood by dark pool".
-Good: "Winterfell solar, stone chamber, wooden table".
-FORBIDDEN: generic fog forest / anonymous stone room without place cue.
+Rule 10 — Location identity is invariant:
+environment MUST name the authored place, architecture class, and materials.
+Projection MAY shorten phrasing. Projection MUST NOT substitute a different place,
+architecture class, or narrative setting.
+Bad: rewrite a military tent into a stone chamber / castle hall.
+Bad: replace one work's landmark with another work's landmark.
+Good: keep "felt military tent, campaign table, hanging maps" as a tent.
+Good: keep "castle solar, stone chamber, wooden table" as that solar.
 
-Rule 11 — Prop salience + cast differentiation:
-Each character.visual = costume cue + at most ONE iconic prop (keep clear nouns).
-Iconic props (Ice, sealed letter) MUST be the clearest noun in that visual — not buried
-under three clothing adjectives.
-Do NOT give every figure the same fur-cloak look.
-Letter/scroll appears ONLY on the beat that needs it (not every dual-cast frame).
-Differentiate Roles: e.g. Ned = northern fur + greatsword Ice; Catelyn = southern gown
-(letter only when she bears news).
-Costume mutex: Catelyn MUST NOT wear heavy fur mantle; Ned MUST NOT wear southern gown.
-Letter beats: "sealed parchment letter only" — FORBIDDEN sand/terrain/map props.
+Rule 11 — Identity salience + cast differentiation:
+Tier 1 Character Identity Features (named weapon, face/body marks, unique silhouette)
+MUST survive compression — they outrank generic costume and cinematic tokens.
+Tier 2 supporting costume MAY fill remaining budget. Tier 3 generic appearance MAY drop.
+Do NOT collapse every figure into the same costume.
+Situational documents (letter, map, scroll) appear ONLY when the beat already names them.
+Do NOT replace a narrative prop with a more familiar but different object.
 
 Rule 12 — Dual-cast both visible (anti missing figure):
 When characters[].length === 2, action MUST name both Roles with left/right placement
-(e.g. "Eddard left by pool with Ice, Catelyn right standing, both fully visible").
+and keep any named narrative object.
 composition MUST include: medium-wide + both figures fully visible + profiles or looking down.
 FORBIDDEN: single centered hero portrait; one figure cropped out; facing-camera stare.
-Godswood env MUST be exclusive landmark: "pale weirwood face carved in white bark, dark pool"
-(do not dilute with generic mist forest).
+FORBIDDEN: inventing a landmark or prop the Canonical Expression did not name
+(e.g. inserting a pool-and-sword layout into an unrelated interior).
 `.trim();
 
 /**
@@ -283,13 +283,31 @@ function hardCapAtBoundary(text: string, maxLen: number): string {
   return (at > maxLen * 0.4 ? cut.slice(0, at) : cut).trim();
 }
 
-const PROP_CUE_PATTERN =
-  /\b(ice|greatsword|sword|letter|scroll|parchment|raven)\b/i;
+/** Body / face marks that carry character identity (cross-work). */
+const IDENTITY_BODY_PATTERN =
+  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|auburn\s+hair|white\s+hair|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
+
+/** Costume class (Tier 2). */
 const COSTUME_CUE_PATTERN =
-  /\b(cloak|gown|tunic|fur|dress|armor|armour|robe|wrap|mantle|doublet)\b/i;
-const HEAVY_FUR_PATTERN =
-  /\b(fur[\s-]?(?:trimmed\s+)?(?:winter\s+)?(?:cloak|mantle)|heavy\s+fur|fur\s+mantle|shaggy\s+fur)\b/i;
-const SOUTHERN_GOWN_PATTERN = /\b(southern[\s-]?(style\s+)?|noble\s+)?gown\b|\bdress\b/i;
+  /\b(cloak|gown|tunic|fur|dress|armor|armour|robe|wrap|mantle|doublet|sandals|helm|shroud)\b/i;
+
+/** Pose / camera / generic cinematic filler (Tier 3 — drop first). */
+const TIER3_FILLER_PATTERN =
+  /\b(back-?three-?quarter|cinematic|gritty|epic|dark fantasy|photoreal|attractive|handsome|beautiful|looking at camera)\b/i;
+
+/** Weapon / named-object class (not a franchise list). */
+const PROP_CLASS_PATTERN =
+  /\b(blade|glaive|spear|halberd|greatsword|sword|bow|staff|tablet|letter|scroll|parchment|maps?|helm|crown|altar)\b/i;
+const WEAPON_CLASS_PATTERN =
+  /\b(blade|glaive|spear|halberd|greatsword|sword|bow|staff)\b/i;
+const DOCUMENT_CLASS_PATTERN =
+  /\b(letter|scroll|parchment|maps?|tablet)\b/i;
+/** Pose / action phrases living inside character.visual — P3, below identity. */
+const ACTION_PHRASE_PATTERN =
+  /\b(looking|standing|seated|sitting|reaching|turning|reading|facing|walking|leaning|holding|bowed|profile)\b/i;
+
+const MAX_IDENTITY_VISUAL_PARTS = 4;
+const MAX_IDENTITY_VISUAL_LEN = 80;
 
 function shortRoleLabel(role: string): string {
   const parts = role.trim().split(/\s+/).filter(Boolean);
@@ -303,30 +321,38 @@ function roleMentions(text: string, role: string): boolean {
   return (full.length > 2 && t.includes(full)) || (first.length > 2 && t.includes(first));
 }
 
-function cleanupVisualList(visual: string): string {
-  return visual
-    .replace(/\s*,\s*,+/g, ", ")
-    .replace(/^[\s,]+|[\s,]+$/g, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function applyCostumeMutex(role: string, visual: string): string {
-  let v = visual;
-  if (/catelyn/i.test(role)) {
-    v = v.replace(HEAVY_FUR_PATTERN, "");
-    v = cleanupVisualList(v);
-    if (!SOUTHERN_GOWN_PATTERN.test(v)) {
-      v = v ? `${v}, southern noble gown` : "southern noble gown";
-    }
-  } else if (/eddard|\bned\b/i.test(role)) {
-    v = v.replace(SOUTHERN_GOWN_PATTERN, "");
-    v = cleanupVisualList(v);
-    if (!/\b(fur|tunic|mantle|cloak|doublet)\b/i.test(v) && !PROP_CUE_PATTERN.test(v)) {
-      v = v ? `${v}, northern fur cloak` : "northern fur cloak";
-    }
+function isNamedIdentityWeapon(part: string): boolean {
+  return WEAPON_CLASS_PATTERN.test(part) && wordCount(part) >= 2;
+}
+
+/**
+ * Shared identity-slot ranking (not work-specific):
+ * P0 narrative anchors · P1 identity symbols · P2 supporting appearance ·
+ * P3 action/pose · P4 generic cinematic.
+ * Action phrases must not outrank P1 named weapons or body marks.
+ */
+function scoreVisualPart(part: string): number {
+  if (
+    TIER3_FILLER_PATTERN.test(part) &&
+    !IDENTITY_BODY_PATTERN.test(part) &&
+    !isNamedIdentityWeapon(part)
+  ) {
+    return 10;
   }
-  return cleanupVisualList(v);
+  if (IDENTITY_BODY_PATTERN.test(part)) return 100;
+  if (isNamedIdentityWeapon(part)) return 98;
+  if (ACTION_PHRASE_PATTERN.test(part)) return 22;
+  if (DOCUMENT_CLASS_PATTERN.test(part)) return 92;
+  if (COSTUME_CUE_PATTERN.test(part)) return 50;
+  if (WEAPON_CLASS_PATTERN.test(part)) return 80;
+  if (PROP_CLASS_PATTERN.test(part) && wordCount(part) >= 3) return 70;
+  if (PROP_CLASS_PATTERN.test(part)) return 50;
+  if (wordCount(part) >= 3) return 40;
+  return 30;
 }
 
 function pickSalientVisualParts(visual: string): string {
@@ -334,52 +360,58 @@ function pickSalientVisualParts(visual: string): string {
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
-  if (parts.length <= 2) return hardCapAtBoundary(parts.join(", "), 56);
-  const prop = parts.find((p) => PROP_CUE_PATTERN.test(p));
-  const costume = parts.find((p) => p !== prop && COSTUME_CUE_PATTERN.test(p));
-  const keep: string[] = [];
-  if (prop) keep.push(prop);
-  if (costume) keep.push(costume);
-  for (const p of parts) {
-    if (keep.length >= 2) break;
-    if (!keep.includes(p)) keep.push(p);
+  if (parts.length <= MAX_IDENTITY_VISUAL_PARTS) {
+    return hardCapAtBoundary(parts.join(", "), MAX_IDENTITY_VISUAL_LEN);
   }
-  return hardCapAtBoundary(keep.join(", "), 56);
+  const ranked = parts
+    .map((part, index) => ({ part, index, score: scoreVisualPart(part) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, MAX_IDENTITY_VISUAL_PARTS)
+    .sort((a, b) => a.index - b.index)
+    .map((x) => x.part);
+  return hardCapAtBoundary(ranked.join(", "), MAX_IDENTITY_VISUAL_LEN);
+}
+
+/** Longest narrative object already named in action/environment — never invented. */
+function namedNarrativeObject(action: string, environment: string): string | null {
+  const blob = `${action} ${environment}`;
+  const matches = [
+    ...blob.matchAll(
+      /\b((?:campaign\s+)?maps?|(?:sealed\s+)?(?:parchment\s+)?letters?|parchments?|scrolls?|\w+\s+blades?|\w+\s+spears?|greatswords?|\w+\s+swords?|blades?|spears?|swords?|tablets?|altars?)\b/gi
+    ),
+  ];
+  if (matches.length === 0) return null;
+  let best = matches[0]![0];
+  for (const m of matches) {
+    if (m[0].length > best.length) best = m[0];
+  }
+  return best.trim();
+}
+
+function rewriteHandTransferPreservingObject(action: string): string {
+  const obj =
+    namedNarrativeObject(action, "") ??
+    action
+      .match(
+        /\b(?:handing|hands?\s+(?:over|to)|pass(?:es|ing)?|giv(?:es|ing)|exchang(?:es|ing))\s+(?:a\s+|the\s+)?([^,]+?)(?:\s+to\b|$)/i
+      )?.[1]
+      ?.trim();
+  const name = obj && obj.length < 40 ? obj : "the named object";
+  return `${name} resting on a surface, both looking at it`;
 }
 
 /**
- * Rule 10–12: landmark exclusivity, prop salience, costume mutex.
+ * Rule 10–12: preserve location identity; keep Tier-1 visual parts.
+ * MUST NOT substitute a different place or architecture class.
  */
 export function sharpenExpressionAnchors<T extends ExpressionLike>(
   expression: T
 ): T {
-  let environment = hardCapAtBoundary(expression.environment ?? "", 64);
-  const actionBlob = `${expression.action ?? ""} ${expression.composition ?? ""}`;
-  const placeBlob = `${environment} ${actionBlob}`;
-
-  if (/\b(godswood|weirwood|heart\s*tree|dark\s+pool)\b/i.test(placeBlob)) {
-    // Exclusive landmark — do not dilute with generic forest mist.
-    environment = "pale weirwood face carved in white bark, dark pool";
-  } else if (
-    /\bwinterfell\b/i.test(placeBlob) &&
-    !/\b(stone chamber|solar|great hall|courtyard)\b/i.test(environment)
-  ) {
-    environment = hardCapAtBoundary(
-      `Winterfell stone chamber, wooden table`,
-      64
-    );
-  } else if (
-    /\b(chamber|solar|table|letter|parchment|scroll)\b/i.test(placeBlob) &&
-    !/\b(stone chamber|solar|wooden table)\b/i.test(environment)
-  ) {
-    environment = hardCapAtBoundary("Winterfell stone chamber, wooden table", 64);
-  }
-
-  const characters = (expression.characters ?? []).map((ch) => {
-    const muted = applyCostumeMutex(ch.role, ch.visual.trim());
-    return { ...ch, visual: pickSalientVisualParts(muted) };
-  });
-
+  const environment = hardCapAtBoundary(expression.environment ?? "", 80);
+  const characters = (expression.characters ?? []).map((ch) => ({
+    ...ch,
+    visual: pickSalientVisualParts(ch.visual.trim()),
+  }));
   return { ...expression, environment, characters };
 }
 
@@ -400,15 +432,12 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
   // Drop redundant cast-count stacks (LLM + adapt) — blanks Local when repeated.
   action = action
     .replace(/,?\s*exactly\s+(?:\d+|two|three)\s+figures?\b/gi, "")
-    .replace(/\b(sand|terrain)\s+map\b/gi, "sealed parchment letter")
-    .replace(/\bmap\b/gi, "letter")
     .replace(/\s{2,}/g, " ")
     .replace(/^[\s,]+|[\s,]+$/g, "")
     .trim();
 
   if (HAND_TRANSFER_ACTION_PATTERN.test(action)) {
-    action =
-      "sealed parchment letter on wooden table, both looking down at letter";
+    action = rewriteHandTransferPreservingObject(action);
   }
 
   if (castLen === 2) {
@@ -418,16 +447,14 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
       roleMentions(action, chars[0]!.role) &&
       roleMentions(action, chars[1]!.role);
     const hasPlacement = /\bleft\b/i.test(action) && /\bright\b/i.test(action);
+    const namedObject = namedNarrativeObject(
+      action,
+      expression.environment ?? ""
+    );
 
     if (!namesBoth || !hasPlacement) {
-      if (/\b(letter|scroll|parchment)\b/i.test(action)) {
-        action = `sealed parchment letter on table, ${left} left, ${right} right, both looking down`;
-      } else if (
-        /\b(godswood|weirwood|pool|ice|sword)\b/i.test(
-          `${action} ${expression.environment ?? ""}`
-        )
-      ) {
-        action = `${left} left by pool with sword, ${right} right standing, both fully visible`;
+      if (namedObject) {
+        action = `${namedObject} between figures, ${left} left, ${right} right, both looking toward ${namedObject}`;
       } else {
         action = `${left} left, ${right} right, both fully visible`;
       }
@@ -436,7 +463,7 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
     }
 
     composition =
-      "medium wide shot, both figures fully visible, profiles or looking down";
+      "medium-wide, both visible, identity weapons in frame, profiles";
   } else if (castLen > 2) {
     composition = composition
       .replace(new RegExp(CLOSE_DUAL_FRAMING_PATTERN.source, "gi"), " ")

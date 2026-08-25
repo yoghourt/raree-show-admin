@@ -320,8 +320,9 @@ export async function failGenerateJob(
 }
 
 /**
- * Operator discard: hide rejected Execution results (e.g. unusable white image).
- * Allowed from terminal succeeded/failed only — does not touch Assets.
+ * Operator cancel/discard: hide a job from default Admin lists.
+ * Allowed from queued|running (abort stuck Worker claim) or terminal succeeded|failed.
+ * Does not touch Assets.
  */
 export async function cancelGenerateJob(
   id: string,
@@ -338,7 +339,7 @@ export async function cancelGenerateJob(
       updated_at: now,
     })
     .eq("id", id)
-    .in("status", ["succeeded", "failed"])
+    .in("status", ["queued", "running", "succeeded", "failed"])
     .select("*")
     .single();
 

@@ -13,6 +13,7 @@ import {
 } from "@/lib/rollout/sync-discovery-staging";
 import {
   dismissStoryStagingItem,
+  deleteDismissedStoryStagingItem,
   loadRolloutQueue,
   markStoryReviewIdProcessed,
   mergeRolloutQueue,
@@ -105,6 +106,40 @@ describe("sync-discovery-staging", () => {
     const queue = syncRolloutQueueFromDiscovery("work-1", "op-1");
     expect(queue.characterStaging).toHaveLength(1);
     expect(queue.characterStaging?.[0]?.name).toBe("Guan Yu");
+  });
+
+  it("recovers location staging from accepted review items when snapshot has no acceptedLocations", () => {
+    const snapshot: DiscoveryReviewSnapshot = {
+      sessionId: "sess-1",
+      workId: "work-1",
+      operatorId: "op-1",
+      session: {} as DiscoveryReviewSnapshot["session"],
+      candidates: [],
+      reviewItems: [
+        {
+          reviewId: "rev-loc-recover",
+          status: "accepted",
+          candidate: {
+            candidateId: "cand-loc",
+            candidateType: "location",
+            workId: "work-1",
+            displayName: "Zhuozhou",
+            summary: "Commandery",
+            fields: { name: "Zhuozhou", region: "Youzhou", description: "Town" },
+          },
+        },
+      ],
+      acceptedStoryUnits: [],
+      acceptedSceneCandidates: [],
+      savedAt: "2026-07-05T00:00:00.000Z",
+    };
+    store.set(
+      "discovery_review_snapshot:work-1:op-1:sess-1",
+      JSON.stringify(snapshot)
+    );
+    const queue = syncRolloutQueueFromDiscovery("work-1", "op-1");
+    expect(queue.locationStaging).toHaveLength(1);
+    expect(queue.locationStaging?.[0]?.name).toBe("Zhuozhou");
   });
 
   it("appends story staging immediately on accept path", () => {
@@ -201,6 +236,47 @@ describe("sync-discovery-staging", () => {
     const restored = restoreStoryStagingItem(synced, "rev-dismiss");
     expect(restored.storyStaging).toHaveLength(1);
     expect(restored.dismissedStoryStaging).toHaveLength(0);
+  });
+
+  it("deletes dismissed story staging without restoring or re-importing", () => {
+    const staging = {
+      workId: "work-1",
+      sourceReviewId: "rev-delete",
+      sourceCandidateId: "cand-delete",
+      title: "Delete me",
+      summary: "s",
+      acceptedAt: "2026-07-05T00:00:00.000Z",
+    };
+    const dismissed = dismissStoryStagingItem(
+      mergeRolloutQueue(loadRolloutQueue("work-1", "op-1"), {
+        storyUnits: [staging],
+      }),
+      "rev-delete"
+    );
+    const deleted = deleteDismissedStoryStagingItem(dismissed, "rev-delete");
+    saveRolloutQueue("work-1", "op-1", deleted);
+    expect(deleted.storyStaging).toHaveLength(0);
+    expect(deleted.dismissedStoryStaging).toHaveLength(0);
+    expect(deleted.dismissedStoryReviewIds).toContain("rev-delete");
+
+    store.set(
+      "discovery_review_snapshot:work-1:op-1:sess-1",
+      JSON.stringify({
+        sessionId: "sess-1",
+        workId: "work-1",
+        operatorId: "op-1",
+        session: {},
+        candidates: [],
+        reviewItems: [],
+        acceptedStoryUnits: [staging],
+        acceptedSceneCandidates: [],
+        savedAt: "2026-07-05T00:00:00.000Z",
+      })
+    );
+
+    const synced = syncRolloutQueueFromDiscovery("work-1", "op-1");
+    expect(synced.storyStaging).toHaveLength(0);
+    expect(synced.dismissedStoryStaging).toHaveLength(0);
   });
 
   it("passes parent Story fields on scene staging into rollout queue", () => {

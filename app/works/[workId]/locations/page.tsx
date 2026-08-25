@@ -59,7 +59,8 @@ export default function WorkLocationsPage() {
     };
   }, [workId]);
 
-  const { locations, loading, error, deleteLocation } = useLocations(workId);
+  const { locations, loading, error, deleteLocation, deleteLocations } =
+    useLocations(workId);
 
   const workTitle =
     workLoading ? "加载中…" : work?.title ?? "未知作品";
@@ -119,6 +120,7 @@ export default function WorkLocationsPage() {
         loading={loading}
         error={error}
         onDelete={deleteLocation}
+        onDeleteMany={deleteLocations}
       />
     </div>
   );

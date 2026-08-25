@@ -23,12 +23,33 @@ function sharedAdapterEnv(env: NodeJS.ProcessEnv): Omit<ImageAdapterEnv, "accept
   }
 }
 
+const DISABLED_FALLBACK_IDS = new Set([
+  "",
+  "none",
+  "off",
+  "false",
+  "0",
+  "disabled",
+]);
+
+/**
+ * Unset / empty / none → no fallback (do not silently route to Cloud).
+ * Cloud fallback is opt-in: IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
+ */
+export function resolveAcceptFallbackProviderId(
+  raw: string | undefined
+): string {
+  const trimmed = (raw ?? "").trim();
+  if (DISABLED_FALLBACK_IDS.has(trimmed.toLowerCase())) return "";
+  return trimmed;
+}
+
 /**
  * Creator production Deployment config (ADR-010 A3 Constraint F).
  *
  * Env (replaceable):
  * - IMAGE_CREATOR_ACCEPT_PROVIDER (default: local)
- * - IMAGE_CREATOR_ACCEPT_FALLBACK (default: siliconflow)
+ * - IMAGE_CREATOR_ACCEPT_FALLBACK (unset / none / off = no fallback; e.g. siliconflow)
  * - IMAGE_CREATOR_ACCEPT_MODEL
  * - IMAGE_CREATOR_FALLBACK_MODEL
  * - IMAGE_CREATOR_LOCAL_BASE / IMAGE_CREATOR_LOCALAI_BASE (e.g. http://127.0.0.1:8080)
@@ -45,9 +66,9 @@ export function loadCreatorImageDeploymentConfig(
 ): CreatorImageDeploymentConfig {
   return {
     acceptProviderId: (env.IMAGE_CREATOR_ACCEPT_PROVIDER ?? "local").trim(),
-    acceptFallbackProviderId: (
-      env.IMAGE_CREATOR_ACCEPT_FALLBACK ?? "siliconflow"
-    ).trim(),
+    acceptFallbackProviderId: resolveAcceptFallbackProviderId(
+      env.IMAGE_CREATOR_ACCEPT_FALLBACK
+    ),
     acceptModelId: (env.IMAGE_CREATOR_ACCEPT_MODEL ?? "sdxl-turbo").trim(),
     // Text-to-image default. Kontext requires `image` — used when a reference
     // portrait exists (adapter may upgrade), or set IMAGE_CREATOR_FALLBACK_MODEL.

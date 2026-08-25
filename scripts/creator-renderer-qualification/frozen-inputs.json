@@ -1,0 +1,82 @@
+{
+  "grant": "CREATOR-RENDERER-QUAL-001",
+  "source": "EVG-001-R3 / SPIKE-RCS-001 frozen Local prompts",
+  "note": "Do not retune per model. Do not modify Projection or identity rules.",
+  "seedProtocol": [42, 101, 202, 303, 404],
+  "size": 512,
+  "provider": "localai",
+  "cases": [
+    {
+      "id": "tk-campaign-document",
+      "workId": "three-kingdoms",
+      "workDir": "three-kingdoms",
+      "setting": "indoor",
+      "cast": "two",
+      "compositionClass": "two-character-action-named-prop",
+      "caption": "刘备与关羽俯看军帐中的征讨地图。",
+      "castCount": 2,
+      "localPrompt": "Setting: Han command tent. Characters: Liu Bei: plain Han robe, twin swords, looking down at map; Guan Yu: Green Dragon Crescent Blade, red face, long beard, green robe. Action: campaign map between figures, Liu left, Guan right, both looking toward campaign map. Environment: Han felt command tent, campaign map on wooden table, oil lamps. Composition: medium-wide, both visible, identity weapons in frame, profiles. Visual emphasis: felt tent, campaign map, Green Dragon Crescent Blade. No extra people. Frozen still, no text, no watermark.",
+      "reuse": {
+        "z-image-42": "scripts/renderer-capability-spike/results/z-image/tk-campaign-document.png",
+        "sd35-42": "scripts/evg-001-cross-work-visual/results/r3/tk-campaign-document.png"
+      }
+    },
+    {
+      "id": "tk-symbol-profile",
+      "workId": "three-kingdoms",
+      "workDir": "three-kingdoms",
+      "setting": "outdoor",
+      "cast": "one",
+      "compositionClass": "single-character-named-prop",
+      "caption": "关羽侧身立于阵前，青龙偃月刀拄地，红脸长须，不面向观者。",
+      "castCount": 1,
+      "localPrompt": "Setting: Mount Daxing. Characters: Guan Yu: Green Dragon Crescent Blade, red face, long beard, green robe. Action: Guan Yu standing in profile, crescent blade grounded, looking away from viewer. Environment: Han battlefield slope at Mount Daxing, silk banners, packed earth. Composition: medium-wide profile still, face secondary, weapon and beard readable. Visual emphasis: Green Dragon Crescent Blade, red face, long beard. No extra people. Frozen still, no text, no watermark.",
+      "reuse": {
+        "sd35-42": "scripts/evg-001-cross-work-visual/results/r3/tk-symbol-profile.png"
+      }
+    },
+    {
+      "id": "as-indoor-counsel",
+      "workId": "asoiaf",
+      "workDir": "asoiaf",
+      "setting": "indoor",
+      "cast": "two",
+      "compositionClass": "two-character-action-prop",
+      "caption": "Catelyn delivers grave news of Jon Arryn's death; she and Ned look down at the sealed letter.",
+      "castCount": 2,
+      "localPrompt": "Setting: Winterfell solar. Characters: Catelyn Stark: southern noble gown, sealed letter, standing in profile, auburn hair; Eddard Stark: northern fur cloak, seated looking down at parchment, ancestral greatsword Ice. Action: sealed letter between figures, Catelyn left, Eddard right, both looking toward sealed letter. Environment: Winterfell solar, granite chamber, timber table, tallow candles. Composition: medium-wide, both visible, identity weapons in frame, profiles. Visual emphasis: sealed parchment between husband and wife. No extra people. Frozen still, no text, no watermark.",
+      "reuse": {
+        "z-image-42": "scripts/renderer-capability-spike/results/z-image/as-indoor-counsel.png",
+        "sd35-42": "scripts/evg-001-cross-work-visual/results/r3/as-indoor-counsel.png"
+      }
+    },
+    {
+      "id": "as-symbol-profile",
+      "workId": "asoiaf",
+      "workDir": "asoiaf",
+      "setting": "outdoor",
+      "cast": "one",
+      "compositionClass": "single-character-named-prop",
+      "caption": "Eddard sits in profile by the heart tree, cleaning Ice, head bowed, not facing the viewer.",
+      "castCount": 1,
+      "localPrompt": "Setting: Winterfell godswood. Characters: Eddard Stark: greatsword Ice, northern fur cloak, ancestral greatsword Ice, dark northern fur. Action: Eddard seated in profile cleaning greatsword, head bowed, not facing viewer. Environment: Winterfell godswood, pale carved weirwood by dark pool. Composition: medium-wide profile still, face secondary, sword and cloak readable. Visual emphasis: greatsword Ice against the weirwood pool. No extra people. Frozen still, no text, no watermark.",
+      "reuse": {
+        "sd35-42": "scripts/evg-001-cross-work-visual/results/r3/as-symbol-profile.png"
+      }
+    }
+  ],
+  "models": [
+    {
+      "id": "z-image",
+      "label": "Z-Image-Turbo",
+      "modelId": "Z-Image-Turbo",
+      "role": "candidate"
+    },
+    {
+      "id": "sd35",
+      "label": "SD3.5 Medium",
+      "modelId": "sd-3.5-medium-ggml",
+      "role": "baseline"
+    }
+  ]
+}

@@ -4,6 +4,7 @@
 
 import type {
   AcceptedCharacterStaging,
+  AcceptedLocationStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
@@ -16,10 +17,12 @@ import {
   loadRolloutQueue,
   mergeRolloutQueue,
   removeCharacterStagingByReviewId,
+  removeLocationStagingByReviewId,
   removeSceneStagingByReviewId,
   removeStoryStagingByReviewId,
   saveRolloutQueue,
   shouldImportCharacterStaging,
+  shouldImportLocationStaging,
   shouldImportSceneStaging,
   shouldImportStoryStaging,
 } from "@/lib/rollout/rollout-queue-storage";
@@ -46,6 +49,9 @@ export function syncRolloutQueueFromDiscovery(
     ),
     characterStaging: imported.characterStaging.filter((item) =>
       shouldImportCharacterStaging(current, item.sourceReviewId)
+    ),
+    locationStaging: imported.locationStaging.filter((item) =>
+      shouldImportLocationStaging(current, item.sourceReviewId)
     ),
   };
 
@@ -94,6 +100,20 @@ export function appendCharacterStagingToRolloutQueue(
   }
   const merged = mergeRolloutQueue(loadRolloutQueue(workId, operatorId), {
     characterStaging: [staging],
+  });
+  saveRolloutQueue(workId, operatorId, merged);
+}
+
+export function appendLocationStagingToRolloutQueue(
+  workId: string,
+  operatorId: string,
+  staging: AcceptedLocationStaging
+): void {
+  if (!workId || !operatorId) {
+    return;
+  }
+  const merged = mergeRolloutQueue(loadRolloutQueue(workId, operatorId), {
+    locationStaging: [staging],
   });
   saveRolloutQueue(workId, operatorId, merged);
 }
@@ -164,6 +184,28 @@ export function updateCharacterStagingInRolloutQueue(
   saveRolloutQueue(workId, operatorId, next);
 }
 
+export function updateLocationStagingInRolloutQueue(
+  workId: string,
+  operatorId: string,
+  staging: AcceptedLocationStaging
+): void {
+  if (!workId || !operatorId) {
+    return;
+  }
+  const current = loadRolloutQueue(workId, operatorId);
+  const next = {
+    ...current,
+    locationStaging: [
+      ...(current.locationStaging ?? []).filter(
+        (item) => item.sourceReviewId !== staging.sourceReviewId
+      ),
+      staging,
+    ],
+    updatedAt: new Date().toISOString(),
+  };
+  saveRolloutQueue(workId, operatorId, next);
+}
+
 export function removeStoryStagingFromRolloutQueue(
   workId: string,
   operatorId: string,
@@ -209,5 +251,21 @@ export function removeCharacterStagingFromRolloutQueue(
     workId,
     operatorId,
     removeCharacterStagingByReviewId(current, sourceReviewId)
+  );
+}
+
+export function removeLocationStagingFromRolloutQueue(
+  workId: string,
+  operatorId: string,
+  sourceReviewId: string
+): void {
+  if (!workId || !operatorId) {
+    return;
+  }
+  const current = loadRolloutQueue(workId, operatorId);
+  saveRolloutQueue(
+    workId,
+    operatorId,
+    removeLocationStagingByReviewId(current, sourceReviewId)
   );
 }

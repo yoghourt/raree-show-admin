@@ -4,10 +4,14 @@
 
 import type {
   AcceptedCharacterStaging,
+  AcceptedLocationStaging,
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
-import { characterStagingFromAcceptedReviewItems } from "@/lib/discovery/review-state";
+import {
+  characterStagingFromAcceptedReviewItems,
+  locationStagingFromAcceptedReviewItems,
+} from "@/lib/discovery/review-state";
 import type { DiscoveryReviewSnapshot } from "@/lib/discovery/review-session-storage";
 
 const DISCOVERY_PREFIX = "discovery_review_snapshot:";
@@ -53,10 +57,12 @@ export function extractStagingFromDiscoverySnapshots(
   storyUnits: AcceptedStoryUnitStaging[];
   sceneCandidates: AcceptedSceneCandidateStaging[];
   characterStaging: AcceptedCharacterStaging[];
+  locationStaging: AcceptedLocationStaging[];
 } {
   const storyUnits: AcceptedStoryUnitStaging[] = [];
   const sceneCandidates: AcceptedSceneCandidateStaging[] = [];
   const characterStaging: AcceptedCharacterStaging[] = [];
+  const locationStaging: AcceptedLocationStaging[] = [];
 
   for (const snap of snapshots) {
     storyUnits.push(...(snap.acceptedStoryUnits ?? []));
@@ -67,9 +73,15 @@ export function extractStagingFromDiscoverySnapshots(
         ? explicitCharacters
         : characterStagingFromAcceptedReviewItems(snap.reviewItems ?? []))
     );
+    const explicitLocations = snap.acceptedLocations ?? [];
+    locationStaging.push(
+      ...(explicitLocations.length > 0
+        ? explicitLocations
+        : locationStagingFromAcceptedReviewItems(snap.reviewItems ?? []))
+    );
   }
 
-  return { storyUnits, sceneCandidates, characterStaging };
+  return { storyUnits, sceneCandidates, characterStaging, locationStaging };
 }
 
 export function importStagingFromLatestDiscoverySnapshot(
@@ -79,6 +91,7 @@ export function importStagingFromLatestDiscoverySnapshot(
   storyUnits: AcceptedStoryUnitStaging[];
   sceneCandidates: AcceptedSceneCandidateStaging[];
   characterStaging: AcceptedCharacterStaging[];
+  locationStaging: AcceptedLocationStaging[];
 } | null {
   const snapshots = findDiscoverySnapshotsForWork(workId, operatorId);
   if (snapshots.length === 0) {

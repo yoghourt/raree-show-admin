@@ -230,7 +230,7 @@ describe("IMPLEMENT-GRANULARITY-GATE-001 production Accept boundary", () => {
     const result = prepareAcceptReview(items, location.reviewId);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("expected location accept");
-    expect(result.kind).toBe("entity_prefill");
+    expect(result.kind).toBe("location_staging");
   });
 
   it("character Accept without narrative remains ungated", () => {

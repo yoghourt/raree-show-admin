@@ -36,8 +36,8 @@ IMAGE_CREATOR_ACCEPT_PROVIDER=local
 IMAGE_CREATOR_LOCAL_BASE=http://127.0.0.1:8191
 IMAGE_CREATOR_ACCEPT_MODEL=sdxl-turbo
 
-# Cloud fallback（Local 挂了才会用；要强制只走本地可先去掉 key / 注释 fallback）
-IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
+# Cloud fallback（默认关闭。需要时再设 IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow）
+# IMAGE_CREATOR_ACCEPT_FALLBACK=siliconflow
 # SILICONFLOW_API_KEY=...
 ```
 
@@ -177,12 +177,12 @@ npx tsx scripts/verify-execution-localai.ts
 |------|------|
 | `localai timed out` | 多为分辨率过大或首次加载；看 LocalAI 日志；降 `MAX_EDGE`（如 512）或加 `TIMEOUT_MS` |
 | 电脑很卡但最终失败 | LocalAI 仍在本机推理；超时只断客户端等待，后台可能还在跑——必要时重启 LocalAI |
-| 仍像走云 / `usedFallback: true` + siliconflow | 测本机时设 `ACCEPT_FALLBACK=localai`；或修好 primary |
+| 仍像走云 / `usedFallback: true` + siliconflow | 未配 `IMAGE_CREATOR_ACCEPT_FALLBACK` 时不应走云；若仍出现，检查是否显式设了 `siliconflow`，并重启 `npm run dev` / worker |
 | connection refused | LocalAI 未听 8080；检查 `IMAGE_CREATOR_LOCALAI_BASE` |
 | 改了 `.env.local` 无效 | 未重启 `npm run dev` |
 | 模型 4xx/5xx | `IMAGE_CREATOR_ACCEPT_MODEL` 必须与 LocalAI 中 **name** 完全一致 |
 | 误用 8191 portrait server | `ACCEPT_PROVIDER` 应为 `localai` 不是 `local` |
-| 白屏 / 空白图 Job 变 `failed` | 正常：空白检测拒收后会试 Cloud fallback；两边都白才失败。临时关闭：`IMAGE_CREATOR_SKIP_BLANK_GUARD=1` |
+| 白屏 / 空白图 Job 变 `failed` | 正常：空白检测拒收后，未配置 fallback 则直接失败 |
 | fallback 报缺 key | 须设 `SILICONFLOW_API_KEY`；仅有 `IMAGE_SPIKE_SILICONFLOW_KEY` 不够 |
 
 ### 脚本回归（可选）

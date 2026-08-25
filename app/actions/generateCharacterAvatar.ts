@@ -11,7 +11,11 @@ import { z } from "zod"
 import { imageGenerate } from "@/lib/ai/capability"
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload"
 import { formatRequestError } from "@/lib/format-request-error"
-import { buildAvatarPrompt, buildAvatarNegativePrompt } from "@/lib/prompts/avatar"
+import {
+  buildAvatarPrompt,
+  buildAvatarNegativePrompt,
+  PORTRAIT_IMAGE_SIZE,
+} from "@/lib/prompts/avatar"
 
 export type GenerateCharacterAvatarState =
   | { ok: true; url: string }
@@ -63,7 +67,7 @@ export async function generateCharacterAvatar(
       referenceImages: referencePortraitUrl
         ? [{ url: referencePortraitUrl }]
         : undefined,
-      size: { width: 512, height: 512 },
+      size: { ...PORTRAIT_IMAGE_SIZE },
     })
     let url: string
     try {

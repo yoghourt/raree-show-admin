@@ -12,11 +12,12 @@ export type ProjectionProfile = "local" | "cloud";
 
 const MAX_PROMPT_PART_LEN = 400;
 /** Local sd-3.5-medium blanks above ~600 chars — keep Local transport lean. */
-const LOCAL_VISUAL_MAX = 64;
+const LOCAL_VISUAL_MAX = 80;
 const LOCAL_ACTION_MAX = 96;
-const LOCAL_ENV_MAX = 72;
+const LOCAL_ENV_MAX = 80;
 const LOCAL_COMPOSITION_MAX = 72;
 const LOCAL_ROLE_MAX = 28;
+const LOCAL_EMPHASIS_MAX = 72;
 
 function capPart(value: string): string {
   if (value.length <= MAX_PROMPT_PART_LEN) return value;
@@ -103,7 +104,7 @@ function joinLocalPrompt(re: RendererExpression): string {
   let composition = stripExactlyFigureCues(capPart(re.composition ?? ""));
   if (castLen === 2) {
     composition =
-      "medium wide shot, both figures fully visible, profiles or looking down";
+      "medium-wide, both visible, identity weapons in frame, profiles";
   } else if (castLen > 2) {
     if (
       composition.length > LOCAL_COMPOSITION_MAX ||
@@ -121,13 +122,18 @@ function joinLocalPrompt(re: RendererExpression): string {
     stripExactlyFigureCues(capPart(re.environment ?? "")),
     LOCAL_ENV_MAX
   );
+  const emphasis = re.visualEmphasis?.trim()
+    ? hardCap(stripExactlyFigureCues(capPart(re.visualEmphasis.trim())), LOCAL_EMPHASIS_MAX)
+    : "";
 
   const parts = [
     cast && `Characters: ${cast}.`,
     action && `Action: ${action}.`,
     environment && `Environment: ${environment}.`,
     composition && `Composition: ${composition}.`,
-    // lighting / atmosphere / threat / styleHints omitted (Local profile)
+    emphasis && `Visual emphasis: ${emphasis}.`,
+    // lighting / atmosphere / styleHints omitted — work identity lives in
+    // environment materials, identity visuals, and visualEmphasis, not style adjectives.
   ].filter(Boolean);
 
   const body = parts.join(" ").trim();

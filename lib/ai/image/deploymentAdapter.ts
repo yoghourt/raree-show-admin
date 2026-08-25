@@ -112,14 +112,8 @@ async function runFallback(
   config: CreatorImageDeploymentConfig,
   primaryError: string
 ): Promise<ImageCandidateGenerationResult> {
-  console.warn("[generateImageCandidate] primary failed; trying fallback", {
-    primary: config.acceptProviderId,
-    fallback: config.acceptFallbackProviderId,
-    primaryError: primaryError.slice(0, 400),
-    assetSlot: req.assetSlot ?? null,
-  })
-
-  if (isSameProvider(config.acceptProviderId, config.acceptFallbackProviderId)) {
+  const fallbackId = config.acceptFallbackProviderId.trim()
+  if (!fallbackId) {
     throw new Error(
       formatCreatorImageFailure({
         providerId: config.acceptProviderId,
@@ -128,14 +122,27 @@ async function runFallback(
     )
   }
 
-  const fallbackSkip = softPrimarySkipReason(
-    config.acceptFallbackProviderId,
-    config
-  )
+  console.warn("[generateImageCandidate] primary failed; trying fallback", {
+    primary: config.acceptProviderId,
+    fallback: fallbackId,
+    primaryError: primaryError.slice(0, 400),
+    assetSlot: req.assetSlot ?? null,
+  })
+
+  if (isSameProvider(config.acceptProviderId, fallbackId)) {
+    throw new Error(
+      formatCreatorImageFailure({
+        providerId: config.acceptProviderId,
+        error: primaryError,
+      })
+    )
+  }
+
+  const fallbackSkip = softPrimarySkipReason(fallbackId, config)
   if (fallbackSkip) {
     console.warn("[generateImageCandidate] fallback skipped (missing creds)", {
       primary: config.acceptProviderId,
-      fallback: config.acceptFallbackProviderId,
+      fallback: fallbackId,
       primaryError: primaryError.slice(0, 240),
       fallbackSkip,
     })
@@ -143,7 +150,7 @@ async function runFallback(
       formatCreatorImagePrimaryAndFallbackFailure({
         primaryProviderId: config.acceptProviderId,
         primaryError,
-        fallbackProviderId: config.acceptFallbackProviderId,
+        fallbackProviderId: fallbackId,
         fallbackError: fallbackSkip,
       })
     )
@@ -154,7 +161,7 @@ async function runFallback(
     acceptModelId: config.fallbackModelId || config.acceptModelId,
   }
   const fallback = createImageGenerationProvider(
-    config.acceptFallbackProviderId,
+    fallbackId,
     fallbackConfig,
     "accept"
   )
@@ -166,7 +173,7 @@ async function runFallback(
     )
     console.info("[generateImageCandidate] fallback ok", {
       primary: config.acceptProviderId,
-      fallback: config.acceptFallbackProviderId,
+      fallback: fallbackId,
       primaryError: primaryError.slice(0, 240),
       providerId: result.meta.providerId,
       modelId: result.meta.modelId,
@@ -176,7 +183,7 @@ async function runFallback(
     const fallbackMsg = formatImageAttemptError(fallbackErr)
     console.warn("[generateImageCandidate] fallback failed", {
       primary: config.acceptProviderId,
-      fallback: config.acceptFallbackProviderId,
+      fallback: fallbackId,
       primaryError: primaryError.slice(0, 240),
       fallbackError: fallbackMsg.slice(0, 240),
     })
@@ -184,7 +191,7 @@ async function runFallback(
       formatCreatorImagePrimaryAndFallbackFailure({
         primaryProviderId: config.acceptProviderId,
         primaryError,
-        fallbackProviderId: config.acceptFallbackProviderId,
+        fallbackProviderId: fallbackId,
         fallbackError: fallbackMsg,
       })
     )
