@@ -328,4 +328,66 @@ describe("persistReadingFrameFromSceneStaging Context path", () => {
     const options = updateMock.mock.calls[0]?.[5];
     expect(options).toBeUndefined();
   });
+
+  it("does not persist empty-scene stub Expression on provenance", async () => {
+    const parent = {
+      work_id: "work-1",
+      tsid: "scene_route_1",
+      title: "Arc",
+      chapter_number: 1,
+      chapter_title: null,
+      summary: "",
+      tags: [],
+      story_images_v2: [],
+      discovery_source_review_id: "rev-story-1",
+      frame_provenance_v1: [],
+      scene_contexts_v1: [],
+    };
+    getWithContextsMock.mockResolvedValue(parent);
+    updateMock.mockResolvedValue(parent);
+
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ data: [], error: null })),
+        })),
+      })),
+    };
+
+    const { persistReadingFrameFromSceneStaging } = await import(
+      "@/lib/rollout/reading-frame-persist"
+    );
+
+    const result = await persistReadingFrameFromSceneStaging(
+      supabase as never,
+      "work-1",
+      {
+        workId: "work-1",
+        sourceReviewId: "rev-scene-stub",
+        parentStorySourceReviewId: "rev-story-1",
+        parentStoryTitle: "Arc",
+        chapter_number: 1,
+        title: "Zhuo County",
+        summary: "Liu Yan's recruitment notice brings together Liu Bei and Guan Yu.",
+        rendererExpression: {
+          environment: "Zhuo County",
+          characters: [
+            { role: "Liu Bei", visual: "character present" },
+            { role: "Guan Yu", visual: "character present" },
+          ],
+          action: "empty scene",
+          composition: "wide view",
+        },
+        acceptedAt: "2026-08-08T00:00:00.000Z",
+      },
+      { parentRouteTsid: "scene_route_1" }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const provenance = updateMock.mock.calls[0]![4] as Array<{
+      rendererExpression?: unknown;
+    }>;
+    expect(provenance[0]!.rendererExpression).toBeUndefined();
+  });
 });

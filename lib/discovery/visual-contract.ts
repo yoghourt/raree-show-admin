@@ -65,6 +65,26 @@ export const MINIMAL_RENDERER_EXPRESSION: RendererExpression = {
   composition: "wide view",
 };
 
+/**
+ * Placeholder Expression is not executable story form.
+ * Caption / Frame Narrative remains the generate source until a real action exists.
+ */
+export function isStubRendererExpression(
+  expr: RendererExpression | null | undefined
+): boolean {
+  if (!expr) return true;
+  const action = expr.action.trim().toLowerCase();
+  return action.length === 0 || action === "empty scene";
+}
+
+/** Omit stub placeholders; keep authored Expression only. */
+export function executableRendererExpression(
+  expr: RendererExpression | null | undefined
+): RendererExpression | undefined {
+  if (!expr || isStubRendererExpression(expr)) return undefined;
+  return expr;
+}
+
 const STYLE_HINTS_FORBIDDEN =
   /\b(best quality|masterpiece|8k|ultra detailed|ultradetailed)\b/i;
 

@@ -9,7 +9,10 @@ import {
   assessSceneFaceSafety,
   type SceneFaceSafetyAssessment,
 } from "@/lib/discovery/expression-capability-rules";
-import type { RendererExpression } from "@/lib/discovery/visual-contract";
+import {
+  executableRendererExpression,
+  type RendererExpression,
+} from "@/lib/discovery/visual-contract";
 import { formatRequestError } from "@/lib/format-request-error";
 import type {
   CharacterPortraitJobInput,
@@ -64,7 +67,10 @@ export async function executeSceneFrameImageGenerate(input: {
 }): Promise<ExecuteImageGenerateResult> {
   const started = Date.now();
   const caption = input.caption.trim();
-  const hasExpression = Boolean(input.rendererExpression);
+  const rendererExpression = executableRendererExpression(
+    input.rendererExpression
+  );
+  const hasExpression = Boolean(rendererExpression);
   if (!caption && !hasExpression) {
     return {
       ok: false,
@@ -73,8 +79,8 @@ export async function executeSceneFrameImageGenerate(input: {
     };
   }
 
-  const faceSafety = input.rendererExpression
-    ? assessSceneFaceSafety(input.rendererExpression, {
+  const faceSafety = rendererExpression
+    ? assessSceneFaceSafety(rendererExpression, {
         explicitOverride: input.faceSafetyOverride === true,
       })
     : undefined;
@@ -111,7 +117,7 @@ export async function executeSceneFrameImageGenerate(input: {
   const prompt = buildFrameDraftPrompt({
     caption: caption || " ",
     routeTitle,
-    rendererExpression: input.rendererExpression,
+    rendererExpression,
     projectionProfile,
   });
   if (!prompt.trim()) {
@@ -136,7 +142,7 @@ export async function executeSceneFrameImageGenerate(input: {
       assetSlot: "scene_frame",
       prompt,
       negativePrompt: buildFrameNegativePrompt(caption, {
-        castCount: input.rendererExpression?.characters?.length,
+        castCount: rendererExpression?.characters?.length,
       }),
       // A5: Local profile 512² (blank mitigation); Cloud profile 1024².
       size: frameSize,

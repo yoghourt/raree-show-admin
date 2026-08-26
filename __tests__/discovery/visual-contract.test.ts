@@ -25,6 +25,8 @@ import { buildFrameDraftPrompt } from "@/lib/prompts/frame-draft";
 import { parseFrameProvenance } from "@/lib/rollout/scenes-server";
 import {
   MINIMAL_RENDERER_EXPRESSION,
+  executableRendererExpression,
+  isStubRendererExpression,
   parseRendererExpression,
   parseVisualIntent,
   rendererExpressionToPrompt,
@@ -579,9 +581,47 @@ describe("buildFrameDraftPrompt Expression-first", () => {
   });
 
   it("falls back to caption when Expression absent", () => {
-    const prompt = buildFrameDraftPrompt({ caption: "街垒夜战" });
+    const prompt = buildFrameDraftPrompt({
+      caption: "街垒夜战",
+      projectionProfile: "local",
+    });
     expect(prompt).toContain("街垒夜战");
+    expect(prompt).toContain("Scene:");
+    expect(prompt).not.toContain("Scene content (authoritative)");
+    expect(prompt).toMatch(/VISUAL LOCK|no Chinese text/i);
+    expect(prompt).toMatch(/faces sharp|readable/i);
+    expect(prompt.length).toBeLessThan(600);
+  });
+
+  it("falls back to caption when Expression is an empty-scene stub", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption:
+        "Liu Yan's recruitment notice brings together Liu Bei and Guan Yu in Zhuo County.",
+      rendererExpression: {
+        ...MINIMAL_RENDERER_EXPRESSION,
+        environment: "Zhuo County",
+        characters: [
+          { role: "Liu Bei", visual: "character present" },
+          { role: "Guan Yu", visual: "character present" },
+        ],
+      },
+      projectionProfile: "local",
+    });
+    expect(prompt).toContain("blank wooden board");
+    expect(prompt).not.toMatch(/recruitment notice/i);
+    expect(prompt).toContain("Scene:");
+    expect(prompt).not.toMatch(/empty scene/i);
+    expect(prompt).not.toContain("character present");
+    expect(prompt.length).toBeLessThan(600);
+  });
+
+  it("keeps dense caption wrapper on cloud profile", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "街垒夜战",
+      projectionProfile: "cloud",
+    });
     expect(prompt).toContain("Scene content (authoritative)");
+    expect(prompt).toContain("Must match scene:");
   });
 
   it("never requires Intent in prompt builder input", () => {
@@ -641,6 +681,29 @@ describe("normalizeRawCandidate scene Expression", () => {
   });
 });
 
+describe("stub Renderer Expression", () => {
+  it("treats MINIMAL and empty action as stubs", () => {
+    expect(isStubRendererExpression(MINIMAL_RENDERER_EXPRESSION)).toBe(true);
+    expect(
+      isStubRendererExpression({
+        environment: "Zhuo County",
+        characters: [{ role: "Liu Bei", visual: "character present" }],
+        action: "empty scene",
+        composition: "wide view",
+      })
+    ).toBe(true);
+    expect(executableRendererExpression(MINIMAL_RENDERER_EXPRESSION)).toBeUndefined();
+    expect(
+      executableRendererExpression({
+        environment: "castle hall",
+        characters: [],
+        action: "knight kneeling before the king",
+        composition: "wide view",
+      })
+    ).toBeTruthy();
+  });
+});
+
 describe("parseFrameProvenance Expression round-trip", () => {
   it("preserves rendererExpression on provenance entries", () => {
     const parsed = parseFrameProvenance([
@@ -654,6 +717,23 @@ describe("parseFrameProvenance Expression round-trip", () => {
     expect(parsed).toHaveLength(1);
     expect(parsed[0]!.rendererExpression?.action).toContain("kneeling");
     expect(parsed[0]!.visualIntent?.purpose).toBe("establish tension");
+  });
+
+  it("omits empty-scene stub Expression from provenance", () => {
+    const parsed = parseFrameProvenance([
+      {
+        sourceReviewId: "rev-stub",
+        frameIndex: 0,
+        rendererExpression: {
+          environment: "Zhuo County",
+          characters: [{ role: "Zhang Fei", visual: "character present" }],
+          action: "empty scene",
+          composition: "wide view",
+        },
+      },
+    ]);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]!.rendererExpression).toBeUndefined();
   });
 });
 

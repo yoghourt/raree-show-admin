@@ -50,6 +50,14 @@ describe("formatImageAttemptError", () => {
     expect(msg).not.toContain("地址未配置");
   });
 
+  it("advises solo retry when scene frame already at 512", () => {
+    const timeout =
+      "localai timed out after 600000ms (http://127.0.0.1:8080/v1/images/generations; size 512x512). LocalAI may still be loading or CPU-bound — check LocalAI logs, or lower IMAGE_CREATOR_LOCALAI_MAX_EDGE.";
+    const msg = formatImageAttemptError(timeout);
+    expect(msg).toContain("单独重试");
+    expect(msg).not.toContain("MAX_EDGE");
+  });
+
   it("still maps true missing-base errors", () => {
     const missing =
       "localai adapter requires IMAGE_CREATOR_LOCAL_BASE or IMAGE_CREATOR_LOCALAI_BASE (e.g. http://127.0.0.1:8080)";
