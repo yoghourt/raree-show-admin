@@ -40,20 +40,40 @@ describe("media admission factory", () => {
 });
 
 describe("frame draft prompt (derived Job input)", () => {
-  it("derives from Asset Caption without becoming a stored object", () => {
+  it("derives a short Local caption prompt without triple-repeat wrapper", () => {
     const prompt = buildFrameDraftPrompt({
       caption: "街垒夜战",
       routeTitle: "巴黎起义",
+      projectionProfile: "local",
     });
     expect(prompt).toContain("街垒夜战");
-    expect(prompt).toContain("巴黎起义");
-    expect(prompt.toLowerCase()).toContain("narrative reading still");
-    expect(prompt).toContain("Scene content (authoritative):");
-    expect(prompt).toContain("Must match scene:");
+    expect(prompt).toContain("Scene:");
+    expect(prompt).toMatch(/VISUAL LOCK/i);
+    expect(prompt.indexOf("VISUAL LOCK")).toBeLessThan(prompt.indexOf("Scene:"));
+    expect(prompt).toMatch(/cinematic historical|painterly/i);
+    expect(prompt).not.toMatch(/digital illustration/i);
+    expect(prompt).not.toContain("巴黎起义");
+    expect(prompt).not.toContain("Scene content (authoritative):");
+    expect(prompt).not.toContain("Must match scene:");
+    expect(prompt.length).toBeLessThan(600);
+  });
+
+  it("rewrites recruitment-notice cues that paint glyphs on Local", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption:
+        "Prefect Liu Yan posts the official recruitment notice in Zhuozhou.",
+      projectionProfile: "local",
+    });
+    expect(prompt).not.toMatch(/recruitment notice/i);
+    expect(prompt).toMatch(/blank wooden board|no writing/i);
+    expect(prompt).toMatch(/VISUAL LOCK/i);
   });
 
   it("requires caption meaning via non-empty caption string", () => {
-    const prompt = buildFrameDraftPrompt({ caption: "  alone  " });
+    const prompt = buildFrameDraftPrompt({
+      caption: "  alone  ",
+      projectionProfile: "local",
+    });
     expect(prompt).toContain("alone");
   });
 
@@ -61,21 +81,33 @@ describe("frame draft prompt (derived Job input)", () => {
     const prompt = buildFrameDraftPrompt({
       caption: "街垒夜战\n\n[操作员修改意见] 雨夜、火光更强、少一点人",
       routeTitle: "巴黎起义",
+      projectionProfile: "local",
     });
     expect(prompt.indexOf("OPERATOR OVERRIDE")).toBeLessThan(
       prompt.indexOf("街垒夜战")
     );
     expect(prompt).toContain("雨夜、火光更强、少一点人");
-    expect(prompt).toContain("巴黎起义");
-    expect(prompt.indexOf("Remember operator override")).toBeGreaterThan(
-      prompt.indexOf("Must match scene:")
-    );
+    expect(prompt).not.toContain("巴黎起义");
   });
 
-  it("repeats scene caption for weak local models", () => {
-    const prompt = buildFrameDraftPrompt({ caption: "桥上诀别" });
+  it("does not triple-repeat caption on Local", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "桥上诀别",
+      projectionProfile: "local",
+    });
     const hits = prompt.split("桥上诀别").length - 1;
-    expect(hits).toBeGreaterThanOrEqual(3);
+    expect(hits).toBe(1);
+  });
+
+  it("keeps dense caption wrapper on cloud profile", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "街垒夜战",
+      routeTitle: "巴黎起义",
+      projectionProfile: "cloud",
+    });
+    expect(prompt).toContain("Scene content (authoritative):");
+    expect(prompt).toContain("Must match scene:");
+    expect(prompt.toLowerCase()).toContain("narrative reading still");
   });
 
   it("prefers short rendererExpression transport over caption wrapper", () => {
@@ -87,6 +119,7 @@ describe("frame draft prompt (derived Job input)", () => {
         action: "couple parting on bridge",
         composition: "centered couple, river below",
       },
+      projectionProfile: "local",
     });
     expect(prompt).toContain("couple parting on bridge");
     expect(prompt).not.toContain("legacy caption");

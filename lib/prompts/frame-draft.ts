@@ -4,7 +4,8 @@
  * Visual Intent MUST NOT be passed here.
  *
  * Expression path: Execution Projection by Deployment profile (A5).
- * Caption-legacy path: denser wrapper kept for weaker caption-only inputs.
+ * Local caption fallback: short single-pass beat (Local blanks above ~600 chars).
+ * Cloud caption path: denser wrapper for caption-only frames.
  *
  * Operator revision notes (`[操作员修改意见] …`) are promoted to the front —
  * trailing Chinese notes lose to early English style tokens.
@@ -15,9 +16,16 @@ import {
   resolveProjectionProfileFromEnv,
   type ProjectionProfile,
 } from "@/lib/discovery/execution-projection";
-import type { RendererExpression } from "@/lib/discovery/visual-contract";
+import {
+  executableRendererExpression,
+  type RendererExpression,
+} from "@/lib/discovery/visual-contract";
 
 export const FRAME_REVISION_MARKER = "[操作员修改意见]";
+
+/** Local caption beat budget — keep total prompt under Local blank threshold. */
+export const LOCAL_CAPTION_SCENE_MAX = 240;
+const LOCAL_CAPTION_REVISION_MAX = 120;
 
 export function splitFrameCaption(caption: string): {
   base: string;
@@ -75,6 +83,18 @@ export const FRAME_NEGATIVE_PROMPT = [
   "passport photo",
   "headshot portrait studio",
   "neutral gray studio backdrop",
+  "children's textbook",
+  "schoolbook illustration",
+  "storybook for children",
+  "chinese calligraphy",
+  "plaque text",
+  "signboard text",
+  "written characters",
+  "hanzi on sign",
+  "readable writing",
+  "blurry faces",
+  "out of focus faces",
+  "smoothed faces",
   "deformed",
   "mutated",
   "extra limbs",
@@ -151,8 +171,87 @@ function buildExpressionPrompt(input: {
   return parts.join(" ");
 }
 
+function hardCapCaption(text: string, max: number): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const at = Math.max(
+    cut.lastIndexOf(". "),
+    cut.lastIndexOf("; "),
+    cut.lastIndexOf(", "),
+    cut.lastIndexOf(" ")
+  );
+  return `${(at > max * 0.4 ? cut.slice(0, at) : cut).trim()}…`;
+}
+
 /**
- * Legacy caption path — denser wrapper for caption-only frames (no Expression).
+ * Caption beats like "recruitment notice" / 告示 cause Z-Image to paint glyphs.
+ * Rewrite to unmarked props; strip quoted strings that become title calligraphy.
+ */
+export function sanitizeLocalSceneCaptionForGlyphRisk(scene: string): string {
+  let s = scene;
+  s = s.replace(/[「『][^」』]{0,40}[」』]/g, "unmarked surface");
+  s = s.replace(/["“”][^"“”]{0,40}["“”]/g, "unmarked surface");
+  const rewrites: Array<[RegExp, string]> = [
+    [/recruitment\s+notice/gi, "blank wooden board with no writing"],
+    [/official\s+notice/gi, "blank wooden board with no writing"],
+    [/notice\s+board/gi, "unmarked wooden board without letters"],
+    [/notice\s+pinned/gi, "blank paper pinned without letters"],
+    [/\bproclamation\b/gi, "blank scroll without writing"],
+    [/\binscription\b/gi, "unmarked surface"],
+    [/\bsignage\b/gi, "blank hanging board without letters"],
+    [/告示|榜文|檄文|诏书|招牌|牌匾|文书/g, "空白无字木板"],
+  ];
+  for (const [re, rep] of rewrites) {
+    s = s.replace(re, rep);
+  }
+  return s;
+}
+
+/**
+ * Local caption fallback — single beat, no triple-repeat wrapper.
+ * Dense Cloud caption wrappers blank Local (promptLen 1.1k–1.7k observed).
+ * Omit routeTitle: long Setting strings often render as plaque / title text on Z-Image.
+ */
+function buildLocalCaptionPrompt(input: {
+  scene: string;
+  revisionNote: string;
+  routeTitle: string;
+}): string {
+  void input.routeTitle;
+  const scene = hardCapCaption(
+    sanitizeLocalSceneCaptionForGlyphRisk(input.scene),
+    LOCAL_CAPTION_SCENE_MAX
+  );
+  const revision = input.revisionNote
+    ? hardCapCaption(input.revisionNote, LOCAL_CAPTION_REVISION_MAX)
+    : "";
+
+  const parts: string[] = [];
+  // Lock before Scene: Chinese/English scene tokens otherwise win and paint glyphs.
+  parts.push(
+    "VISUAL LOCK: pure image only — no Chinese text, no English text, no letters,",
+    "no calligraphy, no plaque, no signboard writing, no caption overlay, no watermark;",
+    "any paper, scroll, or board must be blank unmarked surface;",
+    "when people appear, faces sharp and readable, not blurry."
+  );
+  if (revision) {
+    parts.push(`OPERATOR OVERRIDE (must follow): ${revision}.`);
+  }
+  parts.push(`Scene: ${scene}.`);
+  // Avoid "digital illustration" alone — Local turbo drifts to children's textbook look.
+  parts.push(
+    "Cinematic historical narrative painting, adult epic tone,",
+    "painterly atmosphere, not a children's textbook, not a schoolbook illustration."
+  );
+  if (revision) {
+    parts.push(`Remember operator override: ${revision}.`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Cloud / legacy caption path — denser wrapper for caption-only frames.
  */
 function buildCaptionLegacyPrompt(input: {
   scene: string;
@@ -202,26 +301,32 @@ function buildCaptionLegacyPrompt(input: {
 export function buildFrameDraftPrompt(input: {
   caption: string;
   routeTitle?: string;
-  /** When present, authoritative scene content (PA-A). Caption used only for revision notes / legacy. */
+  /** When present and executable, authoritative scene content (PA-A). Caption used only for revision notes / legacy. Stub placeholders (empty scene) fall back to caption. */
   rendererExpression?: RendererExpression | null;
   /** A5 Deployment profile; defaults from IMAGE_CREATOR_ACCEPT_PROVIDER. */
   projectionProfile?: ProjectionProfile;
 }): string {
   const { base, revisionNote } = splitFrameCaption(input.caption);
   const routeTitle = input.routeTitle?.trim() ?? "";
+  const projectionProfile =
+    input.projectionProfile ?? resolveProjectionProfileFromEnv();
 
-  if (input.rendererExpression) {
+  const executable = executableRendererExpression(input.rendererExpression);
+  if (executable) {
     return buildExpressionPrompt({
-      expression: input.rendererExpression,
+      expression: executable,
       revisionNote,
       routeTitle,
-      projectionProfile:
-        input.projectionProfile ?? resolveProjectionProfileFromEnv(),
+      projectionProfile,
     });
   }
 
   const scene = (base || input.caption.trim()).trim();
   if (!scene) return "";
+
+  if (projectionProfile === "local") {
+    return buildLocalCaptionPrompt({ scene, revisionNote, routeTitle });
+  }
 
   return buildCaptionLegacyPrompt({ scene, revisionNote, routeTitle });
 }

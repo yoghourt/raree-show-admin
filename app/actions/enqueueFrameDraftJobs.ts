@@ -7,6 +7,7 @@ import {
   type GenerateJobRow,
   type SceneFrameJobInput,
 } from "@/lib/generate-jobs"
+import { executableRendererExpression } from "@/lib/discovery/visual-contract"
 import {
   getSceneRowByTsid,
   parseFrameProvenance,
@@ -44,7 +45,8 @@ const inputSchema = z.object({
 
 /**
  * SPIKE-IMG-003: enqueue image.generate intents as Execution jobs.
- * Attaches rendererExpression from frame_provenance_v1 when present (ADR-011 A3).
+ * Attaches executable rendererExpression from frame_provenance_v1 when present (ADR-011 A3).
+ * Stub placeholders (action: empty scene) are omitted so caption remains the generate source.
  * Does NOT call imageGenerate, create Candidates, or write Assets.
  */
 export async function enqueueFrameDraftJobs(input: {
@@ -89,7 +91,9 @@ export async function enqueueFrameDraftJobs(input: {
         provenanceByScene.set(frame.sceneTsid, provenance)
       }
       const entry = provenance.find((p) => p.frameIndex === frame.frameIndex)
-      const rendererExpression = entry?.rendererExpression
+      const rendererExpression = executableRendererExpression(
+        entry?.rendererExpression
+      )
 
       const inputJson: SceneFrameJobInput = {
         asset_slot: "scene_frame",

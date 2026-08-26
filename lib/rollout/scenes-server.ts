@@ -13,6 +13,7 @@ import type {
 import {
   parseRendererExpression,
   parseVisualIntent,
+  executableRendererExpression,
 } from "@/lib/discovery/visual-contract";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
@@ -82,7 +83,10 @@ export function parseFrameProvenance(raw: unknown): FrameProvenanceEntry[] {
       };
       const expr = parseRendererExpression(rec.rendererExpression);
       if (expr.ok) {
-        entry.rendererExpression = expr.value;
+        const executable = executableRendererExpression(expr.value);
+        if (executable) {
+          entry.rendererExpression = executable;
+        }
       }
       if ("visualIntent" in rec) {
         const intent = parseVisualIntent(rec.visualIntent);

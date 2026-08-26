@@ -46,6 +46,10 @@ function softSkipOperatorMessage(raw: string): string | null {
 
 function timeoutOperatorMessage(raw: string): string | null {
   if (!/timed out|timeout/i.test(raw)) return null;
+  // Scene frames already request 512² — MAX_EDGE advice is usually a red herring.
+  if (/size\s*512\s*x\s*512/i.test(raw)) {
+    return "本地出图超时（LocalAI 过慢或冷启动）。请确认 LocalAI 空闲后单独重试该帧；避免一次连排多帧。可检查 LocalAI 日志。";
+  }
   return "本地出图超时（LocalAI 仍在计算或机器过慢）。可降低 IMAGE_CREATOR_LOCALAI_MAX_EDGE、检查 LocalAI 日志，或稍后再试。";
 }
 

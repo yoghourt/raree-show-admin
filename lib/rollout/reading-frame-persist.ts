@@ -10,6 +10,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
 import {
+  executableRendererExpression,
+  type RendererExpression,
+} from "@/lib/discovery/visual-contract";
+import {
   associateStagingToSceneContext,
   removeSceneContextBySourceReviewId,
   upsertSceneContext,
@@ -32,6 +36,13 @@ import {
   frameNarrativeDraftFromStaging,
   projectFrameSlot,
 } from "@/lib/rollout/frame-narrative";
+
+function executableProvenanceExpression(
+  expr: AcceptedSceneCandidateStaging["rendererExpression"]
+): { rendererExpression: RendererExpression } | Record<string, never> {
+  const executable = executableRendererExpression(expr);
+  return executable ? { rendererExpression: executable } : {};
+}
 
 export type FramePersistResult =
   | {
@@ -192,9 +203,8 @@ async function persistViaContextPath(
     frameIndex,
     sourceContextId: context.contextId,
     // Dual-write Expression for Creator tools that still read provenance (Runtime gap coexistence).
-    ...(staging.rendererExpression
-      ? { rendererExpression: staging.rendererExpression }
-      : {}),
+    // Stub placeholders (action: empty scene) MUST NOT enter provenance.
+    ...executableProvenanceExpression(staging.rendererExpression),
     ...(staging.visualIntent ? { visualIntent: staging.visualIntent } : {}),
   };
 
@@ -274,9 +284,7 @@ async function persistLegacyPath(
   const provenanceFields: FrameProvenanceEntry = {
     sourceReviewId: staging.sourceReviewId,
     frameIndex: existing?.frameIndex ?? frames.length,
-    ...(staging.rendererExpression
-      ? { rendererExpression: staging.rendererExpression }
-      : {}),
+    ...executableProvenanceExpression(staging.rendererExpression),
     ...(staging.visualIntent ? { visualIntent: staging.visualIntent } : {}),
   };
 
