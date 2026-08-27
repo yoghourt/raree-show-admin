@@ -3,7 +3,7 @@
  * Validator only (SPIKE-GRANULARITY-GATE-001). Not a generator or repair engine.
  */
 
-export type GranularityInvariant = "G1" | "G2" | "G3" | "G4";
+export type GranularityInvariant = "G1" | "G2" | "G3" | "G4" | "G5";
 
 export type GranularitySeverity = "error" | "warning";
 

@@ -3,11 +3,7 @@
  */
 
 import { getCandidateDedupeKey } from "@/lib/discovery/candidate-validate";
-import {
-  formatArchiveForPortrait,
-  parseCharacterArchive,
-} from "@/lib/discovery/character-archive";
-import { mergeAppearanceIntoDescription } from "@/lib/prompts/avatar";
+import { readerFacingCharacterDescription } from "@/lib/prompts/avatar";
 import type {
   DiscoveryCandidate,
   CharacterCandidateFields,
@@ -32,7 +28,11 @@ import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
 import { seedSceneStagingCastPlaceFromNames } from "@/lib/rollout/scene-staging-context-edit";
 import { buildEntityCreateHandoffPath } from "@/lib/discovery/accept-prefill";
 import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
-import { parseRendererExpression } from "@/lib/discovery/visual-contract";
+import {
+  parseRendererExpression,
+  type RendererExpression,
+  type VisualIntent,
+} from "@/lib/discovery/visual-contract";
 import {
   framesForStoryCandidate,
   informationEquivalenceAcceptBlock,
@@ -277,6 +277,97 @@ export function replaceReviewCandidate(
   );
 }
 
+/**
+ * Replace one Scene review item with N single-beat Scene drafts (Human Split).
+ * Inserts new pending items at the original index; discards the source item.
+ * Prefer LLM-authored Expression per beat; falls back to stub when omitted.
+ */
+export function replaceSceneWithSplitBeats(
+  items: DiscoveryReviewItem[],
+  sourceReviewId: string,
+  beats: Array<{
+    title: string;
+    summary: string;
+    rendererExpression?: RendererExpression;
+    visualIntent?: VisualIntent | null;
+  }>
+): DiscoveryReviewItem[] {
+  const source = findReviewItem(items, sourceReviewId);
+  if (!source || source.candidate.candidateType !== "scene") {
+    return items;
+  }
+  const cleaned = beats
+    .map((b) => ({
+      title: b.title.trim(),
+      summary: b.summary.trim(),
+      rendererExpression: b.rendererExpression,
+      visualIntent: b.visualIntent,
+    }))
+    .filter((b) => b.title || b.summary);
+  if (cleaned.length < 2) {
+    return items;
+  }
+
+  const sourceFields = getEffectiveFields(source) as SceneCandidateFields;
+  const parentStoryCandidateId = sourceFields.parentStoryCandidateId;
+  const chapter_number = sourceFields.chapter_number;
+  const chapter_title = sourceFields.chapter_title;
+  const workId = source.candidate.workId;
+
+  const newItems: DiscoveryReviewItem[] = cleaned.map((beat, i) => {
+    const title = beat.title || `Beat ${i + 1}`;
+    const summary = beat.summary || title;
+    const rendererExpression =
+      beat.rendererExpression ??
+      ({
+        environment: "unspecified place",
+        characters: [],
+        action: "empty scene",
+        composition: "wide view",
+      } satisfies RendererExpression);
+    const fields: SceneCandidateFields = {
+      parentStoryCandidateId,
+      chapter_number,
+      ...(chapter_title != null ? { chapter_title } : {}),
+      title,
+      summary,
+      rendererExpression,
+      ...(beat.visualIntent != null
+        ? { visualIntent: beat.visualIntent }
+        : {}),
+    };
+    return {
+      reviewId: createReviewId(),
+      status: "edited_pending_accept" as const,
+      editedDisplayName: title,
+      editedSummary: summary,
+      editedFields: fields,
+      candidate: {
+        candidateId: `split_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
+        workId,
+        candidateType: "scene",
+        displayName: title,
+        summary,
+        fields,
+      },
+    };
+  });
+
+  const idx = items.findIndex((item) => item.reviewId === sourceReviewId);
+  if (idx < 0) return items;
+  const next = [...items];
+  next.splice(
+    idx,
+    1,
+    ...newItems,
+    {
+      ...source,
+      status: "discarded" as const,
+    }
+  );
+  return next;
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -380,17 +471,13 @@ export function buildLocationStaging(
   };
 }
 
-function foldArchiveAppearanceIntoStagingDescription(
+function characterStagingDescription(
   fields: CharacterCandidateFields
 ): string {
   const description =
     typeof fields.description === "string" ? fields.description.trim() : "";
-  const parsed = parseCharacterArchive(fields.characterArchive);
-  if (!parsed.ok || !parsed.value) return description;
-  return mergeAppearanceIntoDescription(
-    description,
-    formatArchiveForPortrait(parsed.value)
-  );
+  // Reader-facing Work field — never fold Character Archive / operator notes here.
+  return readerFacingCharacterDescription(description);
 }
 
 export function buildCharacterStaging(
@@ -406,7 +493,7 @@ export function buildCharacterStaging(
       displayName ||
       (typeof fields.name === "string" ? fields.name.trim() : ""),
     house: typeof fields.house === "string" ? fields.house.trim() : "",
-    description: foldArchiveAppearanceIntoStagingDescription(fields),
+    description: characterStagingDescription(fields),
     signatureQuote:
       typeof fields.signatureQuote === "string"
         ? fields.signatureQuote.trim() || null

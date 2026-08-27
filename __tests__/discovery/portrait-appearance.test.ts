@@ -6,6 +6,7 @@ import {
   type DiscoveryReviewSnapshot,
 } from "@/lib/discovery/review-session-storage";
 import type { DiscoverySession } from "@/lib/discovery/types";
+import { readerFacingCharacterDescription } from "@/lib/prompts/avatar";
 
 function stubSessionStorage() {
   const store = new Map<string, string>();
@@ -84,5 +85,8 @@ describe("descriptionWithArchiveAppearance", () => {
     expect(next).toMatch(/\[视觉身份\]/);
     expect(next).toContain("green battle robe");
     expect(next).toContain("Sworn brother of Liu Bei.");
+    expect(readerFacingCharacterDescription(next)).toBe(
+      "Sworn brother of Liu Bei."
+    );
   });
 });

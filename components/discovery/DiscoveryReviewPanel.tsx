@@ -6,13 +6,6 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -36,6 +29,11 @@ import type { UseRolloutReturn } from "@/hooks/useRollout";
 import { RolloutPanel } from "@/components/rollout/RolloutPanel";
 import * as charactersApi from "@/lib/characters";
 import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
+import { draftSceneBeatsFromSummary } from "@/lib/discovery/split-scene-beats";
+import {
+  parseRendererExpression,
+  type RendererExpression,
+} from "@/lib/discovery/visual-contract";
 import * as locationsApi from "@/lib/locations";
 import type { Character, Location } from "@/lib/types";
 import {
@@ -107,8 +105,8 @@ function FlowHint({
   href?: string;
 }) {
   return (
-    <div className="mt-5 flex items-center justify-between border-t pt-3">
-      <p className="text-muted-foreground text-xs">{text}</p>
+    <div className="mt-2 flex shrink-0 items-center justify-between border-t border-zinc-100 pt-1.5">
+      <p className="text-[11px] text-zinc-500">{text}</p>
       {nextLabel && onNext ? (
         <button
           type="button"
@@ -240,7 +238,11 @@ function FieldsPreview({
     if (value === undefined || value === null || value === "") return false;
     // 画面只展示标题与摘要；章节序号等归属故事
     if (candidateType === "scene") {
-      return key === "title" || key === "summary";
+      return (
+        key === "title" ||
+        key === "summary" ||
+        key === "rendererExpression"
+      );
     }
     // characterArchive rendered as structured block below
     if (key === "characterArchive") return false;
@@ -351,6 +353,7 @@ function ReviewItemCard({
   onEdit,
   onDiscard,
   onRegen,
+  onSplit,
 }: {
   item: DiscoveryReviewItem;
   busy: boolean;
@@ -364,6 +367,7 @@ function ReviewItemCard({
   onEdit: () => void;
   onDiscard: () => void;
   onRegen: () => void;
+  onSplit?: () => void;
 }) {
   const fields = getEffectiveFields(item);
   const archivePresent =
@@ -371,13 +375,15 @@ function ReviewItemCard({
     readCharacterArchive(fields) !== null;
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-200 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{getEffectiveDisplayName(item)}</span>
+    <div className="flex flex-col gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="truncate text-xs font-medium text-zinc-900">
+              {getEffectiveDisplayName(item)}
+            </span>
             {existingBadge ? (
-              <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+              <span className="inline-flex rounded border border-emerald-200 bg-emerald-50 px-1 py-0 text-[10px] font-medium text-emerald-800">
                 {existingBadge}
               </span>
             ) : null}
@@ -385,8 +391,8 @@ function ReviewItemCard({
               <span
                 className={
                   archivePresent
-                    ? "rounded bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-900"
-                    : "rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900"
+                    ? "inline-flex rounded border border-sky-200 bg-sky-50 px-1 py-0 text-[10px] font-medium text-sky-900"
+                    : "inline-flex rounded border border-amber-200 bg-amber-50 px-1 py-0 text-[10px] font-medium text-amber-900"
                 }
               >
                 {archivePresent
@@ -394,53 +400,24 @@ function ReviewItemCard({
                   : discoveryReviewUi.characterArchiveMissing}
               </span>
             ) : null}
+            <span className="inline-flex shrink-0 rounded border border-zinc-200 bg-zinc-50 px-1 py-0 text-[10px] font-medium text-zinc-600">
+              {statusLabel(item.status)}
+              {item.candidate.confidence
+                ? ` · ${confidenceLabel(item.candidate.confidence)}`
+                : ""}
+            </span>
           </div>
-          <p className="text-muted-foreground text-sm">
+          <p className="truncate text-[11px] leading-tight text-zinc-500">
             {getEffectiveSummary(item)}
           </p>
         </div>
-        <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
-          {statusLabel(item.status)}
-          {item.candidate.confidence
-            ? ` · ${confidenceLabel(item.candidate.confidence)}`
-            : ""}
-        </span>
-      </div>
-      <FieldsPreview
-        fields={fields}
-        candidateType={item.candidate.candidateType}
-      />
-      {item.candidate.evidence?.length ? (
-        <div className="space-y-1">
-          <p className="text-muted-foreground text-xs font-medium">
-            {candidateFieldLabel("evidence")}
-          </p>
-          <ul className="space-y-1 text-xs">
-            {item.candidate.evidence.map((ev, i) => (
-              <li key={`${ev.sourceLabel}-${i}`}>
-                <span className="font-medium">{ev.sourceLabel}</span>
-                {ev.tier != null
-                  ? ` · ${discoveryReviewUi.tierLabel(ev.tier)}`
-                  : ""}
-                {ev.excerpt ? (
-                  <span className="text-muted-foreground"> — {ev.excerpt}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <p className="text-muted-foreground text-xs">
-          {discoveryReviewUi.verifiedSourceNote}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
         {actionable ? (
-          <>
+          <div className="flex shrink-0 flex-wrap justify-end gap-1">
             {showAccept ? (
               <Button
                 type="button"
                 size="sm"
+                className="h-6 px-2 text-[11px]"
                 disabled={busy || acceptDisabled}
                 onClick={onAccept}
               >
@@ -451,15 +428,29 @@ function ReviewItemCard({
               type="button"
               size="sm"
               variant="outline"
+              className="h-6 px-2 text-[11px]"
               disabled={busy}
               onClick={onEdit}
             >
               {discoveryReviewUi.edit}
             </Button>
+            {onSplit ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[11px]"
+                disabled={busy}
+                onClick={onSplit}
+              >
+                {discoveryReviewUi.splitScene}
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
               variant="outline"
+              className="h-6 px-2 text-[11px]"
               disabled={busy}
               onClick={onRegen}
             >
@@ -469,14 +460,40 @@ function ReviewItemCard({
               type="button"
               size="sm"
               variant="ghost"
+              className="h-6 px-1.5 text-[11px]"
               disabled={busy}
               onClick={onDiscard}
             >
               {discoveryReviewUi.discard}
             </Button>
-          </>
+          </div>
         ) : null}
       </div>
+      <details className="text-[11px] text-zinc-500">
+        <summary className="cursor-pointer select-none text-zinc-600 hover:text-zinc-900">
+          字段 / 证据
+        </summary>
+        <div className="mt-1 space-y-1 border-t border-zinc-100 pt-1">
+          <FieldsPreview
+            fields={fields}
+            candidateType={item.candidate.candidateType}
+          />
+          {item.candidate.evidence?.length ? (
+            <ul className="space-y-0.5">
+              {item.candidate.evidence.map((ev, i) => (
+                <li key={`${ev.sourceLabel}-${i}`} className="truncate">
+                  <span className="font-medium text-zinc-700">{ev.sourceLabel}</span>
+                  {ev.excerpt ? (
+                    <span className="text-zinc-500"> — {ev.excerpt}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>{discoveryReviewUi.verifiedSourceNote}</p>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
@@ -509,6 +526,8 @@ export function DiscoveryReviewPanel({
     saveCandidateEdit,
     saveStoryStagingEdit,
     saveSceneStagingEdit,
+    splitSceneIntoBeats,
+    isSplitting,
     regenCandidate,
     acceptCandidate,
     startFullRePropose,
@@ -641,6 +660,13 @@ export function DiscoveryReviewPanel({
     React.useState<DiscoveryCandidateType | null>(null);
   const [typeRetryFeedback, setTypeRetryFeedback] = React.useState("");
 
+  const [splitItem, setSplitItem] = React.useState<DiscoveryReviewItem | null>(
+    null
+  );
+  const [splitBeats, setSplitBeats] = React.useState<
+    Array<{ title: string; summary: string }>
+  >([]);
+
   const failedTypes = React.useMemo(() => {
     return new Set(proposeError?.errors?.map((e) => e.candidateType) ?? []);
   }, [proposeError]);
@@ -665,10 +691,34 @@ export function DiscoveryReviewPanel({
                     getEffectiveSummary(item),
                 }
               : {}),
+            rendererExpression: (fields as SceneCandidateFields)
+              .rendererExpression,
+            ...((fields as SceneCandidateFields).visualIntent
+              ? {
+                  visualIntent: (fields as SceneCandidateFields).visualIntent,
+                }
+              : {}),
           }
         : fields;
     setEditFieldsJson(JSON.stringify(fieldsForEdit, null, 2));
     setEditParseError(null);
+  };
+
+  const openSplit = (item: DiscoveryReviewItem) => {
+    if (item.candidate.candidateType !== "scene") return;
+    const summary = getEffectiveSummary(item);
+    const drafts = draftSceneBeatsFromSummary(summary, {
+      titleHint: getEffectiveDisplayName(item),
+    });
+    setSplitItem(item);
+    setSplitBeats(
+      drafts.length >= 2
+        ? drafts
+        : [
+            { title: getEffectiveDisplayName(item), summary },
+            { title: "Beat 2", summary: "" },
+          ]
+    );
   };
 
   const openEditByReviewId = (reviewId: string) => {
@@ -722,6 +772,14 @@ export function DiscoveryReviewPanel({
     }
     if (editItem.candidate.candidateType === "scene") {
       const original = getEffectiveFields(editItem) as SceneCandidateFields;
+      const exprParsed = parseRendererExpression(
+        parsedRecord.rendererExpression ?? original.rendererExpression
+      );
+      if (!exprParsed.ok) {
+        setEditParseError(exprParsed.errors.join("; "));
+        return;
+      }
+      const rendererExpression: RendererExpression = exprParsed.value;
       parsed = {
         parentStoryCandidateId: original.parentStoryCandidateId,
         chapter_number: original.chapter_number,
@@ -736,10 +794,12 @@ export function DiscoveryReviewPanel({
             : editSummary.trim()) ||
           original.summary ||
           (typeof parsedRecord.title === "string" ? parsedRecord.title : ""),
-        ...(original.visualIntent
-          ? { visualIntent: original.visualIntent }
-          : {}),
-        rendererExpression: original.rendererExpression,
+        ...(parsedRecord.visualIntent != null
+          ? { visualIntent: parsedRecord.visualIntent as SceneCandidateFields["visualIntent"] }
+          : original.visualIntent
+            ? { visualIntent: original.visualIntent }
+            : {}),
+        rendererExpression,
       };
     } else {
       parsed = parsedRecord as unknown as DiscoveryCandidateFields;
@@ -865,19 +925,22 @@ export function DiscoveryReviewPanel({
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{discoveryReviewUi.panelTitle}</CardTitle>
-          <CardDescription>{discoveryReviewUi.panelDescription}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Toolbar */}
-          <div className="flex flex-wrap gap-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-zinc-100 px-3 py-1.5">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-zinc-900">
+                {discoveryReviewUi.panelTitle}
+              </h2>
+              <p className="truncate text-[11px] text-zinc-500">
+                {discoveryReviewUi.panelDescription}
+              </p>
+            </div>
             <Button
               type="button"
               variant="outline"
               size="sm"
+              className="h-6 text-[11px]"
               disabled={
                 isProposing ||
                 isRegening ||
@@ -892,12 +955,14 @@ export function DiscoveryReviewPanel({
                 void startFullRePropose();
               }}
             >
-              <RefreshCw className="size-4" aria-hidden />
+              <RefreshCw className="size-3" aria-hidden />
               {isProposing
                 ? discoveryReviewUi.fullReProposing
                 : discoveryReviewUi.fullRePropose}
             </Button>
           </div>
+
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2">
 
           {/* Errors */}
           {regenError ? (
@@ -1048,12 +1113,11 @@ export function DiscoveryReviewPanel({
             </div>
           ) : null}
 
-          {/* Pipeline breadcrumb */}
-          <PipelineBreadcrumb activeStep={activeTab} />
-
           {/* Step tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <StepTabsList className="mb-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex w-full min-h-0 flex-1 flex-col">
+            <div className="mb-1 flex shrink-0 flex-wrap items-center gap-2">
+              <PipelineBreadcrumb activeStep={activeTab} />
+              <StepTabsList className="mb-0">
               <StepTabsTrigger value="review">
                 {discoveryReviewUi.tabReview}
                 <CountBadge
@@ -1063,7 +1127,7 @@ export function DiscoveryReviewPanel({
               {rollout ? (
                 <>
                   <ChevronRight
-                    className="mx-0.5 size-4 shrink-0 text-muted-foreground"
+                    className="mx-0.5 size-3.5 shrink-0 text-muted-foreground"
                     aria-hidden="true"
                   />
                   <StepTabsTrigger value="rollout">
@@ -1073,26 +1137,27 @@ export function DiscoveryReviewPanel({
                 </>
               ) : null}
             </StepTabsList>
+            </div>
 
             {/* ── Tab 1: 确认（内分子 tab：待确认 / 已确认）── */}
-            <TabsContent value="review" className="min-h-72 space-y-4">
+            <TabsContent value="review" className="mt-0 min-h-0 flex-1 space-y-2 overflow-hidden data-[state=inactive]:hidden">
               <Tabs
                 value={confirmSubTab}
                 onValueChange={setConfirmSubTab}
-                className="w-full"
+                className="flex h-full min-h-0 w-full flex-col"
               >
-                <TabsList className="mb-4">
-                  <TabsTrigger value="pending">
+                <TabsList className="mb-1.5 h-8 shrink-0">
+                  <TabsTrigger value="pending" className="text-xs">
                     {discoveryReviewUi.tabPendingConfirm}
                     <CountBadge count={reviewListItems.length} />
                   </TabsTrigger>
-                  <TabsTrigger value="accepted">
+                  <TabsTrigger value="accepted" className="text-xs">
                     {discoveryReviewUi.tabAccepted}
                     <CountBadge count={acceptedCount} />
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="pending" className="space-y-4">
+                <TabsContent value="pending" className="mt-0 min-h-0 flex-1 space-y-2 overflow-y-auto data-[state=inactive]:hidden">
               {reviewListItems.length === 0 && !failedTypes.size ? (
                 <p className="text-muted-foreground text-sm">
                   {discoveryReviewUi.noReviewItems}
@@ -1190,11 +1255,11 @@ export function DiscoveryReviewPanel({
                 }
 
                 return (
-                  <div className="space-y-4">
-                    <p className="text-muted-foreground text-xs">
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-zinc-500">
                       {discoveryReviewUi.storyCentricHint}
                     </p>
-                    <ul className="space-y-6">
+                    <ul className="space-y-2">
                       {storyItems.map((story) => {
                         const childScenes = sceneItems.filter((item) => {
                           const parent = (
@@ -1231,7 +1296,7 @@ export function DiscoveryReviewPanel({
                         return (
                           <li
                             key={story.reviewId}
-                            className="space-y-4 rounded-xl border border-zinc-200 p-4"
+                            className="space-y-1.5 rounded-md border border-zinc-200 bg-zinc-50/40 px-2 py-1.5"
                           >
                             <ReviewItemCard
                               item={story}
@@ -1255,29 +1320,28 @@ export function DiscoveryReviewPanel({
                               }}
                             />
 
-                            <div className="ml-2 space-y-0.5 border-l pl-4">
-                              <p className="text-muted-foreground text-xs font-medium">
-                                {discoveryReviewUi.storyRelatedFromScenes}
-                              </p>
-                              <p className="text-muted-foreground text-xs">
+                            <div className="space-y-0.5 border-l border-zinc-200 pl-2">
+                              <p className="truncate text-[11px] text-zinc-500">
+                                <span className="font-medium text-zinc-600">
+                                  {discoveryReviewUi.storyRelatedFromScenes}
+                                </span>
+                                {" · "}
                                 {storyRelatedLine ??
                                   discoveryReviewUi.storyRelatedEmpty}
                               </p>
                             </div>
 
                             {childScenes.length > 0 ? (
-                              <div className="ml-2 space-y-2 border-l pl-4">
-                                <div className="space-y-0.5">
-                                  <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                                    {DISCOVERY_CANDIDATE_TYPE_LABELS.scene}
-                                  </h4>
+                              <div className="space-y-1 border-l border-zinc-200 pl-2">
+                                <h4 className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                                  {DISCOVERY_CANDIDATE_TYPE_LABELS.scene}
                                   {actionable ? (
-                                    <p className="text-muted-foreground text-xs">
-                                      {discoveryReviewUi.sceneAcceptsWithStory}
-                                    </p>
+                                    <span className="ml-1 font-normal normal-case tracking-normal text-zinc-400">
+                                      · {discoveryReviewUi.sceneAcceptsWithStory}
+                                    </span>
                                   ) : null}
-                                </div>
-                                <ul className="space-y-3">
+                                </h4>
+                                <ul className="space-y-1">
                                   {childScenes.map((scene) => {
                                     const sceneActionable =
                                       scene.status === "pending" ||
@@ -1294,6 +1358,11 @@ export function DiscoveryReviewPanel({
                                         showAccept={false}
                                         onAccept={() => undefined}
                                         onEdit={() => openEdit(scene)}
+                                        onSplit={
+                                          sceneActionable
+                                            ? () => openSplit(scene)
+                                            : undefined
+                                        }
                                         onDiscard={() =>
                                           discardCandidate(scene.reviewId)
                                         }
@@ -1322,7 +1391,7 @@ export function DiscoveryReviewPanel({
                               {discoveryReviewUi.orphanSceneHint}
                             </p>
                           </div>
-                          <ul className="space-y-3">
+                          <ul className="space-y-1">
                             {orphanScenes.map((scene) => (
                               <ReviewItemCard
                                 key={scene.reviewId}
@@ -1338,6 +1407,12 @@ export function DiscoveryReviewPanel({
                                 showAccept={false}
                                 onAccept={() => undefined}
                                 onEdit={() => openEdit(scene)}
+                                onSplit={
+                                  scene.status === "pending" ||
+                                  scene.status === "edited_pending_accept"
+                                    ? () => openSplit(scene)
+                                    : undefined
+                                }
                                 onDiscard={() =>
                                   discardCandidate(scene.reviewId)
                                 }
@@ -1353,17 +1428,17 @@ export function DiscoveryReviewPanel({
 
                       {/* L2-A: Work Archive entities — once, not under every Story */}
                       {characterItems.length > 0 ? (
-                        <li className="space-y-2 rounded-xl border border-zinc-200 p-4">
+                        <li className="space-y-1 rounded-md border border-zinc-200 bg-white px-2 py-1.5">
                           <div className="space-y-0.5">
-                            <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
                               {DISCOVERY_CANDIDATE_TYPE_LABELS.character}
                               （作品库）
                             </h4>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-[11px] text-zinc-500">
                               {discoveryReviewUi.entityAcceptsWithStory}
                             </p>
                           </div>
-                          <ul className="space-y-3">
+                          <ul className="space-y-1">
                             {characterItems.map((item) => {
                               const itemActionable =
                                 item.status === "pending" ||
@@ -1396,17 +1471,17 @@ export function DiscoveryReviewPanel({
                       ) : null}
 
                       {locationItems.length > 0 ? (
-                        <li className="space-y-2 rounded-xl border border-zinc-200 p-4">
+                        <li className="space-y-1 rounded-md border border-zinc-200 bg-white px-2 py-1.5">
                           <div className="space-y-0.5">
-                            <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
                               {DISCOVERY_CANDIDATE_TYPE_LABELS.location}
                               （作品库）
                             </h4>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-[11px] text-zinc-500">
                               {discoveryReviewUi.entityAcceptsWithStory}
                             </p>
                           </div>
-                          <ul className="space-y-3">
+                          <ul className="space-y-1">
                             {locationItems.map((item) => {
                               const itemActionable =
                                 item.status === "pending" ||
@@ -1443,7 +1518,7 @@ export function DiscoveryReviewPanel({
               })()}
                 </TabsContent>
 
-                <TabsContent value="accepted" className="space-y-4">
+                <TabsContent value="accepted" className="mt-0 min-h-0 flex-1 space-y-2 overflow-y-auto data-[state=inactive]:hidden">
                   {visibleAcceptedStoryUnits.length === 0 &&
                   visibleAcceptedCharacters.length === 0 &&
                   visibleAcceptedLocations.length === 0 ? (
@@ -1700,7 +1775,7 @@ export function DiscoveryReviewPanel({
             </TabsContent>
 
             {rollout ? (
-              <TabsContent value="rollout" className="min-h-72 space-y-4">
+              <TabsContent value="rollout" className="mt-0 min-h-0 flex-1 space-y-2 overflow-y-auto data-[state=inactive]:hidden">
                 <RolloutPanel
                   workId={workId}
                   rollout={rollout}
@@ -1710,12 +1785,12 @@ export function DiscoveryReviewPanel({
             ) : null}
 
           </Tabs>
-        </CardContent>
-      </Card>
+          </div>
+      </div>
 
       <Dialog open={editItem !== null} onOpenChange={(open) => !open && setEditItem(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(90dvh,calc(100vh-2rem))] max-w-lg flex-col gap-3 overflow-hidden sm:max-w-lg">
+          <DialogHeader className="shrink-0 pr-6">
             <DialogTitle>{discoveryReviewUi.editDialogTitle}</DialogTitle>
             <DialogDescription>
               {editItem?.status === "accepted"
@@ -1723,7 +1798,7 @@ export function DiscoveryReviewPanel({
                 : discoveryReviewUi.editDialogPending}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="max-h-[min(65dvh,calc(100vh-14rem))] space-y-3 overflow-y-auto overscroll-contain pr-1">
             <div className="space-y-1">
               <Label htmlFor="edit-display-name">
                 {candidateFieldLabel("displayName")}
@@ -1754,7 +1829,7 @@ export function DiscoveryReviewPanel({
               <Textarea
                 id="edit-fields"
                 value={editFieldsJson}
-                rows={8}
+                rows={10}
                 className="font-mono text-xs"
                 onChange={(e) => {
                   setEditFieldsJson(e.target.value);
@@ -1766,7 +1841,7 @@ export function DiscoveryReviewPanel({
               ) : null}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button type="button" variant="outline" onClick={() => setEditItem(null)}>
               {discoveryComposerUi.cancel}
             </Button>
@@ -1870,6 +1945,141 @@ export function DiscoveryReviewPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={splitItem !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSplitItem(null);
+            setSplitBeats([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{discoveryReviewUi.splitSceneDialogTitle}</DialogTitle>
+            <DialogDescription>
+              {discoveryReviewUi.splitSceneDialogDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-3 overflow-y-auto">
+            {splitBeats.map((beat, index) => (
+              <div
+                key={`split-beat-${index}`}
+                className="space-y-1.5 rounded-lg border border-zinc-200 px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs">Beat {index + 1}</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    disabled={splitBeats.length <= 2}
+                    onClick={() =>
+                      setSplitBeats((prev) =>
+                        prev.filter((_, i) => i !== index)
+                      )
+                    }
+                  >
+                    {discoveryReviewUi.splitSceneRemoveBeat}
+                  </Button>
+                </div>
+                <Input
+                  value={beat.title}
+                  className="h-8 text-xs"
+                  placeholder="title"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSplitBeats((prev) =>
+                      prev.map((b, i) =>
+                        i === index ? { ...b, title: value } : b
+                      )
+                    );
+                  }}
+                />
+                <Textarea
+                  value={beat.summary}
+                  rows={2}
+                  className="text-xs"
+                  placeholder="summary"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSplitBeats((prev) =>
+                      prev.map((b, i) =>
+                        i === index ? { ...b, summary: value } : b
+                      )
+                    );
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() =>
+                setSplitBeats((prev) => [
+                  ...prev,
+                  { title: `Beat ${prev.length + 1}`, summary: "" },
+                ])
+              }
+            >
+              {discoveryReviewUi.splitSceneAddBeat}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSplitting}
+              onClick={() => {
+                setSplitItem(null);
+                setSplitBeats([]);
+              }}
+            >
+              {discoveryComposerUi.cancel}
+            </Button>
+            <Button
+              type="button"
+              disabled={isSplitting}
+              onClick={() => {
+                if (!splitItem) return;
+                const cleaned = splitBeats
+                  .map((b) => ({
+                    title: b.title.trim(),
+                    summary: b.summary.trim(),
+                  }))
+                  .filter((b) => b.title || b.summary);
+                if (cleaned.length < 2) {
+                  window.alert(discoveryReviewUi.splitSceneNeedTwo);
+                  return;
+                }
+                void (async () => {
+                  const ok = await splitSceneIntoBeats(
+                    splitItem.reviewId,
+                    splitBeats
+                  );
+                  if (!ok) {
+                    window.alert(discoveryReviewUi.splitSceneExpressionFailed);
+                    return;
+                  }
+                  setSplitItem(null);
+                  setSplitBeats([]);
+                })();
+              }}
+            >
+              {isSplitting
+                ? discoveryReviewUi.splitSceneConfirming
+                : discoveryReviewUi.splitSceneConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

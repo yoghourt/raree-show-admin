@@ -16,6 +16,7 @@ import { findExistingByName } from "@/lib/discovery/entity-catalog-match";
 import * as charactersApi from "@/lib/characters";
 import * as locationsApi from "@/lib/locations";
 import { messages } from "@/lib/locale";
+import { readerFacingCharacterDescription } from "@/lib/prompts/avatar";
 import {
   deleteDismissedCharacterStagingItem,
   deleteDismissedLocationStagingItem,
@@ -464,7 +465,9 @@ export function useRollout({
         const created = await charactersApi.create(workId, {
           name,
           house: staging.house.trim(),
-          description: staging.description.trim(),
+          description: readerFacingCharacterDescription(
+            staging.description.trim()
+          ),
           signatureQuote: staging.signatureQuote?.trim() || null,
           portraitUrl: "",
         });

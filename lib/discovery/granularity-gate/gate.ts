@@ -8,7 +8,7 @@
  * FAIL default action is RE-PROPOSE (operator re-runs Propose). No silent repair.
  */
 
-import { analyzeGranularity, bundleByStory, uncoveredTurns } from "./analyze";
+import { analyzeGranularity, bundleByStory, estimateBeatsInCaption, uncoveredTurns } from "./analyze";
 import { coverageRatio } from "./text";
 import type {
   GranularityGateResult,
@@ -162,6 +162,25 @@ function evaluateG4(input: GranularityInput, violations: GranularityViolation[])
   }
 }
 
+/** One Frame.caption / Scene.summary must be one still-worthy beat. */
+function evaluateG5(input: GranularityInput, violations: GranularityViolation[]): void {
+  for (const frame of input.frames) {
+    const beats = estimateBeatsInCaption(frame.caption);
+    if (beats >= 3) {
+      push(violations, "G5", "error", [
+        `Frame "${frame.title}" (${frame.id}) packs estimated ${beats} beats into one caption`,
+        "One Scene / Frame Narrative must be a single Reader step — split into multiple Scenes",
+        `Frame.caption: ${frame.caption}`,
+      ]);
+    } else if (beats === 2) {
+      push(violations, "G5", "warning", [
+        `Frame "${frame.title}" may contain 2 beats in one caption (consider Split Scene)`,
+        `Frame.caption: ${frame.caption}`,
+      ]);
+    }
+  }
+}
+
 export function runGranularityGate(input: GranularityInput): GranularityGateResult {
   const violations: GranularityViolation[] = [];
   const analysis = analyzeGranularity(input);
@@ -169,6 +188,7 @@ export function runGranularityGate(input: GranularityInput): GranularityGateResu
   evaluateG2(input, violations);
   evaluateG3(input, violations);
   evaluateG4(input, violations);
+  evaluateG5(input, violations);
   const status = violations.some((v) => v.severity === "error") ? "FAIL" : "PASS";
   return { status, violations, analysis };
 }

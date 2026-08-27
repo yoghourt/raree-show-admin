@@ -8,6 +8,7 @@ import type {
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
+import { readerFacingCharacterDescription } from "@/lib/prompts/avatar";
 import type {
   ApprovedStoryUnit,
   ProjectedReadingRouteRecord,
@@ -66,7 +67,10 @@ export function loadRolloutQueue(
       workId,
       storyStaging: parsed.storyStaging ?? [],
       readingRouteStaging: parsed.readingRouteStaging ?? parsed.sceneStaging ?? [],
-      characterStaging: parsed.characterStaging ?? [],
+      characterStaging: (parsed.characterStaging ?? []).map((item) => ({
+        ...item,
+        description: readerFacingCharacterDescription(item.description ?? ""),
+      })),
       locationStaging: parsed.locationStaging ?? [],
       processedStoryReviewIds: parsed.processedStoryReviewIds ?? [],
       processedReadingRouteReviewIds: parsed.processedReadingRouteReviewIds ?? parsed.processedSceneReviewIds ?? [],
@@ -158,7 +162,10 @@ function dedupeCharacterStaging(
       continue;
     }
     seen.add(key);
-    out.push(item);
+    out.push({
+      ...item,
+      description: readerFacingCharacterDescription(item.description ?? ""),
+    });
   }
   return out;
 }

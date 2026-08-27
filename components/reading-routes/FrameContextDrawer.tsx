@@ -8,6 +8,7 @@ import { EntityMultiFuzzyPicker } from "@/components/entity/EntityMultiFuzzyPick
 import { FuzzyEntityCombobox } from "@/components/entity/FuzzyEntityCombobox";
 import type { EntityOption } from "@/components/entity/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -21,6 +22,10 @@ import { ImageLightboxDialog } from "@/components/ui/ImageLightboxDialog";
 import { formatGenerateJobErrorForOperator } from "@/lib/ai/image/operatorErrorCopy";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import {
+  parseRendererExpression,
+  type RendererExpression,
+} from "@/lib/discovery/visual-contract";
+import {
   listGenerateJobsForWork,
   parseHostedImageResultReference,
 } from "@/lib/generate-jobs";
@@ -33,8 +38,41 @@ import {
   upsertContextById,
 } from "@/lib/scene-context/frame-context-edit";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
-import { patchSceneFrameUrls } from "@/lib/scenes";
+import {
+  getFrameProvenance,
+  patchFrameProvenanceExpression,
+  patchSceneFrameUrls,
+} from "@/lib/scenes";
 import type { Character, Location, ReadingFrame } from "@/lib/types";
+
+function charactersToLines(
+  characters: RendererExpression["characters"]
+): string {
+  return characters
+    .map((c) => `${c.role}: ${c.visual}`)
+    .join("\n");
+}
+
+function linesToCharacters(
+  text: string
+): RendererExpression["characters"] {
+  const out: RendererExpression["characters"] = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const colon = trimmed.indexOf(":");
+    if (colon <= 0) {
+      throw new Error(`角色行须为「role: visual」格式：${trimmed}`);
+    }
+    const role = trimmed.slice(0, colon).trim();
+    const visual = trimmed.slice(colon + 1).trim();
+    if (!role || !visual) {
+      throw new Error(`角色行须为「role: visual」格式：${trimmed}`);
+    }
+    out.push({ role, visual });
+  }
+  return out;
+}
 
 const JOB_POLL_MS = 2500;
 
@@ -57,6 +95,8 @@ type FrameContextDrawerProps = {
   }) => void;
   onUploadingChange?: (uploading: boolean) => void;
   onNavigate: (index: number) => void;
+  /** After Expression save — parent may refresh route badges. */
+  onExpressionSaved?: () => void;
 };
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -90,6 +130,7 @@ export function FrameContextDrawer({
   onChange,
   onUploadingChange,
   onNavigate,
+  onExpressionSaved,
 }: FrameContextDrawerProps) {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   /** Per-frame polls — switching frames must NOT cancel other frames. */
@@ -115,6 +156,15 @@ export function FrameContextDrawer({
     Record<number, string>
   >({});
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
+  const [exprEnvironment, setExprEnvironment] = React.useState("");
+  const [exprAction, setExprAction] = React.useState("");
+  const [exprComposition, setExprComposition] = React.useState("");
+  const [exprLighting, setExprLighting] = React.useState("");
+  const [exprCharactersText, setExprCharactersText] = React.useState("");
+  const [exprLoading, setExprLoading] = React.useState(false);
+  const [exprSaving, setExprSaving] = React.useState(false);
+  const [exprError, setExprError] = React.useState<string | null>(null);
+  const [exprHint, setExprHint] = React.useState<string | null>(null);
 
   const index = frameIndex ?? -1;
   const frame = index >= 0 ? frames[index] : undefined;
@@ -167,6 +217,47 @@ export function FrameContextDrawer({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, index, characters, locations]);
+
+  // Load frame_provenance_v1 Expression for the open frame.
+  React.useEffect(() => {
+    if (!open || index < 0 || !scenePersisted) {
+      setExprEnvironment("");
+      setExprAction("");
+      setExprComposition("");
+      setExprLighting("");
+      setExprCharactersText("");
+      setExprError(null);
+      setExprHint(null);
+      return;
+    }
+    let cancelled = false;
+    setExprLoading(true);
+    setExprError(null);
+    setExprHint(null);
+    void getFrameProvenance(workId, readingRouteTsid)
+      .then((entries) => {
+        if (cancelled) return;
+        const entry = entries.find((e) => e.frameIndex === index);
+        const expr = entry?.rendererExpression;
+        setExprEnvironment(expr?.environment ?? "");
+        setExprAction(expr?.action ?? "");
+        setExprComposition(expr?.composition ?? "");
+        setExprLighting(expr?.lighting ?? "");
+        setExprCharactersText(
+          expr?.characters?.length ? charactersToLines(expr.characters) : ""
+        );
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setExprError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setExprLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, index, workId, readingRouteTsid, scenePersisted]);
 
   React.useEffect(() => {
     if (generatingFrames.size === 0) return;
@@ -468,6 +559,67 @@ export function FrameContextDrawer({
     }
   };
 
+  const saveExpression = async (
+    expression: RendererExpression | null
+  ): Promise<boolean> => {
+    if (index < 0 || !scenePersisted) return false;
+    setExprSaving(true);
+    setExprError(null);
+    setExprHint(null);
+    try {
+      await patchFrameProvenanceExpression(
+        workId,
+        readingRouteTsid,
+        index,
+        expression
+      );
+      setExprHint(expression ? "Expression 已保存" : "Expression 已清除");
+      onExpressionSaved?.();
+      return true;
+    } catch (e) {
+      setExprError(e instanceof Error ? e.message : String(e));
+      return false;
+    } finally {
+      setExprSaving(false);
+    }
+  };
+
+  const handleSaveExpression = () => {
+    if (index < 0) return;
+    let characters: RendererExpression["characters"];
+    try {
+      characters = linesToCharacters(exprCharactersText);
+    } catch (e) {
+      setExprError(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    const draft: RendererExpression = {
+      environment: exprEnvironment.trim(),
+      action: exprAction.trim(),
+      composition: exprComposition.trim(),
+      characters,
+    };
+    const lighting = exprLighting.trim();
+    if (lighting) draft.lighting = lighting;
+    const parsed = parseRendererExpression(draft);
+    if (!parsed.ok) {
+      setExprError(parsed.errors.join("; "));
+      return;
+    }
+    void saveExpression(parsed.value);
+  };
+
+  const handleClearExpression = () => {
+    void saveExpression(null).then((ok) => {
+      if (!ok) return;
+      setExprEnvironment("");
+      setExprAction("");
+      setExprComposition("");
+      setExprLighting("");
+      setExprCharactersText("");
+    });
+  };
+
   const busy = uploading || generatingThisFrame;
   const captionEmpty = !frame?.caption.trim();
   const otherFramesGenerating =
@@ -637,6 +789,127 @@ export function FrameContextDrawer({
                     </Button>
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-2 border-t pt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs">Expression（生成用）</Label>
+                  {exprLoading ? (
+                    <span className="text-muted-foreground text-[10px]">
+                      加载中…
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-muted-foreground text-[10px] leading-snug">
+                  写入 frame_provenance_v1；手加帧可在此补写后再进制作排队。
+                  {!scenePersisted
+                    ? " 请先保存故事后再编辑 Expression。"
+                    : null}
+                </p>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="frame-expr-environment"
+                    className="text-[10px] text-zinc-600"
+                  >
+                    environment *
+                  </Label>
+                  <Textarea
+                    id="frame-expr-environment"
+                    rows={2}
+                    className="min-h-0 text-xs"
+                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    value={exprEnvironment}
+                    onChange={(e) => setExprEnvironment(e.target.value)}
+                    placeholder="地点与环境"
+                  />
+                  <Label
+                    htmlFor="frame-expr-action"
+                    className="text-[10px] text-zinc-600"
+                  >
+                    action *
+                  </Label>
+                  <Textarea
+                    id="frame-expr-action"
+                    rows={2}
+                    className="min-h-0 text-xs"
+                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    value={exprAction}
+                    onChange={(e) => setExprAction(e.target.value)}
+                    placeholder="本帧瞬间动作"
+                  />
+                  <Label
+                    htmlFor="frame-expr-composition"
+                    className="text-[10px] text-zinc-600"
+                  >
+                    composition *
+                  </Label>
+                  <Input
+                    id="frame-expr-composition"
+                    className="h-7 text-xs"
+                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    value={exprComposition}
+                    onChange={(e) => setExprComposition(e.target.value)}
+                    placeholder="构图"
+                  />
+                  <Label
+                    htmlFor="frame-expr-lighting"
+                    className="text-[10px] text-zinc-600"
+                  >
+                    lighting（可选）
+                  </Label>
+                  <Input
+                    id="frame-expr-lighting"
+                    className="h-7 text-xs"
+                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    value={exprLighting}
+                    onChange={(e) => setExprLighting(e.target.value)}
+                    placeholder="光线"
+                  />
+                  <Label
+                    htmlFor="frame-expr-characters"
+                    className="text-[10px] text-zinc-600"
+                  >
+                    characters（每行 role: visual）
+                  </Label>
+                  <Textarea
+                    id="frame-expr-characters"
+                    rows={3}
+                    className="min-h-0 font-mono text-xs"
+                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    value={exprCharactersText}
+                    onChange={(e) => setExprCharactersText(e.target.value)}
+                    placeholder={"Liu Bei: yellow headcloth\nZhang Fei: ..."}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    onClick={handleSaveExpression}
+                  >
+                    {exprSaving ? "保存中…" : "保存 Expression"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-zinc-500"
+                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    onClick={handleClearExpression}
+                  >
+                    清除
+                  </Button>
+                </div>
+                {exprError ? (
+                  <p className="text-destructive text-[11px]" role="alert">
+                    {exprError}
+                  </p>
+                ) : null}
+                {exprHint && !exprError ? (
+                  <p className="text-muted-foreground text-[11px]">{exprHint}</p>
+                ) : null}
               </div>
 
               <div className="space-y-2 border-t pt-4">

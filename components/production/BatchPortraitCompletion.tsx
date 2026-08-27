@@ -138,7 +138,7 @@ export function BatchPortraitCompletion({
   const [hint, setHint] = React.useState<string | null>(null);
   const [writeError, setWriteError] = React.useState<string | null>(null);
   const [preview, setPreview] = React.useState<{
-    url: string;
+    url: string | null;
     label: string;
     inputJson: Record<string, unknown>;
     currentName?: string;
@@ -659,7 +659,27 @@ export function BatchPortraitCompletion({
                       放大
                     </span>
                   </button>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded border border-dashed border-zinc-300 bg-zinc-50 px-1 text-center text-[10px] leading-snug text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                    onClick={() =>
+                      setPreview({
+                        url: null,
+                        label: name,
+                        inputJson: job.input_json,
+                        currentName: character?.name,
+                        currentDescription: character?.description,
+                        editHref: `/works/${encodeURIComponent(workId)}/characters/${encodeURIComponent(job.subject_id)}/edit`,
+                        draftRevisionNote: revisionNotes[job.id] ?? null,
+                      })
+                    }
+                    aria-label={`查看生成输入 ${name}`}
+                  >
+                    <span className="font-medium text-zinc-700">查看</span>
+                    <span className="text-zinc-400">输入</span>
+                  </button>
+                )}
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <span className="font-medium text-zinc-800">

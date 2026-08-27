@@ -23,6 +23,7 @@ import {
 import { isEmptyFrameUrl } from "@/lib/production/completion-profile";
 import { FRAME_REVISION_MARKER, splitFrameCaption } from "@/lib/prompts/frame-draft";
 import * as scenesApi from "@/lib/scenes";
+import { parseRendererExpression } from "@/lib/discovery/visual-contract";
 import type { ReadingRoute } from "@/lib/types";
 
 type PendingFill = {
@@ -194,6 +195,31 @@ function ExpressionBadge({
   );
 }
 
+/** Structured failure → OPERATOR revision note (WS4). */
+const FAILURE_TYPE_NOTES = {
+  missing_identity:
+    "OPERATOR: 须有可辨识身份色/道具（如 yellow headcloths）。Must show identifiable identity color/prop (e.g. yellow headcloths).",
+  wrong_beat:
+    "OPERATOR: 须画本帧 caption 的瞬间，勿画无关对峙。Must depict this frame caption’s beat, not an unrelated standoff.",
+  missing_prop:
+    "OPERATOR: 须有 blank unmarked wooden board centered。Must include blank unmarked wooden board centered.",
+  cast_count:
+    "OPERATOR: 人物数量/关系须匹配 Expression。Cast count/relations must match Expression.",
+} as const;
+
+type FailureTypeId = keyof typeof FAILURE_TYPE_NOTES;
+
+function mergeFailureTypeNote(
+  existing: string,
+  failureType: FailureTypeId
+): string {
+  const note = FAILURE_TYPE_NOTES[failureType];
+  const trimmed = existing.trim();
+  if (!trimmed) return note;
+  if (trimmed.includes(note)) return trimmed;
+  return `${trimmed}\n${note}`;
+}
+
 /** In-flight Execution jobs: block duplicate enqueue for the same frame. */
 function activeJobForFrame(
   jobs: GenerateJobRow[],
@@ -236,8 +262,12 @@ export function BatchFrameCompletion({
   const [revisionNotes, setRevisionNotes] = React.useState<
     Record<string, string>
   >({});
+  const [exprDraftByJob, setExprDraftByJob] = React.useState<
+    Record<string, string>
+  >({});
+  const [exprBusyId, setExprBusyId] = React.useState<string | null>(null);
   const [preview, setPreview] = React.useState<{
-    url: string;
+    url: string | null;
     label: string;
     inputJson: Record<string, unknown>;
     currentCaption?: string | null;
@@ -342,6 +372,12 @@ export function BatchFrameCompletion({
           : "没有可入队的帧。"
       );
       return;
+    }
+    if (fresh.some((r) => !r.hasRendererExpression)) {
+      const ok = window.confirm(
+        "有帧缺少 Expression，将走 caption 兜底。建议先在读帧补 Expression。仍要排队？"
+      );
+      if (!ok) return;
     }
     setEnqueueBusy(true);
     setWriteError(null);
@@ -849,6 +885,12 @@ export function BatchFrameCompletion({
                         hasNarrativeCues={row.hasNarrativeCues}
                       />
                     </div>
+                    {!row.hasRendererExpression ? (
+                      <p className="mt-1 text-[11px] text-amber-800">
+                        缺 Expression：建议先在读帧（Frame Context）补写，再排队；否则走
+                        caption 兜底。
+                      </p>
+                    ) : null}
                     <p className="truncate text-xs text-zinc-500">{row.caption}</p>
                     {enqueueBlocked ? (
                       <p className="mt-1 text-[11px] text-amber-700">
@@ -1119,7 +1161,36 @@ export function BatchFrameCompletion({
                         点击放大
                       </span>
                     </button>
-                  ) : null}
+                  ) : (
+                    <button
+                      type="button"
+                      className="flex h-16 w-28 shrink-0 flex-col items-center justify-center rounded border border-dashed border-zinc-300 bg-zinc-50 px-1 text-center text-[10px] leading-snug text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                      onClick={() => {
+                        const route = routes.find(
+                          (r) => r.tsid === job.subject_id
+                        );
+                        const liveFrame =
+                          frameIndex !== null
+                            ? route?.story_images_v2?.[frameIndex]
+                            : undefined;
+                        setPreview({
+                          url: null,
+                          label: `${job.subject_id} · ${frameLabel}`,
+                          inputJson: job.input_json,
+                          currentCaption: liveFrame?.caption ?? null,
+                          currentRouteTitle:
+                            route?.title || route?.tsid || null,
+                          draftRevisionNote: revisionNotes[job.id] ?? null,
+                        });
+                      }}
+                      aria-label={`查看生成输入 ${job.subject_id} ${frameLabel}`}
+                    >
+                      <span className="font-medium text-zinc-700">
+                        查看输入
+                      </span>
+                      <span className="text-zinc-400">画面描述 / 入队快照</span>
+                    </button>
+                  )}
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                       <span className="font-medium text-zinc-800">
@@ -1145,6 +1216,12 @@ export function BatchFrameCompletion({
                         <span className="text-amber-700">已在候选</span>
                       ) : null}
                     </div>
+                    {!jobHasRendererExpression(job) ? (
+                      <p className="text-[11px] text-amber-800">
+                        无 Expression：下次可先在读帧 / Frame Context
+                        补写再重试，避免 caption 兜底。
+                      </p>
+                    ) : null}
                     {job.error ? (
                       <p className="text-destructive">
                         {formatGenerateJobErrorForOperator(job.error) ??
@@ -1258,11 +1335,36 @@ export function BatchFrameCompletion({
                                   )
                                 ))
                             }
-                            onClick={() =>
-                              setRetryPanelJobId(
-                                retryPanelJobId === job.id ? null : job.id
-                              )
-                            }
+                            onClick={() => {
+                              const nextId =
+                                retryPanelJobId === job.id ? null : job.id;
+                              setRetryPanelJobId(nextId);
+                              if (nextId && frameIndex !== null) {
+                                void scenesApi
+                                  .getFrameProvenance(workId, job.subject_id)
+                                  .then((entries) => {
+                                    const entry = entries.find(
+                                      (p) => p.frameIndex === frameIndex
+                                    );
+                                    setExprDraftByJob((prev) => ({
+                                      ...prev,
+                                      [job.id]: entry?.rendererExpression
+                                        ? JSON.stringify(
+                                            entry.rendererExpression,
+                                            null,
+                                            2
+                                          )
+                                        : "",
+                                    }));
+                                  })
+                                  .catch(() => {
+                                    setExprDraftByJob((prev) => ({
+                                      ...prev,
+                                      [job.id]: "",
+                                    }));
+                                  });
+                              }
+                            }}
                           >
                             {retryPanelJobId === job.id
                               ? "收起修改意见"
@@ -1304,6 +1406,120 @@ export function BatchFrameCompletion({
                     </div>
                     {retryPanelJobId === job.id ? (
                       <div className="mt-1 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
+                        <label
+                          className="block text-[11px] text-zinc-600"
+                          htmlFor={`frame-failure-type-${job.id}`}
+                        >
+                          失败类型（填入修改意见）
+                        </label>
+                        <select
+                          id={`frame-failure-type-${job.id}`}
+                          className="h-7 w-full rounded-md border border-zinc-200 bg-white px-2 text-xs text-zinc-800"
+                          defaultValue=""
+                          onChange={(e) => {
+                            const value = e.target.value as FailureTypeId | "";
+                            if (!value) return;
+                            setRevisionNotes((prev) => ({
+                              ...prev,
+                              [job.id]: mergeFailureTypeNote(
+                                prev[job.id] ?? "",
+                                value
+                              ),
+                            }));
+                            e.target.value = "";
+                          }}
+                        >
+                          <option value="" disabled>
+                            选择结构化纠偏…
+                          </option>
+                          <option value="missing_identity">
+                            missing_identity · 须有可辨识身份色/道具（如 yellow
+                            headcloths）
+                          </option>
+                          <option value="wrong_beat">
+                            wrong_beat · 须画本帧 caption 的瞬间，勿画无关对峙
+                          </option>
+                          <option value="missing_prop">
+                            missing_prop · 须有 blank unmarked wooden board
+                            centered
+                          </option>
+                          <option value="cast_count">
+                            cast_count · 人物数量/关系须匹配 Expression
+                          </option>
+                        </select>
+                        <label
+                          className="block text-[11px] text-zinc-600"
+                          htmlFor={`frame-expr-${job.id}`}
+                        >
+                          Expression（可改后保存并重试；缺则走 caption 兜底）
+                        </label>
+                        <Textarea
+                          id={`frame-expr-${job.id}`}
+                          rows={5}
+                          value={exprDraftByJob[job.id] ?? ""}
+                          onChange={(e) =>
+                            setExprDraftByJob((prev) => ({
+                              ...prev,
+                              [job.id]: e.target.value,
+                            }))
+                          }
+                          placeholder='{"environment":"…","characters":[],"action":"…","composition":"…"}'
+                          className="min-h-[5rem] font-mono text-[11px]"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          disabled={
+                            exprBusyId === job.id ||
+                            frameIndex === null ||
+                            writing ||
+                            enqueueBusy
+                          }
+                          onClick={() => {
+                            if (frameIndex === null) return;
+                            const raw = (exprDraftByJob[job.id] ?? "").trim();
+                            if (!raw) {
+                              setWriteError("Expression JSON 为空");
+                              return;
+                            }
+                            let parsedJson: unknown;
+                            try {
+                              parsedJson = JSON.parse(raw);
+                            } catch {
+                              setWriteError("Expression JSON 解析失败");
+                              return;
+                            }
+                            const parsed = parseRendererExpression(parsedJson);
+                            if (!parsed.ok) {
+                              setWriteError(parsed.errors.join("; "));
+                              return;
+                            }
+                            setExprBusyId(job.id);
+                            setWriteError(null);
+                            void scenesApi
+                              .patchFrameProvenanceExpression(
+                                workId,
+                                job.subject_id,
+                                frameIndex,
+                                parsed.value
+                              )
+                              .then(() =>
+                                setAdmitHint("Expression 已写入 provenance")
+                              )
+                              .catch((e) =>
+                                setWriteError(
+                                  e instanceof Error ? e.message : String(e)
+                                )
+                              )
+                              .finally(() => setExprBusyId(null));
+                          }}
+                        >
+                          {exprBusyId === job.id
+                            ? "保存 Expression…"
+                            : "保存 Expression"}
+                        </Button>
                         <label
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-revision-${job.id}`}

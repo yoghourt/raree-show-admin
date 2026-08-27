@@ -8,6 +8,7 @@ import type {
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
+import { readerFacingCharacterDescription } from "@/lib/prompts/avatar";
 import {
   extractStagingFromDiscoverySnapshots,
   findDiscoverySnapshotsForWork,
@@ -99,7 +100,14 @@ export function appendCharacterStagingToRolloutQueue(
     return;
   }
   const merged = mergeRolloutQueue(loadRolloutQueue(workId, operatorId), {
-    characterStaging: [staging],
+    characterStaging: [
+      {
+        ...staging,
+        description: readerFacingCharacterDescription(
+          staging.description ?? ""
+        ),
+      },
+    ],
   });
   saveRolloutQueue(workId, operatorId, merged);
 }
@@ -170,14 +178,18 @@ export function updateCharacterStagingInRolloutQueue(
   if (!workId || !operatorId) {
     return;
   }
+  const sanitized: AcceptedCharacterStaging = {
+    ...staging,
+    description: readerFacingCharacterDescription(staging.description ?? ""),
+  };
   const current = loadRolloutQueue(workId, operatorId);
   const next = {
     ...current,
     characterStaging: [
       ...(current.characterStaging ?? []).filter(
-        (item) => item.sourceReviewId !== staging.sourceReviewId
+        (item) => item.sourceReviewId !== sanitized.sourceReviewId
       ),
-      staging,
+      sanitized,
     ],
     updatedAt: new Date().toISOString(),
   };

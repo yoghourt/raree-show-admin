@@ -75,6 +75,7 @@ import {
   prepareAcceptReview,
   prepareAcceptStoryWithChildScenes,
   replaceReviewCandidate,
+  replaceSceneWithSplitBeats,
   revokeReviewAccept,
   saveReviewEdit,
   buildAcceptPrefill,
@@ -168,6 +169,8 @@ export interface UseDiscoverySessionReturn {
   isRegening: boolean;
   regenReviewId: string | null;
   regenError: RegenError | null;
+  isSplitting: boolean;
+  splitError: RegenError | null;
   retryingType: DiscoveryCandidateType | null;
   retryTypeError: RegenError | null;
   acceptError: AcceptReviewError | null;
@@ -194,6 +197,10 @@ export interface UseDiscoverySessionReturn {
     sourceReviewId: string,
     edit: ReviewEditPayload
   ) => void;
+  splitSceneIntoBeats: (
+    sourceReviewId: string,
+    beats: Array<{ title: string; summary: string }>
+  ) => Promise<boolean>;
   regenCandidate: (reviewId: string, feedback?: string | null) => Promise<boolean>;
   retryProposeType: (
     candidateType: DiscoveryCandidateType,
@@ -262,6 +269,8 @@ export function useDiscoverySession(
   const [isRegening, setIsRegening] = useState(false);
   const [regenReviewId, setRegenReviewId] = useState<string | null>(null);
   const [regenError, setRegenError] = useState<RegenError | null>(null);
+  const [isSplitting, setIsSplitting] = useState(false);
+  const [splitError, setSplitError] = useState<RegenError | null>(null);
   const [retryingType, setRetryingType] = useState<DiscoveryCandidateType | null>(
     null
   );
@@ -332,6 +341,7 @@ export function useDiscoverySession(
     setGateFlags({});
     setLockError(null);
     setRegenError(null);
+    setSplitError(null);
     setAcceptError(null);
     setSessionConflict(false);
   }, [workId, operatorId]);
@@ -434,6 +444,7 @@ export function useDiscoverySession(
     setAcceptedStoryUnits([]);
     setAcceptedSceneCandidates([]);
     setRegenError(null);
+    setSplitError(null);
     setAcceptError(null);
     setSessionConflict(false);
     claimClientSession(workId, operatorId, sessionIdRef.current);
@@ -592,6 +603,7 @@ export function useDiscoverySession(
     setAcceptedStoryUnits([]);
     setAcceptedSceneCandidates([]);
     setRegenError(null);
+    setSplitError(null);
     setAcceptError(null);
   }, [session.sessionId, session.state, workId, operatorId]);
 
@@ -906,6 +918,13 @@ export function useDiscoverySession(
           : typeof edit.editedSummary === "string" && edit.editedSummary.trim()
             ? { summary: edit.editedSummary.trim() }
             : {}),
+        ...(sceneFields.visualIntent
+          ? { visualIntent: sceneFields.visualIntent }
+          : existing.visualIntent
+            ? { visualIntent: existing.visualIntent }
+            : {}),
+        rendererExpression:
+          sceneFields.rendererExpression ?? existing.rendererExpression,
         acceptedAt: existing.acceptedAt,
       };
       setAcceptedSceneCandidates((prev) =>
@@ -924,6 +943,90 @@ export function useDiscoverySession(
     ]
   );
 
+  const splitSceneIntoBeats = useCallback(
+    async (
+      sourceReviewId: string,
+      beats: Array<{ title: string; summary: string }>
+    ): Promise<boolean> => {
+      setAcceptError(null);
+      setSplitError(null);
+      const source = findReviewItem(reviewItems, sourceReviewId);
+      if (!source || source.candidate.candidateType !== "scene") {
+        return false;
+      }
+      if (!session.lockedAt || sessionConflict || isSplitting) {
+        return false;
+      }
+      const cleaned = beats
+        .map((b) => ({ title: b.title.trim(), summary: b.summary.trim() }))
+        .filter((b) => b.title || b.summary);
+      if (cleaned.length < 2) {
+        return false;
+      }
+
+      setIsSplitting(true);
+      try {
+        const characterCandidates = reviewItems
+          .filter(
+            (r) =>
+              r.status !== "discarded" &&
+              r.candidate.candidateType === "character"
+          )
+          .map(getEffectiveCandidate);
+
+        const res = await fetch(
+          "/api/admin/discovery/propose/split-expressions",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              workId,
+              sessionId: session.sessionId,
+              narrative: session.narrative,
+              lockedAt: session.lockedAt,
+              beats: cleaned,
+              characterCandidates,
+            }),
+          }
+        );
+        const data = (await res.json()) as {
+          beats?: Array<{
+            title: string;
+            summary: string;
+            rendererExpression: SceneCandidateFields["rendererExpression"];
+            visualIntent?: SceneCandidateFields["visualIntent"];
+          }>;
+          error?: RegenError;
+          warning?: RegenError;
+        };
+
+        if (!res.ok || !data.beats || data.beats.length < 2) {
+          setSplitError(
+            data.error ?? {
+              code: "SPLIT_EXPRESSION_FAILED",
+              message: "拆分后补全 Expression 失败",
+            }
+          );
+          return false;
+        }
+
+        setReviewItems((prev) =>
+          replaceSceneWithSplitBeats(prev, sourceReviewId, data.beats!)
+        );
+        return true;
+      } catch (e) {
+        setSplitError({
+          code: "SPLIT_EXPRESSION_FAILED",
+          message: e instanceof Error ? e.message : String(e),
+        });
+        return false;
+      } finally {
+        setIsSplitting(false);
+      }
+    },
+    [reviewItems, session.lockedAt, session.sessionId, session.narrative, sessionConflict, isSplitting, workId]
+  );
+
   const regenCandidate = useCallback(
     async (reviewId: string, feedback?: string | null): Promise<boolean> => {
       const item = findReviewItem(reviewItems, reviewId);
@@ -934,6 +1037,7 @@ export function useDiscoverySession(
       setIsRegening(true);
       setRegenReviewId(reviewId);
       setRegenError(null);
+      setSplitError(null);
 
       try {
         const siblingCandidates = getSiblingCandidatesForRegen(
@@ -1344,6 +1448,8 @@ export function useDiscoverySession(
     isRegening,
     regenReviewId,
     regenError,
+    isSplitting,
+    splitError,
     retryingType,
     retryTypeError,
     acceptError,
@@ -1361,6 +1467,7 @@ export function useDiscoverySession(
     saveCandidateEdit,
     saveStoryStagingEdit,
     saveSceneStagingEdit,
+    splitSceneIntoBeats,
     regenCandidate,
     retryProposeType,
     acceptCandidate,

@@ -5,7 +5,7 @@ export type FixtureCase = {
   id: "A" | "B" | "C" | "D";
   label: string;
   expectedStatus: "PASS" | "FAIL";
-  expectedErrorInvariants: Array<"G1" | "G2" | "G3" | "G4">;
+  expectedErrorInvariants: Array<"G1" | "G2" | "G3" | "G4" | "G5">;
   provenance?: { workId?: string; capturedAt?: string; note?: string };
   input: GranularityInput;
 };

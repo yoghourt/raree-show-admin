@@ -1,5 +1,12 @@
+import {
+  parseRendererExpression,
+  type RendererExpression,
+} from "@/lib/discovery/visual-contract";
 import { supabase } from "@/lib/supabase";
-import { parseFrameProvenance } from "@/lib/rollout/scenes-server";
+import {
+  parseFrameProvenance,
+  type FrameProvenanceEntry,
+} from "@/lib/rollout/scenes-server";
 import {
   aggregateStoryRelatedRefs,
   formatStoryRelatedAggregateLine,
@@ -359,6 +366,127 @@ export async function updateScene(
       throw e;
     }
     throw new Error(String(e));
+  }
+}
+
+/** Creator-only: frame_provenance_v1 for a Reading Route (by scene tsid). */
+export async function getFrameProvenance(
+  workId: string,
+  tsid: string
+): Promise<FrameProvenanceEntry[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("frame_provenance_v1")
+    .eq("work_id", workId)
+    .eq("tsid", tsid)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new Error(`故事不存在：${tsid}`);
+  }
+  return parseFrameProvenance(
+    (data as { frame_provenance_v1?: unknown }).frame_provenance_v1
+  );
+}
+
+/**
+ * Upsert or clear rendererExpression on frame_provenance_v1 at frameIndex.
+ * Keeps existing sourceReviewId when present; otherwise uses `manual_${frameIndex}`.
+ * When expression is null: strips Expression from the entry, or drops the entry
+ * if nothing else (Intent / sourceContextId) remains.
+ */
+export async function patchFrameProvenanceExpression(
+  workId: string,
+  tsid: string,
+  frameIndex: number,
+  expression: RendererExpression | null
+): Promise<void> {
+  if (!Number.isInteger(frameIndex) || frameIndex < 0) {
+    throw new Error(`帧索引无效：${frameIndex}`);
+  }
+
+  const parsedExpr =
+    expression === null ? null : parseRendererExpression(expression);
+  if (parsedExpr && !parsedExpr.ok) {
+    throw new Error(parsedExpr.errors.join("; "));
+  }
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("story_images_v2, frame_provenance_v1")
+    .eq("work_id", workId)
+    .eq("tsid", tsid)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new Error(`故事不存在：${tsid}`);
+  }
+
+  const row = data as {
+    story_images_v2?: unknown;
+    frame_provenance_v1?: unknown;
+  };
+  const frames = parseStoryImagesV2(row.story_images_v2) ?? [];
+  if (frameIndex >= frames.length) {
+    throw new Error(
+      `帧索引越界：${tsid}[${frameIndex}]（共 ${frames.length} 帧）`
+    );
+  }
+
+  const provenance = parseFrameProvenance(row.frame_provenance_v1);
+  const existingIdx = provenance.findIndex((p) => p.frameIndex === frameIndex);
+  const existing = existingIdx >= 0 ? provenance[existingIdx] : undefined;
+
+  let next: FrameProvenanceEntry[];
+  if (parsedExpr === null) {
+    if (!existing) {
+      return;
+    }
+    const kept: FrameProvenanceEntry = {
+      sourceReviewId: existing.sourceReviewId,
+      frameIndex: existing.frameIndex,
+    };
+    if (existing.visualIntent) kept.visualIntent = existing.visualIntent;
+    if (existing.sourceContextId) kept.sourceContextId = existing.sourceContextId;
+    const hasExtras = Boolean(kept.visualIntent || kept.sourceContextId);
+    if (hasExtras) {
+      next = [...provenance];
+      next[existingIdx] = kept;
+    } else {
+      next = provenance.filter((_, i) => i !== existingIdx);
+    }
+  } else {
+    const entry: FrameProvenanceEntry = {
+      sourceReviewId: existing?.sourceReviewId ?? `manual_${frameIndex}`,
+      frameIndex,
+      rendererExpression: parsedExpr.value,
+    };
+    if (existing?.visualIntent) entry.visualIntent = existing.visualIntent;
+    if (existing?.sourceContextId) {
+      entry.sourceContextId = existing.sourceContextId;
+    }
+    if (existingIdx >= 0) {
+      next = [...provenance];
+      next[existingIdx] = entry;
+    } else {
+      next = [...provenance, entry];
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from(TABLE)
+    .update({ frame_provenance_v1: next })
+    .eq("work_id", workId)
+    .eq("tsid", tsid);
+
+  if (updateError) {
+    throw new Error(updateError.message);
   }
 }
 

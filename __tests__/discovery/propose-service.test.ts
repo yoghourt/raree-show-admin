@@ -330,6 +330,42 @@ describe("regenCandidate (mock)", () => {
   });
 });
 
+describe("buildProposePrompt scene with Expression (WS1 default)", () => {
+  it("requires same-call rendererExpression and lists required Reader steps", () => {
+    const prompt = buildProposePrompt({
+      workTitle: "Romance of the Three Kingdoms",
+      narrative: validNarrative,
+      candidateType: "scene",
+      storyCandidates: [
+        {
+          candidateId: "story-1",
+          candidateType: "story",
+          workId: "work-1",
+          displayName: "Arc",
+          summary: "s",
+          fields: { title: "Arc", summary: "s" },
+        },
+      ],
+      requiredSceneSteps: [
+        {
+          storyCandidateId: "story-1",
+          storyTitle: "Arc",
+          steps: ["Peach Garden Oath", "Merchant Arms", "Daxing Victory"],
+        },
+      ],
+    });
+
+    expect(prompt).toContain("REQUIRED Reader steps");
+    expect(prompt).toContain("Merchant Arms");
+    expect(prompt).not.toContain("Do NOT include rendererExpression");
+    expect(prompt).toContain(
+      "Renderer Expression — Canonical Visual Expression authorship"
+    );
+    expect(prompt).toContain("SAME instant as fields.summary");
+    expect(prompt).toContain("not stub placeholders");
+  });
+});
+
 describe("buildProposePrompt scene narrative-only", () => {
   it("lists required Reader steps and omits Expression authorship rules", () => {
     const prompt = buildProposePrompt({

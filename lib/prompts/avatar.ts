@@ -75,6 +75,14 @@ export function mergeAppearanceIntoDescription(
   return parts.join("\n\n");
 }
 
+/**
+ * Reader / Work-library description: bio only.
+ * Strips Creator packaging (`[视觉身份]`, `[操作员修改意见]`).
+ */
+export function readerFacingCharacterDescription(description: string): string {
+  return splitAvatarDescription(description).base;
+}
+
 type GenderCue = "male" | "female" | null;
 
 /** Lightweight cues from operator notes / description (EN + 中文). */
