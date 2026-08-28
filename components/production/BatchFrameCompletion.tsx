@@ -198,7 +198,7 @@ function ExpressionBadge({
 /** Structured failure → OPERATOR revision note (WS4). */
 const FAILURE_TYPE_NOTES = {
   missing_identity:
-    "OPERATOR: 须有可辨识身份色/道具（如 yellow headcloths）。Must show identifiable identity color/prop (e.g. yellow headcloths).",
+    "OPERATOR: 主角须有稳定身份 cue（长须/专属兵器/甲色）；敌军标识只放敌军，勿戴在主角身上。Heroes need fixed identity cues (beard, iconic weapon, armor color); enemy markers (e.g. rebel colors) must stay on enemies only, never on heroes.",
   wrong_beat:
     "OPERATOR: 须画本帧 caption 的瞬间，勿画无关对峙。Must depict this frame caption’s beat, not an unrelated standoff.",
   missing_prop:
@@ -1472,8 +1472,7 @@ export function BatchFrameCompletion({
                             选择结构化纠偏…
                           </option>
                           <option value="missing_identity">
-                            missing_identity · 须有可辨识身份色/道具（如 yellow
-                            headcloths）
+                            missing_identity · 主角身份 cue（兵器/胡须/甲色）；敌标勿贴主角
                           </option>
                           <option value="wrong_beat">
                             wrong_beat · 须画本帧 caption 的瞬间，勿画无关对峙
