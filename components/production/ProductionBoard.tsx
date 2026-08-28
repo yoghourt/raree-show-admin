@@ -143,13 +143,20 @@ export function ProductionBoard({
     (t) => t.kind === "complete_character_portrait"
   );
 
-  const [tab, setTab] = React.useState<WorkTab>(() =>
-    frameTasks.length > 0 || portraitTasks.length === 0 ? "frames" : "portraits"
-  );
+  const [tab, setTab] = React.useState<WorkTab>("frames");
+  const didAutoPickTabRef = React.useRef(false);
   const [focusPortrait, setFocusPortrait] = React.useState<{
     tsid: string;
     nonce: number;
   } | null>(null);
+
+  React.useEffect(() => {
+    if (didAutoPickTabRef.current) return;
+    didAutoPickTabRef.current = true;
+    if (frameTasks.length === 0 && portraitTasks.length > 0) {
+      setTab("portraits");
+    }
+  }, [frameTasks.length, portraitTasks.length]);
 
   const activateTab = React.useCallback((next: WorkTab) => {
     setTab(next);
