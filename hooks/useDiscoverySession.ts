@@ -810,17 +810,23 @@ export function useDiscoverySession(
           const candidateType = item.candidate.candidateType;
           if (candidateType === "character") {
             const staging = buildCharacterStaging(item);
-            setAcceptedCharacters((units) => [
-              ...units.filter((unit) => unit.sourceReviewId !== reviewId),
-              staging,
-            ]);
+            setAcceptedCharacters((units) => {
+              const index = units.findIndex(
+                (unit) => unit.sourceReviewId === reviewId
+              );
+              if (index === -1) return [...units, staging];
+              return units.map((unit, i) => (i === index ? staging : unit));
+            });
             updateCharacterStagingInRolloutQueue(workId, operatorId, staging);
           } else if (candidateType === "location") {
             const staging = buildLocationStaging(item);
-            setAcceptedLocations((units) => [
-              ...units.filter((unit) => unit.sourceReviewId !== reviewId),
-              staging,
-            ]);
+            setAcceptedLocations((units) => {
+              const index = units.findIndex(
+                (unit) => unit.sourceReviewId === reviewId
+              );
+              if (index === -1) return [...units, staging];
+              return units.map((unit, i) => (i === index ? staging : unit));
+            });
             updateLocationStagingInRolloutQueue(workId, operatorId, staging);
           } else if (candidateType === "story") {
             const staging = buildStoryStaging(item);
