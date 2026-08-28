@@ -29,7 +29,6 @@ import {
 } from "@/lib/discovery/expression-capability-rules";
 import { parseCandidateArray } from "@/lib/discovery/propose-parse";
 import {
-  canDraftScenesFromSourceHeadings,
   expectedSceneCount,
   formatRequiredSceneStepsBlock,
   requiredSceneStepsFromStories,
@@ -224,7 +223,10 @@ export function buildProposePrompt(params: {
   storyCandidates?: DiscoveryCandidate[];
   /** Role candidates (character) for SPEC-CHAR-001 scene Expression fold. */
   characterCandidates?: DiscoveryCandidate[];
-  /** Scene propose: Frame Narrative drafts only (Expression attached after parse). */
+  /**
+   * Legacy escape hatch: Frame Narrative only (stub Expression after parse).
+   * Production default false — same LLM call authors rendererExpression (WS1).
+   */
   sceneNarrativeOnly?: boolean;
   requiredSceneSteps?: ReturnType<typeof requiredSceneStepsFromStories>;
 }): string {
@@ -288,7 +290,7 @@ Generation rules (critical):
 - Do NOT pad the list to reach the cap.
 - For a single chapter excerpt, typical counts are: character 2-5, location 1-3.
 - Stories: one Story per continuous reading arc (Mental Model Transition), NOT one Story per outline heading. A chapter excerpt is often 1 Story, sometimes 2. Do not slice one arc into many singleton Stories.
-- Scenes: one Scene per Reader step under that Story. If the arc has multiple required turns (outcome, attempt, prevention, cause), emit multiple Scenes with the SAME parentStoryCandidateId. Use as many Scenes as the prose supports, up to the hard cap. Do NOT compress a multi-turn Story into 1–4 stills.
+- Scenes: one Scene per Reader step under that Story. If the arc has multiple required turns (outcome, attempt, prevention, cause), emit multiple Scenes with the SAME parentStoryCandidateId. Use as many Scenes as the prose supports, up to the hard cap. Do NOT compress a multi-turn Story into 1–4 stills. One Scene.summary = ONE still-worthy beat — NEVER chain corruption→uprising→defeat→recruitment into a single summary.
 - If the narrative supports zero distinct ${candidateType} units, return {"candidates":[]}.
 
 Return ONLY valid JSON — a single object {"candidates":[...]}. No markdown fences, no commentary.
@@ -308,21 +310,24 @@ ${formatRequiredSceneStepsBlock(requiredSceneSteps)}
 - Prefer proper names from the narrative. English Latin script only.
 \n` : ""}
 ${candidateType === "scene" && !sceneNarrativeOnly ? `\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required. fields.summary is REQUIRED.
-
+${formatRequiredSceneStepsBlock(requiredSceneSteps)}
 Frame Narrative draft (CRITICAL — this is what Human confirms into Reader text):
 - fields.summary (and matching top-level summary) IS the Reading Frame Narrative DRAFT for this step.
   After Human Confirm it is written to story_images_v2[].caption. Empty summary is not a valid Scene candidate.
-- One Scene = one Reader step. Split the parent Story into as many Scenes as required turns. Same parentStoryCandidateId.
+- One Scene = one Reader step = ONE still-worthy beat. Split the parent Story into as many Scenes as required turns. Same parentStoryCandidateId.
+- FORBIDDEN: packing a multi-event causal chain into one summary (e.g. "decades of corruption, then Yellow Turbans rise, then officers call for recruits"). Each of those is its own Scene.
 - The draft MUST let a Reader recover this step's turn: event, outcome, attempted action, prevented action, causal turn, relationship change — when that is the beat.
 - Prefer proper names from the narrative when the text supports them.
 - FORBIDDEN in fields.summary: still-only geometry that drops the turn (e.g. "confront on horseback" when the Source beat is that they slay the commanders; pose/lighting-only prose).
 - Do NOT shorten, role-genericize, or minimize this prose for image-model constraints.
 - Expression authorship rules below apply ONLY to fields.rendererExpression — NEVER to title/summary.
 
-Visualization (ADR-011 A5 / SPEC-DVE-001 v1.4 — required):
-- fields.rendererExpression is REQUIRED Canonical Visual Expression:
+Visualization (ADR-011 A5 / SPEC-DVE-001 v1.4 — required; same LLM call as summary):
+- fields.rendererExpression is REQUIRED Canonical Visual Expression — MUST be authored in this response (not deferred, not stub placeholders like "empty scene" / "unspecified place").
   { environment, characters (array, MAY be []), action, composition,
     lighting?, atmosphere?, threatPerception?, visualEmphasis?, styleHints? }.
+- Expression MUST depict the SAME instant as fields.summary (not a different beat from the same arc).
+- Prefer recognizable identity color / props in character.visual when the beat needs them (e.g. yellow headcloths for Yellow Turbans; blank unmarked recruitment board centered for a call-to-arms beat). FORBIDDEN: vague "tense crowd / brink of ruin" with no identity cue.
 - Author for the best renderer: include optional lighting/atmosphere/threatPerception/visualEmphasis when Intent supports them.
 - characters MAY be [] for landscape/atmosphere scenes; when non-empty each item needs role + visual (identity + prop/costume).
 - fields.visualIntent is OPTIONAL by scene: { characters?, relationship?, emotion?, purpose? }. Presence optional; quality when present.
@@ -438,36 +443,9 @@ async function generateForType(params: {
     ),
   });
 
-  if (
-    candidateType === "scene" &&
-    canDraftScenesFromSourceHeadings(storyCandidates, sourceText)
-  ) {
-    const fromSource = capCandidatesByType(
-      dedupeCandidates(
-        sceneCandidatesFromRequiredSteps({
-          workId,
-          bundles: requiredSceneSteps,
-          sourceText,
-        })
-      )
-    );
-    if (fromSource.length >= 2) {
-      if (process.env.DISCOVERY_PROPOSE_DEBUG === "1") {
-        console.info(
-          "[discovery-propose] type=scene from_source_headings=%d",
-          fromSource.length
-        );
-      }
-      if (timingOn) {
-        console.info(
-          "[discovery-propose] type=scene timing_ms=%d candidates=%d source_headings",
-          Date.now() - t0,
-          fromSource.length
-        );
-      }
-      return finishScenes(fromSource);
-    }
-  }
+  // Do not short-circuit Scene propose from Source headings: that path only
+  // stamped stub Expression. WS1 requires same-call LLM rendererExpression;
+  // heading drafts remain a count-fill fallback after LLM (fillFromRequiredSteps).
 
   const ingestItems = (
     items: unknown[]
@@ -524,9 +502,7 @@ async function generateForType(params: {
   try {
     const prompt = buildProposePrompt({
       ...params,
-      ...(candidateType === "scene"
-        ? { sceneNarrativeOnly: true, requiredSceneSteps }
-        : {}),
+      ...(candidateType === "scene" ? { requiredSceneSteps } : {}),
     });
     const raw = await callDiscoveryTextLlm(prompt, { geminiJsonObject: true });
     const llmMs = timingOn ? Date.now() - t0 : 0;
@@ -567,9 +543,8 @@ async function generateForType(params: {
         .slice(capped.length);
       const retryPrompt = buildProposePrompt({
         ...params,
-        sceneNarrativeOnly: true,
         requiredSceneSteps,
-        feedback: `You MUST output ${expectedScenes} Scene objects (one per listed step). Previous output had ${capped.length}. Remaining steps each need their own Scene:\n${missing.map((s) => `- ${s}`).join("\n")}`,
+        feedback: `You MUST output ${expectedScenes} Scene objects (one per listed step), each with fields.summary AND fields.rendererExpression for that same instant. Previous output had ${capped.length}. Remaining steps each need their own Scene:\n${missing.map((s) => `- ${s}`).join("\n")}`,
       });
       try {
         const retryRaw = await callDiscoveryTextLlm(retryPrompt, {

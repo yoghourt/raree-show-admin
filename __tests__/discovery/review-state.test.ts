@@ -221,9 +221,9 @@ describe("Accept handoff guards", () => {
     const result = prepareAcceptReview(items, items[0]!.reviewId);
     expect(result.ok).toBe(true);
     if (result.ok && result.kind === "character_staging") {
-      expect(result.staging.description).toMatch(/\[视觉身份\]/);
-      expect(result.staging.description).toContain("green battle robe");
-      expect(result.staging.description).toContain("Sworn brother");
+      expect(result.staging.description).toBe("Sworn brother of Liu Bei.");
+      expect(result.staging.description).not.toMatch(/\[视觉身份\]/);
+      expect(result.staging.description).not.toContain("green battle robe");
     }
   });
 

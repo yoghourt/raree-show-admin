@@ -18,7 +18,7 @@ export type {
 } from "./types";
 
 export { runGranularityGate, invariantSet } from "./gate";
-export { analyzeGranularity } from "./analyze";
+export { analyzeGranularity, estimateBeatsInCaption } from "./analyze";
 export {
   candidatesToGranularityInput,
   evaluateGranularityForCandidates,

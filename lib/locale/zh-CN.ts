@@ -412,6 +412,16 @@ export const zhCN = {
       orphanSceneHint:
         '没有所属故事，无法确认。可编辑所属故事字段，或丢弃后重新提炼。',
       edit: '编辑',
+      splitScene: '拆成多画面',
+      splitSceneDialogTitle: '拆成多个单 beat 画面',
+      splitSceneDialogDescription:
+        '将一条多事件画面说明拆成多条。确认后会按各条 summary 补全 Expression；原条目丢弃。',
+      splitSceneConfirm: '确认拆分',
+      splitSceneConfirming: '拆分并补全 Expression…',
+      splitSceneAddBeat: '加一条',
+      splitSceneRemoveBeat: '删除',
+      splitSceneNeedTwo: '至少保留两条 beat',
+      splitSceneExpressionFailed: '拆分后补全 Expression 失败，请重试',
       discard: '不要',
       regen: '重新提炼',
       regening: '重新提炼中…',
@@ -492,6 +502,9 @@ export const zhCN = {
       unlockNarrative: '改正文',
       startPropose: '开始提炼',
       proposing: '正在提炼…',
+      goReviewTab: '去提炼与写入',
+      emptyReviewHint: '还没有可确认的提炼结果。',
+      goPasteTab: '去粘贴正文',
       lockConfirmTitle: '确认正文？',
       lockConfirmDescription:
         '确认后正文暂时不能改，需要改的话再点「改正文」。',

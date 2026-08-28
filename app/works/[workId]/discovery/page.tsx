@@ -110,10 +110,10 @@ export default function WorkDiscoveryPage() {
   const workTitle = workLoading ? "加载中…" : work?.title ?? "未知作品";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-6 py-8">
+    <div className="flex h-screen flex-col overflow-hidden px-3 pb-2 pt-2">
       {workError ? (
         <div
-          className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          className="mb-1.5 shrink-0 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs text-destructive"
           role="alert"
         >
           {workError}
@@ -122,41 +122,44 @@ export default function WorkDiscoveryPage() {
 
       {authError ? (
         <div
-          className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          className="mb-1.5 shrink-0 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs text-destructive"
           role="alert"
         >
           {authError}
         </div>
       ) : null}
 
-      <nav
-        className="flex flex-wrap items-center gap-1 text-sm text-zinc-500"
-        aria-label="面包屑"
-      >
-        <Link href="/" className="transition-colors hover:text-zinc-800">
-          首页
-        </Link>
-        <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <Link href="/works" className="transition-colors hover:text-zinc-800">
-          作品管理
-        </Link>
-        <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="max-w-[200px] truncate font-medium text-zinc-800">
-          {workTitle}
-        </span>
-        <ChevronRight className="size-3.5 shrink-0 opacity-60" aria-hidden />
-        <span className="font-medium text-zinc-800">{DISCOVERY_PAGE_TITLE}</span>
-      </nav>
-
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+      <header className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-zinc-200/80 pb-2">
+        <div className="min-w-0">
+          <nav
+            className="text-muted-foreground flex flex-wrap items-center gap-1 text-[11px]"
+            aria-label="面包屑"
+          >
+            <Link href="/" className="hover:text-foreground">
+              首页
+            </Link>
+            <ChevronRight className="size-3 shrink-0 opacity-60" aria-hidden />
+            <Link href="/works" className="hover:text-foreground">
+              作品管理
+            </Link>
+            <ChevronRight className="size-3 shrink-0 opacity-60" aria-hidden />
+            <span className="text-foreground max-w-[160px] truncate font-medium">
+              {workTitle}
+            </span>
+            <ChevronRight className="size-3 shrink-0 opacity-60" aria-hidden />
+            <span className="text-foreground font-medium">
+              {DISCOVERY_PAGE_TITLE}
+            </span>
+          </nav>
+          <h1 className="text-sm font-semibold leading-tight text-zinc-900">
             {DISCOVERY_PAGE_TITLE}
+            <span className="ml-2 font-normal text-[11px] text-zinc-500">
+              {DISCOVERY_PAGE_SUBTITLE}
+            </span>
           </h1>
-          <p className="text-muted-foreground text-sm">{DISCOVERY_PAGE_SUBTITLE}</p>
         </div>
         {workId ? (
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
             <Link href={`/works/${encodeURIComponent(workId)}/production`}>
               {DISCOVERY_GO_PRODUCTION}
             </Link>
@@ -165,11 +168,13 @@ export default function WorkDiscoveryPage() {
       </header>
 
       {operatorId ? (
-        <DiscoveryComposer
-          discovery={discovery}
-          rollout={rollout}
-          initialStep={initialStep}
-        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <DiscoveryComposer
+            discovery={discovery}
+            rollout={rollout}
+            initialStep={initialStep}
+          />
+        </div>
       ) : null}
     </div>
   );

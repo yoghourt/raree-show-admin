@@ -159,15 +159,13 @@ function buildExpressionPrompt(input: {
 
   const parts: string[] = [];
   if (input.revisionNote) {
+    // Front only — Local often ignores trailing Chinese; do not duplicate the full note.
     parts.push(`OPERATOR OVERRIDE (must follow): ${input.revisionNote}.`);
   }
   if (input.routeTitle) {
     parts.push(`Setting: ${input.routeTitle}.`);
   }
   parts.push(body);
-  if (input.revisionNote) {
-    parts.push(`Remember operator override: ${input.revisionNote}.`);
-  }
   return parts.join(" ");
 }
 
@@ -244,9 +242,6 @@ function buildLocalCaptionPrompt(input: {
     "Cinematic historical narrative painting, adult epic tone,",
     "painterly atmosphere, not a children's textbook, not a schoolbook illustration."
   );
-  if (revision) {
-    parts.push(`Remember operator override: ${revision}.`);
-  }
   return parts.join(" ");
 }
 
@@ -291,9 +286,6 @@ function buildCaptionLegacyPrompt(input: {
   );
 
   parts.push(`Must match scene: ${input.scene}.`);
-  if (input.revisionNote) {
-    parts.push(`Remember operator override: ${input.revisionNote}.`);
-  }
 
   return parts.join(" ");
 }

@@ -137,3 +137,19 @@ export const regenDiscoveryBodySchema = z.object({
   storyCandidates: z.array(discoveryCandidateSchema).optional(),
   feedback: z.string().nullable().optional(),
 });
+
+export const splitSceneExpressionsBodySchema = z.object({
+  workId: z.string().min(1),
+  sessionId: z.string().min(1),
+  narrative: narrativeInputBundleSchema,
+  lockedAt: z.string().min(1),
+  beats: z
+    .array(
+      z.object({
+        title: z.string(),
+        summary: z.string(),
+      })
+    )
+    .min(2),
+  characterCandidates: z.array(discoveryCandidateSchema).optional(),
+});

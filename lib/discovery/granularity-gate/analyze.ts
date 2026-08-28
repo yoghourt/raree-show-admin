@@ -42,6 +42,28 @@ export function estimateProgressionUnits(
   return Math.max(frames.length, sentences.length, 1);
 }
 
+/**
+ * Heuristic beat count inside a single Frame caption / Scene.summary.
+ * Multi-sentence causal chains (≥3 content sentences, or ≥2 sentences with
+ * multi-event connectors) are under-framed for a single still.
+ */
+export function estimateBeatsInCaption(caption: string): number {
+  const sentences = splitSentences(caption).filter(
+    (s) => contentTokens(s).length >= 4
+  );
+  if (sentences.length <= 1) return Math.max(sentences.length, 1);
+
+  const multiEventCue =
+    /\b(then|after|before|meanwhile|subsequently|as\s+\w+\s+\w+,\s+\w+|alongside|following|triggers?|launches?|issues?)\b/i.test(
+      caption
+    ) ||
+    /[，,]\s*(然后|随后|接着|同时|之后|并|且)|；|;/.test(caption);
+
+  if (sentences.length >= 3) return sentences.length;
+  if (sentences.length === 2 && multiEventCue) return 2;
+  return sentences.length;
+}
+
 export function sharedProperNames(stories: StoryNode[]): string[] {
   if (stories.length < 2) return [];
   const perStory = stories.map((s) =>

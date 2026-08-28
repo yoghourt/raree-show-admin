@@ -113,7 +113,9 @@ export function FrameJobResultDialog({
               />
             </div>
           ) : (
-            <p className="text-sm text-zinc-500">无图片</p>
+            <div className="flex min-h-[12rem] items-center justify-center rounded border border-dashed border-zinc-200 bg-zinc-50 px-4 text-center text-sm text-zinc-500">
+              暂无图片（queued / running 时可先核对右侧入队画面描述与生成输入）
+            </div>
           )}
           <div className="flex max-h-[min(85vh,56rem)] min-h-0 flex-col space-y-3 overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm">
             <div

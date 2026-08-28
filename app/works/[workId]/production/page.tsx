@@ -36,16 +36,21 @@ export default function WorkProductionPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [reloadToken, setReloadToken] = React.useState(0);
+  const initialLoadDoneRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!workId) {
       setWork(null);
       setPlan(null);
       setLoading(false);
+      initialLoadDoneRef.current = false;
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    const isBackgroundRefresh = initialLoadDoneRef.current;
+    if (!isBackgroundRefresh) {
+      setLoading(true);
+    }
     setError(null);
     (async () => {
       try {
@@ -80,6 +85,7 @@ export default function WorkProductionPage() {
       } finally {
         if (!cancelled) {
           setLoading(false);
+          initialLoadDoneRef.current = true;
         }
       }
     })();
