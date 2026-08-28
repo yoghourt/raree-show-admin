@@ -578,6 +578,9 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt.indexOf("OPERATOR OVERRIDE")).toBeLessThan(
       prompt.indexOf("knight left kneeling")
     );
+    // Full note once only (front); no trailing duplicate.
+    expect(prompt.split("加雨").length - 1).toBe(1);
+    expect(prompt).not.toContain("Remember operator override");
   });
 
   it("falls back to caption when Expression absent", () => {

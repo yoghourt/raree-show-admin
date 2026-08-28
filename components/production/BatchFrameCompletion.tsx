@@ -666,6 +666,38 @@ export function BatchFrameCompletion({
       setWriteError("重新排队失败：job 无 caption");
       return;
     }
+
+    // Persist Expression draft from the retry panel before enqueue — otherwise
+    // requeue only reads stale frame_provenance_v1 and ignores the edited JSON.
+    const exprRaw = (exprDraftByJob[job.id] ?? "").trim();
+    if (exprRaw) {
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(exprRaw);
+      } catch {
+        setWriteError("Expression JSON 解析失败，请先修正后再重试");
+        return;
+      }
+      const parsed = parseRendererExpression(parsedJson);
+      if (!parsed.ok) {
+        setWriteError(`Expression 无效：${parsed.errors.join("; ")}`);
+        return;
+      }
+      try {
+        await scenesApi.patchFrameProvenanceExpression(
+          workId,
+          job.subject_id,
+          frameIndex,
+          parsed.value
+        );
+      } catch (e) {
+        setWriteError(
+          `保存 Expression 失败：${e instanceof Error ? e.message : String(e)}`
+        );
+        return;
+      }
+    }
+
     setRequeueingId(job.id);
     setEnqueueBusy(true);
     setWriteError(null);
@@ -704,10 +736,17 @@ export function BatchFrameCompletion({
         delete next[job.id];
         return next;
       });
+      setExprDraftByJob((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
       await refreshJobs();
       setAdmitHint(
         note.trim()
-          ? "已按修改意见重新排队；不满意的旧结果已从列表移除。"
+          ? exprRaw
+            ? "已保存 Expression 并按修改意见重新排队；旧结果已从列表移除。"
+            : "已按修改意见重新排队；不满意的旧结果已从列表移除。"
           : "已重新排队；不满意的旧结果已从列表移除。"
       );
     } catch (e) {
@@ -1451,7 +1490,8 @@ export function BatchFrameCompletion({
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-expr-${job.id}`}
                         >
-                          Expression（可改后保存并重试；缺则走 caption 兜底）
+                          Expression（点「按修改意见重试」时会自动写入 provenance
+                          再入队；也可先单独保存）
                         </label>
                         <Textarea
                           id={`frame-expr-${job.id}`}

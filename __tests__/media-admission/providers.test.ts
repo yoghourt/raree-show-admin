@@ -88,6 +88,8 @@ describe("frame draft prompt (derived Job input)", () => {
     );
     expect(prompt).toContain("雨夜、火光更强、少一点人");
     expect(prompt).not.toContain("巴黎起义");
+    expect(prompt.split("雨夜、火光更强、少一点人").length - 1).toBe(1);
+    expect(prompt).not.toContain("Remember operator override");
   });
 
   it("does not triple-repeat caption on Local", () => {
