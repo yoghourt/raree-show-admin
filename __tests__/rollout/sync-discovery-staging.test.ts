@@ -10,6 +10,9 @@ import {
   appendSceneStagingToRolloutQueue,
   appendStoryStagingToRolloutQueue,
   syncRolloutQueueFromDiscovery,
+  updateCharacterStagingInRolloutQueue,
+  updateSceneStagingInRolloutQueue,
+  updateStoryStagingInRolloutQueue,
 } from "@/lib/rollout/sync-discovery-staging";
 import {
   dismissStoryStagingItem,
@@ -311,6 +314,121 @@ describe("sync-discovery-staging", () => {
     const queue = loadRolloutQueue("work-1", "op-1");
     expect(queue.characterStaging).toHaveLength(1);
     expect(queue.characterStaging?.[0]?.name).toBe("Liu Bei");
+  });
+
+  it("keeps scene staging order when updating a middle frame's cast", () => {
+    const parent = "rev-story-1";
+    const frames = [
+      {
+        workId: "work-1",
+        sourceReviewId: "rev-scene-a",
+        parentStorySourceReviewId: parent,
+        chapter_number: 1,
+        title: "Frame A",
+        acceptedAt: "2026-07-05T00:00:00.000Z",
+      },
+      {
+        workId: "work-1",
+        sourceReviewId: "rev-scene-b",
+        parentStorySourceReviewId: parent,
+        chapter_number: 1,
+        title: "Frame B",
+        acceptedAt: "2026-07-05T00:00:01.000Z",
+      },
+      {
+        workId: "work-1",
+        sourceReviewId: "rev-scene-c",
+        parentStorySourceReviewId: parent,
+        chapter_number: 1,
+        title: "Frame C",
+        acceptedAt: "2026-07-05T00:00:02.000Z",
+      },
+    ];
+    for (const frame of frames) {
+      appendSceneStagingToRolloutQueue("work-1", "op-1", frame);
+    }
+
+    updateSceneStagingInRolloutQueue("work-1", "op-1", {
+      ...frames[1],
+      title: "Frame B edited",
+      rendererExpression: {
+        environment: "courtyard",
+        characters: [{ role: "Liu Bei", visual: "present" }],
+        action: "standing",
+        composition: "wide view",
+      },
+    });
+
+    const queue = loadRolloutQueue("work-1", "op-1");
+    expect(queue.readingRouteStaging.map((s) => s.sourceReviewId)).toEqual([
+      "rev-scene-a",
+      "rev-scene-b",
+      "rev-scene-c",
+    ]);
+    expect(queue.readingRouteStaging[1]?.title).toBe("Frame B edited");
+  });
+
+  it("keeps story and character staging order when editing in place", () => {
+    appendStoryStagingToRolloutQueue("work-1", "op-1", {
+      workId: "work-1",
+      sourceReviewId: "rev-story-a",
+      title: "Story A",
+      summary: "a",
+      acceptedAt: "2026-07-05T00:00:00.000Z",
+    });
+    appendStoryStagingToRolloutQueue("work-1", "op-1", {
+      workId: "work-1",
+      sourceReviewId: "rev-story-b",
+      title: "Story B",
+      summary: "b",
+      acceptedAt: "2026-07-05T00:00:01.000Z",
+    });
+    appendCharacterStagingToRolloutQueue("work-1", "op-1", {
+      workId: "work-1",
+      sourceReviewId: "rev-char-a",
+      name: "Liu Bei",
+      house: "Shu",
+      description: "sworn",
+      signatureQuote: null,
+      acceptedAt: "2026-07-05T00:00:00.000Z",
+    });
+    appendCharacterStagingToRolloutQueue("work-1", "op-1", {
+      workId: "work-1",
+      sourceReviewId: "rev-char-b",
+      name: "Guan Yu",
+      house: "Shu",
+      description: "general",
+      signatureQuote: null,
+      acceptedAt: "2026-07-05T00:00:01.000Z",
+    });
+
+    updateStoryStagingInRolloutQueue("work-1", "op-1", {
+      workId: "work-1",
+      sourceReviewId: "rev-story-a",
+      title: "Story A edited",
+      summary: "a",
+      acceptedAt: "2026-07-05T00:00:00.000Z",
+    });
+    updateCharacterStagingInRolloutQueue("work-1", "op-1", {
+      workId: "work-1",
+      sourceReviewId: "rev-char-a",
+      name: "Liu Bei",
+      house: "Shu",
+      description: "edited",
+      signatureQuote: null,
+      acceptedAt: "2026-07-05T00:00:00.000Z",
+    });
+
+    const queue = loadRolloutQueue("work-1", "op-1");
+    expect(queue.storyStaging.map((s) => s.sourceReviewId)).toEqual([
+      "rev-story-a",
+      "rev-story-b",
+    ]);
+    expect(queue.storyStaging[0]?.title).toBe("Story A edited");
+    expect(queue.characterStaging?.map((s) => s.sourceReviewId)).toEqual([
+      "rev-char-a",
+      "rev-char-b",
+    ]);
   });
 
   it("reads legacy sceneStaging alias from storage", () => {

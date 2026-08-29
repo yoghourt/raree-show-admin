@@ -29,6 +29,26 @@ import {
 } from "@/lib/rollout/rollout-queue-storage";
 import type { RolloutQueueSnapshot } from "@/lib/rollout/types";
 
+/**
+ * Replace an existing staging item in place so narrative/frame order is
+ * preserved. Filter-then-append would move the edited item to the end
+ * (e.g. changing a frame's cast shuffled 画面 order vs confirm-time order).
+ */
+function replaceBySourceReviewId<T extends { sourceReviewId: string }>(
+  items: T[],
+  next: T
+): T[] {
+  const index = items.findIndex(
+    (item) => item.sourceReviewId === next.sourceReviewId
+  );
+  if (index === -1) {
+    return [...items, next];
+  }
+  const copy = items.slice();
+  copy[index] = next;
+  return copy;
+}
+
 export function syncRolloutQueueFromDiscovery(
   workId: string,
   operatorId: string
@@ -137,12 +157,7 @@ export function updateStoryStagingInRolloutQueue(
   const current = loadRolloutQueue(workId, operatorId);
   const next = {
     ...current,
-    storyStaging: [
-      ...current.storyStaging.filter(
-        (item) => item.sourceReviewId !== staging.sourceReviewId
-      ),
-      staging,
-    ],
+    storyStaging: replaceBySourceReviewId(current.storyStaging, staging),
     updatedAt: new Date().toISOString(),
   };
   saveRolloutQueue(workId, operatorId, next);
@@ -159,12 +174,10 @@ export function updateSceneStagingInRolloutQueue(
   const current = loadRolloutQueue(workId, operatorId);
   const next = {
     ...current,
-    readingRouteStaging: [
-      ...current.readingRouteStaging.filter(
-        (item) => item.sourceReviewId !== staging.sourceReviewId
-      ),
-      staging,
-    ],
+    readingRouteStaging: replaceBySourceReviewId(
+      current.readingRouteStaging,
+      staging
+    ),
     updatedAt: new Date().toISOString(),
   };
   saveRolloutQueue(workId, operatorId, next);
@@ -185,12 +198,10 @@ export function updateCharacterStagingInRolloutQueue(
   const current = loadRolloutQueue(workId, operatorId);
   const next = {
     ...current,
-    characterStaging: [
-      ...(current.characterStaging ?? []).filter(
-        (item) => item.sourceReviewId !== sanitized.sourceReviewId
-      ),
-      sanitized,
-    ],
+    characterStaging: replaceBySourceReviewId(
+      current.characterStaging ?? [],
+      sanitized
+    ),
     updatedAt: new Date().toISOString(),
   };
   saveRolloutQueue(workId, operatorId, next);
@@ -207,12 +218,10 @@ export function updateLocationStagingInRolloutQueue(
   const current = loadRolloutQueue(workId, operatorId);
   const next = {
     ...current,
-    locationStaging: [
-      ...(current.locationStaging ?? []).filter(
-        (item) => item.sourceReviewId !== staging.sourceReviewId
-      ),
-      staging,
-    ],
+    locationStaging: replaceBySourceReviewId(
+      current.locationStaging ?? [],
+      staging
+    ),
     updatedAt: new Date().toISOString(),
   };
   saveRolloutQueue(workId, operatorId, next);
