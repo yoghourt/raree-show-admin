@@ -166,6 +166,10 @@ export function BatchPortraitCompletion({
   const [proposingVisualJobId, setProposingVisualJobId] = React.useState<
     string | null
   >(null);
+  /** Focus-card drafts (derived-task「打开」). */
+  const [focusVisualDraft, setFocusVisualDraft] = React.useState("");
+  const [focusRevisionNote, setFocusRevisionNote] = React.useState("");
+  const [proposingFocusVisual, setProposingFocusVisual] = React.useState(false);
 
   const refreshJobs = React.useCallback(async () => {
     try {
@@ -190,6 +194,18 @@ export function BatchPortraitCompletion({
   );
 
   React.useEffect(() => {
+    if (!focusCharacter) {
+      setFocusVisualDraft("");
+      setFocusRevisionNote("");
+      return;
+    }
+    setFocusVisualDraft(focusCharacter.visualIdentity ?? "");
+    setFocusRevisionNote("");
+    // Seed when focus target / open nonce changes — not on every character field refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional seed keys
+  }, [focusCharacter?.tsid, focusNonce]);
+
+  React.useEffect(() => {
     if (!focusCharacterTsid) return;
     const id = window.setTimeout(() => {
       document
@@ -202,29 +218,76 @@ export function BatchPortraitCompletion({
     return () => window.clearTimeout(id);
   }, [focusCharacterTsid, focusNonce]);
 
+  const proposeFocusVisualIdentity = async () => {
+    if (!focusCharacter) return;
+    setProposingFocusVisual(true);
+    setWriteError(null);
+    setHint(null);
+    try {
+      const result = await proposeCharacterVisualIdentity({
+        workId,
+        name: focusCharacter.name,
+        house: focusCharacter.house,
+        description: focusCharacter.description,
+        currentVisualIdentity: focusVisualDraft,
+        operatorNote: focusRevisionNote,
+      });
+      if (!result.ok) {
+        setWriteError(result.message);
+        return;
+      }
+      setFocusVisualDraft(result.visualIdentity);
+      setHint("已填入 AI 视觉身份提案（未入队、未写库；可再改后排队）。");
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProposingFocusVisual(false);
+    }
+  };
+
   const enqueueFocusedCharacter = async () => {
     if (!focusCharacter) return;
     setEnqueueBusy(true);
     setWriteError(null);
     setHint(null);
     try {
+      const visualDraft = focusVisualDraft.trim();
+      if (visualDraft !== (focusCharacter.visualIdentity ?? "").trim()) {
+        await charactersApi.update(workId, focusCharacter.tsid, {
+          name: focusCharacter.name,
+          house: focusCharacter.house,
+          description: focusCharacter.description,
+          visualIdentity: visualDraft,
+          signatureQuote: focusCharacter.signatureQuote,
+          portraitUrl: focusCharacter.portraitUrl,
+        });
+        onWrote();
+      }
+      const note = focusRevisionNote.trim();
+      const baseDescription = descriptionWithArchiveAppearance(
+        workId,
+        focusCharacter.name,
+        focusCharacter.description,
+        visualDraft
+      );
+      const description = note
+        ? baseDescription
+          ? `${baseDescription}\n\n[操作员修改意见] ${note}`
+          : `[操作员修改意见] ${note}`
+        : baseDescription;
       const result = await enqueueCharacterPortraitJobs({
         workId,
         characters: [
           {
             characterTsid: focusCharacter.tsid,
             name: focusCharacter.name,
-            description: descriptionWithArchiveAppearance(
-              workId,
-              focusCharacter.name,
-              focusCharacter.description,
-              focusCharacter.visualIdentity
-            ),
+            description,
             referenceUrl:
               focusCharacter.portraitUrl?.startsWith("http://") ||
               focusCharacter.portraitUrl?.startsWith("https://")
                 ? focusCharacter.portraitUrl
                 : undefined,
+            ...(note ? { operatorRevision: note } : {}),
           },
         ],
       });
@@ -237,6 +300,7 @@ export function BatchPortraitCompletion({
           ? `${focusCharacter.name} 已有 queued/running 任务。`
           : `已为 ${focusCharacter.name} 入队肖像任务。`
       );
+      setFocusRevisionNote("");
       await refreshJobs();
       onFocusCharacterHandled?.();
     } catch (e) {
@@ -609,52 +673,116 @@ export function BatchPortraitCompletion({
       {focusCharacter ? (
         <div
           id={`portrait-focus-${focusCharacter.tsid}`}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"
+          className="space-y-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950"
           role="status"
         >
-          <p>
-            派生任务聚焦：
-            <span className="font-semibold">{focusCharacter.name}</span>
-            {isMissingPortraitUrl(focusCharacter.portraitUrl)
-              ? "（缺肖像）"
-              : "（已有 Asset，可仍查看 Job）"}
-          </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p>
+              派生任务聚焦：
+              <span className="font-semibold">{focusCharacter.name}</span>
+              {isMissingPortraitUrl(focusCharacter.portraitUrl)
+                ? "（缺肖像）"
+                : "（已有 Asset，可仍查看 Job）"}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                asChild
+              >
+                <Link
+                  href={`/works/${encodeURIComponent(workId)}/characters/${encodeURIComponent(focusCharacter.tsid)}/edit`}
+                >
+                  去编辑页
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => onFocusCharacterHandled?.()}
+              >
+                关闭
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-md border border-amber-100 bg-white/70 p-2">
+            <label
+              className="block text-[11px] text-amber-900/80"
+              htmlFor={`focus-visual-${focusCharacter.tsid}`}
+            >
+              视觉身份（生图用；改后排队会写入角色）
+            </label>
+            <Textarea
+              id={`focus-visual-${focusCharacter.tsid}`}
+              rows={4}
+              value={focusVisualDraft}
+              onChange={(e) => setFocusVisualDraft(e.target.value)}
+              placeholder="FACE / COSTUME / PROP / STYLE…"
+              className="min-h-[5.5rem] border-amber-100 bg-white text-xs text-zinc-900"
+              disabled={enqueueBusy || proposingFocusVisual}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-7 text-xs"
+                disabled={
+                  enqueueBusy ||
+                  proposingFocusVisual ||
+                  hasInFlightFor(focusCharacter.tsid)
+                }
+                onClick={() => void proposeFocusVisualIdentity()}
+              >
+                {proposingFocusVisual ? "提案中…" : "AI 提案视觉身份"}
+              </Button>
+              <span className="text-[10px] text-amber-900/70">
+                只填草稿，确认后再排队
+              </span>
+            </div>
+            <label
+              className="block text-[11px] text-amber-900/80"
+              htmlFor={`focus-revision-${focusCharacter.tsid}`}
+            >
+              修改意见（可选；并入本次生成与 AI 提案）
+            </label>
+            <Textarea
+              id={`focus-revision-${focusCharacter.tsid}`}
+              rows={2}
+              value={focusRevisionNote}
+              onChange={(e) => setFocusRevisionNote(e.target.value)}
+              placeholder="例如：半写实、不要年画风…"
+              className="min-h-[3.5rem] border-amber-100 bg-white text-xs text-zinc-900"
+              disabled={enqueueBusy || proposingFocusVisual}
+            />
             {isMissingPortraitUrl(focusCharacter.portraitUrl) ? (
               <Button
                 type="button"
                 size="sm"
                 className="h-7 text-xs"
-                disabled={enqueueBusy || hasInFlightFor(focusCharacter.tsid)}
+                disabled={
+                  enqueueBusy ||
+                  proposingFocusVisual ||
+                  hasInFlightFor(focusCharacter.tsid)
+                }
                 onClick={() => void enqueueFocusedCharacter()}
               >
                 {hasInFlightFor(focusCharacter.tsid)
                   ? "已在队列中"
-                  : "为此角色排队"}
+                  : enqueueBusy
+                    ? "排队中…"
+                    : "为此角色排队"}
               </Button>
-            ) : null}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              asChild
-            >
-              <Link
-                href={`/works/${encodeURIComponent(workId)}/characters/${encodeURIComponent(focusCharacter.tsid)}/edit`}
-              >
-                去编辑页
-              </Link>
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs"
-              onClick={() => onFocusCharacterHandled?.()}
-            >
-              关闭
-            </Button>
+            ) : (
+              <p className="text-[10px] text-amber-900/70">
+                已有肖像 Asset；若要改视觉身份后重跑，请在下方 Job
+                使用「改视觉身份/意见重试」。
+              </p>
+            )}
           </div>
         </div>
       ) : null}
