@@ -71,7 +71,8 @@ function portraitEnqueuePayloadFromJob(
   workId: string,
   job: GenerateJobRow,
   character: Character | undefined,
-  revisionNote: string
+  revisionNote: string,
+  visualIdentityOverride?: string
 ): {
   characterTsid: string;
   name: string;
@@ -105,6 +106,10 @@ function portraitEnqueuePayloadFromJob(
     referenceUrl = character.portraitUrl;
   }
   const note = revisionNote.trim();
+  const visualIdentity =
+    visualIdentityOverride !== undefined
+      ? visualIdentityOverride
+      : (character?.visualIdentity ?? "");
   return {
     characterTsid: job.subject_id,
     name,
@@ -113,7 +118,7 @@ function portraitEnqueuePayloadFromJob(
         workId,
         name,
         description ?? "",
-        character?.visualIdentity ?? ""
+        visualIdentity
       ),
       note
     ),
@@ -151,6 +156,10 @@ export function BatchPortraitCompletion({
     null
   );
   const [revisionNotes, setRevisionNotes] = React.useState<
+    Record<string, string>
+  >({});
+  /** Draft visual identity while retry panel is open (seeded from character). */
+  const [visualIdentityDrafts, setVisualIdentityDrafts] = React.useState<
     Record<string, string>
   >({});
 
@@ -342,11 +351,14 @@ export function BatchPortraitCompletion({
     }
     const character = characters.find((c) => c.tsid === job.subject_id);
     const note = revisionNotes[job.id] ?? "";
+    const visualDraft =
+      visualIdentityDrafts[job.id] ?? character?.visualIdentity ?? "";
     const payload = portraitEnqueuePayloadFromJob(
       workId,
       job,
       character,
-      note
+      note,
+      visualDraft
     );
     if (!payload) {
       setWriteError("重新排队失败：缺少角色姓名");
@@ -356,6 +368,21 @@ export function BatchPortraitCompletion({
     setWriteError(null);
     setHint(null);
     try {
+      // Persist visual identity when the retry panel edited it (Creator field).
+      if (
+        character &&
+        visualDraft.trim() !== (character.visualIdentity ?? "").trim()
+      ) {
+        await charactersApi.update(workId, character.tsid, {
+          name: character.name,
+          house: character.house,
+          description: character.description,
+          visualIdentity: visualDraft.trim(),
+          signatureQuote: character.signatureQuote,
+          portraitUrl: character.portraitUrl,
+        });
+        onWrote();
+      }
       const result = await enqueueCharacterPortraitJobs({
         workId,
         characters: [payload],
@@ -382,10 +409,17 @@ export function BatchPortraitCompletion({
         delete next[job.id];
         return next;
       });
+      setVisualIdentityDrafts((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
       await refreshJobs();
+      const changedVisual =
+        visualDraft.trim() !== (character?.visualIdentity ?? "").trim();
       setHint(
-        note.trim()
-          ? "已按修改意见重新排队；不满意的旧结果已从列表移除。"
+        note.trim() || changedVisual
+          ? "已按修改意见/视觉身份重新排队；不满意的旧结果已从列表移除。"
           : "已重新排队；不满意的旧结果已从列表移除。"
       );
     } catch (e) {
@@ -411,6 +445,11 @@ export function BatchPortraitCompletion({
       }
       setRetryPanelJobId(null);
       setRevisionNotes((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
+      setVisualIdentityDrafts((prev) => {
         const next = { ...prev };
         delete next[job.id];
         return next;
@@ -742,11 +781,23 @@ export function BatchPortraitCompletion({
                             requeueingId === job.id ||
                             Boolean(writingId)
                           }
-                          onClick={() =>
-                            setRetryPanelJobId(panelOpen ? null : job.id)
-                          }
+                          onClick={() => {
+                            if (panelOpen) {
+                              setRetryPanelJobId(null);
+                              return;
+                            }
+                            const c = characters.find(
+                              (x) => x.tsid === job.subject_id
+                            );
+                            setVisualIdentityDrafts((prev) => ({
+                              ...prev,
+                              [job.id]:
+                                prev[job.id] ?? c?.visualIdentity ?? "",
+                            }));
+                            setRetryPanelJobId(job.id);
+                          }}
                         >
-                          {panelOpen ? "收起修改意见" : "附修改意见重试"}
+                          {panelOpen ? "收起修改" : "改视觉身份/意见重试"}
                         </Button>
                       </>
                     ) : null}
@@ -792,9 +843,33 @@ export function BatchPortraitCompletion({
                     <div className="mt-1 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
                       <label
                         className="block text-[11px] text-zinc-600"
+                        htmlFor={`portrait-visual-${job.id}`}
+                      >
+                        视觉身份（生图用；改后会写入角色并用于本次重试）
+                      </label>
+                      <Textarea
+                        id={`portrait-visual-${job.id}`}
+                        rows={4}
+                        value={
+                          visualIdentityDrafts[job.id] ??
+                          characters.find((c) => c.tsid === job.subject_id)
+                            ?.visualIdentity ??
+                          ""
+                        }
+                        onChange={(e) =>
+                          setVisualIdentityDrafts((prev) => ({
+                            ...prev,
+                            [job.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="FACE / COSTUME / PROP / STYLE…"
+                        className="min-h-[5.5rem] text-xs"
+                      />
+                      <label
+                        className="block text-[11px] text-zinc-600"
                         htmlFor={`portrait-revision-${job.id}`}
                       >
-                        修改意见（会并入下次生成描述；不改库里的角色描述）
+                        修改意见（可选；并入下次生成，不改库里的角色描述）
                       </label>
                       <Textarea
                         id={`portrait-revision-${job.id}`}
@@ -806,22 +881,19 @@ export function BatchPortraitCompletion({
                             [job.id]: e.target.value,
                           }))
                         }
-                        placeholder="例如：不要白屏；需可见脸部；深色头发；半身像…"
+                        placeholder="例如：不要年画风；半写实皮肤质感；绿袍不要丢…"
                         className="min-h-[4.5rem] text-xs"
                       />
                       <Button
                         type="button"
                         size="sm"
                         className="h-7 text-xs"
-                        disabled={
-                          !(revisionNotes[job.id] ?? "").trim() ||
-                          requeueingId === job.id
-                        }
+                        disabled={requeueingId === job.id}
                         onClick={() => void requeuePortraitJob(job)}
                       >
                         {requeueingId === job.id
                           ? "排队中…"
-                          : "带意见重新排队"}
+                          : "带修改重新排队"}
                       </Button>
                     </div>
                   ) : null}
