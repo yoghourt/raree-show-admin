@@ -17,13 +17,20 @@ export type CharacterArchive = {
   propCues: string[];
 };
 
-/** Cue budget when folding archive → Expression. */
+/** Cue budget when folding archive → Expression (scene). */
 export const CHARACTER_ARCHIVE_CUE_BUDGET = {
   maxIdentity: 3,
   maxCostume: 1,
   maxProp: 1,
   /** identity + costume + prop hard cap */
   maxTotal: 4,
+} as const;
+
+/** Cue budget when folding archive → portrait prompt (standing identity). */
+export const PORTRAIT_ARCHIVE_CUE_BUDGET = {
+  maxIdentity: 6,
+  maxCostume: 3,
+  maxProp: 2,
 } as const;
 
 export type ActiveCharacterCues = {
@@ -168,15 +175,58 @@ export function formatActiveCuesForVisual(active: ActiveCharacterCues): string {
   return active.activeCues.join(", ");
 }
 
+export type PortraitCharacterCues = {
+  visualSummary?: string;
+  identityCues: string[];
+  costumeCues: string[];
+  propCues: string[];
+};
+
+/** Select portrait budget cues (standing weapons; no scene gating). */
+export function selectPortraitCharacterCues(
+  archive: CharacterArchive | null | undefined,
+  budget = PORTRAIT_ARCHIVE_CUE_BUDGET
+): PortraitCharacterCues {
+  if (!archive) {
+    return { identityCues: [], costumeCues: [], propCues: [] };
+  }
+  const identityCues = (archive.identityCues ?? []).slice(0, budget.maxIdentity);
+  const costumeCues = archive.costumeCues.slice(0, budget.maxCostume);
+  const propCues = archive.propCues
+    .slice(0, budget.maxProp)
+    .filter((prop) => STANDING_IDENTITY_PROP_PATTERN.test(prop) || prop.trim());
+  return {
+    ...(archive.visualSummary ? { visualSummary: archive.visualSummary } : {}),
+    identityCues,
+    costumeCues,
+    propCues,
+  };
+}
+
+function joinCueSection(label: string, cues: string[]): string {
+  if (cues.length === 0) return "";
+  return `${label}: ${cues.join(", ")}.`;
+}
+
 /**
- * Budgeted archive cues for a portrait prompt (standing identity props included).
+ * Labeled portrait fragment for Creator `visual_identity` / enqueue description.
  * Renderer still receives a prompt string only — never the Archive object.
  */
 export function formatArchiveForPortrait(
   archive: CharacterArchive | null | undefined
 ): string {
-  if (!archive) return "";
-  return formatActiveCuesForVisual(selectActiveCharacterCues(archive));
+  const selected = selectPortraitCharacterCues(archive);
+  const parts: string[] = [];
+  if (selected.visualSummary) {
+    parts.push(`SUMMARY: ${selected.visualSummary}.`);
+  }
+  const face = joinCueSection("FACE", selected.identityCues);
+  if (face) parts.push(face);
+  const costume = joinCueSection("COSTUME", selected.costumeCues);
+  if (costume) parts.push(costume);
+  const prop = joinCueSection("PROP", selected.propCues);
+  if (prop) parts.push(prop);
+  return parts.join(" ").trim();
 }
 
 type ExpressionCharacter = { role: string; visual: string };
@@ -263,7 +313,9 @@ fields.characterArchive MAY be present:
 Archive = STABLE visual identity only (body marks, iconic props, clothing, silhouette).
 FORBIDDEN in characterArchive: current scene action, emotion, camera, close-up, face-ref, InstantID, LoRA.
 identityCues = Tier 1 (face/body marks + named weapons). costumeCues = Tier 2 clothing.
-Discovery budgets: identity ≤3, costume ≤1, prop ≤1, total ≤4. Prefer short English phrases.
+MUST cover when evidence or stable work tradition supports: face/skin tone, facial hair, signature costume, named weapon.
+When the narrative omits iconic look but the work has a stable visual tradition (e.g. opera/stage canon), author as operator-editable proposal — do NOT claim it was extracted from the excerpt.
+Discovery scene budgets: identity ≤3, costume ≤1, prop ≤1, total ≤4. Prefer short English phrases.
 Situational documents (letter/map/scroll) are props, not standing identity.
 `.trim();
 

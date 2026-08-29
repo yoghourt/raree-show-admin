@@ -37,6 +37,8 @@ describe("FIELD_REGISTRY — SPEC-CORE-001 §4.3 completeness", () => {
     expect(charReg["name"].classification).toBe("scope");
     expect(charReg["house"].classification).toBe("canonical");
     expect(charReg["description"].classification).toBe("narrative");
+    expect(charReg["visualIdentity"].classification).toBe("canonical");
+    expect(charReg["visualIdentity"].copilot_route).toBe("excluded");
     expect(charReg["signatureQuote"].classification).toBe("narrative");
     expect(charReg["portraitUrl"].classification).toBe("asset");
   });

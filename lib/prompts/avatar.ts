@@ -176,22 +176,26 @@ export function buildAvatarPrompt(name: string, description: string): string {
   const scrubbedBase =
     revisionCue != null ? scrubConflictingGenderTokens(base, revisionCue) : base;
 
-  // Appearance (archive cues) outranks biographical description in the subject.
+  const clippedAppearance = scrubbedAppearance
+    ? clipPromptChunk(scrubbedAppearance, AVATAR_APPEARANCE_MAX_CHARS)
+    : "";
+  const clippedBio = scrubbedBase
+    ? clipPromptChunk(scrubbedBase, AVATAR_BIO_MAX_CHARS)
+    : "";
+
   const subjectParts = [n];
-  if (scrubbedAppearance) {
-    subjectParts.push(
-      clipPromptChunk(scrubbedAppearance, AVATAR_APPEARANCE_MAX_CHARS)
-    );
-  }
-  if (scrubbedBase) {
-    subjectParts.push(clipPromptChunk(scrubbedBase, AVATAR_BIO_MAX_CHARS));
-  }
+  if (clippedBio) subjectParts.push(clippedBio);
   const subject = subjectParts.join(", ");
 
   const parts: string[] = [];
   if (revisionNote) {
     parts.push(
       `OPERATOR OVERRIDE (must follow): ${clipPromptChunk(revisionNote, 120)}.`
+    );
+  }
+  if (clippedAppearance) {
+    parts.push(
+      `CRITICAL visual identity (must depict): ${clippedAppearance}.`
     );
   }
   parts.push(...genderPos);
@@ -206,6 +210,7 @@ export function buildAvatarPrompt(name: string, description: string): string {
   // Keep positive short for Local Z-Image; rejects live in negative prompt.
   parts.push(
     "waist-up portrait, head shoulders and torso with costume visible,",
+    "iconic weapon visible in frame when specified,",
     "solo, one person, facing camera, soft studio light, gray backdrop,",
     "digital illustration, sharp face."
   );
@@ -235,6 +240,32 @@ export const AVATAR_NEGATIVE_PROMPT = [
   "close-up face only",
 ].join(", ");
 
+/** Heuristic negatives from appearance cues (not work-specific dictionaries). */
+function appearanceNegativeExtras(appearance: string): string[] {
+  const t = appearance.toLowerCase();
+  const out: string[] = [];
+  if (/\bred face\b|\bred-faced\b|\brouged face\b/.test(t)) {
+    out.push("pale face", "fair skin", "pink cheeks only");
+  }
+  if (/\bblack face\b|\bdark skin\b|\btanned\b/.test(t)) {
+    out.push("pale skin", "very fair skin");
+  }
+  if (
+    /\bcrescent\b|\bglaive\b|\bhalberd\b|\bserpent spear\b|\bgreen dragon\b/.test(
+      t
+    )
+  ) {
+    out.push("western straight sword", "katana", "rapier");
+  }
+  if (/\blong beard\b|\bflowing beard\b|\bfull beard\b/.test(t)) {
+    out.push("clean shaven", "no beard");
+  }
+  if (/\bthick beard\b|\bbushy beard\b|\bwild beard\b/.test(t)) {
+    out.push("clean shaven", "thin mustache only");
+  }
+  return [...new Set(out)];
+}
+
 /** Negatives for portrait slot, optionally extended from description cues. */
 export function buildAvatarNegativePrompt(description?: string): string {
   const { base, revisionNote, appearance } = splitAvatarDescription(
@@ -245,6 +276,8 @@ export function buildAvatarNegativePrompt(description?: string): string {
     detectGenderCue(appearance) ??
     detectGenderCue(base);
   const { negativeExtra } = genderOverrideClauses(cue);
-  if (negativeExtra.length === 0) return AVATAR_NEGATIVE_PROMPT;
-  return `${AVATAR_NEGATIVE_PROMPT}, ${negativeExtra.join(", ")}`;
+  const appearanceNeg = appearanceNegativeExtras(appearance);
+  const merged = [...new Set([...negativeExtra, ...appearanceNeg])];
+  if (merged.length === 0) return AVATAR_NEGATIVE_PROMPT;
+  return `${AVATAR_NEGATIVE_PROMPT}, ${merged.join(", ")}`;
 }

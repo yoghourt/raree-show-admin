@@ -28,6 +28,7 @@ const CHARACTER_REGISTRY: Record<string, FieldMetadata> = {
   name:           { classification: "scope",     copilot_route: "excluded"  },
   house:          { classification: "canonical",  copilot_route: "fact"      },
   description:    { classification: "narrative",  copilot_route: "narrative" },
+  visualIdentity: { classification: "canonical",  copilot_route: "excluded"  },
   signatureQuote: { classification: "narrative",  copilot_route: "narrative" },
   portraitUrl:    { classification: "asset",      copilot_route: "excluded"  },
 };

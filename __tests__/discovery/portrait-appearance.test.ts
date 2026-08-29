@@ -89,4 +89,44 @@ describe("descriptionWithArchiveAppearance", () => {
       "Sworn brother of Liu Bei."
     );
   });
+
+  it("prefers persisted visualIdentity over sessionStorage archive", () => {
+    const snapshot: DiscoveryReviewSnapshot = {
+      sessionId: "sess-1",
+      workId: "work-1",
+      operatorId: "op-1",
+      session,
+      candidates: [
+        {
+          candidateId: "c1",
+          candidateType: "character",
+          workId: "work-1",
+          displayName: "Guan Yu",
+          summary: "Sworn brother",
+          fields: {
+            name: "Guan Yu",
+            characterArchive: {
+              identityCues: ["wrong face"],
+              costumeCues: ["wrong robe"],
+              propCues: [],
+            },
+          },
+        },
+      ],
+      reviewItems: [],
+      acceptedStoryUnits: [],
+      acceptedSceneCandidates: [],
+      savedAt: new Date().toISOString(),
+    };
+    saveDiscoveryReviewSnapshot(snapshot);
+
+    const next = descriptionWithArchiveAppearance(
+      "work-1",
+      "Guan Yu",
+      "Bio.",
+      "FACE: red face, long beard. COSTUME: green battle robe."
+    );
+    expect(next).toContain("FACE: red face");
+    expect(next).not.toContain("wrong face");
+  });
 });

@@ -224,6 +224,9 @@ describe("Accept handoff guards", () => {
       expect(result.staging.description).toBe("Sworn brother of Liu Bei.");
       expect(result.staging.description).not.toMatch(/\[视觉身份\]/);
       expect(result.staging.description).not.toContain("green battle robe");
+      expect(result.staging.visualIdentity).toMatch(/FACE:.*red face/i);
+      expect(result.staging.visualIdentity).toContain("green battle robe");
+      expect(result.staging.visualIdentity).toContain("Green Dragon Crescent Blade");
     }
   });
 

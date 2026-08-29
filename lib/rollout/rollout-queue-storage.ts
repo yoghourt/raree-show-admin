@@ -70,6 +70,7 @@ export function loadRolloutQueue(
       characterStaging: (parsed.characterStaging ?? []).map((item) => ({
         ...item,
         description: readerFacingCharacterDescription(item.description ?? ""),
+        visualIdentity: item.visualIdentity?.trim() ?? "",
       })),
       locationStaging: parsed.locationStaging ?? [],
       processedStoryReviewIds: parsed.processedStoryReviewIds ?? [],
@@ -165,6 +166,7 @@ function dedupeCharacterStaging(
     out.push({
       ...item,
       description: readerFacingCharacterDescription(item.description ?? ""),
+      visualIdentity: item.visualIdentity?.trim() ?? "",
     });
   }
   return out;

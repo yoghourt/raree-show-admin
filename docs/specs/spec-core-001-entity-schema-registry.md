@@ -153,6 +153,7 @@ This registry supersedes SPEC-D2-002 Appendix A as the authoritative source. The
 | `name`           | `name`            | `scope`        | `excluded`    | No       | Yes       | Duplicate check target; operator-defined |
 | `house`          | `house`           | `canonical`    | `fact`        | Yes      | No        | House/faction; Source First (SC-04)        |
 | `description`    | `description`     | `narrative`    | `narrative`   | Yes      | No        | Character description prose                |
+| `visualIdentity` | `visual_identity` | `canonical`    | `excluded`    | No       | No        | Creator portrait cues; not Reader prose    |
 | `signatureQuote` | `signature_quote` | `narrative`    | `narrative`   | Yes      | No        | Memorable quote                            |
 | `portraitUrl`    | `portrait_url`    | `asset`        | `excluded`    | No       | No        | Portrait URL; FC-03 permanent exclusion    |
 

@@ -55,6 +55,8 @@ export type Character = {
   name: string;
   house: string;
   description: string;
+  /** Creator-only portrait cues (SPEC-CHAR-001); not Reader description. */
+  visualIdentity: string;
   signatureQuote: string | null;
   portraitUrl: string;
   workId: string;

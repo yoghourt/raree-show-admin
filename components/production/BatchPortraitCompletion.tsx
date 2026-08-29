@@ -112,7 +112,8 @@ function portraitEnqueuePayloadFromJob(
       descriptionWithArchiveAppearance(
         workId,
         name,
-        description ?? ""
+        description ?? "",
+        character?.visualIdentity ?? ""
       ),
       note
     ),
@@ -203,7 +204,8 @@ export function BatchPortraitCompletion({
             description: descriptionWithArchiveAppearance(
               workId,
               focusCharacter.name,
-              focusCharacter.description
+              focusCharacter.description,
+              focusCharacter.visualIdentity
             ),
             referenceUrl:
               focusCharacter.portraitUrl?.startsWith("http://") ||
@@ -261,7 +263,8 @@ export function BatchPortraitCompletion({
           description: descriptionWithArchiveAppearance(
             workId,
             c.name,
-            c.description
+            c.description,
+            c.visualIdentity
           ),
           referenceUrl:
             c.portraitUrl?.startsWith("http://") ||
@@ -314,6 +317,7 @@ export function BatchPortraitCompletion({
         name: character.name,
         house: character.house,
         description: character.description,
+        visualIdentity: character.visualIdentity,
         signatureQuote: character.signatureQuote,
         portraitUrl: hosted.url,
       });

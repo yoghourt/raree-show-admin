@@ -350,6 +350,7 @@ export const zhCN = {
       parentStoryTitle: '所属故事',
       characterArchive: '角色档案',
       visualSummary: '视觉摘要',
+      identityCues: '身份线索',
       costumeCues: '服饰线索',
       propCues: '道具线索',
     },

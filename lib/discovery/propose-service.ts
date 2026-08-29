@@ -82,7 +82,7 @@ const REGISTRY_FIELD_HINTS: Record<DiscoveryCandidateType, string[]> = {
 };
 
 const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
-  character: `{"candidates":[{"displayName":"Eddard Stark","summary":"Lord of Winterfell.","fields":{"name":"Eddard Stark","house":"Stark","characterArchive":{"visualSummary":"Northern lord shaped by honor and winter","costumeCues":["dark northern fur cloak","wool noble attire"],"propCues":["ancestral greatsword"]}}}]}`,
+  character: `{"candidates":[{"displayName":"Guan Yu","summary":"Sworn brother of Liu Bei; loyal general.","fields":{"name":"Guan Yu","house":"Shu","description":"Sworn brother of Liu Bei.","characterArchive":{"visualSummary":"iconic Shu general with dignified bearing","identityCues":["red face","long flowing beard"],"costumeCues":["green battle robe","green armor trim"],"propCues":["Green Dragon Crescent Blade"]}}}]}`,
   location: `{"candidates":[{"displayName":"Winterfell","summary":"Seat of House Stark.","fields":{"name":"Winterfell","region":"The North"}}]}`,
   story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
   scene: `{"candidates":[{"displayName":"Moonlit Duel","summary":"Ser Waymar Royce faces the Other under the trees.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Prologue","title":"Moonlit Duel","summary":"Ser Waymar Royce confronts a White Walker in a fatal duel; Will watches from cover.","visualIntent":{"characters":[{"role":"knight","name":"Ser Waymar Royce"},{"role":"watcher","name":"Will"}],"relationship":"knight confronts white walker","purpose":"establish lethal threat","emotion":"defiance"},"rendererExpression":${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}}}]}`,
@@ -205,7 +205,7 @@ function formatRoleArchiveListForPrompt(
       if (!archive) {
         return `- ${fields.name}: (no characterArchive)`;
       }
-      return `- ${fields.name}: costumeCues=${JSON.stringify(archive.costumeCues)}; propCues=${JSON.stringify(archive.propCues)}`;
+      return `- ${fields.name}: identityCues=${JSON.stringify(archive.identityCues ?? [])}; costumeCues=${JSON.stringify(archive.costumeCues)}; propCues=${JSON.stringify(archive.propCues)}`;
     });
   if (lines.length === 0) {
     return "(none — author Expression visuals without Role archive fold)";

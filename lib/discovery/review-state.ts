@@ -3,6 +3,10 @@
  */
 
 import { getCandidateDedupeKey } from "@/lib/discovery/candidate-validate";
+import {
+  formatArchiveForPortrait,
+  parseCharacterArchive,
+} from "@/lib/discovery/character-archive";
 import { readerFacingCharacterDescription } from "@/lib/prompts/avatar";
 import type {
   DiscoveryCandidate,
@@ -480,6 +484,14 @@ function characterStagingDescription(
   return readerFacingCharacterDescription(description);
 }
 
+function characterStagingVisualIdentity(
+  fields: CharacterCandidateFields
+): string {
+  const parsed = parseCharacterArchive(fields.characterArchive);
+  if (!parsed.ok || !parsed.value) return "";
+  return formatArchiveForPortrait(parsed.value);
+}
+
 export function buildCharacterStaging(
   item: DiscoveryReviewItem
 ): AcceptedCharacterStaging {
@@ -494,6 +506,7 @@ export function buildCharacterStaging(
       (typeof fields.name === "string" ? fields.name.trim() : ""),
     house: typeof fields.house === "string" ? fields.house.trim() : "",
     description: characterStagingDescription(fields),
+    visualIdentity: characterStagingVisualIdentity(fields),
     signatureQuote:
       typeof fields.signatureQuote === "string"
         ? fields.signatureQuote.trim() || null

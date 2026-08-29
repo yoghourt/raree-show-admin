@@ -309,6 +309,7 @@ describe("sync-discovery-staging", () => {
       house: "Shu",
       description: "Sworn brother",
       signatureQuote: null,
+      visualIdentity: "",
       acceptedAt: "2026-07-05T00:00:00.000Z",
     });
     const queue = loadRolloutQueue("work-1", "op-1");
@@ -390,6 +391,7 @@ describe("sync-discovery-staging", () => {
       house: "Shu",
       description: "sworn",
       signatureQuote: null,
+      visualIdentity: "",
       acceptedAt: "2026-07-05T00:00:00.000Z",
     });
     appendCharacterStagingToRolloutQueue("work-1", "op-1", {
@@ -399,6 +401,7 @@ describe("sync-discovery-staging", () => {
       house: "Shu",
       description: "general",
       signatureQuote: null,
+      visualIdentity: "",
       acceptedAt: "2026-07-05T00:00:01.000Z",
     });
 
@@ -416,6 +419,7 @@ describe("sync-discovery-staging", () => {
       house: "Shu",
       description: "edited",
       signatureQuote: null,
+      visualIdentity: "",
       acceptedAt: "2026-07-05T00:00:00.000Z",
     });
 

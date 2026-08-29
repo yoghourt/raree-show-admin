@@ -174,6 +174,10 @@ function readCharacterArchive(
 }
 
 function CharacterArchivePreview({ archive }: { archive: CharacterArchive }) {
+  const identity =
+    (archive.identityCues ?? []).length > 0
+      ? archive.identityCues!.join(" · ")
+      : discoveryReviewUi.characterArchiveCueNone;
   const costume =
     archive.costumeCues.length > 0
       ? archive.costumeCues.join(" · ")
@@ -192,6 +196,12 @@ function CharacterArchivePreview({ archive }: { archive: CharacterArchive }) {
           {archive.visualSummary}
         </p>
       ) : null}
+      <p className="text-zinc-700">
+        <span className="text-muted-foreground font-medium">
+          {candidateFieldLabel("identityCues")}：
+        </span>
+        {identity}
+      </p>
       <p className="text-zinc-700">
         <span className="text-muted-foreground font-medium">
           {candidateFieldLabel("costumeCues")}：
