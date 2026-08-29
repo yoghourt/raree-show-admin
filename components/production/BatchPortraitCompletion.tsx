@@ -12,6 +12,7 @@ import Link from "next/link";
 
 import { enqueueCharacterPortraitJobs } from "@/app/actions/enqueueCharacterPortraitJobs";
 import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
+import { proposeCharacterVisualIdentity } from "@/app/actions/proposeCharacterVisualIdentity";
 import {
   PortraitJobResultDialog,
   splitPortraitEnqueueDescription,
@@ -162,6 +163,9 @@ export function BatchPortraitCompletion({
   const [visualIdentityDrafts, setVisualIdentityDrafts] = React.useState<
     Record<string, string>
   >({});
+  const [proposingVisualJobId, setProposingVisualJobId] = React.useState<
+    string | null
+  >(null);
 
   const refreshJobs = React.useCallback(async () => {
     try {
@@ -341,6 +345,51 @@ export function BatchPortraitCompletion({
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
       setWritingId(null);
+    }
+  };
+
+  const proposeVisualIdentityForJob = async (job: GenerateJobRow) => {
+    const character = characters.find((c) => c.tsid === job.subject_id);
+    const name =
+      character?.name?.trim() ||
+      (() => {
+        try {
+          return parseCharacterPortraitJobInput(job.input_json).name;
+        } catch {
+          return "";
+        }
+      })();
+    if (!name) {
+      setWriteError("无法提案：缺少角色姓名");
+      return;
+    }
+    setProposingVisualJobId(job.id);
+    setWriteError(null);
+    setHint(null);
+    try {
+      const draft =
+        visualIdentityDrafts[job.id] ?? character?.visualIdentity ?? "";
+      const result = await proposeCharacterVisualIdentity({
+        workId,
+        name,
+        house: character?.house,
+        description: character?.description,
+        currentVisualIdentity: draft,
+        operatorNote: revisionNotes[job.id],
+      });
+      if (!result.ok) {
+        setWriteError(result.message);
+        return;
+      }
+      setVisualIdentityDrafts((prev) => ({
+        ...prev,
+        [job.id]: result.visualIdentity,
+      }));
+      setHint("已填入 AI 视觉身份提案（未入队、未写库；可再改后重试）。");
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProposingVisualJobId(null);
     }
   };
 
@@ -865,11 +914,31 @@ export function BatchPortraitCompletion({
                         placeholder="FACE / COSTUME / PROP / STYLE…"
                         className="min-h-[5.5rem] text-xs"
                       />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={
+                            proposingVisualJobId === job.id ||
+                            requeueingId === job.id
+                          }
+                          onClick={() => void proposeVisualIdentityForJob(job)}
+                        >
+                          {proposingVisualJobId === job.id
+                            ? "提案中…"
+                            : "AI 提案视觉身份"}
+                        </Button>
+                        <span className="text-[10px] text-zinc-500">
+                          只填草稿，需你确认后再排队
+                        </span>
+                      </div>
                       <label
                         className="block text-[11px] text-zinc-600"
                         htmlFor={`portrait-revision-${job.id}`}
                       >
-                        修改意见（可选；并入下次生成，不改库里的角色描述）
+                        修改意见（可选；并入下次生成与 AI 提案，不改库里的角色描述）
                       </label>
                       <Textarea
                         id={`portrait-revision-${job.id}`}
@@ -888,7 +957,10 @@ export function BatchPortraitCompletion({
                         type="button"
                         size="sm"
                         className="h-7 text-xs"
-                        disabled={requeueingId === job.id}
+                        disabled={
+                          requeueingId === job.id ||
+                          proposingVisualJobId === job.id
+                        }
                         onClick={() => void requeuePortraitJob(job)}
                       >
                         {requeueingId === job.id
