@@ -1652,7 +1652,9 @@ export function BatchFrameCompletion({
                                 parsed.value
                               )
                               .then(() =>
-                                setAdmitHint("Expression 已写入 provenance")
+                                setAdmitHint(
+                                  "Expression 已写入，出场人物已对齐"
+                                )
                               )
                               .catch((e) =>
                                 setWriteError(

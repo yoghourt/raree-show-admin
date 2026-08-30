@@ -36,6 +36,7 @@ import {
   contextAtFrameIndex,
   enrichContextArchiveRefsFromWork,
   ensureContextForFrame,
+  syncFrameContextAppearanceFromExpression,
   upsertContextById,
 } from "@/lib/scene-context/frame-context-edit";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
@@ -587,7 +588,32 @@ export function FrameContextDrawer({
         index,
         expression
       );
-      setExprHint(expression ? "Expression 已保存" : "Expression 已清除");
+      if (expression) {
+        const currentFrame = framesRef.current[index];
+        if (currentFrame) {
+          onChange({
+            frames: framesRef.current,
+            contexts: syncFrameContextAppearanceFromExpression({
+              workId,
+              readingRouteTsid,
+              frameIndex: index,
+              frame: currentFrame,
+              contexts: contextsRef.current,
+              routeTitle,
+              chapter_number,
+              chapter_title,
+              expression,
+              archiveCharacters: characters.map((c) => ({
+                tsid: c.tsid,
+                name: c.name,
+              })),
+            }),
+          });
+        }
+        setExprHint("Expression 已保存，出场人物已对齐");
+      } else {
+        setExprHint("Expression 已清除");
+      }
       onExpressionSaved?.();
       return true;
     } catch (e) {
