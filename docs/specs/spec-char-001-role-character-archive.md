@@ -13,7 +13,7 @@
 | Evidence | `docs/findings/character-archive-mvp-spike.md` · `docs/findings/character-archive-capability-implementation.md` |
 | Related | SPEC-D3-003 (character / scene propose) · Face Safety Rule 6 (unchanged) |
 
-> **MVP scope:** Character Archive is a **Role capability** inside Discovery. No independent entity, no DB table, no management UI, no face identity transfer.
+> **MVP scope:** Character Archive is a **Role capability** inside Discovery. No independent entity or Archive table. Accepted archive cues MAY persist on the Role row as Creator field `visual_identity` (textarea in Character form). No face identity transfer.
 
 ---
 
@@ -23,9 +23,9 @@ Enable Discovery to understand and express a Role through **stable visual identi
 
 This SPEC does **not**:
 
-- create a character database
+- create a Character Archive database table
 - create a face identity system
-- generate prompts outside Renderer Expression
+- pass Character Archive objects directly to Renderer (prompt string only)
 - replace narrative understanding (`visualIntent`)
 - replace Face Safety policy
 
@@ -45,6 +45,7 @@ Work
 | Character Archive as independent entity / table | **MUST NOT** |
 | Renderer consumes Character Archive objects | **MUST NOT** |
 | Discovery selects cues into `rendererExpression` | **MUST** |
+| Accepted archive MAY fold to Role `visual_identity` (Creator) | **MAY** |
 
 TypeScript shape (conceptual):
 
@@ -57,10 +58,13 @@ interface Role {
 
 interface CharacterArchive {
   visualSummary?: string
+  identityCues?: string[]
   costumeCues: string[]
   propCues: string[]
 }
 ```
+
+**Creator persistence (Role row):** `characters.visual_identity` stores a labeled prompt fragment folded from archive at Accept; operators MAY edit via Character form. Reader `description` MUST NOT include archive dumps.
 
 In this MVP, Role ≈ Discovery `character` candidate (`fields.characterArchive`).
 
@@ -70,7 +74,8 @@ In this MVP, Role ≈ Discovery `character` candidate (`fields.characterArchive`
 
 | Field | Type | Semantics |
 | ----- | ---- | --------- |
-| `visualSummary` | `string?` | Stable visual thesis (narrative meaning). Not dumped wholesale into Expression. |
+| `visualSummary` | `string?` | Stable visual thesis (narrative meaning). Included in portrait fold; not dumped wholesale into Expression. |
+| `identityCues` | `string[]?` | Tier 1 — face/body marks, named weapons (short phrases). |
 | `costumeCues` | `string[]` | Clothing / silhouette cues (short phrases). |
 | `propCues` | `string[]` | Iconic props / symbols that travel with the Role. |
 
@@ -166,8 +171,8 @@ Face visibility / geometry remain Expression + Face Safety concerns — not arch
 
 ## 6. Out of scope (MVP)
 
-- Character Archive table / migration
-- Character management UI / CRUD
+- Character Archive as independent table / entity
+- Full Character Archive management UI (only `visual_identity` textarea on Character form)
 - Face embeddings, portrait reference URLs
 - InstantID / IP-Adapter / LoRA
 - Renderer architecture or provider selection changes

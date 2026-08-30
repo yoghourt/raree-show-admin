@@ -62,19 +62,41 @@ export function lookupCharacterArchiveFromReviewSnapshots(
 }
 
 /**
- * If a Review snapshot still has archive cues for this name, fold them into
- * description. Existing `[视觉身份]` blocks are replaced when new cues exist.
+ * Build portrait enqueue description: prefer persisted visualIdentity, then
+ * sessionStorage archive fallback. Existing `[视觉身份]` blocks are replaced.
+ */
+export function portraitEnqueueDescription(input: {
+  workId: string;
+  characterName: string;
+  description: string;
+  visualIdentity?: string;
+}): string {
+  const persisted = input.visualIdentity?.trim() ?? "";
+  if (persisted) {
+    return mergeAppearanceIntoDescription(input.description, persisted);
+  }
+  const archive = lookupCharacterArchiveFromReviewSnapshots(
+    input.workId,
+    input.characterName
+  );
+  const appearance = formatArchiveForPortrait(archive);
+  if (!appearance) return input.description;
+  return mergeAppearanceIntoDescription(input.description, appearance);
+}
+
+/**
+ * @deprecated Use portraitEnqueueDescription — kept for call-site clarity.
  */
 export function descriptionWithArchiveAppearance(
   workId: string,
   characterName: string,
-  description: string
+  description: string,
+  visualIdentity?: string
 ): string {
-  const archive = lookupCharacterArchiveFromReviewSnapshots(
+  return portraitEnqueueDescription({
     workId,
-    characterName
-  );
-  const appearance = formatArchiveForPortrait(archive);
-  if (!appearance) return description;
-  return mergeAppearanceIntoDescription(description, appearance);
+    characterName,
+    description,
+    visualIdentity,
+  });
 }

@@ -20,6 +20,7 @@ const character = (overrides: Partial<Character> = {}): Character => ({
   name: "A",
   house: "",
   description: "",
+  visualIdentity: "",
   signatureQuote: null,
   portraitUrl: "",
   workId: "w1",

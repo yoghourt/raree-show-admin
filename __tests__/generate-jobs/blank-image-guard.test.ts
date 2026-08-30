@@ -44,14 +44,17 @@ describe("buildAvatarPrompt", () => {
     expect(prompt.toLowerCase()).not.toMatch(/head-and-shoulders bust/);
   });
 
-  it("puts archive appearance ahead of biographical description", () => {
+  it("promotes CRITICAL visual identity before biographical subject", () => {
     const prompt = buildAvatarPrompt(
       "Guan Yu",
-      "Sworn brother of Liu Bei.\n\n[视觉身份] red face, long beard, green battle robe, Green Dragon Crescent Blade"
+      "Sworn brother of Liu Bei.\n\n[视觉身份] FACE: red face, long beard. COSTUME: green battle robe. PROP: Green Dragon Crescent Blade."
     );
+    const criticalIdx = prompt.indexOf("CRITICAL visual identity");
     const appearanceIdx = prompt.indexOf("red face");
     const bioIdx = prompt.indexOf("Sworn brother");
-    expect(appearanceIdx).toBeGreaterThan(0);
+    expect(prompt).toContain("CRITICAL visual identity");
+    expect(criticalIdx).toBeGreaterThanOrEqual(0);
+    expect(appearanceIdx).toBeGreaterThan(criticalIdx);
     expect(bioIdx).toBeGreaterThan(appearanceIdx);
   });
 
@@ -84,6 +87,15 @@ describe("buildAvatarNegativePrompt", () => {
     );
     expect(neg).toMatch(/woman/);
     expect(neg).toMatch(/lady/);
+  });
+
+  it("adds appearance-driven rejects for red face and crescent weapons", () => {
+    const neg = buildAvatarNegativePrompt(
+      "Bio\n\n[视觉身份] FACE: red face, long beard. PROP: Green Dragon Crescent Blade."
+    );
+    expect(neg).toMatch(/pale face/);
+    expect(neg).toMatch(/western straight sword/);
+    expect(neg).toMatch(/clean shaven/);
   });
 });
 

@@ -107,9 +107,29 @@ describe("selectActiveCharacterCues (budget)", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok || !parsed.value) return;
     const line = formatArchiveForPortrait(parsed.value);
-    expect(line).toContain("red face");
-    expect(line).toContain("green battle robe");
-    expect(line).toContain("Green Dragon Crescent Blade");
+    expect(line).toMatch(/FACE:.*red face/i);
+    expect(line).toMatch(/COSTUME:.*green battle robe/i);
+    expect(line).toMatch(/PROP:.*Green Dragon Crescent Blade/i);
+  });
+
+  it("uses portrait budget (more cues than scene fold)", () => {
+    const parsed = parseCharacterArchive({
+      identityCues: [
+        "red face",
+        "long beard",
+        "bushy eyebrows",
+        "Green Dragon Crescent Blade",
+      ],
+      costumeCues: ["green battle robe", "green armor trim", "gold belt"],
+      propCues: ["Green Dragon Crescent Blade", "extra prop"],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok || !parsed.value) return;
+    const scene = selectActiveCharacterCues(parsed.value);
+    const line = formatArchiveForPortrait(parsed.value);
+    expect(scene.activeCues.length).toBeLessThanOrEqual(4);
+    expect(line).toContain("green armor trim");
+    expect(line).toContain("gold belt");
   });
 
   it("does not inject a letter into a scene that never names a document", () => {

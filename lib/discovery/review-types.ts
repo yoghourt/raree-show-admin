@@ -86,6 +86,8 @@ export interface AcceptedCharacterStaging {
   name: string;
   house: string;
   description: string;
+  /** Creator portrait cues folded from Character Archive at Accept. */
+  visualIdentity: string;
   signatureQuote: string | null;
   acceptedAt: string;
 }

@@ -94,6 +94,22 @@ export function CharacterWritePreviewCard({
           />
         </div>
         <div className="space-y-1 sm:col-span-2">
+          <Label htmlFor={`char-visual-${staging.sourceReviewId}`}>
+            视觉身份
+            <span className="ml-1 text-xs text-muted-foreground">
+              （生图用，不进读者简介）
+            </span>
+          </Label>
+          <Textarea
+            id={`char-visual-${staging.sourceReviewId}`}
+            value={staging.visualIdentity}
+            disabled={busy}
+            rows={3}
+            placeholder="FACE / COSTUME / PROP 线索…"
+            onChange={(e) => patch({ visualIdentity: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1 sm:col-span-2">
           <Label htmlFor={`char-quote-${staging.sourceReviewId}`}>
             {messages.discovery.candidateFields.signatureQuote}
           </Label>

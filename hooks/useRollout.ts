@@ -468,6 +468,7 @@ export function useRollout({
           description: readerFacingCharacterDescription(
             staging.description.trim()
           ),
+          visualIdentity: staging.visualIdentity?.trim() ?? "",
           signatureQuote: staging.signatureQuote?.trim() || null,
           portraitUrl: "",
         });

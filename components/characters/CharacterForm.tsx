@@ -61,6 +61,7 @@ const characterFormSchema = z.object({
   name: z.string().min(1, "姓名不能为空"),
   house: z.string(),
   description: z.string(),
+  visualIdentity: z.string(),
   signatureQuote: z.string().nullable().optional(),
   portraitUrl: z.string(),
 });
@@ -72,6 +73,7 @@ function characterToFormValues(c: Character): CharacterFormValues {
     name: c.name,
     house: c.house,
     description: c.description,
+    visualIdentity: c.visualIdentity,
     signatureQuote: c.signatureQuote,
     portraitUrl: c.portraitUrl,
   };
@@ -84,6 +86,7 @@ function toPayload(
     name: values.name.trim(),
     house: values.house.trim(),
     description: values.description.trim(),
+    visualIdentity: values.visualIdentity.trim(),
     signatureQuote: values.signatureQuote?.trim() || null,
     portraitUrl: values.portraitUrl.trim(),
   };
@@ -119,6 +122,7 @@ export function CharacterForm(props: CharacterFormProps) {
           name: props.initialValues?.name ?? "",
           house: props.initialValues?.house ?? "",
           description: props.initialValues?.description ?? "",
+          visualIdentity: props.initialValues?.visualIdentity ?? "",
           signatureQuote: props.initialValues?.signatureQuote ?? null,
           portraitUrl: props.initialValues?.portraitUrl ?? "",
         };
@@ -136,6 +140,7 @@ export function CharacterForm(props: CharacterFormProps) {
       name: props.initialValues.name ?? "",
       house: props.initialValues.house ?? "",
       description: props.initialValues.description ?? "",
+      visualIdentity: props.initialValues.visualIdentity ?? "",
       signatureQuote: props.initialValues.signatureQuote ?? null,
       portraitUrl: props.initialValues.portraitUrl ?? "",
     });
@@ -255,7 +260,8 @@ export function CharacterForm(props: CharacterFormProps) {
       const baseDescription = descriptionWithArchiveAppearance(
         props.workId,
         form.getValues("name"),
-        form.getValues("description")?.trim() ?? ""
+        form.getValues("description")?.trim() ?? "",
+        form.getValues("visualIdentity")?.trim() ?? ""
       );
       const note = portraitRevisionNote.trim();
       const description =
@@ -503,6 +509,22 @@ export function CharacterForm(props: CharacterFormProps) {
         />
       </div>
 
+      {/* ── Visual identity (Creator portrait cues — excluded from Copilot) ── */}
+      <div className="space-y-2">
+        <Label htmlFor="char-visual-identity">
+          视觉身份
+          <span className="ml-1 text-xs text-muted-foreground">
+            （生图用，不进读者简介）
+          </span>
+        </Label>
+        <Textarea
+          id="char-visual-identity"
+          placeholder="例如：FACE: red face, long beard. COSTUME: green battle robe. PROP: Green Dragon Crescent Blade."
+          rows={3}
+          {...form.register("visualIdentity")}
+        />
+      </div>
+
       {/* ── Signature Quote (narrative) ── */}
       <div className="space-y-2">
         <Label htmlFor="char-signature-quote">
@@ -644,7 +666,8 @@ export function CharacterForm(props: CharacterFormProps) {
                     descriptionWithArchiveAppearance(
                       props.workId,
                       watchedName,
-                      watchedDescription
+                      watchedDescription,
+                      form.getValues("visualIdentity")?.trim() ?? ""
                     )
                   );
                   if (props.mode === "edit") {
