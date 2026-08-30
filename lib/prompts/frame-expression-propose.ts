@@ -8,6 +8,16 @@ import {
   EXPRESSION_CAPABILITY_RULES,
 } from "@/lib/discovery/expression-capability-rules";
 import {
+  clipLocalBudgetText,
+  LOCAL_ACTION_MAX,
+  LOCAL_COMPOSITION_MAX,
+  LOCAL_EMPHASIS_MAX,
+  LOCAL_ENV_MAX,
+  LOCAL_ROLE_MAX,
+  LOCAL_VISUAL_MAX,
+  packExpressionForLocalTransport,
+} from "@/lib/discovery/execution-projection";
+import {
   parseRendererExpression,
   type RendererExpression,
 } from "@/lib/discovery/visual-contract";
@@ -100,7 +110,9 @@ export function parseFrameExpressionProposal(
       obj = rec.rendererExpression;
     }
   }
-  return parseRendererExpression(obj);
+  const parsed = parseRendererExpression(obj);
+  if (!parsed.ok) return parsed;
+  return { ok: true, value: packExpressionForLocalTransport(parsed.value) };
 }
 
 export function buildFrameExpressionProposePrompt(
@@ -117,7 +129,8 @@ export function buildFrameExpressionProposePrompt(
       : input.characterCues
           .map((c) => {
             const vis = c.visualIdentity?.trim();
-            return vis ? `- ${c.name}: ${vis}` : `- ${c.name}`;
+            if (!vis) return `- ${c.name}`;
+            return `- ${c.name}: ${clipLocalBudgetText(vis, LOCAL_VISUAL_MAX)}`;
           })
           .join("\n");
 
@@ -153,6 +166,14 @@ Rules:
 - OUTPUT LANGUAGE: English (Latin script only).
 - Return ONLY valid JSON for rendererExpression (no preamble).
 - Shape: ${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}
+- Local execute budget (Creator Default = Local). Longer tails are DROPPED at generate — write WITHIN budget so pose is not cut:
+  - characters[].visual ≤ ${LOCAL_VISUAL_MAX} chars. FIRST tokens MUST be pose/blocking (kneeling, mounted, standing, holding X), THEN 1–2 look cues. Do not paste full visual identity.
+  - characters[].role ≤ ${LOCAL_ROLE_MAX} chars.
+  - action ≤ ${LOCAL_ACTION_MAX} chars — who does what to whom; name each figure's pose.
+  - environment ≤ ${LOCAL_ENV_MAX} chars.
+  - composition ≤ ${LOCAL_COMPOSITION_MAX} chars.
+  - visualEmphasis / lighting / atmosphere / threatPerception ≤ ${LOCAL_EMPHASIS_MAX} chars each.
+- FORBIDDEN: long costume paragraphs; repeating every archive cue; putting kneeling/mounted/holding at the END of visual.
 - Caption is beat authority. Do not invent a different moment or a more famous adjacent still.
 - Cast MUST come from caption-named agents. FORBIDDEN: swapping in other Work characters because they have visual cues.
 - FORBIDDEN props/places the caption does not name (raven, letter, parchment, solar, godswood, empty throne) unless the caption names them.
@@ -168,5 +189,7 @@ caption: King Robert traveling north to offer Ned the Hand and a Joffrey–Sansa
 bad expression: Catelyn and Eddard looking at a raven parchment in Winterfell solar.
 good expression: kingsroad / northern approach; Robert Baratheon with royal party traveling; Ned may await the host; marriage alliance as banners or named escort — not a letter.
 
-${EXPRESSION_CAPABILITY_RULES}`.trim();
+${EXPRESSION_CAPABILITY_RULES}
+
+Creator production override: field lengths MUST fit the Local execute budgets above. Pose/blocking first in every visual. Ignore Discovery "do not shrink to Local prompt budget" for this re-propose.`.trim();
 }

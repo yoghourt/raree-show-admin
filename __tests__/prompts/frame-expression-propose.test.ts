@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  LOCAL_ACTION_MAX,
+  LOCAL_VISUAL_MAX,
+} from "@/lib/discovery/execution-projection";
+import {
   buildFrameExpressionProposePrompt,
   captionProperNamePhrases,
   parseFrameExpressionProposal,
@@ -48,6 +52,41 @@ describe("parseFrameExpressionProposal", () => {
     );
     expect(out.ok).toBe(false);
   });
+
+  it("packs overlong visual and action to Local execute budgets, keeping the start", () => {
+    const longVisual =
+      "kneeling in snow, stubble beard, pale eyes, rough black wool tunic, boiled leather doublet, heavy fur-lined black cloak, weathered young Night's Watch deserter";
+    const longAction =
+      "Lord Eddard Stark standing over kneeling Gared with raised sword; Bran Stark mounted on horse in background watching in profile from the far courtyard edge";
+    expect(longVisual.length).toBeGreaterThan(LOCAL_VISUAL_MAX);
+    expect(longAction.length).toBeGreaterThan(LOCAL_ACTION_MAX);
+
+    const out = parseFrameExpressionProposal(
+      JSON.stringify({
+        environment: "Winterfell, snowy courtyard, stone walls",
+        characters: [
+          { role: "Gared", visual: longVisual },
+          {
+            role: "Bran Stark",
+            visual:
+              "mounted on horse far behind, small boy, dark brown hair, grey Stark cloak, watching, not kneeling, pale ivory skin, neat hair, fur-lined leather doublet",
+          },
+        ],
+        action: longAction,
+        composition:
+          "medium-wide shot, figures placed side-to-side, faces secondary and partly in shadow",
+      })
+    );
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.characters[0]?.visual.length).toBeLessThanOrEqual(
+      LOCAL_VISUAL_MAX
+    );
+    expect(out.value.characters[0]?.visual).toMatch(/^kneeling in snow/);
+    expect(out.value.characters[1]?.visual).toMatch(/^mounted on horse/);
+    expect(out.value.action.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
+    expect(out.value.action).toMatch(/kneeling Gared/);
+  });
 });
 
 describe("buildFrameExpressionProposePrompt", () => {
@@ -58,7 +97,11 @@ describe("buildFrameExpressionProposePrompt", () => {
         "King Robert Baratheon is traveling north to offer Ned the position of Hand of the King, alongside a proposed marriage alliance between Prince Joffrey and Sansa Stark.",
       characterCues: [
         { name: "Catelyn Stark", visualIdentity: "COSTUME: northern dress." },
-        { name: "Eddard Stark", visualIdentity: "COSTUME: fur mantle." },
+        {
+          name: "Eddard Stark",
+          visualIdentity:
+            "weathered northern lord face, lined complexion, short dark brown hair, dark grey quilted leather doublet, heavy winter wool tunic, thick direwolf fur mantle, holding Ice, a massive Valyrian steel greatsword upright with both hands",
+        },
         { name: "Robert Baratheon", visualIdentity: "COSTUME: crowned king." },
       ],
     });
@@ -69,6 +112,11 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/raven parchment/);
     expect(p).toMatch(/kingsroad/);
     expect(p).toMatch(/Do NOT add other Work characters/);
+    expect(p).toMatch(new RegExp(String(LOCAL_VISUAL_MAX)));
+    expect(p).toMatch(/pose\/blocking/);
+    expect(p).toMatch(/Creator production override/);
+    expect(p).toMatch(/weathered northern lord face/);
+    expect(p).not.toMatch(/Valyrian steel greatsword/);
   });
 
   it("makes caption the beat authority and allows replacing a contradicting draft", () => {
