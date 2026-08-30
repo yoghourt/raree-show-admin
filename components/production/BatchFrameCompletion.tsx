@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
+import { proposeFrameExpression } from "@/app/actions/proposeFrameExpression";
 import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
 import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
 import { FrameJobResultDialog } from "@/components/generate-jobs/FrameJobResultDialog";
@@ -276,6 +277,9 @@ export function BatchFrameCompletion({
     Record<string, string>
   >({});
   const [exprBusyId, setExprBusyId] = React.useState<string | null>(null);
+  const [proposingExprId, setProposingExprId] = React.useState<string | null>(
+    null
+  );
   const [preview, setPreview] = React.useState<{
     url: string | null;
     label: string;
@@ -775,6 +779,53 @@ export function BatchFrameCompletion({
     } finally {
       setRequeueingId(null);
       setEnqueueBusy(false);
+    }
+  };
+
+  const proposeExprForJob = async (job: GenerateJobRow) => {
+    if (job.subject_type !== "scene") return;
+    const frameIndex = jobFrameIndex(job);
+    if (frameIndex === null) {
+      setWriteError("无法提案：job 无 frame_index");
+      return;
+    }
+    const route = routes.find((r) => r.tsid === job.subject_id);
+    const liveCaption =
+      route?.story_images_v2?.[frameIndex]?.caption?.trim() ?? "";
+    const jobCaption =
+      typeof job.input_json.caption === "string"
+        ? job.input_json.caption
+        : "";
+    const caption = splitFrameCaption(liveCaption || jobCaption).base;
+    if (!caption) {
+      setWriteError("无法提案：缺少画面说明");
+      return;
+    }
+    setProposingExprId(job.id);
+    setWriteError(null);
+    try {
+      const result = await proposeFrameExpression({
+        workId,
+        caption,
+        currentExpression: exprDraftByJob[job.id],
+        operatorNote: revisionNotes[job.id],
+        routeTitle: route?.title,
+      });
+      if (!result.ok) {
+        setWriteError(result.message);
+        return;
+      }
+      setExprDraftByJob((prev) => ({
+        ...prev,
+        [job.id]: JSON.stringify(result.rendererExpression, null, 2),
+      }));
+      setAdmitHint(
+        "已填入 AI Expression（未写入 provenance；可再改后保存或重新排队）"
+      );
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProposingExprId(null);
     }
   };
 
@@ -1541,18 +1592,38 @@ export function BatchFrameCompletion({
                           placeholder='{"environment":"…","characters":[],"action":"…","composition":"…"}'
                           className="min-h-[5rem] font-mono text-[11px]"
                         />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs"
-                          disabled={
-                            exprBusyId === job.id ||
-                            frameIndex === null ||
-                            writing ||
-                            enqueueBusy
-                          }
-                          onClick={() => {
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 text-xs"
+                            disabled={
+                              proposingExprId === job.id ||
+                              exprBusyId === job.id ||
+                              frameIndex === null ||
+                              writing ||
+                              enqueueBusy
+                            }
+                            onClick={() => void proposeExprForJob(job)}
+                          >
+                            {proposingExprId === job.id
+                              ? "提案中…"
+                              : "AI 提案 Expression"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            disabled={
+                              proposingExprId === job.id ||
+                              exprBusyId === job.id ||
+                              frameIndex === null ||
+                              writing ||
+                              enqueueBusy
+                            }
+                            onClick={() => {
                             if (frameIndex === null) return;
                             const raw = (exprDraftByJob[job.id] ?? "").trim();
                             if (!raw) {
@@ -1595,6 +1666,7 @@ export function BatchFrameCompletion({
                             ? "保存 Expression…"
                             : "保存 Expression"}
                         </Button>
+                        </div>
                         <label
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-revision-${job.id}`}
