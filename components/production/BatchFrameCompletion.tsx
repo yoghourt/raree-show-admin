@@ -220,6 +220,13 @@ function mergeFailureTypeNote(
   return `${trimmed}\n${note}`;
 }
 
+function isExprDraftDirty(
+  draft: string | undefined,
+  baseline: string | undefined
+): boolean {
+  return (draft ?? "").trim() !== (baseline ?? "").trim();
+}
+
 /** In-flight Execution jobs: block duplicate enqueue for the same frame. */
 function activeJobForFrame(
   jobs: GenerateJobRow[],
@@ -263,6 +270,9 @@ export function BatchFrameCompletion({
     Record<string, string>
   >({});
   const [exprDraftByJob, setExprDraftByJob] = React.useState<
+    Record<string, string>
+  >({});
+  const [exprBaselineByJob, setExprBaselineByJob] = React.useState<
     Record<string, string>
   >({});
   const [exprBusyId, setExprBusyId] = React.useState<string | null>(null);
@@ -670,7 +680,11 @@ export function BatchFrameCompletion({
     // Persist Expression draft from the retry panel before enqueue — otherwise
     // requeue only reads stale frame_provenance_v1 and ignores the edited JSON.
     const exprRaw = (exprDraftByJob[job.id] ?? "").trim();
-    if (exprRaw) {
+    const exprDirty = isExprDraftDirty(
+      exprDraftByJob[job.id],
+      exprBaselineByJob[job.id]
+    );
+    if (exprDirty && exprRaw) {
       let parsedJson: unknown;
       try {
         parsedJson = JSON.parse(exprRaw);
@@ -741,13 +755,20 @@ export function BatchFrameCompletion({
         delete next[job.id];
         return next;
       });
+      setExprBaselineByJob((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
       await refreshJobs();
       setAdmitHint(
-        note.trim()
-          ? exprRaw
+        exprDirty && exprRaw
+          ? note.trim()
             ? "已保存 Expression 并按修改意见重新排队；旧结果已从列表移除。"
-            : "已按修改意见重新排队；不满意的旧结果已从列表移除。"
-          : "已重新排队；不满意的旧结果已从列表移除。"
+            : "已保存 Expression 并重新排队；旧结果已从列表移除。"
+          : note.trim()
+            ? "已按修改意见重新排队；不满意的旧结果已从列表移除。"
+            : "已重新排队；不满意的旧结果已从列表移除。"
       );
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
@@ -1160,6 +1181,12 @@ export function BatchFrameCompletion({
                     r.frameIndex === frameIndex &&
                     Boolean(r.candidateUrl)
                 );
+              const canSubmitRetryPanel =
+                Boolean((revisionNotes[job.id] ?? "").trim()) ||
+                isExprDraftDirty(
+                  exprDraftByJob[job.id],
+                  exprBaselineByJob[job.id]
+                );
 
               return (
                 <li
@@ -1385,19 +1412,28 @@ export function BatchFrameCompletion({
                                     const entry = entries.find(
                                       (p) => p.frameIndex === frameIndex
                                     );
+                                    const json = entry?.rendererExpression
+                                      ? JSON.stringify(
+                                          entry.rendererExpression,
+                                          null,
+                                          2
+                                        )
+                                      : "";
                                     setExprDraftByJob((prev) => ({
                                       ...prev,
-                                      [job.id]: entry?.rendererExpression
-                                        ? JSON.stringify(
-                                            entry.rendererExpression,
-                                            null,
-                                            2
-                                          )
-                                        : "",
+                                      [job.id]: json,
+                                    }));
+                                    setExprBaselineByJob((prev) => ({
+                                      ...prev,
+                                      [job.id]: json,
                                     }));
                                   })
                                   .catch(() => {
                                     setExprDraftByJob((prev) => ({
+                                      ...prev,
+                                      [job.id]: "",
+                                    }));
+                                    setExprBaselineByJob((prev) => ({
                                       ...prev,
                                       [job.id]: "",
                                     }));
@@ -1489,8 +1525,8 @@ export function BatchFrameCompletion({
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-expr-${job.id}`}
                         >
-                          Expression（点「按修改意见重试」时会自动写入 provenance
-                          再入队；也可先单独保存）
+                          Expression（点下方重新排队时会写入 provenance
+                          再入队；也可先单独保存。修改意见可留空）
                         </label>
                         <Textarea
                           id={`frame-expr-${job.id}`}
@@ -1563,7 +1599,7 @@ export function BatchFrameCompletion({
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-revision-${job.id}`}
                         >
-                          修改意见（会并入下次生成 caption；不改库里的画面描述）
+                          修改意见（可选；会并入下次生成 caption；不改库里的画面描述）
                         </label>
                         <Textarea
                           id={`frame-revision-${job.id}`}
@@ -1582,8 +1618,13 @@ export function BatchFrameCompletion({
                           type="button"
                           size="sm"
                           className="h-7 text-xs"
+                          title={
+                            canSubmitRetryPanel
+                              ? undefined
+                              : "请修改 Expression 或填写修改意见"
+                          }
                           disabled={
-                            !(revisionNotes[job.id] ?? "").trim() ||
+                            !canSubmitRetryPanel ||
                             requeueingId === job.id ||
                             writing ||
                             enqueueBusy ||
@@ -1600,7 +1641,7 @@ export function BatchFrameCompletion({
                         >
                           {requeueingId === job.id
                             ? "排队中…"
-                            : "带意见重新排队"}
+                            : "按当前修改重新排队"}
                         </Button>
                       </div>
                     ) : null}
