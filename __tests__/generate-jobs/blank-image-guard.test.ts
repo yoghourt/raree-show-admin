@@ -58,6 +58,24 @@ describe("buildAvatarPrompt", () => {
     expect(bioIdx).toBeGreaterThan(appearanceIdx);
   });
 
+  it("keeps PROP when visual identity is overlong and SUMMARY-first", () => {
+    const prompt = buildAvatarPrompt(
+      "Cao Cao",
+      `Chancellor of Wei.\n\n[视觉身份] SUMMARY: astute young military commander of Wei, pragmatic and sharp-eyed, extra court politics filler.
+FACE: determined sharp eyes, chiseled jawline, neat dark hair tied back in a high topknot, subtle natural skin texture with pores.
+COSTUME: functional dark leather and steel-plated lamellar shoulder guards over a deep green military tunic, practical bronze-trimmed belt.
+PROP: rolled military strategy bamboo scroll held in hand.
+STYLE: semi-realistic digital painting, textured painterly brushwork, cinematic character concept art.`
+    );
+    expect(prompt).toMatch(/bamboo|scroll/i);
+    expect(prompt).toMatch(/COSTUME:/);
+    const critical = prompt.slice(
+      prompt.indexOf("CRITICAL visual identity"),
+      prompt.indexOf("Character portrait")
+    );
+    expect(critical.length).toBeLessThan(320);
+  });
+
   it("truncates long biographical description", () => {
     const longBio = `${"He served the realm for many years. ".repeat(20)}ENDMARK`;
     const prompt = buildAvatarPrompt("Ned", longBio);

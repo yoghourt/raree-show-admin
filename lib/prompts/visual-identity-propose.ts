@@ -1,7 +1,13 @@
 /**
  * Creator-only: propose a portrait visual_identity draft (not Reader description).
  * Output is operator-editable FACE/COSTUME/PROP/STYLE text — not Archive objects.
+ * Length must fit Local portrait execute budget (AVATAR_APPEARANCE_MAX_CHARS).
  */
+
+import {
+  AVATAR_APPEARANCE_MAX_CHARS,
+  packVisualIdentityForPortrait,
+} from "@/lib/prompts/avatar";
 
 export type VisualIdentityProposeInput = {
   workTitle?: string;
@@ -33,7 +39,7 @@ export function parseVisualIdentityProposal(raw: string): string {
       if (fromField) t = fromField.trim();
       else {
         const parts: string[] = [];
-        for (const key of ["SUMMARY", "FACE", "COSTUME", "PROP", "STYLE"] as const) {
+        for (const key of ["FACE", "COSTUME", "PROP", "STYLE", "SUMMARY"] as const) {
           const lower = key.toLowerCase();
           const val =
             (typeof obj[key] === "string" && obj[key]) ||
@@ -55,10 +61,8 @@ export function parseVisualIdentityProposal(raw: string): string {
     .map((l) => l.trim())
     .filter(Boolean);
   const labeled = lines.filter((l) => LABEL_LINE.test(l));
-  if (labeled.length >= 1) {
-    return labeled.join("\n").slice(0, 1200);
-  }
-  return t.slice(0, 1200);
+  const extracted = labeled.length >= 1 ? labeled.join("\n") : t;
+  return packVisualIdentityForPortrait(extracted);
 }
 
 export function buildVisualIdentityProposePrompt(
@@ -77,24 +81,27 @@ This is NOT Reader prose. Output short English cue lines only.
 Work: ${work}
 Character name: ${name}
 House/faction: ${house}
-Reader description (context only, do not copy as identity): ${description}
+Reader description (story role only — IGNORE age/look words like young, handsome, chiseled, beard, robes): ${description}
 Current visual identity draft: ${current}
 Operator revision note (must honor if present): ${note}
 
 Rules:
-- Output ONLY labeled lines, one per line, no preamble:
-  SUMMARY: …
+- Output ONLY labeled lines, one per line, no preamble, in this order:
   FACE: …
   COSTUME: …
   PROP: …
   STYLE: …
-- Prefer FACE / COSTUME / PROP; SUMMARY and STYLE optional but STYLE recommended.
+- FACE, COSTUME, and PROP are required when the role has a stable look.
+- STYLE: one short clause (painterly digital painting). Omit SUMMARY — it wastes the Local budget.
 - Stable visual identity only: face/skin, hair/beard, clothing silhouette, iconic standing weapon.
 - FORBIDDEN: scene action, emotion, camera, InstantID, LoRA, reference image language.
-- Prefer short English phrases (Local image models).
+- Prefer short English phrases (Local image models). No long adjectives.
 - When source text omits iconic look but the work has a stable visual tradition, propose as editable tradition cues — do NOT claim they were extracted from the description.
 - STYLE must push semi-realistic digital painting / painterly skin texture; avoid Chinese New Year poster, nianhua, temple icon, flat opera face paint, glowing neon weapons.
 - If FACE needs a reddish complexion, write natural skin texture wording (e.g. ruddy bronze complexion with pores) — NEVER bare "red face" alone.
-- If current draft exists, improve it; honor operator note over conflicting draft bits.
-- Keep total under ~800 characters.`.trim();
+- FACE comes from the work's stable visual tradition + name, not from Reader description adjectives.
+- If current draft FACE is a generic youthful idol that contradicts tradition, replace it; otherwise improve the draft.
+- Honor operator note over conflicting draft bits.
+- Hard limit: total output MUST be ≤ ${AVATAR_APPEARANCE_MAX_CHARS} characters including newlines. This is the Local portrait execute budget; longer tails are dropped.
+- Example length: "FACE: ruddy bronze complexion with pores, long beard.\\nCOSTUME: green battle robe.\\nPROP: Green Dragon Crescent Blade.\\nSTYLE: painterly digital painting."`.trim();
 }

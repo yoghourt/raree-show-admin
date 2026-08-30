@@ -514,7 +514,7 @@ export function CharacterForm(props: CharacterFormProps) {
         <Label htmlFor="char-visual-identity">
           视觉身份
           <span className="ml-1 text-xs text-muted-foreground">
-            （生图用，不进读者简介）
+            （生图用，不进读者简介；Local 约 220 字，优先 FACE / COSTUME / PROP）
           </span>
         </Label>
         <Textarea

@@ -19,7 +19,18 @@ export const PORTRAIT_IMAGE_SIZE = { width: 512, height: 512 } as const;
 
 /** Cap bio / archive text so Local turbo stays reliable. */
 export const AVATAR_BIO_MAX_CHARS = 160;
+/** Execute-time identity budget (Local blank / ignore). Pack FACE→PROP first. */
 export const AVATAR_APPEARANCE_MAX_CHARS = 220;
+
+export const VISUAL_IDENTITY_FIELD_ORDER = [
+  "FACE",
+  "COSTUME",
+  "PROP",
+  "STYLE",
+  "SUMMARY",
+] as const;
+
+export type VisualIdentityField = (typeof VISUAL_IDENTITY_FIELD_ORDER)[number];
 
 function clipPromptChunk(text: string, maxChars: number): string {
   const t = text.trim().replace(/\s+/g, " ");
@@ -27,6 +38,92 @@ function clipPromptChunk(text: string, maxChars: number): string {
   const slice = t.slice(0, maxChars);
   const cut = Math.max(slice.lastIndexOf(","), slice.lastIndexOf(" "), 0);
   return `${(cut > maxChars * 0.5 ? slice.slice(0, cut) : slice).trim()}…`;
+}
+
+function fitIdentityLine(line: string, budget: number): string | null {
+  if (budget < 8) return null;
+  if (line.length <= budget) return line;
+  const slice = line.slice(0, budget);
+  const cut = Math.max(slice.lastIndexOf(","), slice.lastIndexOf(" "), 0);
+  const trimmed = (cut > budget * 0.5 ? slice.slice(0, cut) : slice)
+    .trim()
+    .replace(/[,:;]+$/, "");
+  return trimmed.length >= 8 ? trimmed : null;
+}
+
+/** Parse FACE/COSTUME/PROP/STYLE/SUMMARY whether newline- or inline-labeled. */
+export function extractVisualIdentityFields(
+  text: string
+): Partial<Record<VisualIdentityField, string>> {
+  const out: Partial<Record<VisualIdentityField, string>> = {};
+  const re = /(SUMMARY|FACE|COSTUME|PROP|STYLE)\s*:\s*/gi;
+  const hits: {
+    label: VisualIdentityField;
+    labelStart: number;
+    valueStart: number;
+  }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    hits.push({
+      label: m[1].toUpperCase() as VisualIdentityField,
+      labelStart: m.index,
+      valueStart: m.index + m[0].length,
+    });
+  }
+  for (let i = 0; i < hits.length; i++) {
+    const end = i + 1 < hits.length ? hits[i + 1].labelStart : text.length;
+    const val = text
+      .slice(hits[i].valueStart, end)
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/[.;]+$/g, "");
+    if (val) out[hits[i].label] = val;
+  }
+  return out;
+}
+
+/**
+ * Per-line caps so a verbose FACE cannot eat COSTUME/PROP (sum < 220).
+ * STYLE / SUMMARY only take leftover.
+ */
+const PRIMARY_LINE_CAP: Record<"FACE" | "COSTUME" | "PROP", number> = {
+  FACE: 90,
+  COSTUME: 70,
+  PROP: 40,
+};
+
+/**
+ * Fit visual identity into the Local portrait execute budget.
+ * Keeps FACE / COSTUME / PROP before STYLE / SUMMARY — do not left-clip.
+ */
+export function packVisualIdentityForPortrait(
+  text: string,
+  maxChars = AVATAR_APPEARANCE_MAX_CHARS
+): string {
+  const raw = text.trim();
+  if (!raw) return "";
+  const fields = extractVisualIdentityFields(raw);
+  const hasLabeled = VISUAL_IDENTITY_FIELD_ORDER.some((key) => fields[key]);
+  if (!hasLabeled) return clipPromptChunk(raw, maxChars);
+
+  const lines: string[] = [];
+  let used = 0;
+  for (const key of VISUAL_IDENTITY_FIELD_ORDER) {
+    const val = fields[key];
+    if (!val) continue;
+    const line = `${key}: ${val}.`;
+    const sep = lines.length ? 1 : 0;
+    const remaining = maxChars - used - sep;
+    const primaryCap =
+      key === "FACE" || key === "COSTUME" || key === "PROP"
+        ? PRIMARY_LINE_CAP[key]
+        : remaining;
+    const fitted = fitIdentityLine(line, Math.min(remaining, primaryCap));
+    if (!fitted) break;
+    lines.push(fitted);
+    used += sep + fitted.length;
+  }
+  return lines.join("\n");
 }
 
 export function splitAvatarDescription(description: string): {
@@ -177,7 +274,7 @@ export function buildAvatarPrompt(name: string, description: string): string {
     revisionCue != null ? scrubConflictingGenderTokens(base, revisionCue) : base;
 
   const clippedAppearance = scrubbedAppearance
-    ? clipPromptChunk(scrubbedAppearance, AVATAR_APPEARANCE_MAX_CHARS)
+    ? packVisualIdentityForPortrait(scrubbedAppearance).replace(/\s+/g, " ").trim()
     : "";
   const clippedBio = scrubbedBase
     ? clipPromptChunk(scrubbedBase, AVATAR_BIO_MAX_CHARS)
