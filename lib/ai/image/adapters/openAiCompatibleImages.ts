@@ -52,8 +52,8 @@ function tinyPng(): Buffer {
  * host. Product Runtime must not import this module.
  *
  * POST `${baseUrl}/v1/images/generations`
- * body: { model, prompt, size, n, response_format, ref_images? }
- * response: { data: [{ b64_json? | url? }] }
+ * body: { model, prompt, size, n, response_format }
+ * Z-Image-Turbo / LocalAI T2I crashes if `ref_images` is present — never send it.
  */
 export function createOpenAiCompatibleImageProvider(options?: {
   /** Opaque provider id recorded in meta (e.g. localai) */
@@ -73,7 +73,7 @@ export function createOpenAiCompatibleImageProvider(options?: {
 
   return {
     name: providerId,
-    capabilities: { referenceImage: true },
+    capabilities: { referenceImage: false },
     async generate(req: ImageGenerationRequest): Promise<ImageGenerationResult> {
       const requestedW = req.size?.width ?? DEFAULT_SIZE.width
       const requestedH = req.size?.height ?? DEFAULT_SIZE.height
@@ -91,7 +91,11 @@ export function createOpenAiCompatibleImageProvider(options?: {
         DEFAULT_GENERATE_TIMEOUT_MS
       )
       const seed = req.seed ?? Math.floor(Math.random() * 1_000_000_000)
-      const ref = req.referenceImages?.[0]?.url
+      if (req.referenceImages?.[0]?.url) {
+        console.info(
+          `[${providerId}] omitting referenceImages — LocalAI T2I crashes on ref_images`
+        )
+      }
 
       if (skipNetwork) {
         return {
@@ -134,12 +138,9 @@ export function createOpenAiCompatibleImageProvider(options?: {
       if (req.assetSlot === "portrait") {
         body.negative_prompt =
           req.negativePrompt?.trim() || buildAvatarNegativePrompt()
-      } else if (req.assetSlot === "scene_frame") {
+      } else       if (req.assetSlot === "scene_frame") {
         body.negative_prompt =
           req.negativePrompt?.trim() || buildFrameNegativePrompt()
-      }
-      if (ref) {
-        body.ref_images = [ref]
       }
 
       if (clamped) {

@@ -256,20 +256,6 @@ export function CharacterForm(props: CharacterFormProps) {
     setPortraitEnqueueBusy(true);
     setPortraitJobHint(null);
     try {
-      const existingPortrait = form.getValues("portraitUrl")?.trim();
-      const baseDescription = descriptionWithArchiveAppearance(
-        props.workId,
-        form.getValues("name"),
-        form.getValues("description")?.trim() ?? "",
-        form.getValues("visualIdentity")?.trim() ?? ""
-      );
-      const note = portraitRevisionNote.trim();
-      const description =
-        opts?.withRevision && note
-          ? baseDescription
-            ? `${baseDescription}\n\n[操作员修改意见] ${note}`
-            : `[操作员修改意见] ${note}`
-          : baseDescription || undefined;
       const result = await enqueueCharacterPortraitJobs({
         workId: props.workId,
         characters: [
@@ -277,13 +263,6 @@ export function CharacterForm(props: CharacterFormProps) {
             characterTsid,
             name: form.getValues("name"),
             description,
-            referenceUrl:
-              existingPortrait &&
-              (existingPortrait.startsWith("http://") ||
-                existingPortrait.startsWith("https://")) &&
-              existingPortrait !== succeededPortraitUrl
-                ? existingPortrait
-                : undefined,
           },
         ],
       });
@@ -672,14 +651,6 @@ export function CharacterForm(props: CharacterFormProps) {
                   );
                   if (props.mode === "edit") {
                     fd.append("characterTsid", props.defaultValues.tsid);
-                  }
-                  const existingPortrait = form.getValues("portraitUrl")?.trim();
-                  if (
-                    existingPortrait &&
-                    (existingPortrait.startsWith("http://") ||
-                      existingPortrait.startsWith("https://"))
-                  ) {
-                    fd.append("referencePortraitUrl", existingPortrait);
                   }
                   startTransition(() => {
                     avatarGenAction(fd);

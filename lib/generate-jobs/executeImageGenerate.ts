@@ -212,7 +212,6 @@ export async function executeSceneFrameImageGenerate(input: {
 export async function executePortraitImageGenerate(input: {
   name: string;
   description?: string;
-  referenceUrl?: string;
 }): Promise<ExecuteImageGenerateResult> {
   const started = Date.now();
   const name = input.name.trim();
@@ -227,7 +226,6 @@ export async function executePortraitImageGenerate(input: {
   const description = input.description?.trim() ?? "";
   const prompt = buildAvatarPrompt(name, description);
   const negativePrompt = buildAvatarNegativePrompt(description);
-  const referenceUrl = input.referenceUrl?.trim();
 
   console.info("[executePortraitImageGenerate] prompt", {
     name,
@@ -242,12 +240,6 @@ export async function executePortraitImageGenerate(input: {
       assetSlot: "portrait",
       prompt,
       negativePrompt,
-      referenceImages:
-        referenceUrl &&
-        (referenceUrl.startsWith("http://") ||
-          referenceUrl.startsWith("https://"))
-          ? [{ url: referenceUrl }]
-          : undefined,
       size: { ...PORTRAIT_IMAGE_SIZE },
     });
     let url: string;
@@ -315,7 +307,6 @@ export async function executeImageGenerateJob(input: {
     return executePortraitImageGenerate({
       name: input.portrait.name,
       description: input.portrait.description,
-      referenceUrl: input.portrait.reference_url,
     });
   }
   if (input.sceneFrame) {

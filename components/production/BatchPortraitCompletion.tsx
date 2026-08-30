@@ -4,6 +4,7 @@
  * CPP-C — character portrait jobs on Production board.
  * Job ≠ Candidate ≠ Asset; Accept writes portrait_url via characters CRUD only.
  * Rejected / unusable results: requeue (optional operator revision note) — do not Accept.
+ * Requeue is text-to-image: do not attach the previous portrait as referenceImages.
  */
 
 import * as React from "react";
@@ -79,7 +80,6 @@ function portraitEnqueuePayloadFromJob(
   characterTsid: string;
   name: string;
   description?: string;
-  referenceUrl?: string;
   operatorRevision?: string;
 } | null {
   if (job.subject_type !== "character") return null;
@@ -88,28 +88,16 @@ function portraitEnqueuePayloadFromJob(
     descriptionOverride?.trim() ||
     character?.description?.trim() ||
     undefined;
-  let referenceUrl: string | undefined;
   try {
     const parsed = parseCharacterPortraitJobInput(job.input_json);
     if (!name) name = parsed.name;
     if (!description) {
       description = splitPortraitEnqueueDescription(parsed.description).base || undefined;
     }
-    referenceUrl = parsed.reference_url;
   } catch {
     // fall through with character / empty
   }
   if (!name) return null;
-  // Do not pass bad Job result as reference — only prior Asset / enqueue reference.
-  if (
-    !referenceUrl &&
-    character?.portraitUrl &&
-    (character.portraitUrl.startsWith("http://") ||
-      character.portraitUrl.startsWith("https://")) &&
-    !isMissingPortraitUrl(character.portraitUrl)
-  ) {
-    referenceUrl = character.portraitUrl;
-  }
   const note = revisionNote.trim();
   const visualIdentity =
     visualIdentityOverride !== undefined
@@ -127,7 +115,6 @@ function portraitEnqueuePayloadFromJob(
       ),
       note
     ),
-    ...(referenceUrl ? { referenceUrl } : {}),
     ...(note ? { operatorRevision: note } : {}),
   };
 }
@@ -299,11 +286,6 @@ export function BatchPortraitCompletion({
             characterTsid: focusCharacter.tsid,
             name: focusCharacter.name,
             description,
-            referenceUrl:
-              focusCharacter.portraitUrl?.startsWith("http://") ||
-              focusCharacter.portraitUrl?.startsWith("https://")
-                ? focusCharacter.portraitUrl
-                : undefined,
             ...(note ? { operatorRevision: note } : {}),
           },
         ],
@@ -360,11 +342,6 @@ export function BatchPortraitCompletion({
             c.description,
             c.visualIdentity
           ),
-          referenceUrl:
-            c.portraitUrl?.startsWith("http://") ||
-            c.portraitUrl?.startsWith("https://")
-              ? c.portraitUrl
-              : undefined,
         })),
       });
       if (!result.ok) {

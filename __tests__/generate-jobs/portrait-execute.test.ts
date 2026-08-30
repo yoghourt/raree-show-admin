@@ -83,6 +83,34 @@ describe("executeImageGenerateJob dispatch", () => {
         size: { width: 512, height: 512 },
       })
     );
+    expect(vi.mocked(imageGenerate).mock.calls[0]?.[0]).not.toHaveProperty(
+      "referenceImages"
+    );
+  });
+
+  it("does not forward job reference_url to Local generate", async () => {
+    vi.mocked(imageGenerate).mockResolvedValue({
+      bytes: Buffer.from("img"),
+      mimeType: "image/png",
+      usedFallback: false,
+    } as Awaited<ReturnType<typeof imageGenerate>>);
+    vi.mocked(uploadImageBufferToCloudinary).mockResolvedValue(
+      "https://res.cloudinary.com/demo/portrait.png"
+    );
+
+    await executeImageGenerateJob({
+      capabilityId: "image.generate",
+      portrait: parseCharacterPortraitJobInput({
+        asset_slot: "portrait",
+        name: "Arya",
+        description: "assassin",
+        reference_url: "https://example.com/old-portrait.png",
+      }),
+    });
+
+    expect(vi.mocked(imageGenerate).mock.calls[0]?.[0]).not.toHaveProperty(
+      "referenceImages"
+    );
   });
 
   it("dispatches scene_frame unchanged", async () => {
@@ -110,6 +138,9 @@ describe("executeImageGenerateJob dispatch", () => {
         assetSlot: "scene_frame",
         size: { width: 512, height: 512 },
       })
+    );
+    expect(vi.mocked(imageGenerate).mock.calls[0]?.[0]).not.toHaveProperty(
+      "referenceImages"
     );
   });
 });
