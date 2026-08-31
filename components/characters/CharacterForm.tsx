@@ -256,6 +256,19 @@ export function CharacterForm(props: CharacterFormProps) {
     setPortraitEnqueueBusy(true);
     setPortraitJobHint(null);
     try {
+      const baseDescription = descriptionWithArchiveAppearance(
+        props.workId,
+        form.getValues("name"),
+        form.getValues("description")?.trim() ?? "",
+        form.getValues("visualIdentity")?.trim() ?? ""
+      );
+      const note = portraitRevisionNote.trim();
+      const description =
+        opts?.withRevision && note
+          ? baseDescription
+            ? `${baseDescription}\n\n[操作员修改意见] ${note}`
+            : `[操作员修改意见] ${note}`
+          : baseDescription || undefined;
       const result = await enqueueCharacterPortraitJobs({
         workId: props.workId,
         characters: [
