@@ -256,7 +256,6 @@ export function CharacterForm(props: CharacterFormProps) {
     setPortraitEnqueueBusy(true);
     setPortraitJobHint(null);
     try {
-      const existingPortrait = form.getValues("portraitUrl")?.trim();
       const baseDescription = descriptionWithArchiveAppearance(
         props.workId,
         form.getValues("name"),
@@ -277,13 +276,6 @@ export function CharacterForm(props: CharacterFormProps) {
             characterTsid,
             name: form.getValues("name"),
             description,
-            referenceUrl:
-              existingPortrait &&
-              (existingPortrait.startsWith("http://") ||
-                existingPortrait.startsWith("https://")) &&
-              existingPortrait !== succeededPortraitUrl
-                ? existingPortrait
-                : undefined,
           },
         ],
       });
@@ -514,7 +506,7 @@ export function CharacterForm(props: CharacterFormProps) {
         <Label htmlFor="char-visual-identity">
           视觉身份
           <span className="ml-1 text-xs text-muted-foreground">
-            （生图用，不进读者简介）
+            （生图用，不进读者简介；Local 约 220 字，优先 FACE / COSTUME / PROP）
           </span>
         </Label>
         <Textarea
@@ -672,14 +664,6 @@ export function CharacterForm(props: CharacterFormProps) {
                   );
                   if (props.mode === "edit") {
                     fd.append("characterTsid", props.defaultValues.tsid);
-                  }
-                  const existingPortrait = form.getValues("portraitUrl")?.trim();
-                  if (
-                    existingPortrait &&
-                    (existingPortrait.startsWith("http://") ||
-                      existingPortrait.startsWith("https://"))
-                  ) {
-                    fd.append("referencePortraitUrl", existingPortrait);
                   }
                   startTransition(() => {
                     avatarGenAction(fd);

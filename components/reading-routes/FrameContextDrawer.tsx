@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Loader2Icon, Sparkles, UploadIcon } from "lu
 import * as React from "react";
 
 import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
+import { proposeFrameExpression } from "@/app/actions/proposeFrameExpression";
 import { EntityMultiFuzzyPicker } from "@/components/entity/EntityMultiFuzzyPicker";
 import { FuzzyEntityCombobox } from "@/components/entity/FuzzyEntityCombobox";
 import type { EntityOption } from "@/components/entity/types";
@@ -35,6 +36,7 @@ import {
   contextAtFrameIndex,
   enrichContextArchiveRefsFromWork,
   ensureContextForFrame,
+  syncFrameContextAppearanceFromExpression,
   upsertContextById,
 } from "@/lib/scene-context/frame-context-edit";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
@@ -161,8 +163,13 @@ export function FrameContextDrawer({
   const [exprComposition, setExprComposition] = React.useState("");
   const [exprLighting, setExprLighting] = React.useState("");
   const [exprCharactersText, setExprCharactersText] = React.useState("");
+  const [exprAtmosphere, setExprAtmosphere] = React.useState("");
+  const [exprThreat, setExprThreat] = React.useState("");
+  const [exprEmphasis, setExprEmphasis] = React.useState("");
+  const [exprStyleHints, setExprStyleHints] = React.useState("");
   const [exprLoading, setExprLoading] = React.useState(false);
   const [exprSaving, setExprSaving] = React.useState(false);
+  const [exprProposing, setExprProposing] = React.useState(false);
   const [exprError, setExprError] = React.useState<string | null>(null);
   const [exprHint, setExprHint] = React.useState<string | null>(null);
 
@@ -225,6 +232,10 @@ export function FrameContextDrawer({
       setExprAction("");
       setExprComposition("");
       setExprLighting("");
+      setExprAtmosphere("");
+      setExprThreat("");
+      setExprEmphasis("");
+      setExprStyleHints("");
       setExprCharactersText("");
       setExprError(null);
       setExprHint(null);
@@ -243,6 +254,10 @@ export function FrameContextDrawer({
         setExprAction(expr?.action ?? "");
         setExprComposition(expr?.composition ?? "");
         setExprLighting(expr?.lighting ?? "");
+        setExprAtmosphere(expr?.atmosphere ?? "");
+        setExprThreat(expr?.threatPerception ?? "");
+        setExprEmphasis(expr?.visualEmphasis ?? "");
+        setExprStyleHints(expr?.styleHints ?? "");
         setExprCharactersText(
           expr?.characters?.length ? charactersToLines(expr.characters) : ""
         );
@@ -573,7 +588,32 @@ export function FrameContextDrawer({
         index,
         expression
       );
-      setExprHint(expression ? "Expression 已保存" : "Expression 已清除");
+      if (expression) {
+        const currentFrame = framesRef.current[index];
+        if (currentFrame) {
+          onChange({
+            frames: framesRef.current,
+            contexts: syncFrameContextAppearanceFromExpression({
+              workId,
+              readingRouteTsid,
+              frameIndex: index,
+              frame: currentFrame,
+              contexts: contextsRef.current,
+              routeTitle,
+              chapter_number,
+              chapter_title,
+              expression,
+              archiveCharacters: characters.map((c) => ({
+                tsid: c.tsid,
+                name: c.name,
+              })),
+            }),
+          });
+        }
+        setExprHint("Expression 已保存，出场人物已对齐");
+      } else {
+        setExprHint("Expression 已清除");
+      }
       onExpressionSaved?.();
       return true;
     } catch (e) {
@@ -601,12 +641,84 @@ export function FrameContextDrawer({
     };
     const lighting = exprLighting.trim();
     if (lighting) draft.lighting = lighting;
+    const atmosphere = exprAtmosphere.trim();
+    if (atmosphere) draft.atmosphere = atmosphere;
+    const threat = exprThreat.trim();
+    if (threat) draft.threatPerception = threat;
+    const emphasis = exprEmphasis.trim();
+    if (emphasis) draft.visualEmphasis = emphasis;
+    const styleHints = exprStyleHints.trim();
+    if (styleHints) draft.styleHints = styleHints;
     const parsed = parseRendererExpression(draft);
     if (!parsed.ok) {
       setExprError(parsed.errors.join("; "));
       return;
     }
     void saveExpression(parsed.value);
+  };
+
+  const applyExpressionToForm = (expr: RendererExpression) => {
+    setExprEnvironment(expr.environment);
+    setExprAction(expr.action);
+    setExprComposition(expr.composition);
+    setExprLighting(expr.lighting ?? "");
+    setExprAtmosphere(expr.atmosphere ?? "");
+    setExprThreat(expr.threatPerception ?? "");
+    setExprEmphasis(expr.visualEmphasis ?? "");
+    setExprStyleHints(expr.styleHints ?? "");
+    setExprCharactersText(
+      expr.characters.length ? charactersToLines(expr.characters) : ""
+    );
+  };
+
+  const handleProposeExpression = async () => {
+    if (index < 0 || !frame) return;
+    const caption = frame.caption.trim();
+    if (!caption) {
+      setExprError("无法提案：画面说明为空");
+      return;
+    }
+    let currentExpression: string | undefined;
+    if (exprEnvironment.trim() || exprAction.trim()) {
+      try {
+        const characters = linesToCharacters(exprCharactersText);
+        const draft: RendererExpression = {
+          environment: exprEnvironment.trim() || "unspecified place",
+          action: exprAction.trim() || "empty scene",
+          composition: exprComposition.trim() || "wide view",
+          characters,
+        };
+        if (exprLighting.trim()) draft.lighting = exprLighting.trim();
+        if (exprAtmosphere.trim()) draft.atmosphere = exprAtmosphere.trim();
+        if (exprThreat.trim()) draft.threatPerception = exprThreat.trim();
+        if (exprEmphasis.trim()) draft.visualEmphasis = exprEmphasis.trim();
+        if (exprStyleHints.trim()) draft.styleHints = exprStyleHints.trim();
+        currentExpression = JSON.stringify(draft);
+      } catch {
+        currentExpression = undefined;
+      }
+    }
+    setExprProposing(true);
+    setExprError(null);
+    setExprHint(null);
+    try {
+      const result = await proposeFrameExpression({
+        workId,
+        caption,
+        currentExpression,
+        routeTitle,
+      });
+      if (!result.ok) {
+        setExprError(result.message);
+        return;
+      }
+      applyExpressionToForm(result.rendererExpression);
+      setExprHint("已填入 AI Expression（未保存；请核对后点保存）");
+    } catch (e) {
+      setExprError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExprProposing(false);
+    }
   };
 
   const handleClearExpression = () => {
@@ -616,6 +728,10 @@ export function FrameContextDrawer({
       setExprAction("");
       setExprComposition("");
       setExprLighting("");
+      setExprAtmosphere("");
+      setExprThreat("");
+      setExprEmphasis("");
+      setExprStyleHints("");
       setExprCharactersText("");
     });
   };
@@ -801,7 +917,8 @@ export function FrameContextDrawer({
                   ) : null}
                 </div>
                 <p className="text-muted-foreground text-[10px] leading-snug">
-                  写入 frame_provenance_v1；手加帧可在此补写后再进制作排队。
+                  写入 frame_provenance_v1；可 AI 按画面说明重提后再保存。
+                  手加帧可在此补写后再进制作排队。
                   {!scenePersisted
                     ? " 请先保存故事后再编辑 Expression。"
                     : null}
@@ -885,8 +1002,29 @@ export function FrameContextDrawer({
                   <Button
                     type="button"
                     size="sm"
+                    variant="secondary"
                     className="h-7 text-xs"
-                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    disabled={
+                      !scenePersisted ||
+                      exprLoading ||
+                      exprSaving ||
+                      exprProposing ||
+                      !frame?.caption.trim()
+                    }
+                    onClick={() => void handleProposeExpression()}
+                  >
+                    {exprProposing ? "提案中…" : "AI 提案 Expression"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={
+                      !scenePersisted ||
+                      exprLoading ||
+                      exprSaving ||
+                      exprProposing
+                    }
                     onClick={handleSaveExpression}
                   >
                     {exprSaving ? "保存中…" : "保存 Expression"}
@@ -896,7 +1034,12 @@ export function FrameContextDrawer({
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs text-zinc-500"
-                    disabled={!scenePersisted || exprLoading || exprSaving}
+                    disabled={
+                      !scenePersisted ||
+                      exprLoading ||
+                      exprSaving ||
+                      exprProposing
+                    }
                     onClick={handleClearExpression}
                   >
                     清除

@@ -4,15 +4,124 @@
  * Appearance/location stay on Context; Frame sequence is story_images_v2 order.
  */
 
+import { GENERIC_EXPRESSION_ROLE_PATTERN } from "@/lib/discovery/expression-capability-rules";
+import type { RendererExpression } from "@/lib/discovery/visual-contract";
 import type { ReadingFrame } from "@/lib/types";
 import {
   findExistingByName,
   findLocationByEnvironmentCue,
+  normalizeEntityName,
 } from "@/lib/discovery/entity-catalog-match";
 import type {
   SceneContextAppearance,
   SceneContextRecord,
 } from "@/lib/scene-context/types";
+
+const ROLE_TITLE_PREFIX =
+  /^(king|queen|prince|princess|lord|lady|ser|emperor|empress)\s+/i;
+
+/**
+ * Match Expression.characters[].role (Rule 7: usually a Work character name)
+ * to the Work Archive. Exact name first; else unique given-name / token subset.
+ * Ambiguous cues (Jon → Jon Snow vs Jon Arryn) return undefined.
+ */
+export function findArchiveCharacterByRoleCue<
+  T extends { name: string; tsid: string },
+>(role: string, catalog: T[]): T | undefined {
+  const exact = findExistingByName(role, catalog);
+  if (exact) return exact;
+
+  const stripped = normalizeEntityName(role).replace(ROLE_TITLE_PREFIX, "");
+  if (!stripped) return undefined;
+  const strippedExact = catalog.find(
+    (item) => normalizeEntityName(item.name) === stripped
+  );
+  if (strippedExact) return strippedExact;
+
+  const cueTokens = stripped.split(" ").filter((t) => t.length >= 2);
+  if (!cueTokens.length) return undefined;
+
+  if (cueTokens.length >= 2) {
+    const subsetHits = catalog.filter((item) => {
+      const nameTokens = new Set(normalizeEntityName(item.name).split(" "));
+      return cueTokens.every((t) => nameTokens.has(t));
+    });
+    if (subsetHits.length === 1) return subsetHits[0];
+  }
+
+  const given = cueTokens[0]!;
+  const givenHits = catalog.filter((item) => {
+    const nameTokens = normalizeEntityName(item.name).split(" ");
+    return nameTokens[0] === given || nameTokens.includes(given);
+  });
+  if (givenHits.length === 1) return givenHits[0];
+  return undefined;
+}
+
+/**
+ * Replace-frame 出场人物 from Expression.characters.
+ * Generic extras (man/woman/…) are skipped; unmatched named roles are omitted
+ * so the picker only shows Archive-backed appearances.
+ */
+export function appearancesFromExpressionCharacters(
+  characters: RendererExpression["characters"],
+  archive: Array<{ tsid: string; name: string }>
+): SceneContextAppearance[] {
+  const out: SceneContextAppearance[] = [];
+  const seen = new Set<string>();
+  for (const ch of characters) {
+    const role = ch.role.trim();
+    if (!role || GENERIC_EXPRESSION_ROLE_PATTERN.test(role)) continue;
+    const hit = findArchiveCharacterByRoleCue(role, archive);
+    if (!hit || seen.has(hit.tsid)) continue;
+    seen.add(hit.tsid);
+    out.push({
+      role: "character",
+      name: hit.name,
+      archiveTsid: hit.tsid,
+      ...(ch.visual.trim() ? { visual: ch.visual.trim() } : {}),
+    });
+  }
+  return out;
+}
+
+/** Ensure Context exists, then replace that frame's appearance from Expression. */
+export function syncFrameContextAppearanceFromExpression(params: {
+  workId: string;
+  readingRouteTsid: string;
+  frameIndex: number;
+  frame: ReadingFrame;
+  contexts: SceneContextRecord[];
+  routeTitle: string;
+  chapter_number: number;
+  chapter_title: string | null;
+  expression: RendererExpression;
+  archiveCharacters: Array<{ tsid: string; name: string }>;
+  now?: string;
+}): SceneContextRecord[] {
+  const now = params.now ?? new Date().toISOString();
+  const withContext = ensureContextForFrame({
+    workId: params.workId,
+    readingRouteTsid: params.readingRouteTsid,
+    frameIndex: params.frameIndex,
+    frame: params.frame,
+    contexts: params.contexts,
+    routeTitle: params.routeTitle,
+    chapter_number: params.chapter_number,
+    chapter_title: params.chapter_title,
+    now,
+  });
+  const ctx = contextAtFrameIndex(withContext, params.frameIndex);
+  if (!ctx) return params.contexts;
+  return upsertContextById(withContext, {
+    ...ctx,
+    characterAppearanceContext: appearancesFromExpressionCharacters(
+      params.expression.characters,
+      params.archiveCharacters
+    ),
+    updatedAt: now,
+  });
+}
 
 export function contextAtFrameIndex(
   contexts: SceneContextRecord[],

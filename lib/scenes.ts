@@ -11,6 +11,7 @@ import {
   aggregateStoryRelatedRefs,
   formatStoryRelatedAggregateLine,
 } from "@/lib/scene-context/aggregate-story-refs";
+import { syncFrameContextAppearanceFromExpression } from "@/lib/scene-context/frame-context-edit";
 import { parseSceneContextsV1 } from "@/lib/scene-context/parse";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
@@ -397,6 +398,9 @@ export async function getFrameProvenance(
  * Keeps existing sourceReviewId when present; otherwise uses `manual_${frameIndex}`.
  * When expression is null: strips Expression from the entry, or drops the entry
  * if nothing else (Intent / sourceContextId) remains.
+ * When expression is saved: replaces that frame's Scene Context 出场人物 from
+ * Expression.characters (Archive name match) so operators need not edit cast
+ * on the story page.
  */
 export async function patchFrameProvenanceExpression(
   workId: string,
@@ -416,7 +420,9 @@ export async function patchFrameProvenanceExpression(
 
   const { data, error } = await supabase
     .from(TABLE)
-    .select("story_images_v2, frame_provenance_v1")
+    .select(
+      "story_images_v2, frame_provenance_v1, scene_contexts_v1, title, chapter_number, chapter_title"
+    )
     .eq("work_id", workId)
     .eq("tsid", tsid)
     .maybeSingle();
@@ -431,6 +437,10 @@ export async function patchFrameProvenanceExpression(
   const row = data as {
     story_images_v2?: unknown;
     frame_provenance_v1?: unknown;
+    scene_contexts_v1?: unknown;
+    title?: unknown;
+    chapter_number?: unknown;
+    chapter_title?: unknown;
   };
   const frames = parseStoryImagesV2(row.story_images_v2) ?? [];
   if (frameIndex >= frames.length) {
@@ -479,9 +489,50 @@ export async function patchFrameProvenanceExpression(
     }
   }
 
+  const patch: Record<string, unknown> = { frame_provenance_v1: next };
+
+  if (parsedExpr !== null) {
+    const frame = frames[frameIndex];
+    if (frame) {
+      const { data: characterRows, error: characterError } = await supabase
+        .from("characters")
+        .select("tsid, name")
+        .eq("work_id", workId);
+      if (characterError) {
+        throw new Error(characterError.message);
+      }
+      const archiveCharacters = (characterRows ?? []).flatMap((raw) => {
+        const rec = raw as { tsid?: unknown; name?: unknown };
+        const charTsid = typeof rec.tsid === "string" ? rec.tsid.trim() : "";
+        const name = typeof rec.name === "string" ? rec.name.trim() : "";
+        return charTsid && name ? [{ tsid: charTsid, name }] : [];
+      });
+      const chapterNumber =
+        typeof row.chapter_number === "number" &&
+        Number.isFinite(row.chapter_number)
+          ? row.chapter_number
+          : 1;
+      const chapterTitle =
+        typeof row.chapter_title === "string" ? row.chapter_title : null;
+      const routeTitle = typeof row.title === "string" ? row.title : "";
+      patch.scene_contexts_v1 = syncFrameContextAppearanceFromExpression({
+        workId,
+        readingRouteTsid: tsid,
+        frameIndex,
+        frame,
+        contexts: parseSceneContextsV1(row.scene_contexts_v1),
+        routeTitle,
+        chapter_number: chapterNumber,
+        chapter_title: chapterTitle,
+        expression: parsedExpr.value,
+        archiveCharacters,
+      });
+    }
+  }
+
   const { error: updateError } = await supabase
     .from(TABLE)
-    .update({ frame_provenance_v1: next })
+    .update(patch)
     .eq("work_id", workId)
     .eq("tsid", tsid);
 

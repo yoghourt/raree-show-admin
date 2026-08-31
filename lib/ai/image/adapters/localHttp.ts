@@ -19,7 +19,7 @@ function tinyPng(): Buffer {
  * Next.js process.
  *
  * Expected simple contract (POST `${base}/v1/portraits`):
- *   body: { prompt, seed?, width?, height?, reference_url?, model?, negative_prompt? }
+ *   body: { prompt, seed?, width?, height?, model?, negative_prompt? }
  *   response: image bytes (image/*) OR JSON { b64_json | url }
  */
 export function createLocalHttpProvider(options?: {
@@ -38,12 +38,16 @@ export function createLocalHttpProvider(options?: {
     name: "local",
     // Reference support depends on the operator endpoint; advertise true so
     // spike scripts can attempt Phase-B style calls and record failures.
-    capabilities: { referenceImage: true },
+    capabilities: { referenceImage: false },
     async generate(req: ImageGenerationRequest): Promise<ImageGenerationResult> {
       const width = req.size?.width ?? DEFAULT_SIZE.width
       const height = req.size?.height ?? DEFAULT_SIZE.height
       const seed = req.seed ?? Math.floor(Math.random() * 1_000_000_000)
-      const ref = req.referenceImages?.[0]?.url
+      if (req.referenceImages?.[0]?.url) {
+        console.info(
+          "[local] omitting reference_url — Local T2I must not receive a prior portrait"
+        )
+      }
 
       if (skipNetwork) {
         return {
@@ -74,7 +78,6 @@ export function createLocalHttpProvider(options?: {
           width,
           height,
           model: modelId,
-          reference_url: ref,
           negative_prompt:
             req.negativePrompt?.trim() ||
             (req.assetSlot === "scene_frame"

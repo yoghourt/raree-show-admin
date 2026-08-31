@@ -4,6 +4,7 @@
  * CPP-C — character portrait jobs on Production board.
  * Job ≠ Candidate ≠ Asset; Accept writes portrait_url via characters CRUD only.
  * Rejected / unusable results: requeue (optional operator revision note) — do not Accept.
+ * Requeue is text-to-image: do not attach the previous portrait as referenceImages.
  */
 
 import * as React from "react";
@@ -12,7 +13,7 @@ import Link from "next/link";
 
 import { enqueueCharacterPortraitJobs } from "@/app/actions/enqueueCharacterPortraitJobs";
 import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
-import { proposeCharacterVisualIdentity } from "@/app/actions/proposeCharacterVisualIdentity";
+import { proposeCharacterPortraitPrep } from "@/app/actions/proposeCharacterPortraitPrep";
 import {
   PortraitJobResultDialog,
   splitPortraitEnqueueDescription,
@@ -73,39 +74,30 @@ function portraitEnqueuePayloadFromJob(
   job: GenerateJobRow,
   character: Character | undefined,
   revisionNote: string,
-  visualIdentityOverride?: string
+  visualIdentityOverride?: string,
+  descriptionOverride?: string
 ): {
   characterTsid: string;
   name: string;
   description?: string;
-  referenceUrl?: string;
   operatorRevision?: string;
 } | null {
   if (job.subject_type !== "character") return null;
   let name = character?.name?.trim() || "";
-  let description = character?.description?.trim() || undefined;
-  let referenceUrl: string | undefined;
+  let description =
+    descriptionOverride?.trim() ||
+    character?.description?.trim() ||
+    undefined;
   try {
     const parsed = parseCharacterPortraitJobInput(job.input_json);
     if (!name) name = parsed.name;
     if (!description) {
       description = splitPortraitEnqueueDescription(parsed.description).base || undefined;
     }
-    referenceUrl = parsed.reference_url;
   } catch {
     // fall through with character / empty
   }
   if (!name) return null;
-  // Do not pass bad Job result as reference — only prior Asset / enqueue reference.
-  if (
-    !referenceUrl &&
-    character?.portraitUrl &&
-    (character.portraitUrl.startsWith("http://") ||
-      character.portraitUrl.startsWith("https://")) &&
-    !isMissingPortraitUrl(character.portraitUrl)
-  ) {
-    referenceUrl = character.portraitUrl;
-  }
   const note = revisionNote.trim();
   const visualIdentity =
     visualIdentityOverride !== undefined
@@ -123,7 +115,6 @@ function portraitEnqueuePayloadFromJob(
       ),
       note
     ),
-    ...(referenceUrl ? { referenceUrl } : {}),
     ...(note ? { operatorRevision: note } : {}),
   };
 }
@@ -168,8 +159,13 @@ export function BatchPortraitCompletion({
   >(null);
   /** Focus-card drafts (derived-task「打开」). */
   const [focusVisualDraft, setFocusVisualDraft] = React.useState("");
+  const [focusDescriptionDraft, setFocusDescriptionDraft] = React.useState("");
   const [focusRevisionNote, setFocusRevisionNote] = React.useState("");
   const [proposingFocusVisual, setProposingFocusVisual] = React.useState(false);
+  const [descriptionDrafts, setDescriptionDrafts] = React.useState<
+    Record<string, string>
+  >({});
+  const [prepBusyLabel, setPrepBusyLabel] = React.useState<string | null>(null);
 
   const refreshJobs = React.useCallback(async () => {
     try {
@@ -196,10 +192,12 @@ export function BatchPortraitCompletion({
   React.useEffect(() => {
     if (!focusCharacter) {
       setFocusVisualDraft("");
+      setFocusDescriptionDraft("");
       setFocusRevisionNote("");
       return;
     }
     setFocusVisualDraft(focusCharacter.visualIdentity ?? "");
+    setFocusDescriptionDraft(focusCharacter.description ?? "");
     setFocusRevisionNote("");
     // Seed when focus target / open nonce changes — not on every character field refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional seed keys
@@ -224,11 +222,11 @@ export function BatchPortraitCompletion({
     setWriteError(null);
     setHint(null);
     try {
-      const result = await proposeCharacterVisualIdentity({
+      const result = await proposeCharacterPortraitPrep({
         workId,
         name: focusCharacter.name,
         house: focusCharacter.house,
-        description: focusCharacter.description,
+        description: focusDescriptionDraft || focusCharacter.description,
         currentVisualIdentity: focusVisualDraft,
         operatorNote: focusRevisionNote,
       });
@@ -236,8 +234,9 @@ export function BatchPortraitCompletion({
         setWriteError(result.message);
         return;
       }
+      setFocusDescriptionDraft(result.description);
       setFocusVisualDraft(result.visualIdentity);
-      setHint("已填入 AI 视觉身份提案（未入队、未写库；可再改后排队）。");
+      setHint("已填入纠偏简介与视觉身份（未入队、未写库；可再改后排队）。");
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -252,11 +251,16 @@ export function BatchPortraitCompletion({
     setHint(null);
     try {
       const visualDraft = focusVisualDraft.trim();
-      if (visualDraft !== (focusCharacter.visualIdentity ?? "").trim()) {
+      const descriptionDraft = focusDescriptionDraft.trim();
+      const descChanged =
+        descriptionDraft !== (focusCharacter.description ?? "").trim();
+      const visualChanged =
+        visualDraft !== (focusCharacter.visualIdentity ?? "").trim();
+      if (descChanged || visualChanged) {
         await charactersApi.update(workId, focusCharacter.tsid, {
           name: focusCharacter.name,
           house: focusCharacter.house,
-          description: focusCharacter.description,
+          description: descriptionDraft || focusCharacter.description,
           visualIdentity: visualDraft,
           signatureQuote: focusCharacter.signatureQuote,
           portraitUrl: focusCharacter.portraitUrl,
@@ -267,7 +271,7 @@ export function BatchPortraitCompletion({
       const baseDescription = descriptionWithArchiveAppearance(
         workId,
         focusCharacter.name,
-        focusCharacter.description,
+        descriptionDraft || focusCharacter.description,
         visualDraft
       );
       const description = note
@@ -282,11 +286,6 @@ export function BatchPortraitCompletion({
             characterTsid: focusCharacter.tsid,
             name: focusCharacter.name,
             description,
-            referenceUrl:
-              focusCharacter.portraitUrl?.startsWith("http://") ||
-              focusCharacter.portraitUrl?.startsWith("https://")
-                ? focusCharacter.portraitUrl
-                : undefined,
             ...(note ? { operatorRevision: note } : {}),
           },
         ],
@@ -343,11 +342,6 @@ export function BatchPortraitCompletion({
             c.description,
             c.visualIdentity
           ),
-          referenceUrl:
-            c.portraitUrl?.startsWith("http://") ||
-            c.portraitUrl?.startsWith("https://")
-              ? c.portraitUrl
-              : undefined,
         })),
       });
       if (!result.ok) {
@@ -366,6 +360,57 @@ export function BatchPortraitCompletion({
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
       setEnqueueBusy(false);
+    }
+  };
+
+  const batchPrepMissing = async () => {
+    if (missingPortraits.length === 0) {
+      setHint("没有缺肖像的角色可纠偏。");
+      return;
+    }
+    setWriteError(null);
+    setHint(null);
+    let ok = 0;
+    const failures: string[] = [];
+    try {
+      for (let i = 0; i < missingPortraits.length; i++) {
+        const c = missingPortraits[i];
+        setPrepBusyLabel(
+          `纠偏中 ${i + 1}/${missingPortraits.length} · ${c.name}`
+        );
+        const result = await proposeCharacterPortraitPrep({
+          workId,
+          name: c.name,
+          house: c.house,
+          description: c.description,
+          currentVisualIdentity: c.visualIdentity,
+        });
+        if (!result.ok) {
+          failures.push(`${c.name}：${result.message}`);
+          continue;
+        }
+        await charactersApi.update(workId, c.tsid, {
+          name: c.name,
+          house: c.house,
+          description: result.description,
+          visualIdentity: result.visualIdentity,
+          signatureQuote: c.signatureQuote,
+          portraitUrl: c.portraitUrl,
+        });
+        ok += 1;
+      }
+      onWrote();
+      setHint(
+        failures.length === 0
+          ? `已为 ${ok} 名缺肖像角色写入纠偏简介与视觉身份（未出图）。可再点「缺肖像排队」。`
+          : `已写入 ${ok} 名；失败 ${failures.length}：${failures
+              .slice(0, 3)
+              .join("；")}`
+      );
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPrepBusyLabel(null);
     }
   };
 
@@ -433,11 +478,12 @@ export function BatchPortraitCompletion({
     try {
       const draft =
         visualIdentityDrafts[job.id] ?? character?.visualIdentity ?? "";
-      const result = await proposeCharacterVisualIdentity({
+      const result = await proposeCharacterPortraitPrep({
         workId,
         name,
         house: character?.house,
-        description: character?.description,
+        description:
+          descriptionDrafts[job.id] ?? character?.description,
         currentVisualIdentity: draft,
         operatorNote: revisionNotes[job.id],
       });
@@ -445,11 +491,15 @@ export function BatchPortraitCompletion({
         setWriteError(result.message);
         return;
       }
+      setDescriptionDrafts((prev) => ({
+        ...prev,
+        [job.id]: result.description,
+      }));
       setVisualIdentityDrafts((prev) => ({
         ...prev,
         [job.id]: result.visualIdentity,
       }));
-      setHint("已填入 AI 视觉身份提案（未入队、未写库；可再改后重试）。");
+      setHint("已填入纠偏简介与视觉身份（未入队、未写库；可再改后重试）。");
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -466,12 +516,15 @@ export function BatchPortraitCompletion({
     const note = revisionNotes[job.id] ?? "";
     const visualDraft =
       visualIdentityDrafts[job.id] ?? character?.visualIdentity ?? "";
+    const descriptionDraft =
+      descriptionDrafts[job.id] ?? character?.description ?? "";
     const payload = portraitEnqueuePayloadFromJob(
       workId,
       job,
       character,
       note,
-      visualDraft
+      visualDraft,
+      descriptionDraft
     );
     if (!payload) {
       setWriteError("重新排队失败：缺少角色姓名");
@@ -484,12 +537,13 @@ export function BatchPortraitCompletion({
       // Persist visual identity when the retry panel edited it (Creator field).
       if (
         character &&
-        visualDraft.trim() !== (character.visualIdentity ?? "").trim()
+        (visualDraft.trim() !== (character.visualIdentity ?? "").trim() ||
+          descriptionDraft.trim() !== (character.description ?? "").trim())
       ) {
         await charactersApi.update(workId, character.tsid, {
           name: character.name,
           house: character.house,
-          description: character.description,
+          description: descriptionDraft.trim() || character.description,
           visualIdentity: visualDraft.trim(),
           signatureQuote: character.signatureQuote,
           portraitUrl: character.portraitUrl,
@@ -527,12 +581,19 @@ export function BatchPortraitCompletion({
         delete next[job.id];
         return next;
       });
+      setDescriptionDrafts((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
       await refreshJobs();
       const changedVisual =
         visualDraft.trim() !== (character?.visualIdentity ?? "").trim();
+      const changedDesc =
+        descriptionDraft.trim() !== (character?.description ?? "").trim();
       setHint(
-        note.trim() || changedVisual
-          ? "已按修改意见/视觉身份重新排队；不满意的旧结果已从列表移除。"
+        note.trim() || changedVisual || changedDesc
+          ? "已按简介/视觉身份/修改意见重新排队；不满意的旧结果已从列表移除。"
           : "已重新排队；不满意的旧结果已从列表移除。"
       );
     } catch (e) {
@@ -637,7 +698,22 @@ export function BatchPortraitCompletion({
           <Button
             type="button"
             size="sm"
-            disabled={enqueueBusy || missingPortraits.length === 0}
+            variant="secondary"
+            disabled={
+              enqueueBusy ||
+              Boolean(prepBusyLabel) ||
+              missingPortraits.length === 0
+            }
+            onClick={() => void batchPrepMissing()}
+          >
+            {prepBusyLabel
+              ? prepBusyLabel
+              : `批量纠偏简介（${missingPortraits.length}）`}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={enqueueBusy || Boolean(prepBusyLabel) || missingPortraits.length === 0}
             onClick={() => void enqueueMissing()}
           >
             {enqueueBusy
@@ -712,9 +788,24 @@ export function BatchPortraitCompletion({
           <div className="space-y-2 rounded-md border border-amber-100 bg-white/70 p-2">
             <label
               className="block text-[11px] text-amber-900/80"
+              htmlFor={`focus-desc-${focusCharacter.tsid}`}
+            >
+              读者简介（故事身份；不要写年轻/长相。纠偏后排队会写入角色）
+            </label>
+            <Textarea
+              id={`focus-desc-${focusCharacter.tsid}`}
+              rows={2}
+              value={focusDescriptionDraft}
+              onChange={(e) => setFocusDescriptionDraft(e.target.value)}
+              placeholder="例如：Chancellor of Wei who seizes the Han court by cunning."
+              className="min-h-[3.5rem] border-amber-100 bg-white text-xs text-zinc-900"
+              disabled={enqueueBusy || proposingFocusVisual || Boolean(prepBusyLabel)}
+            />
+            <label
+              className="block text-[11px] text-amber-900/80"
               htmlFor={`focus-visual-${focusCharacter.tsid}`}
             >
-              视觉身份（生图用；改后排队会写入角色）
+              视觉身份（生图用；Local 约 220 字，优先 FACE / COSTUME / PROP；改后排队会写入角色）
             </label>
             <Textarea
               id={`focus-visual-${focusCharacter.tsid}`}
@@ -734,11 +825,12 @@ export function BatchPortraitCompletion({
                 disabled={
                   enqueueBusy ||
                   proposingFocusVisual ||
+                  Boolean(prepBusyLabel) ||
                   hasInFlightFor(focusCharacter.tsid)
                 }
                 onClick={() => void proposeFocusVisualIdentity()}
               >
-                {proposingFocusVisual ? "提案中…" : "AI 提案视觉身份"}
+                {proposingFocusVisual ? "提案中…" : "AI 纠偏简介并提案身份"}
               </Button>
               <span className="text-[10px] text-amber-900/70">
                 只填草稿，确认后再排队
@@ -971,10 +1063,15 @@ export function BatchPortraitCompletion({
                               [job.id]:
                                 prev[job.id] ?? c?.visualIdentity ?? "",
                             }));
+                            setDescriptionDrafts((prev) => ({
+                              ...prev,
+                              [job.id]:
+                                prev[job.id] ?? c?.description ?? "",
+                            }));
                             setRetryPanelJobId(job.id);
                           }}
                         >
-                          {panelOpen ? "收起修改" : "改视觉身份/意见重试"}
+                          {panelOpen ? "收起修改" : "改简介/身份重试"}
                         </Button>
                       </>
                     ) : null}
@@ -1020,9 +1117,33 @@ export function BatchPortraitCompletion({
                     <div className="mt-1 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
                       <label
                         className="block text-[11px] text-zinc-600"
+                        htmlFor={`portrait-desc-${job.id}`}
+                      >
+                        读者简介（故事身份；不要写年轻/长相。改后会写入角色）
+                      </label>
+                      <Textarea
+                        id={`portrait-desc-${job.id}`}
+                        rows={2}
+                        value={
+                          descriptionDrafts[job.id] ??
+                          characters.find((c) => c.tsid === job.subject_id)
+                            ?.description ??
+                          ""
+                        }
+                        onChange={(e) =>
+                          setDescriptionDrafts((prev) => ({
+                            ...prev,
+                            [job.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="例如：Chancellor of Wei who seizes the Han court by cunning."
+                        className="min-h-[3.5rem] text-xs"
+                      />
+                      <label
+                        className="block text-[11px] text-zinc-600"
                         htmlFor={`portrait-visual-${job.id}`}
                       >
-                        视觉身份（生图用；改后会写入角色并用于本次重试）
+                        视觉身份（生图用；Local 约 220 字，优先 FACE / COSTUME / PROP；改后会写入角色并用于本次重试）
                       </label>
                       <Textarea
                         id={`portrait-visual-${job.id}`}
@@ -1056,7 +1177,7 @@ export function BatchPortraitCompletion({
                         >
                           {proposingVisualJobId === job.id
                             ? "提案中…"
-                            : "AI 提案视觉身份"}
+                            : "AI 纠偏简介并提案身份"}
                         </Button>
                         <span className="text-[10px] text-zinc-500">
                           只填草稿，需你确认后再排队

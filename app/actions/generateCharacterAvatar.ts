@@ -55,7 +55,7 @@ export async function generateCharacterAvatar(
     return { ok: false, message: "请填写角色名称。" }
   }
 
-  const { name, description, characterTsid, referencePortraitUrl } = raw.data
+  const { name, description, characterTsid } = raw.data
   const prompt = buildAvatarPrompt(name, description)
 
   try {
@@ -64,9 +64,6 @@ export async function generateCharacterAvatar(
       assetSlot: "portrait",
       prompt,
       negativePrompt: buildAvatarNegativePrompt(description),
-      referenceImages: referencePortraitUrl
-        ? [{ url: referencePortraitUrl }]
-        : undefined,
       size: { ...PORTRAIT_IMAGE_SIZE },
     })
     let url: string

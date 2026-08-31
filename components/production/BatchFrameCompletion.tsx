@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
+import { proposeFrameExpression } from "@/app/actions/proposeFrameExpression";
 import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
 import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
 import { FrameJobResultDialog } from "@/components/generate-jobs/FrameJobResultDialog";
@@ -220,6 +221,13 @@ function mergeFailureTypeNote(
   return `${trimmed}\n${note}`;
 }
 
+function isExprDraftDirty(
+  draft: string | undefined,
+  baseline: string | undefined
+): boolean {
+  return (draft ?? "").trim() !== (baseline ?? "").trim();
+}
+
 /** In-flight Execution jobs: block duplicate enqueue for the same frame. */
 function activeJobForFrame(
   jobs: GenerateJobRow[],
@@ -265,7 +273,13 @@ export function BatchFrameCompletion({
   const [exprDraftByJob, setExprDraftByJob] = React.useState<
     Record<string, string>
   >({});
+  const [exprBaselineByJob, setExprBaselineByJob] = React.useState<
+    Record<string, string>
+  >({});
   const [exprBusyId, setExprBusyId] = React.useState<string | null>(null);
+  const [proposingExprId, setProposingExprId] = React.useState<string | null>(
+    null
+  );
   const [preview, setPreview] = React.useState<{
     url: string | null;
     label: string;
@@ -670,7 +684,11 @@ export function BatchFrameCompletion({
     // Persist Expression draft from the retry panel before enqueue — otherwise
     // requeue only reads stale frame_provenance_v1 and ignores the edited JSON.
     const exprRaw = (exprDraftByJob[job.id] ?? "").trim();
-    if (exprRaw) {
+    const exprDirty = isExprDraftDirty(
+      exprDraftByJob[job.id],
+      exprBaselineByJob[job.id]
+    );
+    if (exprDirty && exprRaw) {
       let parsedJson: unknown;
       try {
         parsedJson = JSON.parse(exprRaw);
@@ -741,19 +759,73 @@ export function BatchFrameCompletion({
         delete next[job.id];
         return next;
       });
+      setExprBaselineByJob((prev) => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
       await refreshJobs();
       setAdmitHint(
-        note.trim()
-          ? exprRaw
+        exprDirty && exprRaw
+          ? note.trim()
             ? "已保存 Expression 并按修改意见重新排队；旧结果已从列表移除。"
-            : "已按修改意见重新排队；不满意的旧结果已从列表移除。"
-          : "已重新排队；不满意的旧结果已从列表移除。"
+            : "已保存 Expression 并重新排队；旧结果已从列表移除。"
+          : note.trim()
+            ? "已按修改意见重新排队；不满意的旧结果已从列表移除。"
+            : "已重新排队；不满意的旧结果已从列表移除。"
       );
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
       setRequeueingId(null);
       setEnqueueBusy(false);
+    }
+  };
+
+  const proposeExprForJob = async (job: GenerateJobRow) => {
+    if (job.subject_type !== "scene") return;
+    const frameIndex = jobFrameIndex(job);
+    if (frameIndex === null) {
+      setWriteError("无法提案：job 无 frame_index");
+      return;
+    }
+    const route = routes.find((r) => r.tsid === job.subject_id);
+    const liveCaption =
+      route?.story_images_v2?.[frameIndex]?.caption?.trim() ?? "";
+    const jobCaption =
+      typeof job.input_json.caption === "string"
+        ? job.input_json.caption
+        : "";
+    const caption = splitFrameCaption(liveCaption || jobCaption).base;
+    if (!caption) {
+      setWriteError("无法提案：缺少画面说明");
+      return;
+    }
+    setProposingExprId(job.id);
+    setWriteError(null);
+    try {
+      const result = await proposeFrameExpression({
+        workId,
+        caption,
+        currentExpression: exprDraftByJob[job.id],
+        operatorNote: revisionNotes[job.id],
+        routeTitle: route?.title,
+      });
+      if (!result.ok) {
+        setWriteError(result.message);
+        return;
+      }
+      setExprDraftByJob((prev) => ({
+        ...prev,
+        [job.id]: JSON.stringify(result.rendererExpression, null, 2),
+      }));
+      setAdmitHint(
+        "已填入 AI Expression（未写入 provenance；可再改后保存或重新排队）"
+      );
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProposingExprId(null);
     }
   };
 
@@ -1160,6 +1232,12 @@ export function BatchFrameCompletion({
                     r.frameIndex === frameIndex &&
                     Boolean(r.candidateUrl)
                 );
+              const canSubmitRetryPanel =
+                Boolean((revisionNotes[job.id] ?? "").trim()) ||
+                isExprDraftDirty(
+                  exprDraftByJob[job.id],
+                  exprBaselineByJob[job.id]
+                );
 
               return (
                 <li
@@ -1385,19 +1463,28 @@ export function BatchFrameCompletion({
                                     const entry = entries.find(
                                       (p) => p.frameIndex === frameIndex
                                     );
+                                    const json = entry?.rendererExpression
+                                      ? JSON.stringify(
+                                          entry.rendererExpression,
+                                          null,
+                                          2
+                                        )
+                                      : "";
                                     setExprDraftByJob((prev) => ({
                                       ...prev,
-                                      [job.id]: entry?.rendererExpression
-                                        ? JSON.stringify(
-                                            entry.rendererExpression,
-                                            null,
-                                            2
-                                          )
-                                        : "",
+                                      [job.id]: json,
+                                    }));
+                                    setExprBaselineByJob((prev) => ({
+                                      ...prev,
+                                      [job.id]: json,
                                     }));
                                   })
                                   .catch(() => {
                                     setExprDraftByJob((prev) => ({
+                                      ...prev,
+                                      [job.id]: "",
+                                    }));
+                                    setExprBaselineByJob((prev) => ({
                                       ...prev,
                                       [job.id]: "",
                                     }));
@@ -1489,8 +1576,8 @@ export function BatchFrameCompletion({
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-expr-${job.id}`}
                         >
-                          Expression（点「按修改意见重试」时会自动写入 provenance
-                          再入队；也可先单独保存）
+                          Expression（点下方重新排队时会写入 provenance
+                          再入队；也可先单独保存。修改意见可留空）
                         </label>
                         <Textarea
                           id={`frame-expr-${job.id}`}
@@ -1505,18 +1592,38 @@ export function BatchFrameCompletion({
                           placeholder='{"environment":"…","characters":[],"action":"…","composition":"…"}'
                           className="min-h-[5rem] font-mono text-[11px]"
                         />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs"
-                          disabled={
-                            exprBusyId === job.id ||
-                            frameIndex === null ||
-                            writing ||
-                            enqueueBusy
-                          }
-                          onClick={() => {
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 text-xs"
+                            disabled={
+                              proposingExprId === job.id ||
+                              exprBusyId === job.id ||
+                              frameIndex === null ||
+                              writing ||
+                              enqueueBusy
+                            }
+                            onClick={() => void proposeExprForJob(job)}
+                          >
+                            {proposingExprId === job.id
+                              ? "提案中…"
+                              : "AI 提案 Expression"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            disabled={
+                              proposingExprId === job.id ||
+                              exprBusyId === job.id ||
+                              frameIndex === null ||
+                              writing ||
+                              enqueueBusy
+                            }
+                            onClick={() => {
                             if (frameIndex === null) return;
                             const raw = (exprDraftByJob[job.id] ?? "").trim();
                             if (!raw) {
@@ -1545,7 +1652,9 @@ export function BatchFrameCompletion({
                                 parsed.value
                               )
                               .then(() =>
-                                setAdmitHint("Expression 已写入 provenance")
+                                setAdmitHint(
+                                  "Expression 已写入，出场人物已对齐"
+                                )
                               )
                               .catch((e) =>
                                 setWriteError(
@@ -1559,11 +1668,12 @@ export function BatchFrameCompletion({
                             ? "保存 Expression…"
                             : "保存 Expression"}
                         </Button>
+                        </div>
                         <label
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-revision-${job.id}`}
                         >
-                          修改意见（会并入下次生成 caption；不改库里的画面描述）
+                          修改意见（可选；会并入下次生成 caption；不改库里的画面描述）
                         </label>
                         <Textarea
                           id={`frame-revision-${job.id}`}
@@ -1582,8 +1692,13 @@ export function BatchFrameCompletion({
                           type="button"
                           size="sm"
                           className="h-7 text-xs"
+                          title={
+                            canSubmitRetryPanel
+                              ? undefined
+                              : "请修改 Expression 或填写修改意见"
+                          }
                           disabled={
-                            !(revisionNotes[job.id] ?? "").trim() ||
+                            !canSubmitRetryPanel ||
                             requeueingId === job.id ||
                             writing ||
                             enqueueBusy ||
@@ -1600,7 +1715,7 @@ export function BatchFrameCompletion({
                         >
                           {requeueingId === job.id
                             ? "排队中…"
-                            : "带意见重新排队"}
+                            : "按当前修改重新排队"}
                         </Button>
                       </div>
                     ) : null}

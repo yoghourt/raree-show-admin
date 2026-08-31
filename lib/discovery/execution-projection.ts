@@ -12,12 +12,12 @@ export type ProjectionProfile = "local" | "cloud";
 
 const MAX_PROMPT_PART_LEN = 400;
 /** Local sd-3.5-medium blanks above ~600 chars — keep Local transport lean. */
-const LOCAL_VISUAL_MAX = 80;
-const LOCAL_ACTION_MAX = 96;
-const LOCAL_ENV_MAX = 80;
-const LOCAL_COMPOSITION_MAX = 72;
-const LOCAL_ROLE_MAX = 28;
-const LOCAL_EMPHASIS_MAX = 72;
+export const LOCAL_VISUAL_MAX = 80;
+export const LOCAL_ACTION_MAX = 96;
+export const LOCAL_ENV_MAX = 80;
+export const LOCAL_COMPOSITION_MAX = 72;
+export const LOCAL_ROLE_MAX = 28;
+export const LOCAL_EMPHASIS_MAX = 72;
 
 function capPart(value: string): string {
   if (value.length <= MAX_PROMPT_PART_LEN) return value;
@@ -36,6 +36,72 @@ function hardCap(value: string, max: number): string {
   const t = value.trim();
   if (t.length <= max) return t;
   return `${t.slice(0, Math.max(0, max - 1)).trim()}…`;
+}
+
+/**
+ * Word-boundary clip for Local transport. Keeps the start (pose must be authored first).
+ * No ellipsis — stored Expression should look complete within budget.
+ */
+export function clipLocalBudgetText(text: string, maxChars: number): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length <= maxChars) return t;
+  const slice = t.slice(0, maxChars);
+  const cut = Math.max(slice.lastIndexOf(","), slice.lastIndexOf(" "), 0);
+  return (cut > maxChars * 0.5 ? slice.slice(0, cut) : slice)
+    .trim()
+    .replace(/[,:;]+$/, "");
+}
+
+/**
+ * Fit Canonical Expression into Local execute field budgets.
+ * Used by Creator Expression propose so pose/blocking is not left-clipped at generate.
+ */
+export function packExpressionForLocalTransport(
+  expression: RendererExpression
+): RendererExpression {
+  const packed: RendererExpression = {
+    environment: clipLocalBudgetText(expression.environment, LOCAL_ENV_MAX),
+    action: clipLocalBudgetText(expression.action, LOCAL_ACTION_MAX),
+    composition: clipLocalBudgetText(
+      expression.composition,
+      LOCAL_COMPOSITION_MAX
+    ),
+    characters: expression.characters.map((c) => ({
+      role: clipLocalBudgetText(c.role, LOCAL_ROLE_MAX),
+      visual: clipLocalBudgetText(c.visual, LOCAL_VISUAL_MAX),
+    })),
+  };
+  if (expression.lighting?.trim()) {
+    packed.lighting = clipLocalBudgetText(
+      expression.lighting,
+      LOCAL_EMPHASIS_MAX
+    );
+  }
+  if (expression.atmosphere?.trim()) {
+    packed.atmosphere = clipLocalBudgetText(
+      expression.atmosphere,
+      LOCAL_EMPHASIS_MAX
+    );
+  }
+  if (expression.threatPerception?.trim()) {
+    packed.threatPerception = clipLocalBudgetText(
+      expression.threatPerception,
+      LOCAL_EMPHASIS_MAX
+    );
+  }
+  if (expression.visualEmphasis?.trim()) {
+    packed.visualEmphasis = clipLocalBudgetText(
+      expression.visualEmphasis,
+      LOCAL_EMPHASIS_MAX
+    );
+  }
+  if (expression.styleHints?.trim()) {
+    packed.styleHints = clipLocalBudgetText(
+      expression.styleHints,
+      LOCAL_EMPHASIS_MAX
+    );
+  }
+  return packed;
 }
 
 /** Map IMAGE_CREATOR_ACCEPT_PROVIDER id → projection profile. */

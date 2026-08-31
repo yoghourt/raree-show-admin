@@ -217,15 +217,15 @@ export function formatArchiveForPortrait(
 ): string {
   const selected = selectPortraitCharacterCues(archive);
   const parts: string[] = [];
-  if (selected.visualSummary) {
-    parts.push(`SUMMARY: ${selected.visualSummary}.`);
-  }
   const face = joinCueSection("FACE", selected.identityCues);
   if (face) parts.push(face);
   const costume = joinCueSection("COSTUME", selected.costumeCues);
   if (costume) parts.push(costume);
   const prop = joinCueSection("PROP", selected.propCues);
   if (prop) parts.push(prop);
+  if (selected.visualSummary) {
+    parts.push(`SUMMARY: ${selected.visualSummary}.`);
+  }
   return parts.join(" ").trim();
 }
 

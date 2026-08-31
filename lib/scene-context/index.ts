@@ -34,11 +34,14 @@ export type {
 } from "@/lib/scene-context/backfill-from-provenance";
 export {
   appearancesFromCharacterTsids,
+  appearancesFromExpressionCharacters,
   contextAtFrameIndex,
   ensureContextForFrame,
+  findArchiveCharacterByRoleCue,
   removeFrameWithContexts,
   rewriteContextsReadingRouteTsid,
   swapFramesWithContexts,
+  syncFrameContextAppearanceFromExpression,
   upsertContextById,
 } from "@/lib/scene-context/frame-context-edit";
 export { parseSceneContextsV1 } from "@/lib/scene-context/parse";

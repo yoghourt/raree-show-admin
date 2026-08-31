@@ -6,10 +6,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   appearancesFromCharacterTsids,
+  appearancesFromExpressionCharacters,
   enrichContextArchiveRefsFromWork,
   ensureContextForFrame,
   removeFrameWithContexts,
   swapFramesWithContexts,
+  syncFrameContextAppearanceFromExpression,
 } from "@/lib/scene-context/frame-context-edit";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
 
@@ -145,5 +147,108 @@ describe("enrichContextArchiveRefsFromWork", () => {
         locations: [{ tsid: "loc_winterfell", name: "Winterfell" }],
       })
     ).toBeNull();
+  });
+});
+
+describe("appearancesFromExpressionCharacters", () => {
+  const archive = [
+    { tsid: "char_catelyn", name: "Catelyn Stark" },
+    { tsid: "char_eddard", name: "Eddard Stark" },
+    { tsid: "char_robert", name: "Robert Baratheon" },
+    { tsid: "char_jon_snow", name: "Jon Snow" },
+    { tsid: "char_jon_arryn", name: "Jon Arryn" },
+  ];
+
+  it("matches exact archive names and unique given names", () => {
+    const appearances = appearancesFromExpressionCharacters(
+      [
+        { role: "Catelyn Stark", visual: "auburn hair, travel cloak" },
+        { role: "King Robert", visual: "black-bearded king on horseback" },
+      ],
+      archive
+    );
+    expect(appearances.map((a) => a.archiveTsid)).toEqual([
+      "char_catelyn",
+      "char_robert",
+    ]);
+    expect(appearances[0]?.name).toBe("Catelyn Stark");
+    expect(appearances[0]?.visual).toBe("auburn hair, travel cloak");
+  });
+
+  it("skips generic extras and ambiguous given names", () => {
+    const appearances = appearancesFromExpressionCharacters(
+      [
+        { role: "man", visual: "soldier" },
+        { role: "Jon", visual: "dark-haired youth" },
+        { role: "Catelyn", visual: "auburn hair" },
+      ],
+      archive
+    );
+    expect(appearances.map((a) => a.archiveTsid)).toEqual(["char_catelyn"]);
+  });
+
+  it("dedupes the same archive character listed twice", () => {
+    const appearances = appearancesFromExpressionCharacters(
+      [
+        { role: "Eddard Stark", visual: "dark cloak" },
+        { role: "Eddard", visual: "same man closer" },
+      ],
+      archive
+    );
+    expect(appearances.map((a) => a.archiveTsid)).toEqual(["char_eddard"]);
+  });
+});
+
+describe("syncFrameContextAppearanceFromExpression", () => {
+  it("replaces existing appearance and creates Context when missing", () => {
+    const archive = [
+      { tsid: "char_catelyn", name: "Catelyn Stark" },
+      { tsid: "char_eddard", name: "Eddard Stark" },
+    ];
+    const expression = {
+      environment: "kingsroad, rain",
+      action: "the party rides north",
+      composition: "wide traveling group",
+      characters: [
+        { role: "Catelyn Stark", visual: "travel cloak" },
+        { role: "Eddard Stark", visual: "dark cloak" },
+      ],
+    };
+    const stale = ctx(0, "ctx_stale");
+    const next = syncFrameContextAppearanceFromExpression({
+      workId: "work-1",
+      readingRouteTsid: "scene_1",
+      frameIndex: 0,
+      frame: { url: "", caption: "Catelyn and Ned ride north" },
+      contexts: [stale],
+      routeTitle: "Arc",
+      chapter_number: 1,
+      chapter_title: null,
+      expression,
+      archiveCharacters: archive,
+      now: "2026-08-30T00:00:00.000Z",
+    });
+    const synced = next.find((c) => c.contextId === "ctx_stale");
+    expect(synced?.characterAppearanceContext.map((a) => a.archiveTsid)).toEqual(
+      ["char_catelyn", "char_eddard"]
+    );
+
+    const created = syncFrameContextAppearanceFromExpression({
+      workId: "work-1",
+      readingRouteTsid: "scene_1",
+      frameIndex: 1,
+      frame: { url: "", caption: "same beat" },
+      contexts: [],
+      routeTitle: "Arc",
+      chapter_number: 1,
+      chapter_title: null,
+      expression,
+      archiveCharacters: archive,
+      now: "2026-08-30T00:00:00.000Z",
+    });
+    expect(created).toHaveLength(1);
+    expect(
+      created[0]?.characterAppearanceContext.map((a) => a.archiveTsid)
+    ).toEqual(["char_catelyn", "char_eddard"]);
   });
 });
