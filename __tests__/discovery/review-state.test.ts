@@ -490,7 +490,7 @@ describe("Accept handoff guards", () => {
       displayName: "Broken",
       fields: {
         parentStoryCandidateId: "story-cand-1",
-        chapter_number: 0,
+        chapter_number: -1,
         title: "Broken",
         rendererExpression: {
           environment: "winter courtyard",

@@ -301,7 +301,7 @@ Optional per item: confidence ("green"|"yellow"|"red"), evidence ([{sourceLabel,
 Example shape for type "${candidateType}":
 ${sceneNarrativeOnly ? SCENE_NARRATIVE_ONLY_EXAMPLE : TYPE_EXAMPLES[candidateType]}
 ${candidateType === "scene" && sceneNarrativeOnly ? `\nScene Frame Narrative drafts only (no Expression in this call).
-fields MUST include parentStoryCandidateId (from the Story list), chapter_number INTEGER ≥ 1, title, and summary.
+fields MUST include parentStoryCandidateId (from the Story list), chapter_number INTEGER ≥ 0 (0 = prologue / front matter), title, and summary.
 Do NOT include rendererExpression or visualIntent.
 ${formatRequiredSceneStepsBlock(requiredSceneSteps)}
 - One Scene per required step. Same parentStoryCandidateId. Do not merge two steps.
@@ -309,7 +309,7 @@ ${formatRequiredSceneStepsBlock(requiredSceneSteps)}
 - The draft MUST carry that step's turn (event, outcome, attempt, prevention, cause) — not still geometry.
 - Prefer proper names from the narrative. English Latin script only.
 \n` : ""}
-${candidateType === "scene" && !sceneNarrativeOnly ? `\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 1 (sortable chapter index, e.g. 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" in chapter_title. title is required. fields.summary is REQUIRED.
+${candidateType === "scene" && !sceneNarrativeOnly ? `\nScene fields MUST live under "fields" with parentStoryCandidateId (required, from the Story list above), chapter_number as an INTEGER ≥ 0 (sortable chapter index; 0 = prologue / front matter, then 1, 2, 3 — NOT POV labels). Put POV labels like "Bran I" or "Prologue" in chapter_title. title is required. fields.summary is REQUIRED.
 ${formatRequiredSceneStepsBlock(requiredSceneSteps)}
 Frame Narrative draft (CRITICAL — this is what Human confirms into Reader text):
 - fields.summary (and matching top-level summary) IS the Reading Frame Narrative DRAFT for this step.

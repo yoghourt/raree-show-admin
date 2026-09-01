@@ -44,6 +44,24 @@ describe("mapSceneStagingToReadingRoutePayload", () => {
     }
   });
 
+  it("accepts chapter_number 0 as prologue", () => {
+    const result = mapSceneStagingToReadingRoutePayload({
+      workId: "work-1",
+      sourceReviewId: "rev-prologue",
+      title: "The Night Watch",
+      chapter_number: 0,
+      chapter_title: "Prologue",
+      summary: "Others beyond the Wall",
+      acceptedAt: "2026-07-05T00:00:00.000Z",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.chapter_number).toBe(0);
+      expect(result.payload.chapter_title).toBe("Prologue");
+    }
+  });
+
   it("rejects invalid chapter_number", () => {
     const result = mapSceneStagingToReadingRoutePayload({
       workId: "work-1",

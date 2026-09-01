@@ -18,6 +18,7 @@ import type {
   AcceptedSceneCandidateStaging,
   AcceptedStoryUnitStaging,
 } from "@/lib/discovery/review-types";
+import { MIN_SCENE_CHAPTER_NUMBER, parseSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
 import { messages } from "@/lib/locale";
 import { frameContextArchiveSelectionFromStaging } from "@/lib/rollout/scene-staging-context-edit";
 import { rolloutUi } from "@/lib/rollout/ui-copy";
@@ -69,7 +70,8 @@ function stagingToValues(
   return {
     title: staging.title,
     chapter_number:
-      typeof staging.chapter_number === "number" && staging.chapter_number >= 1
+      typeof staging.chapter_number === "number" &&
+      staging.chapter_number >= MIN_SCENE_CHAPTER_NUMBER
         ? staging.chapter_number
         : defaultChapter,
     chapter_title: staging.chapter_title ?? "",
@@ -372,16 +374,19 @@ export function StoryWritePreviewCard({
           <Input
             id={`chapter-number-${staging.sourceReviewId}`}
             type="number"
-            min={1}
+            min={MIN_SCENE_CHAPTER_NUMBER}
             step={1}
             value={values.chapter_number}
             disabled={busy}
-            onChange={(e) =>
-              patch({
-                chapter_number: Number(e.target.value) || 1,
-              })
-            }
+            onChange={(e) => {
+              const n = parseSceneChapterNumber(e.target.value);
+              if (n === null || n < MIN_SCENE_CHAPTER_NUMBER) return;
+              patch({ chapter_number: n });
+            }}
           />
+          <p className="text-muted-foreground text-xs">
+            {messages.forms.chapterNumberHint}
+          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor={`chapter-title-${staging.sourceReviewId}`}>

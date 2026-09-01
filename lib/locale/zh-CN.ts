@@ -39,7 +39,8 @@ export const zhCN = {
     confirmDelete:      '确认删除',
     delete:             '删除',
     deleting:           '删除中…',
-    chapterN:           (n: number | string) => `第 ${n} 章`,
+    chapterN:           (n: number | string) =>
+      Number(n) === 0 ? "序章" : `第 ${n} 章`,
     businessId:         '编号',
     statusActive:       '活跃',
     statusArchived:     '已归档',
@@ -102,7 +103,8 @@ export const zhCN = {
     noCharacterDataHint:   '当前作品暂无角色数据，请用英文逗号分隔填写角色编号。',
     locationIdPlaceholder: '例如：loc_winterfell',
     characterIdsPlaceholder: '例如：char_arya, char_jon',
-    chapterTitlePlaceholder: '可选，如：布兰一世',
+    chapterTitlePlaceholder: '可选，如：布兰一世 / Prologue',
+    chapterNumberHint: '0 = 序章（Prologue），已录的第 1、2 章不必改号',
   },
   copilot: {
     brand:               '助手',
@@ -311,7 +313,7 @@ export const zhCN = {
     nextStepRollout: '下一步：写入作品 → 读者端验读',
     goRollout: '写入作品',
     editAfterAcceptSceneHint:
-      '章节序号须为 ≥1 的整数；视角名（如布兰一世）请写在章节标题。画面须挂在已确认的故事下。',
+      '章节序号须为 ≥0 的整数（0 = 序章 / Prologue）；视角名（如布兰一世）请写在章节标题。画面须挂在已确认的故事下。',
     editStagingHint: '修改后，正文提炼与写入作品的列表会同步更新。',
     confirmRevokeAccept:
       '确定取消确认？将回到上方待确认列表，并从写入作品列表移除。',

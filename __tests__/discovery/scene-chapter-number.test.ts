@@ -23,8 +23,13 @@ describe("scene chapter_number", () => {
     expect(parseSceneChapterNumber("abc")).toBeNull();
   });
 
-  it("rejects zero and negative", () => {
-    expect(isValidSceneChapterNumber(0)).toBe(false);
+  it("accepts zero as prologue index", () => {
+    expect(parseSceneChapterNumber(0)).toBe(0);
+    expect(isValidSceneChapterNumber(0)).toBe(true);
+    expect(isValidSceneChapterNumber("0")).toBe(true);
+  });
+
+  it("rejects negative", () => {
     expect(isValidSceneChapterNumber(-1)).toBe(false);
   });
 
@@ -59,6 +64,13 @@ describe("scene chapter_number", () => {
       title: "Courtyard",
       rendererExpression: expression,
     });
-    expect(good.ok).toBe(true);
+    const prologue = validateSceneAcceptFields({
+      parentStoryCandidateId: "story-1",
+      chapter_number: 0,
+      chapter_title: "Prologue",
+      title: "The Wall",
+      rendererExpression: expression,
+    });
+    expect(prologue.ok).toBe(true);
   });
 });

@@ -11,7 +11,6 @@ import { z } from "zod";
 import { CopilotIcon } from "@/components/copilot/CopilotIcon";
 import { NarrativeRegenButton } from "@/components/copilot/NarrativeRegenButton";
 import { SuggestionPanel } from "@/components/copilot/SuggestionPanel";
-import { messages } from "@/lib/locale";
 import { FrameContextDrawer } from "@/components/reading-routes/FrameContextDrawer";
 import { FrameListPanel } from "@/components/reading-routes/FrameListPanel";
 import { Button } from "@/components/ui/button";
@@ -25,10 +24,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCopilotSession } from "@/hooks/useCopilotSession";
+import { MIN_SCENE_CHAPTER_NUMBER } from "@/lib/discovery/scene-chapter-number";
 import {
   listGenerateJobsForWork,
 } from "@/lib/generate-jobs";
 import { collectEmptyFrameUrlPatchesFromJobs } from "@/lib/generate-jobs/recoverSceneFrameUrls";
+import { messages } from "@/lib/locale";
 import {
   aggregateStoryRelatedRefs,
   formatStoryRelatedAggregateLine,
@@ -73,7 +74,7 @@ const sceneFormSchema = z.object({
       }
       return undefined;
     },
-    z.number({ error: "请填写章节序号" }).int().min(1, "章节序号至少为 1")
+    z.number({ error: "请填写章节序号" }).int().min(MIN_SCENE_CHAPTER_NUMBER, "章节序号至少为 0（序章）")
   ),
   chapter_title: z.preprocess(
     (v) => (v == null ? "" : String(v)),
@@ -275,6 +276,10 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
   const frames = useWatch({ control: form.control, name: "story_images_v2" }) ?? [];
   const sceneContexts =
     useWatch({ control: form.control, name: "sceneContexts" }) ?? [];
+  const watchedChapterNumber = useWatch({
+    control: form.control,
+    name: "chapter_number",
+  });
 
   const relatedLine = formatStoryRelatedAggregateLine(
     aggregateStoryRelatedRefs({ contexts: sceneContexts })
@@ -460,7 +465,7 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
           <Input
             id="chapter_number"
             type="number"
-            min={1}
+            min={MIN_SCENE_CHAPTER_NUMBER}
             step={1}
             {...form.register("chapter_number", { valueAsNumber: true })}
             aria-invalid={!!form.formState.errors.chapter_number}
@@ -470,6 +475,9 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
               {form.formState.errors.chapter_number.message}
             </p>
           )}
+          <p className="text-muted-foreground text-xs">
+            {messages.forms.chapterNumberHint}
+          </p>
         </div>
 
         {/* ── Chapter Title (optional POV label) ── */}
@@ -562,7 +570,13 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
         workId={workId}
         readingRouteTsid={readingRouteTsid}
         routeTitle={titleStr}
-        chapter_number={form.watch("chapter_number") || 1}
+        chapter_number={
+          typeof watchedChapterNumber === "number" &&
+          Number.isFinite(watchedChapterNumber) &&
+          watchedChapterNumber >= MIN_SCENE_CHAPTER_NUMBER
+            ? watchedChapterNumber
+            : 1
+        }
         chapter_title={form.watch("chapter_title")}
         frameIndex={drawerIndex}
         frames={frames}

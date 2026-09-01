@@ -213,7 +213,7 @@ function validateSceneFields(
     return {
       ok: false,
       errors: [
-        "Scene fields require chapter_number as integer ≥ 1 (not POV title text)",
+        "Scene fields require chapter_number as integer ≥ 0 (0 = prologue; not POV title text)",
       ],
     };
   }
