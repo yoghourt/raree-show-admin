@@ -535,6 +535,13 @@ export const zhCN = {
       '有帧缺少 Expression，将走 caption 兜底。请先在待补列表点「AI 补 Expression」，或到阅读帧 Frame Context 补写。仍要排队？',
     splitExpressionPartial:
       '画面已拆开，但部分 Expression 未写入。请在待补列表点「AI 补 Expression」。',
+    editQueuedExpression: '改 Expression',
+    collapseQueuedExpression: '收起 Expression',
+    reproposeQueuedExpression: 'AI 重新提案',
+    applyQueuedExpression: '保存到排队任务',
+    applyingQueuedExpression: '写入排队快照…',
+    queuedExpressionHint:
+      'Worker 用入队时的 Expression 快照。改完后须点「保存到排队任务」，否则仍用旧稿。生成中无法改。',
   },
 } as const;
 

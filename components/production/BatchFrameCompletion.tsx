@@ -3,6 +3,7 @@
 import Link from "next/link";
 import * as React from "react";
 
+import { applyQueuedFrameExpression } from "@/app/actions/applyQueuedFrameExpression";
 import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
 import { proposeFrameExpression } from "@/app/actions/proposeFrameExpression";
 import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
@@ -260,6 +261,16 @@ function isExprDraftDirty(
   baseline: string | undefined
 ): boolean {
   return (draft ?? "").trim() !== (baseline ?? "").trim();
+}
+
+function snapshotExpressionJson(job: GenerateJobRow): string {
+  const raw = job.input_json.renderer_expression;
+  if (raw == null) return "";
+  try {
+    return JSON.stringify(raw, null, 2);
+  } catch {
+    return "";
+  }
 }
 
 /** In-flight Execution jobs: block duplicate enqueue for the same frame. */
@@ -941,12 +952,15 @@ export function BatchFrameCompletion({
     }
   };
 
-  const proposeExprForJob = async (job: GenerateJobRow) => {
+  const proposeExprForJob = async (
+    job: GenerateJobRow,
+    options?: { currentExpression?: string }
+  ) => {
     if (job.subject_type !== "scene") return;
     const frameIndex = jobFrameIndex(job);
     if (frameIndex === null) {
       setWriteError("无法提案：job 无 frame_index");
-      return;
+      return false;
     }
     const route = routes.find((r) => r.tsid === job.subject_id);
     const liveCaption =
@@ -958,33 +972,137 @@ export function BatchFrameCompletion({
     const caption = splitFrameCaption(liveCaption || jobCaption).base;
     if (!caption) {
       setWriteError("无法提案：缺少画面说明");
-      return;
+      return false;
     }
+    const currentExpression =
+      options?.currentExpression ??
+      exprDraftByJob[job.id] ??
+      snapshotExpressionJson(job) ??
+      undefined;
     setProposingExprId(job.id);
     setWriteError(null);
     try {
       const result = await proposeFrameExpression({
         workId,
         caption,
-        currentExpression: exprDraftByJob[job.id],
+        currentExpression: currentExpression || undefined,
         operatorNote: revisionNotes[job.id],
         routeTitle: route?.title,
       });
       if (!result.ok) {
         setWriteError(result.message);
-        return;
+        return false;
       }
       setExprDraftByJob((prev) => ({
         ...prev,
         [job.id]: JSON.stringify(result.rendererExpression, null, 2),
       }));
       setAdmitHint(
-        "已填入 AI Expression（未写入 provenance；可再改后保存或重新排队）"
+        job.status === "queued"
+          ? "已填入 AI Expression（未写入排队快照；请核对后点「保存到排队任务」）"
+          : "已填入 AI Expression（未写入 provenance；可再改后保存或重新排队）"
       );
+      return true;
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+      return false;
+    } finally {
+      setProposingExprId(null);
+    }
+  };
+
+  const hydrateExprPanel = (job: GenerateJobRow) => {
+    const frameIndex = jobFrameIndex(job);
+    const snapshot = snapshotExpressionJson(job);
+    if (job.status === "queued" && snapshot) {
+      setExprDraftByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      setExprBaselineByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      return;
+    }
+    if (frameIndex === null) {
+      setExprDraftByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      setExprBaselineByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      return;
+    }
+    void scenesApi
+      .getFrameProvenance(workId, job.subject_id)
+      .then((entries) => {
+        const entry = entries.find((p) => p.frameIndex === frameIndex);
+        const json = entry?.rendererExpression
+          ? JSON.stringify(entry.rendererExpression, null, 2)
+          : snapshot;
+        setExprDraftByJob((prev) => ({ ...prev, [job.id]: json }));
+        setExprBaselineByJob((prev) => ({ ...prev, [job.id]: json }));
+      })
+      .catch(() => {
+        setExprDraftByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+        setExprBaselineByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      });
+  };
+
+  const openExprPanel = (job: GenerateJobRow) => {
+    const nextId = retryPanelJobId === job.id ? null : job.id;
+    setRetryPanelJobId(nextId);
+    if (nextId) hydrateExprPanel(job);
+  };
+
+  const saveExprDraftForJob = async (job: GenerateJobRow) => {
+    const frameIndex = jobFrameIndex(job);
+    if (frameIndex === null) {
+      setWriteError("无法保存：job 无 frame_index");
+      return;
+    }
+    const raw = (exprDraftByJob[job.id] ?? "").trim();
+    if (!raw) {
+      setWriteError("Expression JSON 为空");
+      return;
+    }
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(raw);
+    } catch {
+      setWriteError("Expression JSON 解析失败");
+      return;
+    }
+    const parsed = parseRendererExpression(parsedJson);
+    if (!parsed.ok) {
+      setWriteError(parsed.errors.join("; "));
+      return;
+    }
+    setExprBusyId(job.id);
+    setWriteError(null);
+    try {
+      await scenesApi.patchFrameProvenanceExpression(
+        workId,
+        job.subject_id,
+        frameIndex,
+        parsed.value
+      );
+      if (job.status === "queued") {
+        const applied = await applyQueuedFrameExpression({
+          workId,
+          jobId: job.id,
+          expression: parsed.value,
+        });
+        if (!applied.ok) {
+          setWriteError(
+            `Expression 已写入阅读帧，但排队快照未更新：${applied.message}`
+          );
+          onWrote();
+          return;
+        }
+        setExprBaselineByJob((prev) => ({ ...prev, [job.id]: raw }));
+        await refreshJobs();
+        onWrote();
+        setAdmitHint("已写入阅读帧与排队快照，Worker 将用新 Expression");
+        return;
+      }
+      setAdmitHint("Expression 已写入，出场人物已对齐");
+      onWrote();
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
-      setProposingExprId(null);
+      setExprBusyId(null);
     }
   };
 
@@ -1709,45 +1827,7 @@ export function BatchFrameCompletion({
                                   )
                                 ))
                             }
-                            onClick={() => {
-                              const nextId =
-                                retryPanelJobId === job.id ? null : job.id;
-                              setRetryPanelJobId(nextId);
-                              if (nextId && frameIndex !== null) {
-                                void scenesApi
-                                  .getFrameProvenance(workId, job.subject_id)
-                                  .then((entries) => {
-                                    const entry = entries.find(
-                                      (p) => p.frameIndex === frameIndex
-                                    );
-                                    const json = entry?.rendererExpression
-                                      ? JSON.stringify(
-                                          entry.rendererExpression,
-                                          null,
-                                          2
-                                        )
-                                      : "";
-                                    setExprDraftByJob((prev) => ({
-                                      ...prev,
-                                      [job.id]: json,
-                                    }));
-                                    setExprBaselineByJob((prev) => ({
-                                      ...prev,
-                                      [job.id]: json,
-                                    }));
-                                  })
-                                  .catch(() => {
-                                    setExprDraftByJob((prev) => ({
-                                      ...prev,
-                                      [job.id]: "",
-                                    }));
-                                    setExprBaselineByJob((prev) => ({
-                                      ...prev,
-                                      [job.id]: "",
-                                    }));
-                                  });
-                              }
-                            }}
+                            onClick={() => openExprPanel(job)}
                           >
                             {retryPanelJobId === job.id
                               ? "收起修改意见"
@@ -1769,7 +1849,75 @@ export function BatchFrameCompletion({
                           </Button>
                         </>
                       ) : null}
-                      {(job.status === "queued" || job.status === "running") &&
+                      {job.status === "queued" &&
+                      job.subject_type === "scene" ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id ||
+                              proposingExprId === job.id
+                            }
+                            onClick={() => openExprPanel(job)}
+                          >
+                            {retryPanelJobId === job.id
+                              ? messages.batchCompletion.collapseQueuedExpression
+                              : messages.batchCompletion.editQueuedExpression}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id ||
+                              proposingExprId === job.id ||
+                              exprBusyId === job.id ||
+                              frameIndex === null
+                            }
+                            onClick={() => {
+                              const snapshot = snapshotExpressionJson(job);
+                              const current =
+                                retryPanelJobId === job.id
+                                  ? exprDraftByJob[job.id] || snapshot
+                                  : snapshot;
+                              if (retryPanelJobId !== job.id) {
+                                setRetryPanelJobId(job.id);
+                                hydrateExprPanel(job);
+                              }
+                              void proposeExprForJob(job, {
+                                currentExpression: current,
+                              });
+                            }}
+                          >
+                            {proposingExprId === job.id
+                              ? messages.batchCompletion.proposingExpression
+                              : messages.batchCompletion.reproposeQueuedExpression}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-zinc-500"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id
+                            }
+                            onClick={() => void discardFrameJob(job)}
+                          >
+                            {requeueingId === job.id ? "处理中…" : "取消"}
+                          </Button>
+                        </>
+                      ) : null}
+                      {job.status === "running" &&
                       job.subject_type === "scene" ? (
                         <Button
                           type="button"
@@ -1789,6 +1937,11 @@ export function BatchFrameCompletion({
                     </div>
                     {retryPanelJobId === job.id ? (
                       <div className="mt-1 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
+                        {job.status === "queued" ? (
+                          <p className="text-[11px] text-amber-800">
+                            {messages.batchCompletion.queuedExpressionHint}
+                          </p>
+                        ) : null}
                         <label
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-failure-type-${job.id}`}
@@ -1833,8 +1986,9 @@ export function BatchFrameCompletion({
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-expr-${job.id}`}
                         >
-                          Expression（点下方重新排队时会写入 provenance
-                          再入队；也可先单独保存。修改意见可留空）
+                          {job.status === "queued"
+                            ? "Expression（点「保存到排队任务」后 Worker 用这份快照；不必取消重排）"
+                            : "Expression（点下方重新排队时会写入 provenance 再入队；也可先单独保存。修改意见可留空）"}
                         </label>
                         <Textarea
                           id={`frame-expr-${job.id}`}
@@ -1880,57 +2034,24 @@ export function BatchFrameCompletion({
                               writing ||
                               enqueueBusy
                             }
-                            onClick={() => {
-                            if (frameIndex === null) return;
-                            const raw = (exprDraftByJob[job.id] ?? "").trim();
-                            if (!raw) {
-                              setWriteError("Expression JSON 为空");
-                              return;
-                            }
-                            let parsedJson: unknown;
-                            try {
-                              parsedJson = JSON.parse(raw);
-                            } catch {
-                              setWriteError("Expression JSON 解析失败");
-                              return;
-                            }
-                            const parsed = parseRendererExpression(parsedJson);
-                            if (!parsed.ok) {
-                              setWriteError(parsed.errors.join("; "));
-                              return;
-                            }
-                            setExprBusyId(job.id);
-                            setWriteError(null);
-                            void scenesApi
-                              .patchFrameProvenanceExpression(
-                                workId,
-                                job.subject_id,
-                                frameIndex,
-                                parsed.value
-                              )
-                              .then(() =>
-                                setAdmitHint(
-                                  "Expression 已写入，出场人物已对齐"
-                                )
-                              )
-                              .catch((e) =>
-                                setWriteError(
-                                  e instanceof Error ? e.message : String(e)
-                                )
-                              )
-                              .finally(() => setExprBusyId(null));
-                          }}
-                        >
-                          {exprBusyId === job.id
-                            ? "保存 Expression…"
-                            : "保存 Expression"}
-                        </Button>
+                            onClick={() => void saveExprDraftForJob(job)}
+                          >
+                            {exprBusyId === job.id
+                              ? job.status === "queued"
+                                ? messages.batchCompletion.applyingQueuedExpression
+                                : "保存 Expression…"
+                              : job.status === "queued"
+                                ? messages.batchCompletion.applyQueuedExpression
+                                : "保存 Expression"}
+                          </Button>
                         </div>
                         <label
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-revision-${job.id}`}
                         >
-                          修改意见（可选；会并入下次生成 caption；不改库里的画面描述）
+                          {job.status === "queued"
+                            ? "修改意见（可选；给 AI 提案当纠偏。当前排队任务只改 Expression 快照，不改 caption）"
+                            : "修改意见（可选；会并入下次生成 caption；不改库里的画面描述）"}
                         </label>
                         <Textarea
                           id={`frame-revision-${job.id}`}
@@ -1945,35 +2066,37 @@ export function BatchFrameCompletion({
                           placeholder="例如：更暗的夜景；少一点人物；构图偏左；雨夜火光更强…"
                           className="min-h-[4.5rem] text-xs"
                         />
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-7 text-xs"
-                          title={
-                            canSubmitRetryPanel
-                              ? undefined
-                              : "请修改 Expression 或填写修改意见"
-                          }
-                          disabled={
-                            !canSubmitRetryPanel ||
-                            requeueingId === job.id ||
-                            writing ||
-                            enqueueBusy ||
-                            (frameIndex !== null &&
-                              Boolean(
-                                activeJobForFrame(
-                                  jobs,
-                                  job.subject_id,
-                                  frameIndex
-                                )
-                              ))
-                          }
-                          onClick={() => void requeueFromJob(job)}
-                        >
-                          {requeueingId === job.id
-                            ? "排队中…"
-                            : "按当前修改重新排队"}
-                        </Button>
+                        {job.status !== "queued" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 text-xs"
+                            title={
+                              canSubmitRetryPanel
+                                ? undefined
+                                : "请修改 Expression 或填写修改意见"
+                            }
+                            disabled={
+                              !canSubmitRetryPanel ||
+                              requeueingId === job.id ||
+                              writing ||
+                              enqueueBusy ||
+                              (frameIndex !== null &&
+                                Boolean(
+                                  activeJobForFrame(
+                                    jobs,
+                                    job.subject_id,
+                                    frameIndex
+                                  )
+                                ))
+                            }
+                            onClick={() => void requeueFromJob(job)}
+                          >
+                            {requeueingId === job.id
+                              ? "排队中…"
+                              : "按当前修改重新排队"}
+                          </Button>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
