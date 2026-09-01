@@ -1,13 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import * as React from "react";
 
 import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
 import { proposeFrameExpression } from "@/app/actions/proposeFrameExpression";
 import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
 import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
+import { splitReadingFrame } from "@/app/actions/splitReadingFrame";
 import { FrameJobResultDialog } from "@/components/generate-jobs/FrameJobResultDialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatGenerateJobErrorForOperator } from "@/lib/ai/image/operatorErrorCopy";
@@ -25,6 +36,8 @@ import { isEmptyFrameUrl } from "@/lib/production/completion-profile";
 import { FRAME_REVISION_MARKER, splitFrameCaption } from "@/lib/prompts/frame-draft";
 import * as scenesApi from "@/lib/scenes";
 import { parseRendererExpression } from "@/lib/discovery/visual-contract";
+import { messages } from "@/lib/locale";
+import { draftProductionBeatsFromCaption } from "@/lib/production/split-reading-frame";
 import type { ReadingRoute } from "@/lib/types";
 
 type PendingFill = {
@@ -66,6 +79,27 @@ function mergeRevisionNote(
   if (!note) return base;
   if (!base) return `${FRAME_REVISION_MARKER} ${note}`;
   return `${base}\n\n${FRAME_REVISION_MARKER} ${note}`;
+}
+
+type SplitTarget = {
+  routeTsid: string;
+  frameIndex: number;
+  caption: string;
+};
+
+function captionForSplit(
+  routes: ReadingRoute[],
+  sceneTsid: string,
+  frameIndex: number,
+  job?: GenerateJobRow
+): string {
+  const live =
+    routes.find((r) => r.tsid === sceneTsid)?.story_images_v2?.[frameIndex]
+      ?.caption?.trim() ?? "";
+  if (live) return live;
+  const jobCaption =
+    typeof job?.input_json.caption === "string" ? job.input_json.caption : "";
+  return splitFrameCaption(jobCaption).base;
 }
 
 function frameEnqueueCaptionFromJob(
@@ -288,6 +322,11 @@ export function BatchFrameCompletion({
     currentRouteTitle?: string | null;
     draftRevisionNote?: string | null;
   } | null>(null);
+  const [splitRow, setSplitRow] = React.useState<SplitTarget | null>(null);
+  const [splitBeats, setSplitBeats] = React.useState<Array<{ summary: string }>>(
+    []
+  );
+  const [splitting, setSplitting] = React.useState(false);
 
   const refreshJobs = React.useCallback(async () => {
     try {
@@ -298,6 +337,64 @@ export function BatchFrameCompletion({
       setJobsError(e instanceof Error ? e.message : String(e));
     }
   }, [workId]);
+
+  const openSplit = (row: SplitTarget) => {
+    const drafts = draftProductionBeatsFromCaption(row.caption);
+    const beats =
+      drafts.length >= 2
+        ? drafts.map((d) => ({ summary: d.summary }))
+        : [{ summary: row.caption }, { summary: "" }];
+    setSplitBeats(beats);
+    setSplitRow(row);
+  };
+
+  const confirmSplit = async () => {
+    if (!splitRow) return;
+    const cleaned = splitBeats
+      .map((b) => ({ summary: b.summary.trim() }))
+      .filter((b) => b.summary.length > 0);
+    if (cleaned.length < 2) {
+      window.alert(messages.batchCompletion.splitFrameNeedTwo);
+      return;
+    }
+    setSplitting(true);
+    try {
+      const result = await splitReadingFrame({
+        workId,
+        sceneTsid: splitRow.routeTsid,
+        frameIndex: splitRow.frameIndex,
+        beats: cleaned,
+      });
+      if (!result.ok) {
+        window.alert(result.message || messages.batchCompletion.splitFrameFailed);
+        return;
+      }
+      if (result.expressionWarnings.length > 0) {
+        const detail = result.expressionWarnings.join("\n");
+        window.alert(
+          `${messages.batchCompletion.splitExpressionPartial}\n${detail}`
+        );
+        setWriteError(
+          `${messages.batchCompletion.splitExpressionPartial}\n${detail}`
+        );
+      } else {
+        setWriteError(null);
+        setAdmitHint(
+          `已拆成 ${result.inserted} 条画面，并写入 Expression。可再点缺画面排队。`
+        );
+      }
+      setSplitRow(null);
+      setSplitBeats([]);
+      onWrote();
+      await refreshJobs();
+    } catch (e) {
+      window.alert(
+        e instanceof Error ? e.message : messages.batchCompletion.splitFrameFailed
+      );
+    } finally {
+      setSplitting(false);
+    }
+  };
 
   React.useEffect(() => {
     const next: PendingFill[] = [];
@@ -337,6 +434,7 @@ export function BatchFrameCompletion({
   const enqueueableRows = rows.filter(
     (r) => !activeJobForFrame(jobs, r.routeTsid, r.frameIndex)
   );
+  const missingExprRows = rows.filter((r) => !r.hasRendererExpression);
 
   const patchRow = (key: string, patch: Partial<PendingFill>) => {
     setRows((prev) =>
@@ -389,7 +487,7 @@ export function BatchFrameCompletion({
     }
     if (fresh.some((r) => !r.hasRendererExpression)) {
       const ok = window.confirm(
-        "有帧缺少 Expression，将走 caption 兜底。建议先在读帧补 Expression。仍要排队？"
+        messages.batchCompletion.missingExpressionEnqueueConfirm
       );
       if (!ok) return;
     }
@@ -421,6 +519,67 @@ export function BatchFrameCompletion({
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
       setEnqueueBusy(false);
+    }
+  };
+
+  const proposeAndSaveExprForRow = async (
+    row: PendingFill
+  ): Promise<boolean> => {
+    const key = rowKey(row.routeTsid, row.frameIndex);
+    setProposingExprId(key);
+    setWriteError(null);
+    try {
+      const result = await proposeFrameExpression({
+        workId,
+        caption: row.caption,
+        routeTitle: row.routeTitle,
+      });
+      if (!result.ok) {
+        setWriteError(
+          `${row.routeTitle} · 帧 ${row.frameIndex + 1}：${result.message}`
+        );
+        return false;
+      }
+      await scenesApi.patchFrameProvenanceExpression(
+        workId,
+        row.routeTsid,
+        row.frameIndex,
+        result.rendererExpression
+      );
+      return true;
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+      return false;
+    } finally {
+      setProposingExprId(null);
+    }
+  };
+
+  const proposeMissingExpressions = async (targets: PendingFill[]) => {
+    const missing = targets.filter((r) => !r.hasRendererExpression);
+    if (missing.length === 0) {
+      setAdmitHint("所选帧都已有 Expression。");
+      return;
+    }
+    const failures: string[] = [];
+    let okCount = 0;
+    for (let i = 0; i < missing.length; i++) {
+      const row = missing[i]!;
+      setAdmitHint(
+        `正在补 Expression（${i + 1}/${missing.length}）· ${row.routeTitle} 帧 ${row.frameIndex + 1}`
+      );
+      const ok = await proposeAndSaveExprForRow(row);
+      if (ok) okCount += 1;
+      else failures.push(`${row.routeTitle} · 帧 ${row.frameIndex + 1}`);
+    }
+    onWrote();
+    if (failures.length > 0) {
+      setWriteError(
+        `已写入 ${okCount} 条 Expression；失败 ${failures.length}：${failures.join("；")}`
+      );
+    } else {
+      setWriteError(null);
+      setAdmitHint(`已为 ${okCount} 帧写入 Expression，可再点缺画面排队。`);
     }
   };
 
@@ -900,11 +1059,32 @@ export function BatchFrameCompletion({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {missingExprRows.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={
+                writing ||
+                enqueueBusy ||
+                proposingExprId !== null ||
+                splitting
+              }
+              onClick={() => void proposeMissingExpressions(missingExprRows)}
+            >
+              {proposingExprId
+                ? messages.batchCompletion.proposingExpression
+                : `${messages.batchCompletion.proposeMissingExpressions}（${missingExprRows.length}）`}
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
             disabled={
-              writing || enqueueBusy || enqueueableRows.length === 0
+              writing ||
+              enqueueBusy ||
+              proposingExprId !== null ||
+              enqueueableRows.length === 0
             }
             onClick={() => void enqueueRows(rows)}
           >
@@ -998,8 +1178,13 @@ export function BatchFrameCompletion({
                     </div>
                     {!row.hasRendererExpression ? (
                       <p className="mt-1 text-[11px] text-amber-800">
-                        缺 Expression：建议先在读帧（Frame Context）补写，再排队；否则走
-                        caption 兜底。
+                        {messages.batchCompletion.missingExpressionHint}{" "}
+                        <Link
+                          href={`/works/${encodeURIComponent(workId)}/reading-routes/${encodeURIComponent(row.routeTsid)}/edit`}
+                          className="underline"
+                        >
+                          打开阅读帧
+                        </Link>
                       </p>
                     ) : null}
                     <p className="truncate text-xs text-zinc-500">{row.caption}</p>
@@ -1026,7 +1211,11 @@ export function BatchFrameCompletion({
                     type="button"
                     size="sm"
                     disabled={
-                      row.busy || writing || enqueueBusy || enqueueBlocked
+                      row.busy ||
+                      writing ||
+                      enqueueBusy ||
+                      enqueueBlocked ||
+                      proposingExprId !== null
                     }
                     onClick={() => void enqueueRows([row])}
                   >
@@ -1035,6 +1224,43 @@ export function BatchFrameCompletion({
                         ? "生成中…"
                         : "已排队"
                       : "排队生成"}
+                  </Button>
+                  {!row.hasRendererExpression ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={
+                        row.busy ||
+                        writing ||
+                        enqueueBusy ||
+                        proposingExprId !== null ||
+                        splitting
+                      }
+                      onClick={() => {
+                        void proposeAndSaveExprForRow(row).then((ok) => {
+                          if (!ok) return;
+                          onWrote();
+                          setAdmitHint(
+                            `${row.routeTitle} · 帧 ${row.frameIndex + 1}：已写入 Expression`
+                          );
+                        });
+                      }}
+                    >
+                      {proposingExprId === key
+                        ? messages.batchCompletion.proposingExpression
+                        : messages.batchCompletion.proposeExpression}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={row.busy || writing || enqueueBusy || splitting}
+                    onClick={() => openSplit(row)}
+                    title={messages.batchCompletion.splitFrameDescription}
+                  >
+                    {messages.batchCompletion.splitFrame}
                   </Button>
                   {row.candidateUrl ? (
                     <Button
@@ -1335,8 +1561,8 @@ export function BatchFrameCompletion({
                     </div>
                     {!jobHasRendererExpression(job) ? (
                       <p className="text-[11px] text-amber-800">
-                        无 Expression：下次可先在读帧 / Frame Context
-                        补写再重试，避免 caption 兜底。
+                        无 Expression：下次可先点待补列表的「AI 补 Expression」，或到阅读帧
+                        Frame Context 补写再重试，避免 caption 兜底。
                       </p>
                     ) : null}
                     {job.error ? (
@@ -1365,6 +1591,37 @@ export function BatchFrameCompletion({
                       </p>
                     ) : null}
                     <div className="flex flex-wrap gap-1.5">
+                      {job.subject_type === "scene" &&
+                      frameIndex !== null &&
+                      captionForSplit(
+                        routes,
+                        job.subject_id,
+                        frameIndex,
+                        job
+                      ) ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={writing || enqueueBusy || splitting}
+                          onClick={() =>
+                            openSplit({
+                              routeTsid: job.subject_id,
+                              frameIndex,
+                              caption: captionForSplit(
+                                routes,
+                                job.subject_id,
+                                frameIndex,
+                                job
+                              ),
+                            })
+                          }
+                          title={messages.batchCompletion.splitFrameDescription}
+                        >
+                          {messages.batchCompletion.splitFrame}
+                        </Button>
+                      ) : null}
                       {canAdmit ? (
                         <Button
                           type="button"
@@ -1753,6 +2010,102 @@ export function BatchFrameCompletion({
         draftRevisionNote={preview?.draftRevisionNote}
         title={preview?.label ? `${preview.label} · Job 预览` : "Job 画面预览"}
       />
+
+      <Dialog
+        open={splitRow !== null}
+        onOpenChange={(open) => {
+          if (!open && !splitting) {
+            setSplitRow(null);
+            setSplitBeats([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{messages.batchCompletion.splitFrameTitle}</DialogTitle>
+            <DialogDescription>
+              {messages.batchCompletion.splitFrameDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-3 overflow-y-auto">
+            {splitBeats.map((beat, index) => (
+              <div
+                key={`prod-split-${index}`}
+                className="space-y-1.5 rounded-lg border border-zinc-200 px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs">Beat {index + 1}</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    disabled={splitting || splitBeats.length <= 2}
+                    onClick={() =>
+                      setSplitBeats((prev) =>
+                        prev.filter((_, i) => i !== index)
+                      )
+                    }
+                  >
+                    {messages.batchCompletion.splitFrameRemoveBeat}
+                  </Button>
+                </div>
+                <Textarea
+                  value={beat.summary}
+                  rows={3}
+                  className="text-xs"
+                  placeholder={messages.batchCompletion.splitFrameCaptionPlaceholder}
+                  disabled={splitting}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSplitBeats((prev) =>
+                      prev.map((b, i) =>
+                        i === index ? { ...b, summary: value } : b
+                      )
+                    );
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              disabled={splitting}
+              onClick={() =>
+                setSplitBeats((prev) => [...prev, { summary: "" }])
+              }
+            >
+              {messages.batchCompletion.splitFrameAddBeat}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={splitting}
+              onClick={() => {
+                setSplitRow(null);
+                setSplitBeats([]);
+              }}
+            >
+              {messages.batchCompletion.splitFrameCancel}
+            </Button>
+            <Button
+              type="button"
+              disabled={splitting}
+              onClick={() => void confirmSplit()}
+            >
+              {splitting
+                ? messages.batchCompletion.splitFrameConfirming
+                : messages.batchCompletion.splitFrameConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

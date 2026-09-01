@@ -513,6 +513,29 @@ export const zhCN = {
       cancel: '取消',
     },
   },
+  batchCompletion: {
+    splitFrame: '拆成多画面',
+    splitFrameTitle: '拆成多个单 beat 画面',
+    splitFrameDescription:
+      '这条说明含多个事件，一张图画不全。拆开后写入本故事，并为每条补全 Expression。原帧说明被替换；该帧及之后已排队的生成任务会取消。',
+    splitFrameConfirm: '确认拆分',
+    splitFrameConfirming: '拆分并补全 Expression…',
+    splitFrameAddBeat: '加一条',
+    splitFrameRemoveBeat: '删除',
+    splitFrameNeedTwo: '至少保留两条非空说明',
+    splitFrameFailed: '拆分失败，请重试',
+    splitFrameCaptionPlaceholder: '这一拍发生了什么？',
+    splitFrameCancel: '取消',
+    proposeExpression: 'AI 补 Expression',
+    proposingExpression: '补 Expression…',
+    proposeMissingExpressions: '为缺 Expression 的帧补全',
+    missingExpressionHint:
+      '缺 Expression：拆开后自动补全没落到这一帧。可在本行点「AI 补 Expression」，或到阅读帧打开该画面的 Frame Context（AI 提案 → 保存）。',
+    missingExpressionEnqueueConfirm:
+      '有帧缺少 Expression，将走 caption 兜底。请先在待补列表点「AI 补 Expression」，或到阅读帧 Frame Context 补写。仍要排队？',
+    splitExpressionPartial:
+      '画面已拆开，但部分 Expression 未写入。请在待补列表点「AI 补 Expression」。',
+  },
 } as const;
 
 export type ZhCNLocale = typeof zhCN;
