@@ -5,7 +5,10 @@
  * renderer profile. MUST NOT invent story meaning. MUST NOT run at persist.
  */
 
-import { adaptSceneExpressionForLocalCapability } from "@/lib/discovery/expression-capability-rules";
+import {
+  adaptSceneExpressionForLocalCapability,
+  isVerticalTreeCamera,
+} from "@/lib/discovery/expression-capability-rules";
 import type { RendererExpression } from "@/lib/discovery/visual-contract";
 
 export type ProjectionProfile = "local" | "cloud";
@@ -225,38 +228,53 @@ export function expressionToPrompt(
   return joinCloudPrompt(projected);
 }
 
+function isStubCastVisual(visual: string): boolean {
+  const t = visual.trim();
+  if (!t) return true;
+  return /^character present$/i.test(t);
+}
+
+const GARMENT_TOKEN =
+  /\b(cloak|hood|robe|armor|armour|gown|tunic|mail|shroud)\b/gi;
+
+function garmentTokens(visual: string): Set<string> {
+  return new Set(
+    [...visual.toLowerCase().matchAll(GARMENT_TOKEN)].map((m) => m[1]!)
+  );
+}
+
+/** Dual-cast Local prior: copy the first figure's cloak onto everyone. */
+function dualCastNeedsCostumeContrast(visuals: string[]): boolean {
+  if (visuals.length !== 2) return false;
+  const a = garmentTokens(visuals[0]!);
+  const b = garmentTokens(visuals[1]!);
+  if (a.size === 0 && b.size === 0) return false;
+  if (a.size !== b.size) return true;
+  for (const token of a) {
+    if (!b.has(token)) return true;
+  }
+  return false;
+}
+
 function joinLocalPrompt(re: RendererExpression): string {
-  const castLen = re.characters?.length ?? 0;
-  const cast = (re.characters ?? [])
-    .map((c) => {
-      const role = hardCap(capPart(c.role), LOCAL_ROLE_MAX);
-      const visual = hardCap(
-        stripExactlyFigureCues(capPart(c.visual)),
-        LOCAL_VISUAL_MAX
-      );
-      return `${role}: ${visual}`;
-    })
-    .join("; ");
+  const visuals = (re.characters ?? [])
+    .map((c) =>
+      hardCap(stripExactlyFigureCues(capPart(c.visual)), LOCAL_VISUAL_MAX)
+    )
+    .filter((visual) => !isStubCastVisual(visual));
+  const cast = visuals.join("; ");
 
   let action = stripExactlyFigureCues(capPart(re.action ?? ""));
   action = hardCap(action, LOCAL_ACTION_MAX);
 
-  let composition = stripExactlyFigureCues(capPart(re.composition ?? ""));
-  if (castLen === 2) {
-    composition =
-      "medium-wide, both visible, identity weapons in frame, profiles";
-  } else if (castLen > 2) {
-    if (
-      composition.length > LOCAL_COMPOSITION_MAX ||
-      !/\bmedium[\s-]?wide\b|\bwide\s+shot\b/i.test(composition)
-    ) {
-      composition = "medium wide shot, faces secondary";
-    } else {
-      composition = hardCap(composition, LOCAL_COMPOSITION_MAX);
-    }
-  } else {
-    composition = hardCap(composition, LOCAL_COMPOSITION_MAX);
-  }
+  const composition = hardCap(
+    stripExactlyFigureCues(capPart(re.composition ?? "")),
+    LOCAL_COMPOSITION_MAX
+  );
+  const contrast = dualCastNeedsCostumeContrast(visuals)
+    ? "not matching outfits"
+    : "";
+  const perch = isVerticalTreeCamera(re) ? "living perch not a fallen log" : "";
 
   const environment = hardCap(
     stripExactlyFigureCues(capPart(re.environment ?? "")),
@@ -267,18 +285,16 @@ function joinLocalPrompt(re: RendererExpression): string {
     : "";
 
   const parts = [
-    cast && `Characters: ${cast}.`,
-    action && `Action: ${action}.`,
-    environment && `Environment: ${environment}.`,
-    composition && `Composition: ${composition}.`,
-    emphasis && `Visual emphasis: ${emphasis}.`,
-    // lighting / atmosphere / styleHints omitted — work identity lives in
-    // environment materials, identity visuals, and visualEmphasis, not style adjectives.
+    cast,
+    action,
+    environment,
+    composition,
+    perch,
+    contrast,
+    emphasis,
   ].filter(Boolean);
-
-  const body = parts.join(" ").trim();
-  if (!body) return "";
-  return `${body} No extra people. Frozen still, no text, no watermark.`;
+  if (!parts.length) return "";
+  return `${parts.join(". ")}.`;
 }
 
 function joinCloudPrompt(re: RendererExpression): string {

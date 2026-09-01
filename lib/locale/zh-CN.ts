@@ -145,7 +145,7 @@ export const zhCN = {
     visualConventionHint:
       '生图用，不进读者简介。写本作品的画风、时代/材料、禁止项。角色五官与单帧动作仍以角色视觉身份和画面说明为准。',
     visualConventionPlaceholder:
-      '例如：STYLE: painterly digital painting. ERA: medieval wool, fur, leather, all-black cloaks. FORBID: modern military, olive drab, camouflage.',
+      '例如：painterly digital painting, medieval wool, fur, leather; no modern military, no olive drab, no camouflage. 全员同一件斗篷写在角色视觉里，不要写进作品约定。',
   },
   rollout: {
     pageTitle:          '写入作品',

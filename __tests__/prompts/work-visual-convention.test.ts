@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   clipWorkVisualConvention,
+  flattenWorkVisualConventionForPrompt,
+  forbidsFromWorkVisualConvention,
   workTitleAndConventionFromRow,
   workVisualConventionFromRow,
   workVisualConventionPromptBlock,
@@ -68,8 +70,43 @@ describe("workVisualConventionPromptBlock", () => {
       WORK_VISUAL_CONVENTION_PROMPT_MAX_CHARS + 1
     );
     const block = workVisualConventionPromptBlock(long);
-    expect(block).toMatch(/Work visual convention/);
-    expect(block).toMatch(/caption beat still win/);
-    expect(block).toContain(clipped);
+    expect(block).not.toMatch(/Work look/);
+    expect(block).not.toMatch(/\bERA\s*:/);
+    expect(block).not.toMatch(/\bFORBID\s*:/);
+    expect(block).toMatch(/wool/);
+  });
+});
+
+describe("flattenWorkVisualConventionForPrompt", () => {
+  it("strips section labels and drops FORBID from the positive block", () => {
+    const flat = flattenWorkVisualConventionForPrompt(
+      "STYLE: painterly. ERA: wool, fur. FORBID: modern military, olive drab."
+    );
+    expect(flat).toMatch(/painterly/);
+    expect(flat).toMatch(/wool/);
+    expect(flat).not.toMatch(/cloak/i);
+    expect(flat).not.toMatch(/\bSTYLE\s*:/i);
+    expect(flat).not.toMatch(/\bERA\s*:/i);
+    expect(flat).not.toMatch(/modern military/);
+  });
+
+  it("drops work-wide cloaks so they cannot paint every figure the same", () => {
+    const flat = flattenWorkVisualConventionForPrompt(
+      "STYLE: painterly digital painting. ERA: medieval wool, fur, leather, all-black cloaks."
+    );
+    expect(flat).toMatch(/painterly/);
+    expect(flat).toMatch(/wool/);
+    expect(flat).toMatch(/leather/);
+    expect(flat).not.toMatch(/cloak/i);
+  });
+});
+
+describe("forbidsFromWorkVisualConvention", () => {
+  it("extracts FORBID clauses for negatives", () => {
+    expect(
+      forbidsFromWorkVisualConvention(
+        "STYLE: painterly. FORBID: modern military, olive drab."
+      )
+    ).toEqual(["modern military", "olive drab"]);
   });
 });

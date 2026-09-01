@@ -20,7 +20,11 @@ import {
   executableRendererExpression,
   type RendererExpression,
 } from "@/lib/discovery/visual-contract";
-import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
+import { isVerticalTreeCamera } from "@/lib/discovery/expression-capability-rules";
+import {
+  forbidsFromWorkVisualConvention,
+  workVisualConventionPromptBlock,
+} from "@/lib/prompts/work-visual-convention";
 
 export const FRAME_REVISION_MARKER = "[操作员修改意见]";
 
@@ -110,13 +114,45 @@ export const FRAME_NEGATIVE_PROMPT = [
 
 export function buildFrameNegativePrompt(
   _caption?: string,
-  options?: { castCount?: number }
+  options?: {
+    castCount?: number;
+    workVisualConvention?: string;
+    rendererExpression?: RendererExpression | null;
+  }
 ): string {
   void _caption;
+  const forbids = forbidsFromWorkVisualConvention(
+    options?.workVisualConvention ?? ""
+  );
+  const extra = [
+    "floating text",
+    "diagram labels",
+    "title card",
+    "poster title",
+    "framed illustration",
+    "white border",
+    "letterbox",
+    "inset frame",
+    "picture frame",
+    ...forbids,
+  ];
+  if (
+    options?.rendererExpression &&
+    isVerticalTreeCamera(options.rendererExpression)
+  ) {
+    extra.push(
+      "fallen log perch",
+      "standing on a fallen trunk",
+      "matching hooded cloaks",
+      "identical outfits",
+      "two matching cloaks"
+    );
+  }
   const cast = options?.castCount;
   if (cast === 2) {
     return [
       FRAME_NEGATIVE_PROMPT,
+      ...extra,
       "three people",
       "three figures",
       "group of three",
@@ -134,13 +170,16 @@ export function buildFrameNegativePrompt(
   if (cast === 1) {
     return [
       FRAME_NEGATIVE_PROMPT,
+      ...extra,
       "two people",
       "couple",
       "extra person",
       "crowd",
     ].join(", ");
   }
-  return FRAME_NEGATIVE_PROMPT;
+  return extra.length
+    ? `${FRAME_NEGATIVE_PROMPT}, ${extra.join(", ")}`
+    : FRAME_NEGATIVE_PROMPT;
 }
 
 function conventionLead(convention?: string): string | null {
@@ -166,17 +205,20 @@ function buildExpressionPrompt(input: {
 
   const parts: string[] = [];
   if (input.revisionNote) {
-    // Front only — Local often ignores trailing Chinese; do not duplicate the full note.
     parts.push(`OPERATOR OVERRIDE (must follow): ${input.revisionNote}.`);
   }
+  parts.push(body);
   const convention = conventionLead(input.workVisualConvention);
   if (convention) {
     parts.push(convention);
   }
-  if (input.routeTitle) {
-    parts.push(`Setting: ${input.routeTitle}.`);
+  // Local: omit routeTitle — Setting strings render as plaque / title cards.
+  if (input.projectionProfile !== "local") {
+    const routeTitle = input.routeTitle.trim();
+    if (routeTitle) {
+      parts.push(`Setting: ${routeTitle}.`);
+    }
   }
-  parts.push(body);
   return parts.join(" ");
 }
 
@@ -238,21 +280,14 @@ function buildLocalCaptionPrompt(input: {
     : "";
 
   const parts: string[] = [];
-  // Lock before Scene: Chinese/English scene tokens otherwise win and paint glyphs.
-  parts.push(
-    "VISUAL LOCK: pure image only — no Chinese text, no English text, no letters,",
-    "no calligraphy, no plaque, no signboard writing, no caption overlay, no watermark;",
-    "any paper, scroll, or board must be blank unmarked surface;",
-    "when people appear, faces sharp and readable, not blurry."
-  );
   if (revision) {
     parts.push(`OPERATOR OVERRIDE (must follow): ${revision}.`);
   }
+  parts.push(`Scene: ${scene}.`);
   const convention = conventionLead(input.workVisualConvention);
   if (convention) {
     parts.push(convention);
   }
-  parts.push(`Scene: ${scene}.`);
   // Avoid "digital illustration" alone — Local turbo drifts to children's textbook look.
   parts.push(
     "Cinematic narrative painting, adult tone,",

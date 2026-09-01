@@ -313,6 +313,23 @@ export const HAND_TRANSFER_ACTION_PATTERN =
 const CLOSE_DUAL_FRAMING_PATTERN =
   /\b(waist[\s-]?up|bust\s+shot|tight\s+two[\s-]?shot|two[\s-]?shot|head[\s-]and[\s-]shoulders|from\s+the\s+waist)\b/i;
 
+const DUAL_CAST_COMPOSITION_FALLBACK =
+  "medium-wide, both visible, identity weapons in frame, profiles";
+
+/** Elevated / high camera — do not flatten to a left/right ground standoff. */
+const VERTICAL_CAMERA_PATTERN =
+  /\b(elevat|high[- ]angle|over-?head|from above|dwarfed|from (?:a |the )?(?:branch|tree|wall|window|tower|rooftop))\b/i;
+
+const TREE_PERCH_PATTERN =
+  /\b(branch|bough|canopy|treetop|ironwood|(?:from|in|on) (?:a |the )?(?:\w+\s+)?tree)\b/i;
+
+export function isVerticalTreeCamera(
+  expression: Pick<ExpressionLike, "action" | "composition">
+): boolean {
+  const blob = `${expression.action ?? ""} ${expression.composition ?? ""}`;
+  return VERTICAL_CAMERA_PATTERN.test(blob) && TREE_PERCH_PATTERN.test(blob);
+}
+
 function hardCapAtBoundary(text: string, maxLen: number): string {
   const t = text.trim().replace(/\s+/g, " ");
   if (t.length <= maxLen) return t;
@@ -323,7 +340,7 @@ function hardCapAtBoundary(text: string, maxLen: number): string {
 
 /** Body / face marks that carry character identity (cross-work). */
 const IDENTITY_BODY_PATTERN =
-  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|auburn\s+hair|white\s+hair|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
+  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|\bgaunt\b|\bpale\b|auburn\s+hair|white\s+hair|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
 
 /** Costume class (Tier 2). */
 const COSTUME_CUE_PATTERN =
@@ -475,20 +492,28 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
   if (castLen === 2) {
     const left = shortRoleLabel(chars[0]!.role);
     const right = shortRoleLabel(chars[1]!.role);
-    const hasPlacement = /\bleft\b/i.test(action) && /\bright\b/i.test(action);
+    const hasLateralPlacement =
+      /\bleft\b/i.test(action) && /\bright\b/i.test(action);
+    const verticalCamera = VERTICAL_CAMERA_PATTERN.test(
+      `${action} ${composition}`
+    );
 
-    if (action && !hasPlacement) {
-      action = `${action}, ${left} left, ${right} right`;
-    } else if (!action) {
-      action = `${left} left, ${right} right`;
+    if (!verticalCamera) {
+      if (action && !hasLateralPlacement) {
+        action = `${action}, ${left} left, ${right} right`;
+      } else if (!action) {
+        action = `${left} left, ${right} right`;
+      }
+      if (!/\bboth\b/i.test(action)) {
+        action = `${action}, both fully visible`;
+      }
     }
 
-    if (!/\bboth\b/i.test(action)) {
-      action = `${action}, both fully visible`;
+    // Keep authored camera (elevated / wide / dwarfed). Dual-profile fallback
+    // only when composition is empty or a close two-shot Local cannot hold.
+    if (!composition || CLOSE_DUAL_FRAMING_PATTERN.test(composition)) {
+      composition = DUAL_CAST_COMPOSITION_FALLBACK;
     }
-
-    composition =
-      "medium-wide, both visible, identity weapons in frame, profiles";
   } else if (castLen > 2) {
     composition = composition
       .replace(new RegExp(CLOSE_DUAL_FRAMING_PATTERN.source, "gi"), " ")
@@ -496,11 +521,10 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
       .replace(/\s{2,}/g, " ")
       .replace(/^[\s,]+|[\s,]+$/g, "")
       .trim();
-    if (
-      composition.length > 72 ||
-      !/\bmedium[\s-]?wide\b|\bwide\s+shot\b/i.test(composition)
-    ) {
+    if (!composition) {
       composition = "medium wide shot, faces secondary";
+    } else {
+      composition = hardCapAtBoundary(composition, 72);
     }
   }
 

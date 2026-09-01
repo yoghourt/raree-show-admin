@@ -19,7 +19,7 @@ import {
   type RendererExpression,
   type VisualIntent,
 } from "@/lib/discovery/visual-contract";
-import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
+import { workVisualConventionProposeBlock } from "@/lib/prompts/work-visual-convention";
 
 function isSplitExpressionMockMode(): boolean {
   if (process.env.DISCOVERY_PROPOSE_MODE === "live") {
@@ -151,7 +151,7 @@ function buildSplitExpressionPrompt(params: {
   const retryBlock = params.retryNote
     ? `\nRETRY — previous output was rejected:\n${params.retryNote}\n`
     : "";
-  const conventionBlock = workVisualConventionPromptBlock(params.visualConvention);
+  const conventionBlock = workVisualConventionProposeBlock(params.visualConvention);
   const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You author Canonical Visual Expression for Human-split Scene beats.

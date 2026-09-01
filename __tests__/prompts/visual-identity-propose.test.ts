@@ -114,9 +114,9 @@ describe("buildVisualIdentityProposePrompt", () => {
       visualConvention:
         "ERA: medieval wool, fur, leather. FORBID: modern military, olive drab.",
     });
-    expect(p).toMatch(/Work visual convention/);
+    expect(p).toMatch(/Work look/);
     expect(p).toMatch(/medieval wool/);
     expect(p).toMatch(/olive drab/);
-    expect(p).toMatch(/FACE\/COSTUME\/PROP/);
+    expect(p).toMatch(/character looks and the caption beat still win/);
   });
 });

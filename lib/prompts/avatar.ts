@@ -7,7 +7,10 @@
  * prompt — trailing Chinese notes lose to early English tokens like "Lady".
  */
 
-import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
+import {
+  forbidsFromWorkVisualConvention,
+  workVisualConventionPromptBlock,
+} from "@/lib/prompts/work-visual-convention";
 
 export const AVATAR_REVISION_MARKER = "[操作员修改意见]";
 /** Budgeted Character Archive visual cues folded into portrait description. */
@@ -374,7 +377,10 @@ function appearanceNegativeExtras(appearance: string): string[] {
 }
 
 /** Negatives for portrait slot, optionally extended from description cues. */
-export function buildAvatarNegativePrompt(description?: string): string {
+export function buildAvatarNegativePrompt(
+  description?: string,
+  workVisualConvention?: string
+): string {
   const { base, revisionNote, appearance } = splitAvatarDescription(
     description ?? ""
   );
@@ -384,7 +390,12 @@ export function buildAvatarNegativePrompt(description?: string): string {
     detectGenderCue(base);
   const { negativeExtra } = genderOverrideClauses(cue);
   const appearanceNeg = appearanceNegativeExtras(appearance);
-  const merged = [...new Set([...negativeExtra, ...appearanceNeg])];
+  const conventionNeg = forbidsFromWorkVisualConvention(
+    workVisualConvention ?? ""
+  );
+  const merged = [
+    ...new Set([...negativeExtra, ...appearanceNeg, ...conventionNeg]),
+  ];
   if (merged.length === 0) return AVATAR_NEGATIVE_PROMPT;
   return `${AVATAR_NEGATIVE_PROMPT}, ${merged.join(", ")}`;
 }

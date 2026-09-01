@@ -25,14 +25,74 @@ export function workVisualConventionFromRow(row: unknown): string {
   return typeof raw === "string" ? clipWorkVisualConvention(raw) : "";
 }
 
-/** Prompt block for propose / generate. Empty string when unset. */
+const CONVENTION_SECTION_LABEL =
+  /\b(?:STYLE|ERA|FORBID|COSTUME|FACE|PROP|SUMMARY)\s*:\s*/gi;
+
+/**
+ * Work-wide garments paint every figure the same (Local turbo prior).
+ * Wardrobe lives on character visuals; convention keeps style + materials.
+ */
+const WORK_WIDE_GARMENT_PATTERN =
+  /\b(?:all[- ](?:the\s+)?(?:black|white|dark|red|grey|gray)\s+)?(?:matching\s+)?(?:hooded\s+)?cloaks?\b/gi;
+
+function forbidClause(convention: string): string {
+  const m = convention.match(
+    /\bFORBID\s*:\s*(.+?)(?=\b(?:STYLE|ERA|FORBID|COSTUME|FACE|PROP|SUMMARY)\s*:|$)/i
+  );
+  return m?.[1]?.trim() ?? "";
+}
+
+/** FORBID: values for negative_prompt. Empty when the operator used unlabeled prose. */
+export function forbidsFromWorkVisualConvention(convention: string): string[] {
+  const clause = forbidClause(clipWorkVisualConvention(convention));
+  if (!clause) return [];
+  return clause
+    .split(/[,;]/)
+    .map((part) => part.replace(/\.+$/g, "").trim())
+    .filter((part) => part.length > 1);
+}
+
+/**
+ * Positive-prompt prose: drop ALL-CAPS section labels (they paint as glyphs)
+ * and drop the FORBID clause (that belongs in negatives).
+ */
+export function flattenWorkVisualConventionForPrompt(
+  convention: string,
+  maxChars = WORK_VISUAL_CONVENTION_PROMPT_MAX_CHARS
+): string {
+  let t = clipWorkVisualConvention(convention);
+  if (!t) return "";
+  t = t.replace(
+    /\bFORBID\s*:\s*(.+?)(?=\b(?:STYLE|ERA|FORBID|COSTUME|FACE|PROP|SUMMARY)\s*:|$)/gi,
+    " "
+  );
+  t = t.replace(CONVENTION_SECTION_LABEL, "");
+  t = t.replace(WORK_WIDE_GARMENT_PATTERN, " ");
+  t = t.replace(/\s+/g, " ").trim().replace(/^[,;.\s]+|[,;.\s]+$/g, "");
+  return clipWorkVisualConvention(t, maxChars);
+}
+
+/** Image-prompt prose only — no heading (headings paint as glyphs on Local). */
 export function workVisualConventionPromptBlock(
   convention: string | undefined,
   maxChars = WORK_VISUAL_CONVENTION_PROMPT_MAX_CHARS
 ): string {
-  const clipped = clipWorkVisualConvention(convention ?? "", maxChars);
-  if (!clipped) return "";
-  return `Work visual convention (THIS work only — era, style family, forbids. Do not copy another work. Character FACE/COSTUME/PROP and the caption beat still win): ${clipped}`;
+  return flattenWorkVisualConventionForPrompt(convention ?? "", maxChars);
+}
+
+/** Propose LLM block: labeled is fine (text model, not an image canvas). */
+export function workVisualConventionProposeBlock(
+  convention: string | undefined,
+  maxChars = WORK_VISUAL_CONVENTION_PROMPT_MAX_CHARS
+): string {
+  const look = flattenWorkVisualConventionForPrompt(convention ?? "", maxChars);
+  const forbids = forbidsFromWorkVisualConvention(convention ?? "");
+  const avoid = forbids.length ? ` Avoid: ${forbids.join(", ")}.` : "";
+  if (!look && !avoid) return "";
+  if (!look) {
+    return `Work look (this work only; character looks and the caption beat still win):${avoid}`;
+  }
+  return `Work look (this work only; character looks and the caption beat still win): ${look}.${avoid}`;
 }
 
 export function workTitleAndConventionFromRow(row: unknown): {

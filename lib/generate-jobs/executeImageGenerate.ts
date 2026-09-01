@@ -145,6 +145,8 @@ export async function executeSceneFrameImageGenerate(input: {
       prompt,
       negativePrompt: buildFrameNegativePrompt(caption, {
         castCount: rendererExpression?.characters?.length,
+        workVisualConvention: input.workVisualConvention,
+        rendererExpression,
       }),
       // A5: Local profile 512² (blank mitigation); Cloud profile 1024².
       size: frameSize,
@@ -232,7 +234,10 @@ export async function executePortraitImageGenerate(input: {
     description,
     input.workVisualConvention
   );
-  const negativePrompt = buildAvatarNegativePrompt(description);
+  const negativePrompt = buildAvatarNegativePrompt(
+    description,
+    input.workVisualConvention
+  );
 
   console.info("[executePortraitImageGenerate] prompt", {
     name,

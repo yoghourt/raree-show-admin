@@ -372,7 +372,7 @@ describe("buildProposePrompt scene with Expression (WS1 default)", () => {
       narrative: validNarrative,
       candidateType: "character",
     });
-    expect(prompt).toMatch(/Work visual convention/);
+    expect(prompt).toMatch(/Work look/);
     expect(prompt).toMatch(/medieval wool/);
     expect(prompt).toMatch(/modern military/);
   });

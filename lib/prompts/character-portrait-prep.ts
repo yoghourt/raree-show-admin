@@ -6,7 +6,7 @@
 
 import { AVATAR_APPEARANCE_MAX_CHARS } from "@/lib/prompts/avatar";
 import { parseVisualIdentityProposal } from "@/lib/prompts/visual-identity-propose";
-import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
+import { workVisualConventionProposeBlock } from "@/lib/prompts/work-visual-convention";
 
 export const READER_DESCRIPTION_MAX_CHARS = 280;
 
@@ -105,7 +105,7 @@ export function buildPortraitPrepProposePrompt(
   const description = input.description?.trim() || "(none)";
   const current = input.currentVisualIdentity?.trim() || "(empty)";
   const note = input.operatorNote?.trim() || "(none)";
-  const conventionBlock = workVisualConventionPromptBlock(input.visualConvention);
+  const conventionBlock = workVisualConventionProposeBlock(input.visualConvention);
   const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You prepare a character for Creator portrait generation.

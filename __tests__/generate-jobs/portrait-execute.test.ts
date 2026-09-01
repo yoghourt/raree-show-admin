@@ -137,9 +137,13 @@ describe("executeImageGenerateJob dispatch", () => {
     const prompt = String(
       vi.mocked(imageGenerate).mock.calls[0]?.[0]?.prompt ?? ""
     );
-    expect(prompt).toMatch(/Work visual convention/);
     expect(prompt).toMatch(/medieval wool/);
-    expect(prompt).toMatch(/olive drab/);
+    expect(prompt).not.toMatch(/Work look/);
+    expect(prompt).not.toMatch(/olive drab/);
+    const negative = String(
+      vi.mocked(imageGenerate).mock.calls[0]?.[0]?.negativePrompt ?? ""
+    );
+    expect(negative).toMatch(/olive drab/);
   });
 
   it("dispatches scene_frame unchanged", async () => {

@@ -180,7 +180,7 @@ describe("buildFrameExpressionProposePrompt", () => {
       visualConvention:
         "ERA: medieval wool, fur. FORBID: modern military camouflage.",
     });
-    expect(p).toMatch(/Work visual convention/);
+    expect(p).toMatch(/Work look/);
     expect(p).toMatch(/medieval wool/);
     expect(p).toMatch(/modern military/);
     expect(p).toMatch(/caption beat still win/);

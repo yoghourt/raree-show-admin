@@ -48,7 +48,7 @@ import {
 } from "@/lib/discovery/propose-types";
 import { SCENE_CONTEXT_CANDIDATE_PROPOSE_RULES } from "@/lib/discovery/scene-context-candidate-signals";
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
-import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
+import { workVisualConventionProposeBlock } from "@/lib/prompts/work-visual-convention";
 
 export function isDiscoveryProposeMockMode(): boolean {
   // Allow opting into real LLM path under Vitest for taxonomy / integration tests.
@@ -273,7 +273,7 @@ ${SCENE_CONTEXT_CANDIDATE_PROPOSE_RULES}
 \n`
       : "";
 
-  const conventionBlock = workVisualConventionPromptBlock(visualConvention);
+  const conventionBlock = workVisualConventionProposeBlock(visualConvention);
   const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You are a Discovery Copilot generating editorial Candidates for a narrative work.

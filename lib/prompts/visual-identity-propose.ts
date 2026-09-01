@@ -8,7 +8,7 @@ import {
   AVATAR_APPEARANCE_MAX_CHARS,
   packVisualIdentityForPortrait,
 } from "@/lib/prompts/avatar";
-import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
+import { workVisualConventionProposeBlock } from "@/lib/prompts/work-visual-convention";
 import type { CharacterArchive } from "@/lib/discovery/character-archive";
 import { parseCharacterArchive } from "@/lib/discovery/character-archive";
 
@@ -114,7 +114,7 @@ export function buildVisualIdentityProposePrompt(
   const description = input.description?.trim() || "(none)";
   const current = input.currentVisualIdentity?.trim() || "(empty)";
   const note = input.operatorNote?.trim() || "(none)";
-  const conventionBlock = workVisualConventionPromptBlock(input.visualConvention);
+  const conventionBlock = workVisualConventionProposeBlock(input.visualConvention);
   const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You propose Creator visual identity text for a character portrait (image model input).
