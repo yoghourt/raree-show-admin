@@ -113,6 +113,80 @@ export function captionOnStageNames(caption: string): string[] {
   );
 }
 
+const CHILD_LIFE_STAGE =
+  /\b(child emperor|boy emperor|girl empress|young boy|young girl|youthful|child|youth|teen(?:ager)?|infant|toddler)\b/i;
+const ELDER_LIFE_STAGE =
+  /\b(elderly|elder(?:ly)?|aged man|aged woman|white-haired)\b/i;
+const ADULT_FACE_INVENTED =
+  /\b((?:grey|gray)(?:-streaked)?\s+(?:goatee|beard)|white beard|long beard|goatee|middle-?aged|lined (?:face|complexion)|old man)\b/i;
+
+function cueMatchesRole(role: string, cueName: string): boolean {
+  const r = role.trim().toLowerCase();
+  const n = cueName.trim().toLowerCase();
+  if (!r || !n) return false;
+  return r === n || r.includes(n) || n.includes(r);
+}
+
+/** Compact life-stage look from Work visual identity (survives Local visual budget). */
+export function lifeStageLookFromIdentity(
+  visualIdentity: string | undefined
+): string | null {
+  const raw = visualIdentity?.trim() ?? "";
+  if (!raw) return null;
+  const child = raw.match(CHILD_LIFE_STAGE);
+  if (child?.[1]) return `${child[1]}, no beard`;
+  const elder = raw.match(ELDER_LIFE_STAGE);
+  return elder?.[1] ?? null;
+}
+
+export function findLifeStageContradictions(
+  expression: RendererExpression,
+  characterCues: Array<{ name: string; visualIdentity?: string }>
+): string[] {
+  const errors: string[] = [];
+  for (const ch of expression.characters) {
+    const cue = characterCues.find((c) => cueMatchesRole(ch.role, c.name));
+    const stage = lifeStageLookFromIdentity(cue?.visualIdentity);
+    if (!stage || !CHILD_LIFE_STAGE.test(stage)) continue;
+    if (ADULT_FACE_INVENTED.test(ch.visual)) {
+      errors.push(
+        `${ch.role}: visual invents an adult face (${ch.visual}) against looks (${stage})`
+      );
+    }
+  }
+  return errors;
+}
+
+/** Put archive life-stage immediately after pose so Local clip keeps it. */
+export function applyCharacterLifeStageLooks(
+  expression: RendererExpression,
+  characterCues: Array<{ name: string; visualIdentity?: string }>
+): RendererExpression {
+  if (!characterCues.length) return expression;
+  return {
+    ...expression,
+    characters: expression.characters.map((ch) => {
+      const cue = characterCues.find((c) => cueMatchesRole(ch.role, c.name));
+      const stage = lifeStageLookFromIdentity(cue?.visualIdentity);
+      if (!stage) return ch;
+      if (new RegExp(escapeRegExp(stage.split(",")[0] ?? stage), "i").test(ch.visual)) {
+        return ch;
+      }
+      const parts = ch.visual
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((p) => !ADULT_FACE_INVENTED.test(p));
+      const pose = parts[0] || "standing";
+      const rest = parts.slice(1);
+      return {
+        ...ch,
+        visual: clipLocalBudgetText([pose, stage, ...rest].join(", "), LOCAL_VISUAL_MAX),
+      };
+    }),
+  };
+}
+
 function extractJsonObject(raw: string): unknown {
   const trimmed = raw.trim();
   if (trimmed.startsWith("{")) {
@@ -189,6 +263,16 @@ export function buildFrameExpressionProposePrompt(
     agency.length === 0
       ? "(none)"
       : agency.map((n) => `- ${n}`).join("\n");
+  const lifeStages = (input.characterCues ?? [])
+    .map((c) => {
+      const stage = lifeStageLookFromIdentity(c.visualIdentity);
+      return stage ? `- ${c.name}: ${stage}` : null;
+    })
+    .filter((line): line is string => line != null);
+  const lifeStageBlock =
+    lifeStages.length === 0
+      ? "(none in Work looks — still do not invent a mature bearded face for a newly elevated emperor)"
+      : lifeStages.join("\n");
 
   return `You re-author Canonical Visual Expression for ONE Reading Frame.
 This is Creator still geometry for image generation. Do NOT change the caption.
@@ -215,6 +299,9 @@ ${note}
 Work character looks (costume/face ONLY for people already in the caption-named list — NOT a cast menu):
 ${cues}
 
+Life-stage / apparent age from Work looks (MUST appear in that character's visual right after pose):
+${lifeStageBlock}
+
 Rules:
 - OUTPUT LANGUAGE: English (Latin script only).
 - Return ONLY valid JSON for rendererExpression (no preamble).
@@ -240,6 +327,7 @@ Rules:
 - Caption-named groups the beat acts on (eunuchs, officials, retinue) MUST appear in characters[] with a static pose even without a Work character row. Do not leave them only in action prose.
 - Named mounts and treasure (Red Hare, gold, jade) are props between the figures — not extra people in characters[].
 - Current Expression is a draft to replace, not a location lock.
+- Apparent age / life-stage is identity. After pose, the next look cue MUST keep child/youth/elder tokens from Work looks. Title (Emperor, King) MUST NOT default to a mature bearded adult. FORBIDDEN: grey goatee / lined middle-aged face / "mournful features" as a substitute for a boy emperor.
 
 WRONG beat example (do not do this):
 caption: King Robert traveling north to offer Ned the Hand and a Joffrey–Sansa marriage.
@@ -258,6 +346,10 @@ good: Ding Yuan left pointing; Lü Bu center in front of him; Dong Zhuo right, s
 caption: Li Su bears Red Hare, gold and jade on behalf of Dong Zhuo; Lü Bu agrees to switch sides.
 bad: Dong Zhuo standing in the hall watching; action truncated as "…; Lü Bu"; imperial palace copied from the previous frame.
 good: camp courtyard; Li Su left with Red Hare reins and chests; Lü Bu right looking at the horse; Dong Zhuo off-stage. Action names both poses within the Local action budget.
+
+caption: Dong Zhuo elevates Emperor Xian and seizes absolute power.
+bad: Emperor Xian as a middle-aged man with grey goatee, mournful adult face, opulent robes only.
+good: Dong Zhuo towering left; Emperor Xian a boy emperor about nine, no beard, small on the throne.
 
 ${EXPRESSION_CAPABILITY_RULES}
 

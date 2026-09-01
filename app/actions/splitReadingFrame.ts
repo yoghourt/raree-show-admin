@@ -15,7 +15,9 @@ import {
 import { syncFrameContextAppearanceFromExpression } from "@/lib/scene-context/frame-context-edit"
 import { parseSceneContextsV1 } from "@/lib/scene-context/parse"
 import {
+  applyCharacterLifeStageLooks,
   buildFrameExpressionProposePrompt,
+  findLifeStageContradictions,
   parseFrameExpressionProposal,
 } from "@/lib/prompts/frame-expression-propose"
 import {
@@ -201,7 +203,21 @@ export async function splitReadingFrame(input: {
         expressionWarnings.push(`画面 ${at + 1}：${proposal.errors.join("; ")}`)
         continue
       }
-      newExpressions.push({ frameIndex: at, expression: proposal.value })
+      const expression = applyCharacterLifeStageLooks(
+        proposal.value,
+        characterCues
+      )
+      const lifeStageErrors = findLifeStageContradictions(
+        expression,
+        characterCues
+      )
+      if (lifeStageErrors.length > 0) {
+        expressionWarnings.push(
+          `画面 ${at + 1}：${lifeStageErrors.join("; ")}`
+        )
+        continue
+      }
+      newExpressions.push({ frameIndex: at, expression })
     } catch (e) {
       expressionWarnings.push(
         `画面 ${at + 1}：${formatRequestError(e)}`

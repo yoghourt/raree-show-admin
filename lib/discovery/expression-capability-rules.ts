@@ -160,6 +160,18 @@ Bad: two generals swinging/lunging at each other (caption: they storm the palace
 Good: two generals side by side, blades down at kneeling/fallen eunuchs, not at each other.
 Bad: Ding Yuan pointing + Dong Zhuo with a sword; Lü Bu omitted (caption: halt because of Lü Bu).
 Good: Ding Yuan left pointing, Lü Bu in front of him, Dong Zhuo right, execution sword lowered.
+
+Rule 14 — Life-stage is identity (anti adult default):
+Apparent age / life-stage is a Tier-1 identity cue, not mood or costume.
+Title (Emperor, King, Empress, Prince) MUST NOT default to a mature bearded adult.
+If Work archive or visual identity names child, boy, girl, youth, aged, or elder,
+those tokens MUST appear in characters[].visual immediately after pose — they outrank
+robes and "mournful features" and MUST survive Local compression.
+FORBIDDEN: inventing grey beard, lined middle-aged face, or an adult mournful emperor
+when looks mark that ruler as a child/youth, or when the beat elevates/installs a
+named emperor whose looks do not say adult.
+Bad: Emperor Xian as a grey-bearded adult on the throne (caption: Dong Zhuo elevates him).
+Good: boy emperor about eight or nine, no beard, small seated figure; Dong Zhuo towering.
 `.trim();
 
 /**

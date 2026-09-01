@@ -6,7 +6,9 @@ import { callDiscoveryTextLlm } from "@/lib/discovery/discovery-text-llm"
 import { formatRequestError } from "@/lib/format-request-error"
 import type { RendererExpression } from "@/lib/discovery/visual-contract"
 import {
+  applyCharacterLifeStageLooks,
   buildFrameExpressionProposePrompt,
+  findLifeStageContradictions,
   parseFrameExpressionProposal,
 } from "@/lib/prompts/frame-expression-propose"
 import { createSupabaseServerClient } from "@/lib/supabase-server"
@@ -107,18 +109,32 @@ export async function proposeFrameExpression(input: {
 
   try {
     const raw = await callDiscoveryTextLlm(prompt, { geminiJsonObject: true })
-    const proposal = parseFrameExpressionProposal(raw)
+      const proposal = parseFrameExpressionProposal(raw)
     if (!proposal.ok) {
       return {
         ok: false,
         message: `Expression 无效：${proposal.errors.join("; ")}`,
       }
     }
+    const rendererExpression = applyCharacterLifeStageLooks(
+      proposal.value,
+      characterCues
+    )
+    const lifeStageErrors = findLifeStageContradictions(
+      rendererExpression,
+      characterCues
+    )
+    if (lifeStageErrors.length > 0) {
+      return {
+        ok: false,
+        message: `Expression 年龄/人生阶段与角色档案冲突：${lifeStageErrors.join("; ")}`,
+      }
+    }
     console.info("[proposeFrameExpression]", {
       workId: parsed.data.workId,
       captionLen: parsed.data.caption.length,
     })
-    return { ok: true, rendererExpression: proposal.value }
+    return { ok: true, rendererExpression }
   } catch (e) {
     const message = formatRequestError(e)
     console.warn("[proposeFrameExpression]", { ok: false, message })

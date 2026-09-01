@@ -6,10 +6,13 @@ import {
   packActionNamingCast,
 } from "@/lib/discovery/execution-projection";
 import {
+  applyCharacterLifeStageLooks,
   buildFrameExpressionProposePrompt,
   captionAgencyOnlyNames,
   captionOnStageNames,
   captionProperNamePhrases,
+  findLifeStageContradictions,
+  lifeStageLookFromIdentity,
   parseFrameExpressionProposal,
 } from "@/lib/prompts/frame-expression-propose";
 
@@ -130,6 +133,24 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/Creator production override/);
     expect(p).toMatch(/weathered northern lord face/);
     expect(p).not.toMatch(/Valyrian steel greatsword/);
+    expect(p).toMatch(/Rule 14/);
+    expect(p).toMatch(/boy emperor about nine/);
+    expect(p).toMatch(/grey goatee/);
+  });
+
+  it("lists life-stage from Work looks as a must-keep identity cue", () => {
+    const p = buildFrameExpressionProposePrompt({
+      workTitle: "Romance of the Three Kingdoms",
+      caption: "Dong Zhuo elevates Emperor Xian and seizes absolute power.",
+      characterCues: [
+        {
+          name: "Emperor Xian",
+          visualIdentity: "FACE: child emperor, boy about nine. COSTUME: imperial robes.",
+        },
+      ],
+    });
+    expect(p).toMatch(/Life-stage \/ apparent age/);
+    expect(p).toMatch(/Emperor Xian: child emperor, no beard/);
   });
 
   it("makes caption the beat authority and allows replacing a contradicting draft", () => {
@@ -150,6 +171,59 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/MUST NOT appear alive/);
     expect(p).toMatch(/Prince Bian/);
     expect(p).toMatch(/灵帝已死/);
+  });
+});
+
+describe("life-stage identity", () => {
+  it("extracts a child look and folds it after pose", () => {
+    expect(
+      lifeStageLookFromIdentity("FACE: child emperor, boy about nine.")
+    ).toBe("child emperor, no beard");
+
+    const folded = applyCharacterLifeStageLooks(
+      {
+        environment: "imperial throne room",
+        characters: [
+          {
+            role: "Emperor Xian",
+            visual:
+              "seated on throne, mournful features, opulent imperial robes, grey goatee",
+          },
+        ],
+        action: "Dong Zhuo towers; Emperor Xian seated",
+        composition: "medium-wide",
+      },
+      [
+        {
+          name: "Emperor Xian",
+          visualIdentity: "FACE: child emperor about nine.",
+        },
+      ]
+    );
+    expect(folded.characters[0]?.visual).toMatch(/^seated on throne/i);
+    expect(folded.characters[0]?.visual).toMatch(/child emperor/i);
+    expect(folded.characters[0]?.visual).not.toMatch(/grey goatee/i);
+    expect(folded.characters[0]?.visual.length).toBeLessThanOrEqual(
+      LOCAL_VISUAL_MAX
+    );
+  });
+
+  it("flags an adult face against child looks", () => {
+    const errors = findLifeStageContradictions(
+      {
+        environment: "hall",
+        characters: [
+          {
+            role: "Emperor Xian",
+            visual: "seated, middle-aged, grey goatee, imperial robes",
+          },
+        ],
+        action: "seated",
+        composition: "wide",
+      },
+      [{ name: "Emperor Xian", visualIdentity: "FACE: child emperor." }]
+    );
+    expect(errors.join(" ")).toMatch(/adult face/i);
   });
 });
 
