@@ -82,13 +82,13 @@ const REGISTRY_FIELD_HINTS: Record<DiscoveryCandidateType, string[]> = {
 };
 
 const TYPE_EXAMPLES: Record<DiscoveryCandidateType, string> = {
-  character: `{"candidates":[{"displayName":"Guan Yu","summary":"Sworn brother of Liu Bei; loyal general.","fields":{"name":"Guan Yu","house":"Shu","description":"Sworn brother of Liu Bei.","characterArchive":{"visualSummary":"iconic Shu general with dignified bearing","identityCues":["red face","long flowing beard"],"costumeCues":["green battle robe","green armor trim"],"propCues":["Green Dragon Crescent Blade"]}}}]}`,
-  location: `{"candidates":[{"displayName":"Winterfell","summary":"Seat of House Stark.","fields":{"name":"Winterfell","region":"The North"}}]}`,
-  story: `{"candidates":[{"displayName":"The Royal Visit","summary":"Editorial story unit.","fields":{"title":"The Royal Visit","summary":"Prose summary of the story arc."}}]}`,
-  scene: `{"candidates":[{"displayName":"Moonlit Duel","summary":"Ser Waymar Royce faces the Other under the trees.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Prologue","title":"Moonlit Duel","summary":"Ser Waymar Royce confronts a White Walker in a fatal duel; Will watches from cover.","visualIntent":{"characters":[{"role":"knight","name":"Ser Waymar Royce"},{"role":"watcher","name":"Will"}],"relationship":"knight confronts white walker","purpose":"establish lethal threat","emotion":"defiance"},"rendererExpression":${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}}}]}`,
+  character: `{"candidates":[{"displayName":"Name","summary":"Who they are in this story.","fields":{"name":"Name","house":"Faction if any","description":"Story role only, no look adjectives.","characterArchive":{"visualSummary":"standing look for THIS work","identityCues":["face cues from this work"],"costumeCues":["garments of this work's era"],"propCues":["iconic object if any"]}}}]}`,
+  location: `{"candidates":[{"displayName":"Place","summary":"What this place is in the story.","fields":{"name":"Place","region":"Region if any"}}]}`,
+  story: `{"candidates":[{"displayName":"Story title","summary":"Editorial story unit.","fields":{"title":"Story title","summary":"Prose summary of this arc."}}]}`,
+  scene: `{"candidates":[{"displayName":"Beat title","summary":"One still-worthy turn from this story.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"chapter_title":"Chapter title if any","title":"Beat title","summary":"The Reader-step draft for this one turn.","visualIntent":{"characters":[{"role":"role","name":"Name from this caption"}],"relationship":"as this beat states","purpose":"this turn","emotion":"this beat"},"rendererExpression":${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}}}]}`,
 };
 
-const SCENE_NARRATIVE_ONLY_EXAMPLE = `{"candidates":[{"displayName":"Peach Garden Oath","summary":"Liu Bei, Guan Yu, and Zhang Fei swear brotherhood in the peach garden and vow to serve the Han.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"title":"Peach Garden Oath","summary":"Liu Bei, Guan Yu, and Zhang Fei swear brotherhood in the peach garden and vow to serve the Han."}},{"displayName":"Merchant Arms","summary":"Zhang Shiping and Su Shuang fund horses and metal; the three brothers forge their weapons.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"title":"Merchant Arms","summary":"Zhang Shiping and Su Shuang fund horses and metal; the three brothers forge their weapons."}}]}`;
+const SCENE_NARRATIVE_ONLY_EXAMPLE = `{"candidates":[{"displayName":"First required turn","summary":"The first still-worthy beat of this story.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"title":"First required turn","summary":"The first still-worthy beat of this story."}},{"displayName":"Second required turn","summary":"The next required turn, not merged into the first.","fields":{"parentStoryCandidateId":"<story-candidate-id>","chapter_number":1,"title":"Second required turn","summary":"The next required turn, not merged into the first."}}]}`;
 
 function mockCandidatesForType(
   workId: string,
@@ -282,7 +282,7 @@ Generation rules (critical):
 - OUTPUT LANGUAGE (mandatory): Every string in your JSON response MUST be English (Latin script only).
   This includes displayName, summary, all fields values, evidence sourceLabel/excerpt, chapter_title, title, name, etc.
   The narrative input MAY be Chinese or another language — you MUST still emit English canonical names
-  (e.g. character "Gared" not "盖雷德", location "Winterfell" not "临冬城").
+  for this work (established English spellings when the work has them; otherwise standard transliteration — not CJK in name fields).
   Do NOT return Chinese, Japanese, Korean, or other CJK/non-Latin text in candidate output.
   Use established English spellings from the work when known; otherwise use standard English transliteration.
 - Include ONLY ${candidateType} entities explicitly supported by the narrative prose above.
@@ -315,7 +315,7 @@ Frame Narrative draft (CRITICAL — this is what Human confirms into Reader text
 - fields.summary (and matching top-level summary) IS the Reading Frame Narrative DRAFT for this step.
   After Human Confirm it is written to story_images_v2[].caption. Empty summary is not a valid Scene candidate.
 - One Scene = one Reader step = ONE still-worthy beat. Split the parent Story into as many Scenes as required turns. Same parentStoryCandidateId.
-- FORBIDDEN: packing a multi-event causal chain into one summary (e.g. "decades of corruption, then Yellow Turbans rise, then officers call for recruits"). Each of those is its own Scene.
+- FORBIDDEN: packing a multi-event causal chain into one summary. Each required turn is its own Scene.
 - The draft MUST let a Reader recover this step's turn: event, outcome, attempted action, prevented action, causal turn, relationship change — when that is the beat.
 - Prefer proper names from the narrative when the text supports them.
 - FORBIDDEN in fields.summary: still-only geometry that drops the turn (e.g. "confront on horseback" when the Source beat is that they slay the commanders; pose/lighting-only prose).
@@ -327,7 +327,7 @@ Visualization (ADR-011 A5 / SPEC-DVE-001 v1.4 — required; same LLM call as sum
   { environment, characters (array, MAY be []), action, composition,
     lighting?, atmosphere?, threatPerception?, visualEmphasis?, styleHints? }.
 - Expression MUST depict the SAME instant as fields.summary (not a different beat from the same arc).
-- Prefer recognizable identity color / props in character.visual when the beat needs them (e.g. yellow headcloths for Yellow Turbans; blank unmarked recruitment board centered for a call-to-arms beat). FORBIDDEN: vague "tense crowd / brink of ruin" with no identity cue.
+- Prefer recognizable identity color / props in character.visual when THIS narrative names them. FORBIDDEN: vague "tense crowd / brink of ruin" with no identity cue.
 - Author for the best renderer: include optional lighting/atmosphere/threatPerception/visualEmphasis when Intent supports them.
 - characters MAY be [] for landscape/atmosphere scenes; when non-empty each item needs role + visual (identity + prop/costume).
 - fields.visualIntent is OPTIONAL by scene: { characters?, relationship?, emotion?, purpose? }. Presence optional; quality when present.

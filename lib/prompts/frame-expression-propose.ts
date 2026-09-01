@@ -271,7 +271,7 @@ export function buildFrameExpressionProposePrompt(
     .filter((line): line is string => line != null);
   const lifeStageBlock =
     lifeStages.length === 0
-      ? "(none in Work looks — still do not invent a mature bearded face for a newly elevated emperor)"
+      ? "(none in Work looks — still do not invent a mature bearded adult when Work looks or the caption mark a child or youth)"
       : lifeStages.join("\n");
 
   return `You re-author Canonical Visual Expression for ONE Reading Frame.
@@ -279,12 +279,13 @@ This is Creator still geometry for image generation. Do NOT change the caption.
 
 Work title: ${work}
 Route title: ${route}
+Looks, places, and era MUST come from THIS work. Do not import another book's setting.
 
 Frame Narrative (caption) — THIS is the beat. Expression MUST depict this same instant:
 ${JSON.stringify(caption)}
 
 Caption-named agents ON STAGE (MUST be the Expression cast / visible subjects).
-Map nicknames to Work character names (Ned = Eddard Stark). Do NOT add other Work characters the caption does not name:
+Map nicknames to Work character names. Do NOT add other Work characters the caption does not name:
 ${namedBlock}
 
 Named only as the source of a gift or order (on behalf of / sent by) — MUST NOT stand in the still unless the caption places them in the scene:
@@ -310,25 +311,26 @@ Rules:
   - characters[].visual ≤ ${LOCAL_VISUAL_MAX} chars. FIRST tokens MUST be pose/blocking (kneeling, mounted, standing, holding X), THEN 1–2 look cues. Do not paste full visual identity.
   - characters[].role ≤ ${LOCAL_ROLE_MAX} chars.
   - action ≤ ${LOCAL_ACTION_MAX} chars — COMPLETE clause for EVERY characters[] role (pose + left/right). FORBIDDEN: ending on a bare name with no verb ("…; Lü Bu"). Write the compact still first; drop adjectives if needed.
-  - environment ≤ ${LOCAL_ENV_MAX} chars. From THIS caption only. FORBIDDEN: copying a palace/hall/solar from Current Expression when the caption does not name that place.
+  - environment ≤ ${LOCAL_ENV_MAX} chars. From THIS caption only. FORBIDDEN: copying an interior from Current Expression when the caption does not name that place.
   - composition ≤ ${LOCAL_COMPOSITION_MAX} chars.
   - visualEmphasis / lighting / atmosphere / threatPerception ≤ ${LOCAL_EMPHASIS_MAX} chars each.
 - FORBIDDEN: long costume paragraphs; repeating every archive cue; putting kneeling/mounted/holding at the END of visual.
 - Caption is beat authority. Do not invent a different moment or a more famous adjacent still.
 - Cast MUST come from caption-named agents. FORBIDDEN: swapping in other Work characters because they have visual cues.
-- FORBIDDEN props/places the caption does not name (raven, letter, parchment, solar, godswood, empty throne) unless the caption names them.
-- If caption is travel / riding / procession / going north, environment MUST be the road or approaching host — not an indoor council.
+- FORBIDDEN: inventing props or places the caption does not name.
+- If caption is travel / riding / procession / going north, environment MUST be the road or approaching host — not an indoor council from another beat.
 - If caption says someone is dead / absent, they MUST NOT appear alive in action or characters[].
-- Convert abstract offers/alliances into visible stills (royal banners, approaching party, two named figures on the road) — not a private letter scene.
+- Convert abstract offers/alliances into visible stills that match the caption's place — do not substitute a different private interior.
 - characters[].role MUST be Work character names when they appear; never "man"/"woman".
 - characters[].role MUST be a person, never a sentence verb (Backed, Enticed) or a generic title (Emperor, King) alone.
-- Dual-cast / two-figure preference MUST NOT override caption cast. If the beat is a royal progress, show that progress (Robert + retinue or Robert approaching Winterfell), not a two-person solar.
+- Dual-cast / two-figure preference MUST NOT override caption cast. If the beat is a procession or arrival, show that procession — not a private two-person interior from another beat.
 - Dual-cast when the caption actually has two figures: medium-wide, both fully visible, faces secondary.
 - Caption-named groups the beat acts on (eunuchs, officials, retinue) MUST appear in characters[] with a static pose even without a Work character row. Do not leave them only in action prose.
-- Named mounts and treasure (Red Hare, gold, jade) are props between the figures — not extra people in characters[].
+- Named mounts and treasure in the caption are props between the figures — not extra people in characters[].
 - Current Expression is a draft to replace, not a location lock.
 - Apparent age / life-stage is identity. After pose, the next look cue MUST keep child/youth/elder tokens from Work looks. Title (Emperor, King) MUST NOT default to a mature bearded adult. FORBIDDEN: grey goatee / lined middle-aged face / "mournful features" as a substitute for a boy emperor.
 
+Structural counterexamples (geometry only — do not copy their era, costumes, or place names into this work):
 WRONG beat example (do not do this):
 caption: King Robert traveling north to offer Ned the Hand and a Joffrey–Sansa marriage.
 bad expression: Catelyn and Eddard looking at a raven parchment in Winterfell solar.

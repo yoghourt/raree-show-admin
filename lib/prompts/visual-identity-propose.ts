@@ -130,16 +130,15 @@ Rules:
   PROP: …
   STYLE: …
 - FACE, COSTUME, and PROP are required when the role has a stable look.
-- STYLE: one short clause (painterly digital painting). Omit SUMMARY — it wastes the Local budget.
+- STYLE: one short clause matching THIS work (title above). Omit SUMMARY — it wastes the Local budget.
 - Stable visual identity only: face/skin, hair/beard, clothing silhouette, iconic standing weapon.
 - FORBIDDEN: scene action, emotion, camera, InstantID, LoRA, reference image language.
 - Prefer short English phrases (Local image models). No long adjectives.
-- When source text omits iconic look but the work has a stable visual tradition, propose as editable tradition cues — do NOT claim they were extracted from the description.
-- STYLE must push semi-realistic digital painting / painterly skin texture; avoid Chinese New Year poster, nianhua, temple icon, flat opera face paint, glowing neon weapons.
-- If FACE needs a reddish complexion, write natural skin texture wording (e.g. ruddy bronze complexion with pores) — NEVER bare "red face" alone.
-- FACE comes from the work's stable visual tradition + name, not from Reader description adjectives.
-- If current draft FACE is a generic youthful idol that contradicts tradition, replace it; otherwise improve the draft.
+- When source text omits iconic look but THIS work has a stable visual tradition, propose as editable tradition cues for THIS work — do NOT copy another work's costumes, weapons, or poster style.
+- FACE is anatomy (skin, hair, beard, scars), not a job title. COSTUME names garments and materials of THIS work's era.
+- FACE comes from THIS work's visual tradition + name, not from Reader description adjectives.
+- If current draft FACE is a generic youthful idol that contradicts THIS work's tradition, replace it; otherwise improve the draft.
 - Honor operator note over conflicting draft bits.
 - Hard limit: total output MUST be ≤ ${AVATAR_APPEARANCE_MAX_CHARS} characters including newlines. This is the Local portrait execute budget; longer tails are dropped.
-- Example length: "FACE: ruddy bronze complexion with pores, long beard.\\nCOSTUME: green battle robe.\\nPROP: Green Dragon Crescent Blade.\\nSTYLE: painterly digital painting."`.trim();
+- Example format (fill from THIS work; do not copy sample looks): "FACE: …\\nCOSTUME: …\\nPROP: …\\nSTYLE: painterly digital painting."`.trim();
 }

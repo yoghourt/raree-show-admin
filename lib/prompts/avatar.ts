@@ -186,7 +186,7 @@ type GenderCue = "male" | "female" | null;
 export function detectGenderCue(text: string): GenderCue {
   const t = text.toLowerCase();
   const male =
-    /\b(male|man|men|he|him|his|boy|gentleman|lord|ser|knight|ranger)\b/.test(
+    /\b(male|man|men|he|him|his|boy|gentleman|lord|ser|knight)\b/.test(
       t
     ) ||
     /他是个男|他是男|男性|男人|男的|帅哥/.test(text);

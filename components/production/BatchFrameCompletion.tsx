@@ -234,11 +234,11 @@ function ExpressionBadge({
 /** Structured failure → OPERATOR revision note (WS4). */
 const FAILURE_TYPE_NOTES = {
   missing_identity:
-    "OPERATOR: 主角须有稳定身份 cue（长须/专属兵器/甲色）；敌军标识只放敌军，勿戴在主角身上。Heroes need fixed identity cues (beard, iconic weapon, armor color); enemy markers (e.g. rebel colors) must stay on enemies only, never on heroes.",
+    "OPERATOR: 主角须有本作品视觉身份里的稳定 cue；敌军/敌对标识只放在敌军身上。Heroes need this work's standing identity cues; enemy markers must stay on enemies only, never on heroes.",
   wrong_beat:
     "OPERATOR: 须画本帧 caption 的瞬间，勿画无关对峙。Must depict this frame caption’s beat, not an unrelated standoff.",
   missing_prop:
-    "OPERATOR: 须有 blank unmarked wooden board centered。Must include blank unmarked wooden board centered.",
+    "OPERATOR: 须画出本帧 caption / Expression 点名的道具，居中可读。Must include the named prop from this frame, readable and centered.",
   cast_count:
     "OPERATOR: 人物数量/关系须匹配 Expression。Cast count/relations must match Expression.",
 } as const;
@@ -1969,14 +1969,13 @@ export function BatchFrameCompletion({
                             选择结构化纠偏…
                           </option>
                           <option value="missing_identity">
-                            missing_identity · 主角身份 cue（兵器/胡须/甲色）；敌标勿贴主角
+                            missing_identity · 主角须有本作品身份 cue；敌标勿贴主角
                           </option>
                           <option value="wrong_beat">
                             wrong_beat · 须画本帧 caption 的瞬间，勿画无关对峙
                           </option>
                           <option value="missing_prop">
-                            missing_prop · 须有 blank unmarked wooden board
-                            centered
+                            missing_prop · 须画出本帧点名的道具
                           </option>
                           <option value="cast_count">
                             cast_count · 人物数量/关系须匹配 Expression

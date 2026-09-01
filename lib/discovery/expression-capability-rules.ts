@@ -42,7 +42,7 @@ lighting = lighting intent (cold moonlight, ember key, etc.) — not model hyper
 atmosphere = mood of the air/place (bitter hush, dread, isolation).
 threatPerception = how threat should read visually (unseen fog pressure, inhuman scale).
 visualEmphasis = narrative focus (formation, prop, scale contrast).
-styleHints = stable style family only (e.g. "desaturated dark fantasy illustration").
+styleHints = stable style family matching THIS work only.
 FORBIDDEN in styleHints: masterpiece, 8k, best quality, ultra detailed.
 Intent narrow-fold (same propose call, no second AI): when visualIntent has emotion/purpose/
 relationship/threat-like meaning, encode into atmosphere / visualEmphasis / threatPerception
@@ -63,7 +63,7 @@ MUST NOT be the only renderer cue — convert to visible arrangement.
 Bad: action "protects the king" / "fight" / "talk" / "threat".
 Good: "knight standing in front of king, holding sword" + composition "knight foreground, king behind".
 Bad: "two warriors fighting".
-Good (opponents only): "knight on left holding steel sword, enemy on right holding ice sword, both facing each other".
+Good (opponents only): "figure on left holding a weapon, opponent on right holding a weapon, both facing each other".
 Allies / same-side beats MUST NOT use facing-each-other or crossed blades.
 
 Rule 5 — Cast consistency (action/composition ↔ characters[]):
@@ -267,22 +267,22 @@ export const EXPRESSION_CAPABILITY_EXAMPLE: ExpressionLike & {
   threatPerception?: string;
   lighting?: string;
 } = {
-  environment: "Haunted Forest clearing under moonlight",
+  environment: "the place named in this caption",
   characters: [
     {
-      role: "Waymar Royce",
-      visual: "steel sword, closed helm armor",
+      role: "PersonA",
+      visual: "standing left, look cues from this work",
     },
     {
-      role: "White Walker",
-      visual: "ice sword, hooded pale figure",
+      role: "PersonB",
+      visual: "standing right, look cues from this work",
     },
   ],
-  action: "two warriors facing each other, swords crossed at middle distance",
-  composition: "wide shot, faces secondary, two silhouettes",
-  lighting: "cold moonlight, pale rim on ice blade",
-  atmosphere: "supernatural cold, wrong stillness",
-  threatPerception: "inhuman opponent; lethal scale",
+  action: "both figures visible in this caption's still",
+  composition: "medium-wide, faces secondary, two figures",
+  lighting: "lighting named in this beat if any",
+  atmosphere: "mood of this place",
+  threatPerception: "threat as this caption states it",
 };
 
 /** Mock / courtyard beat — minimal static greeting + face-safe dual cast. */

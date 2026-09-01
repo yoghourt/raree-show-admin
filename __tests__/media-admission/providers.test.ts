@@ -65,7 +65,7 @@ describe("frame draft prompt (derived Job input)", () => {
       projectionProfile: "local",
     });
     expect(prompt).not.toMatch(/recruitment notice/i);
-    expect(prompt).toMatch(/blank wooden board|no writing/i);
+    expect(prompt).toMatch(/blank unmarked board|no writing/i);
     expect(prompt).toMatch(/VISUAL LOCK/i);
   });
 

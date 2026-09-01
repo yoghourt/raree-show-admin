@@ -637,7 +637,7 @@ describe("buildFrameDraftPrompt Expression-first", () => {
       },
       projectionProfile: "local",
     });
-    expect(prompt).toContain("blank wooden board");
+    expect(prompt).toContain("blank unmarked board");
     expect(prompt).not.toMatch(/recruitment notice/i);
     expect(prompt).toContain("Scene:");
     expect(prompt).not.toMatch(/empty scene/i);

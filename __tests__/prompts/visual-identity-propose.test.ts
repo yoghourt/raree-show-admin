@@ -85,7 +85,7 @@ describe("packVisualIdentityForPortrait", () => {
 });
 
 describe("buildVisualIdentityProposePrompt", () => {
-  it("includes operator note and forbids bare red-face instruction", () => {
+  it("includes operator note and keeps looks scoped to this work", () => {
     const p = buildVisualIdentityProposePrompt({
       name: "Guan Yu",
       operatorNote: "avoid nianhua",
@@ -93,9 +93,10 @@ describe("buildVisualIdentityProposePrompt", () => {
     });
     expect(p).toMatch(/Guan Yu/);
     expect(p).toMatch(/avoid nianhua/);
-    expect(p).toMatch(/NEVER bare "red face"/);
+    expect(p).toMatch(/THIS work/);
     expect(p).toMatch(/IGNORE age\/look/);
-    expect(p).toMatch(/generic youthful idol/);
+    expect(p).not.toMatch(/Green Dragon Crescent Blade/);
+    expect(p).not.toMatch(/nianhua, temple icon/);
   });
 
   it("requires output within the Local execute budget and omits SUMMARY", () => {

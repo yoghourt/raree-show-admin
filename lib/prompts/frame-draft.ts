@@ -191,14 +191,14 @@ export function sanitizeLocalSceneCaptionForGlyphRisk(scene: string): string {
   s = s.replace(/[「『][^」』]{0,40}[」』]/g, "unmarked surface");
   s = s.replace(/["“”][^"“”]{0,40}["“”]/g, "unmarked surface");
   const rewrites: Array<[RegExp, string]> = [
-    [/recruitment\s+notice/gi, "blank wooden board with no writing"],
-    [/official\s+notice/gi, "blank wooden board with no writing"],
-    [/notice\s+board/gi, "unmarked wooden board without letters"],
+    [/recruitment\s+notice/gi, "blank unmarked board with no writing"],
+    [/official\s+notice/gi, "blank unmarked board with no writing"],
+    [/notice\s+board/gi, "unmarked board without letters"],
     [/notice\s+pinned/gi, "blank paper pinned without letters"],
-    [/\bproclamation\b/gi, "blank scroll without writing"],
+    [/\bproclamation\b/gi, "blank unmarked surface without writing"],
     [/\binscription\b/gi, "unmarked surface"],
     [/\bsignage\b/gi, "blank hanging board without letters"],
-    [/告示|榜文|檄文|诏书|招牌|牌匾|文书/g, "空白无字木板"],
+    [/告示|榜文|檄文|诏书|招牌|牌匾|文书/g, "空白无字板面"],
   ];
   for (const [re, rep] of rewrites) {
     s = s.replace(re, rep);
@@ -239,7 +239,7 @@ function buildLocalCaptionPrompt(input: {
   parts.push(`Scene: ${scene}.`);
   // Avoid "digital illustration" alone — Local turbo drifts to children's textbook look.
   parts.push(
-    "Cinematic historical narrative painting, adult epic tone,",
+    "Cinematic narrative painting, adult tone,",
     "painterly atmosphere, not a children's textbook, not a schoolbook illustration."
   );
   return parts.join(" ");
