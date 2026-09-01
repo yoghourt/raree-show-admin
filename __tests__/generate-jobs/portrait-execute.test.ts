@@ -113,6 +113,35 @@ describe("executeImageGenerateJob dispatch", () => {
     );
   });
 
+  it("injects work visual convention into the portrait prompt", async () => {
+    vi.mocked(imageGenerate).mockResolvedValue({
+      bytes: Buffer.from("img"),
+      mimeType: "image/png",
+      usedFallback: false,
+    } as Awaited<ReturnType<typeof imageGenerate>>);
+    vi.mocked(uploadImageBufferToCloudinary).mockResolvedValue(
+      "https://res.cloudinary.com/demo/portrait.png"
+    );
+
+    await executeImageGenerateJob({
+      capabilityId: "image.generate",
+      portrait: parseCharacterPortraitJobInput({
+        asset_slot: "portrait",
+        name: "Will",
+        description: "Night's Watch ranger",
+      }),
+      workVisualConvention:
+        "ERA: medieval wool. FORBID: modern military, olive drab.",
+    });
+
+    const prompt = String(
+      vi.mocked(imageGenerate).mock.calls[0]?.[0]?.prompt ?? ""
+    );
+    expect(prompt).toMatch(/Work visual convention/);
+    expect(prompt).toMatch(/medieval wool/);
+    expect(prompt).toMatch(/olive drab/);
+  });
+
   it("dispatches scene_frame unchanged", async () => {
     vi.mocked(imageGenerate).mockResolvedValue({
       bytes: Buffer.from("img"),

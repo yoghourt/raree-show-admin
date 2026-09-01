@@ -20,6 +20,7 @@ import {
   executableRendererExpression,
   type RendererExpression,
 } from "@/lib/discovery/visual-contract";
+import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
 
 export const FRAME_REVISION_MARKER = "[操作员修改意见]";
 
@@ -142,6 +143,11 @@ export function buildFrameNegativePrompt(
   return FRAME_NEGATIVE_PROMPT;
 }
 
+function conventionLead(convention?: string): string | null {
+  const block = workVisualConventionPromptBlock(convention);
+  return block || null;
+}
+
 /**
  * Expression → prompt via Execution Projection; optional operator override / route title.
  */
@@ -150,6 +156,7 @@ function buildExpressionPrompt(input: {
   revisionNote: string;
   routeTitle: string;
   projectionProfile: ProjectionProfile;
+  workVisualConvention?: string;
 }): string {
   const body = expressionToPrompt(
     input.expression,
@@ -161,6 +168,10 @@ function buildExpressionPrompt(input: {
   if (input.revisionNote) {
     // Front only — Local often ignores trailing Chinese; do not duplicate the full note.
     parts.push(`OPERATOR OVERRIDE (must follow): ${input.revisionNote}.`);
+  }
+  const convention = conventionLead(input.workVisualConvention);
+  if (convention) {
+    parts.push(convention);
   }
   if (input.routeTitle) {
     parts.push(`Setting: ${input.routeTitle}.`);
@@ -215,6 +226,7 @@ function buildLocalCaptionPrompt(input: {
   scene: string;
   revisionNote: string;
   routeTitle: string;
+  workVisualConvention?: string;
 }): string {
   void input.routeTitle;
   const scene = hardCapCaption(
@@ -236,6 +248,10 @@ function buildLocalCaptionPrompt(input: {
   if (revision) {
     parts.push(`OPERATOR OVERRIDE (must follow): ${revision}.`);
   }
+  const convention = conventionLead(input.workVisualConvention);
+  if (convention) {
+    parts.push(convention);
+  }
   parts.push(`Scene: ${scene}.`);
   // Avoid "digital illustration" alone — Local turbo drifts to children's textbook look.
   parts.push(
@@ -252,6 +268,7 @@ function buildCaptionLegacyPrompt(input: {
   scene: string;
   revisionNote: string;
   routeTitle: string;
+  workVisualConvention?: string;
 }): string {
   const parts: string[] = [];
 
@@ -260,6 +277,10 @@ function buildCaptionLegacyPrompt(input: {
       `OPERATOR OVERRIDE (must follow): ${input.revisionNote}.`,
       "Prefer this override over conflicting details in the scene description."
     );
+  }
+  const convention = conventionLead(input.workVisualConvention);
+  if (convention) {
+    parts.push(convention);
   }
 
   parts.push(
@@ -297,11 +318,14 @@ export function buildFrameDraftPrompt(input: {
   rendererExpression?: RendererExpression | null;
   /** A5 Deployment profile; defaults from IMAGE_CREATOR_ACCEPT_PROVIDER. */
   projectionProfile?: ProjectionProfile;
+  /** Creator-only work convention (era/style/forbids). Must not override the caption beat. */
+  workVisualConvention?: string;
 }): string {
   const { base, revisionNote } = splitFrameCaption(input.caption);
   const routeTitle = input.routeTitle?.trim() ?? "";
   const projectionProfile =
     input.projectionProfile ?? resolveProjectionProfileFromEnv();
+  const workVisualConvention = input.workVisualConvention;
 
   const executable = executableRendererExpression(input.rendererExpression);
   if (executable) {
@@ -310,6 +334,7 @@ export function buildFrameDraftPrompt(input: {
       revisionNote,
       routeTitle,
       projectionProfile,
+      workVisualConvention,
     });
   }
 
@@ -317,8 +342,18 @@ export function buildFrameDraftPrompt(input: {
   if (!scene) return "";
 
   if (projectionProfile === "local") {
-    return buildLocalCaptionPrompt({ scene, revisionNote, routeTitle });
+    return buildLocalCaptionPrompt({
+      scene,
+      revisionNote,
+      routeTitle,
+      workVisualConvention,
+    });
   }
 
-  return buildCaptionLegacyPrompt({ scene, revisionNote, routeTitle });
+  return buildCaptionLegacyPrompt({
+    scene,
+    revisionNote,
+    routeTitle,
+    workVisualConvention,
+  });
 }

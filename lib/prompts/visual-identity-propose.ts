@@ -8,11 +8,13 @@ import {
   AVATAR_APPEARANCE_MAX_CHARS,
   packVisualIdentityForPortrait,
 } from "@/lib/prompts/avatar";
+import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
 import type { CharacterArchive } from "@/lib/discovery/character-archive";
 import { parseCharacterArchive } from "@/lib/discovery/character-archive";
 
 export type VisualIdentityProposeInput = {
   workTitle?: string;
+  visualConvention?: string;
   name: string;
   house?: string;
   description?: string;
@@ -112,11 +114,13 @@ export function buildVisualIdentityProposePrompt(
   const description = input.description?.trim() || "(none)";
   const current = input.currentVisualIdentity?.trim() || "(empty)";
   const note = input.operatorNote?.trim() || "(none)";
+  const conventionBlock = workVisualConventionPromptBlock(input.visualConvention);
+  const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You propose Creator visual identity text for a character portrait (image model input).
 This is NOT Reader prose. Output short English cue lines only.
 
-Work: ${work}
+Work: ${work}${conventionLead}
 Character name: ${name}
 House/faction: ${house}
 Reader description (story role only — IGNORE age/look words like young, handsome, chiseled, beard, robes): ${description}

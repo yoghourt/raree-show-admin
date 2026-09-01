@@ -80,6 +80,7 @@ export async function POST(request: Request) {
   const result = await regenCandidate({
     workId,
     workTitle: workResult.title,
+    visualConvention: workResult.visualConvention,
     narrative,
     candidateType,
     previousCandidate,

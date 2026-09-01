@@ -21,9 +21,11 @@ import {
   parseRendererExpression,
   type RendererExpression,
 } from "@/lib/discovery/visual-contract";
+import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
 
 export type FrameExpressionProposeInput = {
   workTitle?: string;
+  visualConvention?: string;
   routeTitle?: string;
   caption: string;
   currentExpression?: string;
@@ -273,11 +275,13 @@ export function buildFrameExpressionProposePrompt(
     lifeStages.length === 0
       ? "(none in Work looks — still do not invent a mature bearded adult when Work looks or the caption mark a child or youth)"
       : lifeStages.join("\n");
+  const conventionBlock = workVisualConventionPromptBlock(input.visualConvention);
+  const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You re-author Canonical Visual Expression for ONE Reading Frame.
 This is Creator still geometry for image generation. Do NOT change the caption.
 
-Work title: ${work}
+Work title: ${work}${conventionLead}
 Route title: ${route}
 Looks, places, and era MUST come from THIS work. Do not import another book's setting.
 

@@ -7,6 +7,8 @@
  * prompt — trailing Chinese notes lose to early English tokens like "Lady".
  */
 
+import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
+
 export const AVATAR_REVISION_MARKER = "[操作员修改意见]";
 /** Budgeted Character Archive visual cues folded into portrait description. */
 export const AVATAR_APPEARANCE_MARKER = "[视觉身份]";
@@ -256,7 +258,11 @@ export function scrubConflictingGenderTokens(
   return out.replace(/\s{2,}/g, " ").replace(/\s([,.])/g, "$1").trim();
 }
 
-export function buildAvatarPrompt(name: string, description: string): string {
+export function buildAvatarPrompt(
+  name: string,
+  description: string,
+  workVisualConvention?: string
+): string {
   const n = name.trim();
   const { base, revisionNote, appearance } = splitAvatarDescription(description);
   const revisionCue = detectGenderCue(revisionNote);
@@ -289,6 +295,10 @@ export function buildAvatarPrompt(name: string, description: string): string {
     parts.push(
       `OPERATOR OVERRIDE (must follow): ${clipPromptChunk(revisionNote, 120)}.`
     );
+  }
+  const convention = workVisualConventionPromptBlock(workVisualConvention);
+  if (convention) {
+    parts.push(convention);
   }
   if (clippedAppearance) {
     parts.push(

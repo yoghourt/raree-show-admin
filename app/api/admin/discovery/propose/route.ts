@@ -86,6 +86,7 @@ export async function POST(request: Request) {
   const { candidates, errors } = await proposeCandidateTypes({
     workId,
     workTitle: workResult.title,
+    visualConvention: workResult.visualConvention,
     narrative,
     candidateTypes,
     existingStoryCandidates,

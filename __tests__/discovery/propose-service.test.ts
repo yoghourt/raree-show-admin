@@ -364,6 +364,18 @@ describe("buildProposePrompt scene with Expression (WS1 default)", () => {
     expect(prompt).toContain("SAME instant as fields.summary");
     expect(prompt).toContain("not stub placeholders");
   });
+
+  it("injects work visual convention when set", () => {
+    const prompt = buildProposePrompt({
+      workTitle: "A Game of Thrones",
+      visualConvention: "ERA: medieval wool. FORBID: modern military.",
+      narrative: validNarrative,
+      candidateType: "character",
+    });
+    expect(prompt).toMatch(/Work visual convention/);
+    expect(prompt).toMatch(/medieval wool/);
+    expect(prompt).toMatch(/modern military/);
+  });
 });
 
 describe("buildProposePrompt scene narrative-only", () => {

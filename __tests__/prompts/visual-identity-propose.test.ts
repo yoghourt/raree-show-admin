@@ -106,4 +106,17 @@ describe("buildVisualIdentityProposePrompt", () => {
     expect(p).toMatch(/Omit SUMMARY/);
     expect(p).toMatch(/FACE: …/);
   });
+
+  it("injects this work's visual convention when set", () => {
+    const p = buildVisualIdentityProposePrompt({
+      name: "Will",
+      workTitle: "A Game of Thrones",
+      visualConvention:
+        "ERA: medieval wool, fur, leather. FORBID: modern military, olive drab.",
+    });
+    expect(p).toMatch(/Work visual convention/);
+    expect(p).toMatch(/medieval wool/);
+    expect(p).toMatch(/olive drab/);
+    expect(p).toMatch(/FACE\/COSTUME\/PROP/);
+  });
 });

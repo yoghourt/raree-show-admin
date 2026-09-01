@@ -12,6 +12,7 @@ import {
   parseFrameExpressionProposal,
 } from "@/lib/prompts/frame-expression-propose"
 import { createSupabaseServerClient } from "@/lib/supabase-server"
+import { workTitleAndConventionFromRow } from "@/lib/prompts/work-visual-convention"
 
 export type ProposeFrameExpressionResult =
   | { ok: true; rendererExpression: RendererExpression }
@@ -77,14 +78,15 @@ export async function proposeFrameExpression(input: {
   }
 
   let workTitle: string | undefined
+  let visualConvention = ""
   const { data: work } = await supabase
     .from("works")
-    .select("title")
+    .select("title, visual_convention")
     .eq("id", parsed.data.workId)
     .maybeSingle()
-  if (work && typeof (work as { title?: string }).title === "string") {
-    workTitle = (work as { title: string }).title
-  }
+  const parsedWork = workTitleAndConventionFromRow(work)
+  workTitle = parsedWork.title
+  visualConvention = parsedWork.visualConvention
 
   const { data: characterRows } = await supabase
     .from("characters")
@@ -126,6 +128,7 @@ export async function proposeFrameExpression(input: {
 
   const prompt = buildFrameExpressionProposePrompt({
     workTitle,
+    visualConvention,
     routeTitle: parsed.data.routeTitle,
     caption: parsed.data.caption,
     currentExpression: parsed.data.currentExpression,

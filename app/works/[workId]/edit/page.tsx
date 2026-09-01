@@ -132,6 +132,7 @@ export default function EditWorkPage() {
           description: work.description,
           coverImage: work.coverImage,
           sourceProfileId: work.sourceProfileId ?? "",
+          visualConvention: work.visualConvention ?? "",
         }}
       />
     </div>

@@ -77,6 +77,7 @@ export async function POST(request: Request) {
   const result = await authorExpressionsForSplitBeats({
     workId,
     workTitle: workResult.title,
+    visualConvention: workResult.visualConvention,
     narrative,
     beats,
     characterCandidates,

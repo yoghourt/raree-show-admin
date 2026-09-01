@@ -172,6 +172,19 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/Prince Bian/);
     expect(p).toMatch(/灵帝已死/);
   });
+
+  it("injects this work's visual convention when set", () => {
+    const p = buildFrameExpressionProposePrompt({
+      workTitle: "A Game of Thrones",
+      caption: "Will sees the Others in the woods.",
+      visualConvention:
+        "ERA: medieval wool, fur. FORBID: modern military camouflage.",
+    });
+    expect(p).toMatch(/Work visual convention/);
+    expect(p).toMatch(/medieval wool/);
+    expect(p).toMatch(/modern military/);
+    expect(p).toMatch(/caption beat still win/);
+  });
 });
 
 describe("life-stage identity", () => {

@@ -593,6 +593,23 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt.split("knight left kneeling").length - 1).toBe(1);
   });
 
+  it("injects work convention without replacing the Expression beat", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "legacy caption should not dominate",
+      rendererExpression: SAMPLE_EXPRESSION,
+      projectionProfile: "local",
+      workVisualConvention:
+        "ERA: medieval wool. FORBID: modern military camouflage.",
+    });
+    expect(prompt).toMatch(/Work visual convention/);
+    expect(prompt).toMatch(/medieval wool/);
+    expect(prompt).toContain("knight left kneeling");
+    expect(prompt.indexOf("Work visual convention")).toBeLessThan(
+      prompt.indexOf("knight left kneeling")
+    );
+    expect(prompt).not.toContain("legacy caption should not dominate");
+  });
+
   it("keeps operator revision with Expression", () => {
     const prompt = buildFrameDraftPrompt({
       caption: "legacy\n\n[操作员修改意见] 加雨",

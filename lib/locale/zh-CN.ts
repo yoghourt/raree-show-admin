@@ -141,6 +141,11 @@ export const zhCN = {
       '确定要删除该故事吗？删除后无法恢复。',
     manageReadingRoutes: '管理当前作品下的故事',
     newReadingRoute:   '新增故事',
+    visualConvention: '视觉约定',
+    visualConventionHint:
+      '生图用，不进读者简介。写本作品的画风、时代/材料、禁止项。角色五官与单帧动作仍以角色视觉身份和画面说明为准。',
+    visualConventionPlaceholder:
+      '例如：STYLE: painterly digital painting. ERA: medieval wool, fur, leather, all-black cloaks. FORBID: modern military, olive drab, camouflage.',
   },
   rollout: {
     pageTitle:          '写入作品',

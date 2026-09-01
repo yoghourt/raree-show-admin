@@ -28,6 +28,7 @@ import {
 } from "@/lib/production/split-reading-frame"
 import { createSupabaseServerClient } from "@/lib/supabase-server"
 import type { RendererExpression } from "@/lib/discovery/visual-contract"
+import { workTitleAndConventionFromRow } from "@/lib/prompts/work-visual-convention"
 
 export type SplitReadingFrameResult =
   | {
@@ -138,13 +139,12 @@ export async function splitReadingFrame(input: {
 
   const { data: work } = await supabase
     .from("works")
-    .select("title")
+    .select("title, visual_convention")
     .eq("id", workId)
     .maybeSingle()
-  const workTitle =
-    work && typeof (work as { title?: string }).title === "string"
-      ? (work as { title: string }).title
-      : undefined
+  const parsedWork = workTitleAndConventionFromRow(work)
+  const workTitle = parsedWork.title
+  const visualConvention = parsedWork.visualConvention
   const routeTitle = typeof row.title === "string" ? row.title : undefined
   const chapterNumber =
     typeof row.chapter_number === "number" && Number.isFinite(row.chapter_number)
@@ -193,6 +193,7 @@ export async function splitReadingFrame(input: {
     try {
       const prompt = buildFrameExpressionProposePrompt({
         workTitle,
+        visualConvention,
         routeTitle,
         caption,
         characterCues,

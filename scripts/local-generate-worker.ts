@@ -26,10 +26,25 @@ import {
   parseSceneFrameJobInput,
 } from "../lib/generate-jobs";
 import { executeImageGenerateJob } from "../lib/generate-jobs/executeImageGenerate";
+import { workVisualConventionFromRow } from "../lib/prompts/work-visual-convention";
 import { createSupabaseServiceClient } from "../lib/supabase-service";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function loadWorkVisualConvention(
+  client: ReturnType<typeof createSupabaseServiceClient>,
+  workId: string
+): Promise<string> {
+  if (!workId) return "";
+  const { data, error } = await client
+    .from("works")
+    .select("visual_convention")
+    .eq("id", workId)
+    .maybeSingle();
+  if (error || !data) return "";
+  return workVisualConventionFromRow(data);
 }
 
 async function processOne(
@@ -52,17 +67,23 @@ async function processOne(
     }
 
     let result;
+    const workVisualConvention = await loadWorkVisualConvention(
+      client,
+      job.work_id
+    );
     if (job.subject_type === "scene") {
       const sceneFrame = parseSceneFrameJobInput(job.input_json);
       result = await executeImageGenerateJob({
         capabilityId: job.capability_id,
         sceneFrame,
+        workVisualConvention,
       });
     } else if (job.subject_type === "character") {
       const portrait = parseCharacterPortraitJobInput(job.input_json);
       result = await executeImageGenerateJob({
         capabilityId: job.capability_id,
         portrait,
+        workVisualConvention,
       });
     } else {
       throw new Error(`unsupported subject_type: ${job.subject_type}`);

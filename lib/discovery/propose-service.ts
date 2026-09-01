@@ -48,6 +48,7 @@ import {
 } from "@/lib/discovery/propose-types";
 import { SCENE_CONTEXT_CANDIDATE_PROPOSE_RULES } from "@/lib/discovery/scene-context-candidate-signals";
 import type { NarrativeInputBundle } from "@/lib/discovery/types";
+import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
 
 export function isDiscoveryProposeMockMode(): boolean {
   // Allow opting into real LLM path under Vitest for taxonomy / integration tests.
@@ -215,6 +216,7 @@ function formatRoleArchiveListForPrompt(
 
 export function buildProposePrompt(params: {
   workTitle: string;
+  visualConvention?: string;
   narrative: NarrativeInputBundle;
   candidateType: DiscoveryCandidateType;
   feedback?: string | null;
@@ -232,6 +234,7 @@ export function buildProposePrompt(params: {
 }): string {
   const {
     workTitle,
+    visualConvention,
     narrative,
     candidateType,
     feedback,
@@ -270,8 +273,11 @@ ${SCENE_CONTEXT_CANDIDATE_PROPOSE_RULES}
 \n`
       : "";
 
+  const conventionBlock = workVisualConventionPromptBlock(visualConvention);
+  const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
+
   return `You are a Discovery Copilot generating editorial Candidates for a narrative work.
-Work title: ${workTitle}
+Work title: ${workTitle}${conventionLead}
 Candidate type: ${candidateType}
 Hard cap (never exceed): ${MAX_CANDIDATES_PER_TYPE} per type
 
@@ -383,6 +389,7 @@ function prepareSceneRawItem(
 async function generateForType(params: {
   workId: string;
   workTitle: string;
+  visualConvention?: string;
   narrative: NarrativeInputBundle;
   candidateType: DiscoveryCandidateType;
   feedback?: string | null;
@@ -666,6 +673,7 @@ async function generateForType(params: {
 export async function proposeCandidateTypes(params: {
   workId: string;
   workTitle: string;
+  visualConvention?: string;
   narrative: NarrativeInputBundle;
   candidateTypes?: DiscoveryCandidateType[];
   /** Story candidates from an open review session (scene-only retry). */
@@ -693,6 +701,7 @@ export async function proposeCandidateTypes(params: {
     const result = await generateForType({
       workId: params.workId,
       workTitle: params.workTitle,
+      visualConvention: params.visualConvention,
       narrative: params.narrative,
       candidateType,
       feedback: params.feedback,
@@ -731,6 +740,7 @@ export async function proposeCandidateTypes(params: {
 export async function proposeAllCandidateTypes(params: {
   workId: string;
   workTitle: string;
+  visualConvention?: string;
   narrative: NarrativeInputBundle;
 }): Promise<{ candidates: DiscoveryCandidate[]; errors: ProposeTypeError[] }> {
   return proposeCandidateTypes(params);
@@ -739,6 +749,7 @@ export async function proposeAllCandidateTypes(params: {
 export async function regenCandidate(params: {
   workId: string;
   workTitle: string;
+  visualConvention?: string;
   narrative: NarrativeInputBundle;
   candidateType: DiscoveryCandidateType;
   previousCandidate: DiscoveryCandidate;
@@ -780,6 +791,7 @@ export async function regenCandidate(params: {
   const result = await generateForType({
     workId: params.workId,
     workTitle: params.workTitle,
+    visualConvention: params.visualConvention,
     narrative: params.narrative,
     candidateType: params.candidateType,
     feedback: params.feedback,

@@ -19,6 +19,7 @@ import {
   type RendererExpression,
   type VisualIntent,
 } from "@/lib/discovery/visual-contract";
+import { workVisualConventionPromptBlock } from "@/lib/prompts/work-visual-convention";
 
 function isSplitExpressionMockMode(): boolean {
   if (process.env.DISCOVERY_PROPOSE_MODE === "live") {
@@ -117,6 +118,7 @@ function rawExpressionFromRow(row: unknown): unknown {
 
 function buildSplitExpressionPrompt(params: {
   workTitle: string;
+  visualConvention?: string;
   narrative: NarrativeInputBundle;
   beats: SplitBeatInput[];
   characterCandidates: DiscoveryCandidate[];
@@ -149,9 +151,11 @@ function buildSplitExpressionPrompt(params: {
   const retryBlock = params.retryNote
     ? `\nRETRY — previous output was rejected:\n${params.retryNote}\n`
     : "";
+  const conventionBlock = workVisualConventionPromptBlock(params.visualConvention);
+  const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You author Canonical Visual Expression for Human-split Scene beats.
-Work title: ${params.workTitle}
+Work title: ${params.workTitle}${conventionLead}
 
 Locked narrative bundle (JSON):
 ${JSON.stringify(params.narrative, null, 2)}
@@ -297,6 +301,7 @@ function parsedSplitIsUsable(
 export async function authorExpressionsForSplitBeats(params: {
   workId: string;
   workTitle: string;
+  visualConvention?: string;
   narrative: NarrativeInputBundle;
   beats: SplitBeatInput[];
   characterCandidates?: DiscoveryCandidate[];
@@ -334,6 +339,7 @@ export async function authorExpressionsForSplitBeats(params: {
 
   const promptParams = {
     workTitle: params.workTitle,
+    visualConvention: params.visualConvention,
     narrative: params.narrative,
     beats,
     characterCandidates,
