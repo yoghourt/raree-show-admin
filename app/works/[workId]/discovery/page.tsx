@@ -132,7 +132,7 @@ export default function WorkDiscoveryPage() {
       <header className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-zinc-200/80 pb-2">
         <div className="min-w-0">
           <nav
-            className="text-muted-foreground flex flex-wrap items-center gap-1 text-[11px]"
+            className="text-muted-foreground flex flex-wrap items-center gap-1 text-xs"
             aria-label="面包屑"
           >
             <Link href="/" className="hover:text-foreground">
@@ -151,9 +151,9 @@ export default function WorkDiscoveryPage() {
               {DISCOVERY_PAGE_TITLE}
             </span>
           </nav>
-          <h1 className="text-sm font-semibold leading-tight text-zinc-900">
+          <h1 className="text-base font-semibold leading-tight text-zinc-900">
             {DISCOVERY_PAGE_TITLE}
-            <span className="ml-2 font-normal text-[11px] text-zinc-500">
+            <span className="ml-2 font-normal text-xs text-zinc-500">
               {DISCOVERY_PAGE_SUBTITLE}
             </span>
           </h1>

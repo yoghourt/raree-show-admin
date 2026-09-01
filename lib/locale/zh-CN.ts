@@ -174,6 +174,10 @@ export const zhCN = {
     persistCharacter: '写入角色',
     persistCharacterSkipExisting: '已有档案，移出队列',
     characterPortraitDeferredHint: '肖像不在此写入。写入后可在制作页派生「补齐角色肖像」任务。',
+    reproposeVisualIdentity: 'AI 提案视觉身份',
+    reproposingVisualIdentity: '提案视觉身份…',
+    reproposeVisualIdentityHint:
+      '按姓名与简介重写 FACE / COSTUME / PROP。提案后请核对再写入作品库。',
     locationStagingTitle: '待保存的地点',
     noLocationStaging: '暂时没有待保存的地点',
     writeLocationPreviewHint:
@@ -350,6 +354,7 @@ export const zhCN = {
       parentStoryTitle: '所属故事',
       rendererExpression: '画面 Expression',
       visualIntent: '视觉意图',
+      visualIdentity: '视觉身份',
       characterArchive: '角色档案',
       visualSummary: '视觉摘要',
       identityCues: '身份线索',
@@ -421,6 +426,12 @@ export const zhCN = {
       reproposeExpressionHint:
         '只重写画面 Expression，不改标题与说明。确认故事前可先核对。',
       reproposeExpressionNeedSummary: '没有画面说明，无法提案 Expression。',
+      reproposeVisualIdentity: 'AI 提案视觉身份',
+      reproposingVisualIdentity: '提案视觉身份…',
+      reproposeVisualIdentityHint:
+        '重写 FACE / COSTUME / PROP，不改姓名与读者简介。卡片上会立刻写入待确认草稿；编辑框里提案后请再点保存。',
+      reproposeVisualIdentityFailed: '视觉身份提案失败，请重试。',
+      visualIdentityMissing: '缺视觉身份',
       splitSceneDialogTitle: '拆成多个单 beat 画面',
       splitSceneDialogDescription:
         '将一条多事件画面说明拆成多条。确认后会按各条 summary 补全 Expression；原条目丢弃。',

@@ -6,6 +6,7 @@ import {
 } from "@/lib/prompts/avatar";
 import {
   buildVisualIdentityProposePrompt,
+  characterArchiveFromLabeledIdentity,
   parseVisualIdentityProposal,
 } from "@/lib/prompts/visual-identity-propose";
 
@@ -53,6 +54,24 @@ STYLE: semi-realistic digital painting.`;
     expect(out).toMatch(/PROP:/);
     expect(out).toMatch(/bamboo|scroll/i);
     expect(out.indexOf("FACE:")).toBeLessThan(out.indexOf("PROP:"));
+  });
+});
+
+describe("characterArchiveFromLabeledIdentity", () => {
+  it("maps FACE/COSTUME/PROP lines into archive cues", () => {
+    const archive = characterArchiveFromLabeledIdentity(
+      "FACE: ruddy bronze complexion, long beard.\nCOSTUME: green battle robe.\nPROP: Green Dragon Crescent Blade.\nSTYLE: painterly digital painting."
+    );
+    expect(archive).not.toBeNull();
+    expect(archive?.identityCues).toEqual(
+      expect.arrayContaining(["ruddy bronze complexion", "long beard"])
+    );
+    expect(archive?.costumeCues).toEqual(
+      expect.arrayContaining(["green battle robe"])
+    );
+    expect(archive?.propCues).toEqual(
+      expect.arrayContaining(["Green Dragon Crescent Blade"])
+    );
   });
 });
 

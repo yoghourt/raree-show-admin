@@ -8,6 +8,8 @@ import {
   AVATAR_APPEARANCE_MAX_CHARS,
   packVisualIdentityForPortrait,
 } from "@/lib/prompts/avatar";
+import type { CharacterArchive } from "@/lib/discovery/character-archive";
+import { parseCharacterArchive } from "@/lib/discovery/character-archive";
 
 export type VisualIdentityProposeInput = {
   workTitle?: string;
@@ -63,6 +65,42 @@ export function parseVisualIdentityProposal(raw: string): string {
   const labeled = lines.filter((l) => LABEL_LINE.test(l));
   const extracted = labeled.length >= 1 ? labeled.join("\n") : t;
   return packVisualIdentityForPortrait(extracted);
+}
+
+function labeledLineValue(text: string, label: string): string {
+  const match = text.match(new RegExp(`^${label}\\s*:\\s*(.+)$`, "im"));
+  if (!match?.[1]) return "";
+  return match[1].replace(/\.+$/, "").trim();
+}
+
+function cuesFromLabeledLine(text: string, label: string): string[] {
+  const value = labeledLineValue(text, label);
+  if (!value) return [];
+  const parts = value
+    .split(/\s*[,;]\s*/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts : [value];
+}
+
+/** Map FACE/COSTUME/PROP proposal text back to Role Character Archive. */
+export function characterArchiveFromLabeledIdentity(
+  text: string
+): CharacterArchive | null {
+  const packed = parseVisualIdentityProposal(text);
+  if (!packed) return null;
+  const identityCues = cuesFromLabeledLine(packed, "FACE");
+  const costumeCues = cuesFromLabeledLine(packed, "COSTUME");
+  const propCues = cuesFromLabeledLine(packed, "PROP");
+  const visualSummary = labeledLineValue(packed, "SUMMARY");
+  const parsed = parseCharacterArchive({
+    ...(visualSummary ? { visualSummary } : {}),
+    ...(identityCues.length ? { identityCues } : {}),
+    costumeCues,
+    propCues,
+  });
+  if (!parsed.ok) return null;
+  return parsed.value;
 }
 
 export function buildVisualIdentityProposePrompt(

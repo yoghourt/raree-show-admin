@@ -7,6 +7,7 @@
 
 import * as React from "react";
 
+import { proposeCharacterVisualIdentity } from "@/app/actions/proposeCharacterVisualIdentity";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,9 +37,35 @@ export function CharacterWritePreviewCard({
 }: CharacterWritePreviewCardProps) {
   const existing = findExistingByName(staging.name, catalog);
   const canWrite = Boolean(staging.name.trim());
+  const [proposing, setProposing] = React.useState(false);
+  const [proposeError, setProposeError] = React.useState<string | null>(null);
 
   const patch = (partial: Partial<AcceptedCharacterStaging>) => {
     onChange({ ...staging, ...partial });
+  };
+
+  const proposeVisual = async () => {
+    if (!staging.name.trim()) return;
+    setProposing(true);
+    setProposeError(null);
+    try {
+      const result = await proposeCharacterVisualIdentity({
+        workId: staging.workId,
+        name: staging.name,
+        house: staging.house,
+        description: staging.description,
+        currentVisualIdentity: staging.visualIdentity,
+      });
+      if (!result.ok) {
+        setProposeError(result.message);
+        return;
+      }
+      patch({ visualIdentity: result.visualIdentity });
+    } catch (e) {
+      setProposeError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProposing(false);
+    }
   };
 
   return (
@@ -103,11 +130,31 @@ export function CharacterWritePreviewCard({
           <Textarea
             id={`char-visual-${staging.sourceReviewId}`}
             value={staging.visualIdentity}
-            disabled={busy}
+            disabled={busy || proposing}
             rows={3}
             placeholder="FACE / COSTUME / PROP 线索…"
             onChange={(e) => patch({ visualIdentity: e.target.value })}
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs"
+              disabled={busy || proposing || !staging.name.trim()}
+              onClick={() => void proposeVisual()}
+            >
+              {proposing
+                ? rolloutUi.reproposingVisualIdentity
+                : rolloutUi.reproposeVisualIdentity}
+            </Button>
+            <p className="text-[11px] text-zinc-500">
+              {rolloutUi.reproposeVisualIdentityHint}
+            </p>
+          </div>
+          {proposeError ? (
+            <p className="text-destructive text-xs">{proposeError}</p>
+          ) : null}
         </div>
         <div className="space-y-1 sm:col-span-2">
           <Label htmlFor={`char-quote-${staging.sourceReviewId}`}>
