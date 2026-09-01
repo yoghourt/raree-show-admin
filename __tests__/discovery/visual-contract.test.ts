@@ -507,6 +507,33 @@ describe("Rule 6 Face Safety", () => {
     expect(adapted.composition).toMatch(/both visible/i);
     expect(adapted.environment).toBe("Winterfell chamber");
   });
+
+  it("does not replace a dual-cast story action with a placement-only stub", () => {
+    const adapted = adaptSceneExpressionForLocalCapability({
+      environment: "opulent imperial palace interior, ornate pillars and silk draperies",
+      characters: [
+        {
+          role: "Yuan Shao",
+          visual: "standing, swinging a heavy jian sword, decorated armor",
+        },
+        {
+          role: "Cao Cao",
+          visual: "standing, lunging forward with a drawn dao saber",
+        },
+      ],
+      action:
+        "Yuan Shao and Cao Cao storm the palace, both figures striking down fleeing eunuchs",
+      composition: "medium wide shot, faces secondary, dynamic dual-cast framing",
+    });
+    expect(adapted.action).toMatch(/storm the palace/i);
+    expect(adapted.action).toMatch(/eunuchs/i);
+    expect(adapted.action).not.toMatch(
+      /^(Yuan|Cao) left, (Yuan|Cao) right, both fully visible$/i
+    );
+    expect(adapted.action).toMatch(/left/i);
+    expect(adapted.action).toMatch(/right/i);
+    expect(adapted.composition).toMatch(/both visible/i);
+  });
 });
 
 describe("parseVisualIntent", () => {

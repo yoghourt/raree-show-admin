@@ -314,13 +314,6 @@ function shortRoleLabel(role: string): string {
   return parts[0] || role.trim();
 }
 
-function roleMentions(text: string, role: string): boolean {
-  const full = role.trim().toLowerCase();
-  const first = shortRoleLabel(role).toLowerCase();
-  const t = text.toLowerCase();
-  return (full.length > 2 && t.includes(full)) || (first.length > 2 && t.includes(first));
-}
-
 function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -419,7 +412,8 @@ export function sharpenExpressionAnchors<T extends ExpressionLike>(
  * Local Execution Projection adapt (ADR-011 A5).
  * Apply at execute time via projectExpressionForDeployment("local").
  * MUST NOT overwrite persisted Canonical Expression at propose/validate.
- * Applies Rules 8–12 for Local face-safety + landmark/prop blank avoidance.
+ * MAY wrap (placement / face-safety / length). MUST NOT replace story action
+ * with a placement-only stub — that invents a two-figure duel prior.
  */
 export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>(
   expression: T
@@ -443,22 +437,15 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
   if (castLen === 2) {
     const left = shortRoleLabel(chars[0]!.role);
     const right = shortRoleLabel(chars[1]!.role);
-    const namesBoth =
-      roleMentions(action, chars[0]!.role) &&
-      roleMentions(action, chars[1]!.role);
     const hasPlacement = /\bleft\b/i.test(action) && /\bright\b/i.test(action);
-    const namedObject = namedNarrativeObject(
-      action,
-      expression.environment ?? ""
-    );
 
-    if (!namesBoth || !hasPlacement) {
-      if (namedObject) {
-        action = `${namedObject} between figures, ${left} left, ${right} right, both looking toward ${namedObject}`;
-      } else {
-        action = `${left} left, ${right} right, both fully visible`;
-      }
-    } else if (!/\bboth\b/i.test(action)) {
+    if (action && !hasPlacement) {
+      action = `${action}, ${left} left, ${right} right`;
+    } else if (!action) {
+      action = `${left} left, ${right} right`;
+    }
+
+    if (!/\bboth\b/i.test(action)) {
       action = `${action}, both fully visible`;
     }
 
