@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     characterCandidates,
   });
 
-  if (result.beats.length < 2) {
+  if (result.error || result.beats.length < 2) {
     return NextResponse.json(
       {
         error: {
@@ -97,13 +97,5 @@ export async function POST(request: Request) {
   return NextResponse.json({
     sessionId,
     beats: result.beats,
-    ...(result.error
-      ? {
-          warning: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        }
-      : {}),
   });
 }
