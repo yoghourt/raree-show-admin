@@ -53,7 +53,8 @@ Prefer verbs/poses: standing, facing, holding, behind, near, fallen, pointing.
 FORBIDDEN as motion/physics cues: shattering, lifting, hoisting, throwing, exploding,
 mid-air collision/choke, flying debris, large anonymous crowds.
 Prefer mid/wide with all required bodies over close-ups that drop a character.
-Prefer 2 clear figures over crowds when the beat is a relationship.
+Prefer 2 clear figures over anonymous crowds when the beat is a two-person relationship.
+MUST NOT drop a caption-named hinge figure, victim, or third actor to force a two-shot.
 Prefer flat left/right or front/back placement — avoid upper/lower tree stacking when possible.
 
 Rule 4 — Abstract action expansion:
@@ -62,7 +63,8 @@ MUST NOT be the only renderer cue — convert to visible arrangement.
 Bad: action "protects the king" / "fight" / "talk" / "threat".
 Good: "knight standing in front of king, holding sword" + composition "knight foreground, king behind".
 Bad: "two warriors fighting".
-Good: "knight on left holding steel sword, enemy on right holding ice sword, both facing each other".
+Good (opponents only): "knight on left holding steel sword, enemy on right holding ice sword, both facing each other".
+Allies / same-side beats MUST NOT use facing-each-other or crossed blades.
 
 Rule 5 — Cast consistency (action/composition ↔ characters[]):
 Every explicit actor count or named role in action/composition MUST match characters[].
@@ -134,6 +136,30 @@ composition MUST include: medium-wide + both figures fully visible + profiles or
 FORBIDDEN: single centered hero portrait; one figure cropped out; facing-camera stare.
 FORBIDDEN: inventing a landmark or prop the Canonical Expression did not name
 (e.g. inserting a pool-and-sword layout into an unrelated interior).
+
+Rule 13 — Relationship geometry + hinge cast (anti duel / anti missing third):
+Caption relationship decides facing. Do not default two armed figures to a duel.
+Allies / same side / storming together: side by side, facing the SAME direction or the same victims.
+FORBIDDEN for allies: facing each other; blades crossed; swinging/lunging at one another.
+Prefer a stopped still of the same beat (blades down, kneeling/fallen victims) over mid-swing physics.
+
+When caption names a third person as the reason a blow stops (upon seeing X, adopted son, blocks, restrains):
+that person MUST be in characters[] with blocking placement (in front / between).
+FORBIDDEN: a two-person side-by-side debate that omits the hinge figure.
+Convert "halts / stops execution" to static geometry: sword lowered, not striking.
+
+Named extras the beat acts on (eunuchs struck down, officials cowering) MUST have characters[]
+entries with static poses (kneeling, fallen, cowering). Do not leave them only in action prose.
+
+A person named only as the source of a gift or order (on behalf of / sent by / by order of)
+is off-stage unless the caption places them in the scene. Do not stand them in the still.
+
+Named mounts and treasure (Red Hare, gold, jade) are props in action/visual — not extra people.
+
+Bad: two generals swinging/lunging at each other (caption: they storm the palace together).
+Good: two generals side by side, blades down at kneeling/fallen eunuchs, not at each other.
+Bad: Ding Yuan pointing + Dong Zhuo with a sword; Lü Bu omitted (caption: halt because of Lü Bu).
+Good: Ding Yuan left pointing, Lü Bu in front of him, Dong Zhuo right, execution sword lowered.
 `.trim();
 
 /**

@@ -52,6 +52,76 @@ export function clipLocalBudgetText(text: string, maxChars: number): string {
     .replace(/[,:;]+$/, "");
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function firstPoseClause(visual: string): string {
+  return visual.split(",")[0]?.trim().replace(/\s+/g, " ") || "standing";
+}
+
+function shortRole(role: string): string {
+  return role.trim().split(/\s+/).filter(Boolean)[0] || role.trim();
+}
+
+function actionRoleLabel(role: string): string {
+  const t = role.trim().replace(/\s+/g, " ");
+  if (t.length <= LOCAL_ROLE_MAX) return t;
+  return shortRole(t);
+}
+
+/**
+ * Keep every cast member's pose in action. Trailing bare names ("; Lü Bu")
+ * get their visual's first pose; if still over budget, rebuild a compact
+ * "{role} {pose}" list so the last figure is not clipped off.
+ */
+export function packActionNamingCast(
+  action: string,
+  characters: Array<{ role: string; visual: string }>,
+  maxChars: number
+): string {
+  const original = action.trim().replace(/\s+/g, " ");
+  let next = original;
+  let repaired = false;
+
+  for (const ch of characters) {
+    const full = ch.role.trim();
+    const label = actionRoleLabel(full);
+    if (label.length < 2) continue;
+    const trailing = new RegExp(
+      `([;,]\\s*)(${escapeRegExp(full)}|${escapeRegExp(shortRole(full))})\\s*$`,
+      "i"
+    );
+    if (trailing.test(next)) {
+      next = next.replace(trailing, `$1${label} ${firstPoseClause(ch.visual)}`);
+      repaired = true;
+    }
+  }
+
+  for (const ch of characters) {
+    const label = actionRoleLabel(ch.role);
+    if (label.length < 2) continue;
+    if (new RegExp(`\\b${escapeRegExp(shortRole(ch.role))}\\b`, "i").test(next)) {
+      continue;
+    }
+    next = next
+      ? `${next}, ${label} ${firstPoseClause(ch.visual)}`
+      : `${label} ${firstPoseClause(ch.visual)}`;
+    repaired = true;
+  }
+
+  if (next.length <= maxChars) return next;
+  if (repaired) {
+    const compact = characters
+      .map((ch) => `${actionRoleLabel(ch.role)} ${firstPoseClause(ch.visual)}`)
+      .filter((part) => part.trim().length > 2)
+      .join(", ");
+    if (compact.length > 0 && compact.length <= maxChars) return compact;
+    return clipLocalBudgetText(compact || next, maxChars);
+  }
+  return clipLocalBudgetText(original, maxChars);
+}
+
 /**
  * Fit Canonical Expression into Local execute field budgets.
  * Used by Creator Expression propose so pose/blocking is not left-clipped at generate.
@@ -61,7 +131,11 @@ export function packExpressionForLocalTransport(
 ): RendererExpression {
   const packed: RendererExpression = {
     environment: clipLocalBudgetText(expression.environment, LOCAL_ENV_MAX),
-    action: clipLocalBudgetText(expression.action, LOCAL_ACTION_MAX),
+    action: packActionNamingCast(
+      expression.action,
+      expression.characters,
+      LOCAL_ACTION_MAX
+    ),
     composition: clipLocalBudgetText(
       expression.composition,
       LOCAL_COMPOSITION_MAX

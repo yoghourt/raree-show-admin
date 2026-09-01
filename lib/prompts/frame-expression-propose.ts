@@ -37,7 +37,7 @@ const TITLE_PREFIX =
 /** Capitalized name phrases from caption — prompt MUST-CAST, not a dictionary. */
 export function captionProperNamePhrases(caption: string): string[] {
   const matches = caption.match(
-    /\b(?:King|Queen|Prince|Princess|Lord|Lady|Ser|Emperor|Empress)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*|\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+|\b[A-Z][a-z]{2,}\b/g
+    /\b(?:King|Queen|Prince|Princess|Lord|Lady|Ser|Emperor|Empress)\s+\p{Lu}\p{L}+(?:\s+\p{Lu}\p{L}+)*|\b\p{Lu}\p{L}+(?:\s+\p{Lu}\p{L}+)+|\b\p{Lu}\p{L}{2,}\b/gu
   );
   if (!matches) return [];
   const skip = new Set([
@@ -66,6 +66,38 @@ export function captionProperNamePhrases(caption: string): string[] {
     out.push(t);
   }
   return out;
+}
+
+const AGENCY_PHRASE =
+  /\b(?:on behalf of|sent by|by order(?:s)? of|in the name of)\s+/gi;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Names that appear only inside on-behalf-of / sent-by phrasing. */
+export function captionAgencyOnlyNames(caption: string): string[] {
+  const names = captionProperNamePhrases(caption);
+  return names.filter((name) => {
+    const stripped = caption.replace(
+      new RegExp(
+        `${AGENCY_PHRASE.source}(${escapeRegExp(name)})\\b`,
+        "gi"
+      ),
+      " "
+    );
+    return !new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(stripped);
+  });
+}
+
+/** Caption names that belong on stage (excludes agency-only principals). */
+export function captionOnStageNames(caption: string): string[] {
+  const agency = new Set(
+    captionAgencyOnlyNames(caption).map((n) => n.toLowerCase())
+  );
+  return captionProperNamePhrases(caption).filter(
+    (n) => !agency.has(n.toLowerCase())
+  );
 }
 
 function extractJsonObject(raw: string): unknown {
@@ -134,11 +166,16 @@ export function buildFrameExpressionProposePrompt(
           })
           .join("\n");
 
-  const named = captionProperNamePhrases(caption);
+  const named = captionOnStageNames(caption);
   const namedBlock =
     named.length === 0
       ? "(none extracted — still follow the caption's own names)"
       : named.map((n) => `- ${n}`).join("\n");
+  const agency = captionAgencyOnlyNames(caption);
+  const agencyBlock =
+    agency.length === 0
+      ? "(none)"
+      : agency.map((n) => `- ${n}`).join("\n");
 
   return `You re-author Canonical Visual Expression for ONE Reading Frame.
 This is Creator still geometry for image generation. Do NOT change the caption.
@@ -149,9 +186,12 @@ Route title: ${route}
 Frame Narrative (caption) — THIS is the beat. Expression MUST depict this same instant:
 ${JSON.stringify(caption)}
 
-Caption-named agents (MUST be the Expression cast / visible subjects).
+Caption-named agents ON STAGE (MUST be the Expression cast / visible subjects).
 Map nicknames to Work character names (Ned = Eddard Stark). Do NOT add other Work characters the caption does not name:
 ${namedBlock}
+
+Named only as the source of a gift or order (on behalf of / sent by) — MUST NOT stand in the still unless the caption places them in the scene:
+${agencyBlock}
 
 Current Expression (may contradict the caption — if so, REPLACE it, do not polish):
 ${current}
@@ -169,8 +209,8 @@ Rules:
 - Local execute budget (Creator Default = Local). Longer tails are DROPPED at generate — write WITHIN budget so pose is not cut:
   - characters[].visual ≤ ${LOCAL_VISUAL_MAX} chars. FIRST tokens MUST be pose/blocking (kneeling, mounted, standing, holding X), THEN 1–2 look cues. Do not paste full visual identity.
   - characters[].role ≤ ${LOCAL_ROLE_MAX} chars.
-  - action ≤ ${LOCAL_ACTION_MAX} chars — who does what to whom; name each figure's pose.
-  - environment ≤ ${LOCAL_ENV_MAX} chars.
+  - action ≤ ${LOCAL_ACTION_MAX} chars — COMPLETE clause for EVERY characters[] role (pose + left/right). FORBIDDEN: ending on a bare name with no verb ("…; Lü Bu"). Write the compact still first; drop adjectives if needed.
+  - environment ≤ ${LOCAL_ENV_MAX} chars. From THIS caption only. FORBIDDEN: copying a palace/hall/solar from Current Expression when the caption does not name that place.
   - composition ≤ ${LOCAL_COMPOSITION_MAX} chars.
   - visualEmphasis / lighting / atmosphere / threatPerception ≤ ${LOCAL_EMPHASIS_MAX} chars each.
 - FORBIDDEN: long costume paragraphs; repeating every archive cue; putting kneeling/mounted/holding at the END of visual.
@@ -183,11 +223,27 @@ Rules:
 - characters[].role MUST be Work character names when they appear; never "man"/"woman".
 - Dual-cast / two-figure preference MUST NOT override caption cast. If the beat is a royal progress, show that progress (Robert + retinue or Robert approaching Winterfell), not a two-person solar.
 - Dual-cast when the caption actually has two figures: medium-wide, both fully visible, faces secondary.
+- Caption-named groups the beat acts on (eunuchs, officials, retinue) MUST appear in characters[] with a static pose even without a Work character row. Do not leave them only in action prose.
+- Named mounts and treasure (Red Hare, gold, jade) are props between the figures — not extra people in characters[].
+- Current Expression is a draft to replace, not a location lock.
 
 WRONG beat example (do not do this):
 caption: King Robert traveling north to offer Ned the Hand and a Joffrey–Sansa marriage.
 bad expression: Catelyn and Eddard looking at a raven parchment in Winterfell solar.
 good expression: kingsroad / northern approach; Robert Baratheon with royal party traveling; Ned may await the host; marriage alliance as banners or named escort — not a letter.
+
+WRONG relationship geometry (do not do this):
+caption: Enraged, Yuan Shao and Cao Cao storm the palace, slaughtering the eunuchs.
+bad: two armed generals facing each other, blades crossed (duel). Eunuchs omitted from characters[].
+good: Yuan Shao and Cao Cao side by side facing the same hall; blades down at kneeling/fallen eunuchs in characters[]; not at each other.
+
+caption: Ding Yuan denounces treason; Dong Zhuo stops his execution sword upon seeing Lü Bu.
+bad: Ding Yuan and Dong Zhuo two-shot, Lü Bu missing or a blur.
+good: Ding Yuan left pointing; Lü Bu center in front of him; Dong Zhuo right, sword lowered not striking.
+
+caption: Li Su bears Red Hare, gold and jade on behalf of Dong Zhuo; Lü Bu agrees to switch sides.
+bad: Dong Zhuo standing in the hall watching; action truncated as "…; Lü Bu"; imperial palace copied from the previous frame.
+good: camp courtyard; Li Su left with Red Hare reins and chests; Lü Bu right looking at the horse; Dong Zhuo off-stage. Action names both poses within the Local action budget.
 
 ${EXPRESSION_CAPABILITY_RULES}
 

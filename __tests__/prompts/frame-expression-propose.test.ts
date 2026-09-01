@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   LOCAL_ACTION_MAX,
   LOCAL_VISUAL_MAX,
+  packActionNamingCast,
 } from "@/lib/discovery/execution-projection";
 import {
   buildFrameExpressionProposePrompt,
+  captionAgencyOnlyNames,
+  captionOnStageNames,
   captionProperNamePhrases,
   parseFrameExpressionProposal,
 } from "@/lib/prompts/frame-expression-propose";
@@ -111,6 +114,16 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/NOT a cast menu/);
     expect(p).toMatch(/raven parchment/);
     expect(p).toMatch(/kingsroad/);
+    expect(p).toMatch(/Rule 13/);
+    expect(p).toMatch(/not at each other/);
+    expect(p).toMatch(/hinge/);
+    expect(p).toMatch(/storm the palace/);
+    expect(p).toMatch(/Lü Bu/);
+    expect(p).toMatch(/Caption-named groups/);
+    expect(p).toMatch(/MUST NOT stand in the still/);
+    expect(p).toMatch(/Red Hare/);
+    expect(p).toMatch(/off-stage/);
+    expect(p).toMatch(/ending on a bare name/);
     expect(p).toMatch(/Do NOT add other Work characters/);
     expect(p).toMatch(new RegExp(String(LOCAL_VISUAL_MAX)));
     expect(p).toMatch(/pose\/blocking/);
@@ -154,5 +167,69 @@ describe("captionProperNamePhrases", () => {
       ])
     );
     expect(names.join(" ")).not.toMatch(/\bHand\b/);
+  });
+});
+
+describe("captionAgencyOnlyNames / captionOnStageNames", () => {
+  const caption =
+    "Enticed by Li Su bearing the legendary Red Hare horse, gold, pearls, and jade on behalf of Dong Zhuo, the mercenary Lü Bu agrees to switch sides.";
+
+  it("keeps the messenger and the tempted on stage, not the off-stage principal", () => {
+    expect(captionAgencyOnlyNames(caption)).toEqual(
+      expect.arrayContaining(["Dong Zhuo"])
+    );
+    const onStage = captionOnStageNames(caption);
+    expect(onStage).toEqual(expect.arrayContaining(["Li Su", "Lü Bu"]));
+    expect(onStage).not.toEqual(expect.arrayContaining(["Dong Zhuo"]));
+  });
+});
+
+describe("packActionNamingCast", () => {
+  it("fills a trailing bare role with the first visual pose", () => {
+    const packed = packActionNamingCast(
+      "Li Su stands left presenting the Red Hare horse and treasure chests of gold and jade; Lü Bu",
+      [
+        {
+          role: "Li Su",
+          visual: "standing on left, holding reins of Red Hare horse",
+        },
+        {
+          role: "Lü Bu",
+          visual: "standing center, looking intently at the horse",
+        },
+      ],
+      LOCAL_ACTION_MAX
+    );
+    expect(packed).toMatch(/Lü Bu/i);
+    expect(packed).toMatch(/standing center/i);
+    expect(packed).not.toMatch(/;\s*Lü Bu\s*$/i);
+    expect(packed.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
+  });
+});
+
+describe("parseFrameExpressionProposal trailing action", () => {
+  it("does not leave action ending on a bare last name after Local pack", () => {
+    const out = parseFrameExpressionProposal(
+      JSON.stringify({
+        environment: "military camp courtyard at night, torch posts",
+        characters: [
+          {
+            role: "Li Su",
+            visual: "standing on left, holding reins of Red Hare horse",
+          },
+          {
+            role: "Lü Bu",
+            visual: "standing center, looking intently at the horse",
+          },
+        ],
+        action:
+          "Li Su stands left presenting the Red Hare horse and treasure chests of gold and jade; Lü Bu",
+        composition: "medium-wide shot, both fully visible, faces secondary",
+      })
+    );
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.action).toMatch(/standing center/i);
+    expect(out.value.action.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
   });
 });
