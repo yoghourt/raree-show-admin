@@ -348,6 +348,8 @@ export const zhCN = {
       chapter_number: '章节序号',
       parentStoryCandidateId: '所属故事',
       parentStoryTitle: '所属故事',
+      rendererExpression: '画面 Expression',
+      visualIntent: '视觉意图',
       characterArchive: '角色档案',
       visualSummary: '视觉摘要',
       identityCues: '身份线索',
@@ -414,6 +416,11 @@ export const zhCN = {
         '没有所属故事，无法确认。可编辑所属故事字段，或丢弃后重新提炼。',
       edit: '编辑',
       splitScene: '拆成多画面',
+      reproposeExpression: 'AI 提案 Expression',
+      reproposingExpression: '提案 Expression…',
+      reproposeExpressionHint:
+        '只重写画面 Expression，不改标题与说明。确认故事前可先核对。',
+      reproposeExpressionNeedSummary: '没有画面说明，无法提案 Expression。',
       splitSceneDialogTitle: '拆成多个单 beat 画面',
       splitSceneDialogDescription:
         '将一条多事件画面说明拆成多条。确认后会按各条 summary 补全 Expression；原条目丢弃。',

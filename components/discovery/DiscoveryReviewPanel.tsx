@@ -4,6 +4,7 @@ import { ChevronRight, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
+import { proposeFrameExpression } from "@/app/actions/proposeFrameExpression";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -351,9 +352,66 @@ function sceneStagingToReviewItem(
   };
 }
 
+function parentStoryTitleForScene(
+  item: DiscoveryReviewItem,
+  items: DiscoveryReviewItem[]
+): string | undefined {
+  const parentId = (getEffectiveFields(item) as SceneCandidateFields)
+    .parentStoryCandidateId;
+  if (!parentId) return undefined;
+  const story = items.find(
+    (row) =>
+      row.candidate.candidateType === "story" &&
+      row.candidate.candidateId === parentId
+  );
+  return story ? getEffectiveDisplayName(story) : undefined;
+}
+
+function characterCuesForExpressionPropose(
+  catalog: Character[],
+  items: DiscoveryReviewItem[]
+): Array<{ name: string; visualIdentity?: string }> {
+  const out = new Map<string, { name: string; visualIdentity?: string }>();
+  for (const character of catalog) {
+    const name = character.name.trim();
+    if (!name) continue;
+    out.set(name.toLowerCase(), {
+      name,
+      ...(character.visualIdentity.trim()
+        ? { visualIdentity: character.visualIdentity.trim() }
+        : {}),
+    });
+  }
+  for (const item of items) {
+    if (item.candidate.candidateType !== "character") continue;
+    const fields = getEffectiveFields(item) as CharacterCandidateFields;
+    const name = (fields.name || getEffectiveDisplayName(item)).trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    const existing = out.get(key);
+    if (existing?.visualIdentity) continue;
+    const archive = fields.characterArchive;
+    const vis = archive
+      ? [
+          archive.visualSummary,
+          ...(archive.identityCues ?? []),
+          ...archive.costumeCues.slice(0, 1),
+        ]
+          .filter((part): part is string => Boolean(part?.trim()))
+          .join(". ")
+      : "";
+    out.set(key, {
+      name,
+      ...(vis ? { visualIdentity: vis } : existing ?? {}),
+    });
+  }
+  return [...out.values()];
+}
+
 function ReviewItemCard({
   item,
   busy,
+  expressionBusy = false,
   actionable,
   showAccept = true,
   acceptDisabled = false,
@@ -364,9 +422,11 @@ function ReviewItemCard({
   onDiscard,
   onRegen,
   onSplit,
+  onReproposeExpression,
 }: {
   item: DiscoveryReviewItem;
   busy: boolean;
+  expressionBusy?: boolean;
   actionable: boolean;
   showAccept?: boolean;
   acceptDisabled?: boolean;
@@ -378,11 +438,13 @@ function ReviewItemCard({
   onDiscard: () => void;
   onRegen: () => void;
   onSplit?: () => void;
+  onReproposeExpression?: () => void;
 }) {
   const fields = getEffectiveFields(item);
   const archivePresent =
     item.candidate.candidateType === "character" &&
     readCharacterArchive(fields) !== null;
+  const locked = busy || expressionBusy;
 
   return (
     <div className="flex flex-col gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5">
@@ -428,7 +490,7 @@ function ReviewItemCard({
                 type="button"
                 size="sm"
                 className="h-6 px-2 text-[11px]"
-                disabled={busy || acceptDisabled}
+                disabled={locked || acceptDisabled}
                 onClick={onAccept}
               >
                 {acceptLabel ?? discoveryReviewUi.accept}
@@ -439,7 +501,7 @@ function ReviewItemCard({
               size="sm"
               variant="outline"
               className="h-6 px-2 text-[11px]"
-              disabled={busy}
+              disabled={locked}
               onClick={onEdit}
             >
               {discoveryReviewUi.edit}
@@ -450,10 +512,25 @@ function ReviewItemCard({
                 size="sm"
                 variant="outline"
                 className="h-6 px-2 text-[11px]"
-                disabled={busy}
+                disabled={locked}
                 onClick={onSplit}
               >
                 {discoveryReviewUi.splitScene}
+              </Button>
+            ) : null}
+            {onReproposeExpression ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-6 px-2 text-[11px]"
+                disabled={locked}
+                onClick={onReproposeExpression}
+                title={discoveryReviewUi.reproposeExpressionHint}
+              >
+                {expressionBusy
+                  ? discoveryReviewUi.reproposingExpression
+                  : discoveryReviewUi.reproposeExpression}
               </Button>
             ) : null}
             <Button
@@ -461,7 +538,7 @@ function ReviewItemCard({
               size="sm"
               variant="outline"
               className="h-6 px-2 text-[11px]"
-              disabled={busy}
+              disabled={locked}
               onClick={onRegen}
             >
               {busy ? discoveryReviewUi.regening : discoveryReviewUi.regen}
@@ -471,7 +548,7 @@ function ReviewItemCard({
               size="sm"
               variant="ghost"
               className="h-6 px-1.5 text-[11px]"
-              disabled={busy}
+              disabled={locked}
               onClick={onDiscard}
             >
               {discoveryReviewUi.discard}
@@ -676,6 +753,12 @@ export function DiscoveryReviewPanel({
   const [splitBeats, setSplitBeats] = React.useState<
     Array<{ title: string; summary: string }>
   >([]);
+  const [proposingExprReviewId, setProposingExprReviewId] = React.useState<
+    string | null
+  >(null);
+  const [exprProposeError, setExprProposeError] = React.useState<string | null>(
+    null
+  );
 
   const failedTypes = React.useMemo(() => {
     return new Set(proposeError?.errors?.map((e) => e.candidateType) ?? []);
@@ -829,6 +912,96 @@ export function DiscoveryReviewPanel({
       saveCandidateEdit(editItem.reviewId, payload);
     }
     setEditItem(null);
+  };
+
+  const applySceneExpression = (
+    item: DiscoveryReviewItem,
+    expression: RendererExpression
+  ) => {
+    const fields = getEffectiveFields(item) as SceneCandidateFields;
+    saveSceneStagingEdit(item.reviewId, {
+      editedFields: {
+        ...fields,
+        rendererExpression: expression,
+      },
+      editedDisplayName: getEffectiveDisplayName(item),
+      editedSummary: getEffectiveSummary(item),
+    });
+  };
+
+  const mergeExpressionIntoEditJson = (expression: RendererExpression) => {
+    try {
+      const parsed = JSON.parse(editFieldsJson) as Record<string, unknown>;
+      parsed.rendererExpression = expression;
+      setEditFieldsJson(JSON.stringify(parsed, null, 2));
+      setEditParseError(null);
+    } catch {
+      setEditFieldsJson(
+        JSON.stringify({ rendererExpression: expression }, null, 2)
+      );
+    }
+  };
+
+  const reproposeSceneExpression = async (
+    item: DiscoveryReviewItem,
+    intoEditJson = false
+  ) => {
+    if (item.candidate.candidateType !== "scene") return;
+    const caption = (
+      intoEditJson ? editSummary : getEffectiveSummary(item)
+    ).trim();
+    if (!caption) {
+      setExprProposeError(discoveryReviewUi.reproposeExpressionNeedSummary);
+      return;
+    }
+    let currentExpression: string | undefined;
+    if (intoEditJson) {
+      try {
+        const parsed = JSON.parse(editFieldsJson) as {
+          rendererExpression?: unknown;
+        };
+        if (parsed.rendererExpression) {
+          currentExpression = JSON.stringify(parsed.rendererExpression);
+        }
+      } catch {
+        currentExpression = undefined;
+      }
+    } else {
+      const fields = getEffectiveFields(item) as SceneCandidateFields;
+      if (fields.rendererExpression) {
+        currentExpression = JSON.stringify(fields.rendererExpression);
+      }
+    }
+    setProposingExprReviewId(item.reviewId);
+    setExprProposeError(null);
+    try {
+      const result = await proposeFrameExpression({
+        workId,
+        caption,
+        currentExpression,
+        routeTitle: parentStoryTitleForScene(item, reviewItems),
+        characterCues: characterCuesForExpressionPropose(
+          characterCatalog,
+          reviewItems
+        ),
+      });
+      if (!result.ok) {
+        setExprProposeError(result.message);
+        return;
+      }
+      if (intoEditJson) {
+        mergeExpressionIntoEditJson(result.rendererExpression);
+        return;
+      }
+      applySceneExpression(item, result.rendererExpression);
+      if (editItem?.reviewId === item.reviewId) {
+        mergeExpressionIntoEditJson(result.rendererExpression);
+      }
+    } catch (e) {
+      setExprProposeError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProposingExprReviewId(null);
+    }
   };
 
   const handleRegen = async () => {
@@ -1014,6 +1187,15 @@ export function DiscoveryReviewPanel({
                   ))}
                 </ul>
               ) : null}
+            </div>
+          ) : null}
+
+          {exprProposeError ? (
+            <div
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
+              {exprProposeError}
             </div>
           ) : null}
 
@@ -1373,6 +1555,18 @@ export function DiscoveryReviewPanel({
                                             ? () => openSplit(scene)
                                             : undefined
                                         }
+                                        onReproposeExpression={
+                                          sceneActionable
+                                            ? () =>
+                                                void reproposeSceneExpression(
+                                                  scene
+                                                )
+                                            : undefined
+                                        }
+                                        expressionBusy={
+                                          proposingExprReviewId ===
+                                          scene.reviewId
+                                        }
                                         onDiscard={() =>
                                           discardCandidate(scene.reviewId)
                                         }
@@ -1422,6 +1616,16 @@ export function DiscoveryReviewPanel({
                                   scene.status === "edited_pending_accept"
                                     ? () => openSplit(scene)
                                     : undefined
+                                }
+                                onReproposeExpression={
+                                  scene.status === "pending" ||
+                                  scene.status === "edited_pending_accept"
+                                    ? () =>
+                                        void reproposeSceneExpression(scene)
+                                    : undefined
+                                }
+                                expressionBusy={
+                                  proposingExprReviewId === scene.reviewId
                                 }
                                 onDiscard={() =>
                                   discardCandidate(scene.reviewId)
@@ -1848,6 +2052,32 @@ export function DiscoveryReviewPanel({
               />
               {editParseError ? (
                 <p className="text-destructive text-xs">{editParseError}</p>
+              ) : null}
+              {editItem?.candidate.candidateType === "scene" ? (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 text-xs"
+                    disabled={
+                      proposingExprReviewId === editItem.reviewId ||
+                      isRegening ||
+                      isSplitting
+                    }
+                    onClick={() =>
+                      void reproposeSceneExpression(editItem, true)
+                    }
+                    title={discoveryReviewUi.reproposeExpressionHint}
+                  >
+                    {proposingExprReviewId === editItem.reviewId
+                      ? discoveryReviewUi.reproposingExpression
+                      : discoveryReviewUi.reproposeExpression}
+                  </Button>
+                  <p className="text-[11px] text-zinc-500">
+                    {discoveryReviewUi.reproposeExpressionHint}
+                  </p>
+                </div>
               ) : null}
             </div>
           </div>

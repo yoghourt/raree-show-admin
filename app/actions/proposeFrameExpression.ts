@@ -41,6 +41,14 @@ const inputSchema = z.object({
       const t = s?.trim()
       return t ? t : undefined
     }),
+  characterCues: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1),
+        visualIdentity: z.string().optional(),
+      })
+    )
+    .optional(),
 })
 
 /**
@@ -53,6 +61,7 @@ export async function proposeFrameExpression(input: {
   currentExpression?: string
   operatorNote?: string
   routeTitle?: string
+  characterCues?: Array<{ name: string; visualIdentity?: string }>
 }): Promise<ProposeFrameExpressionResult> {
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) {
@@ -82,7 +91,7 @@ export async function proposeFrameExpression(input: {
     .select("name, visual_identity")
     .eq("work_id", parsed.data.workId)
 
-  const characterCues = (characterRows ?? [])
+  const fromArchive = (characterRows ?? [])
     .map((row) => {
       const rec = row as { name?: unknown; visual_identity?: unknown }
       const name = typeof rec.name === "string" ? rec.name.trim() : ""
@@ -98,13 +107,30 @@ export async function proposeFrameExpression(input: {
     })
     .filter((c): c is { name: string; visualIdentity?: string } => c != null)
 
+  const characterCues = new Map<
+    string,
+    { name: string; visualIdentity?: string }
+  >()
+  for (const cue of fromArchive) {
+    characterCues.set(cue.name.toLowerCase(), cue)
+  }
+  for (const cue of parsed.data.characterCues ?? []) {
+    const key = cue.name.toLowerCase()
+    const prev = characterCues.get(key)
+    characterCues.set(key, {
+      name: cue.name,
+      visualIdentity: cue.visualIdentity?.trim() || prev?.visualIdentity,
+    })
+  }
+  const mergedCues = [...characterCues.values()]
+
   const prompt = buildFrameExpressionProposePrompt({
     workTitle,
     routeTitle: parsed.data.routeTitle,
     caption: parsed.data.caption,
     currentExpression: parsed.data.currentExpression,
     operatorNote: parsed.data.operatorNote,
-    characterCues,
+    characterCues: mergedCues,
   })
 
   try {
@@ -118,11 +144,11 @@ export async function proposeFrameExpression(input: {
     }
     const rendererExpression = applyCharacterLifeStageLooks(
       proposal.value,
-      characterCues
+      mergedCues
     )
     const lifeStageErrors = findLifeStageContradictions(
       rendererExpression,
-      characterCues
+      mergedCues
     )
     if (lifeStageErrors.length > 0) {
       return {
