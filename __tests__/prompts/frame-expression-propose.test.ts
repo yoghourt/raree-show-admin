@@ -168,6 +168,15 @@ describe("captionProperNamePhrases", () => {
     );
     expect(names.join(" ")).not.toMatch(/\bHand\b/);
   });
+
+  it("does not treat sentence-initial verbs or generic Emperor as cast", () => {
+    const names = captionProperNamePhrases(
+      "Backed by Lü Bu, Dong Zhuo demands the deposition of the Emperor at a second assembly."
+    );
+    expect(names).toEqual(expect.arrayContaining(["Lü Bu", "Dong Zhuo"]));
+    expect(names).not.toEqual(expect.arrayContaining(["Backed"]));
+    expect(names).not.toEqual(expect.arrayContaining(["Emperor"]));
+  });
 });
 
 describe("captionAgencyOnlyNames / captionOnStageNames", () => {
@@ -181,6 +190,7 @@ describe("captionAgencyOnlyNames / captionOnStageNames", () => {
     const onStage = captionOnStageNames(caption);
     expect(onStage).toEqual(expect.arrayContaining(["Li Su", "Lü Bu"]));
     expect(onStage).not.toEqual(expect.arrayContaining(["Dong Zhuo"]));
+    expect(onStage).not.toEqual(expect.arrayContaining(["Enticed"]));
   });
 });
 

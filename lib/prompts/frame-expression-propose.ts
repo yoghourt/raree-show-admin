@@ -53,6 +53,8 @@ export function captionProperNamePhrases(caption: string): string[] {
     "Queen",
     "Prince",
     "Princess",
+    "Emperor",
+    "Empress",
   ]);
   const out: string[] = [];
   const seen = new Set<string>();
@@ -60,12 +62,23 @@ export function captionProperNamePhrases(caption: string): string[] {
     const t = raw.trim();
     const core = t.replace(TITLE_PREFIX, "").trim();
     if (!core || skip.has(core) || skip.has(t)) continue;
+    if (isSentenceInitialNonName(caption, t)) continue;
     const key = t.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(t);
   }
   return out;
+}
+
+/** "Backed by…" / "Enticed by…" — sentence-initial verb, not a character. */
+function isSentenceInitialNonName(caption: string, name: string): boolean {
+  const trimmed = caption.trim();
+  if (!trimmed.startsWith(name)) return false;
+  if (/\s/.test(name)) return false;
+  const after = trimmed.slice(name.length).trim();
+  if (/^(by|with|from|after|while|when|as|upon)\b/i.test(after)) return true;
+  return name.length > 3 && /(?:ed|ing)$/i.test(name);
 }
 
 const AGENCY_PHRASE =
@@ -221,6 +234,7 @@ Rules:
 - If caption says someone is dead / absent, they MUST NOT appear alive in action or characters[].
 - Convert abstract offers/alliances into visible stills (royal banners, approaching party, two named figures on the road) — not a private letter scene.
 - characters[].role MUST be Work character names when they appear; never "man"/"woman".
+- characters[].role MUST be a person, never a sentence verb (Backed, Enticed) or a generic title (Emperor, King) alone.
 - Dual-cast / two-figure preference MUST NOT override caption cast. If the beat is a royal progress, show that progress (Robert + retinue or Robert approaching Winterfell), not a two-person solar.
 - Dual-cast when the caption actually has two figures: medium-wide, both fully visible, faces secondary.
 - Caption-named groups the beat acts on (eunuchs, officials, retinue) MUST appear in characters[] with a static pose even without a Work character row. Do not leave them only in action prose.
