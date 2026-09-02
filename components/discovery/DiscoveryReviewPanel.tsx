@@ -409,10 +409,7 @@ function characterCuesForExpressionPropose(
           .filter((part): part is string => Boolean(part?.trim()))
           .join(". ")
       : "";
-    out.set(key, {
-      name,
-      ...(vis ? { visualIdentity: vis } : existing ?? {}),
-    });
+    out.set(key, vis ? { name, visualIdentity: vis } : { name });
   }
   return [...out.values()];
 }
