@@ -361,8 +361,13 @@ const DOCUMENT_CLASS_PATTERN =
 const ACTION_PHRASE_PATTERN =
   /\b(looking|standing|seated|sitting|reaching|turning|reading|facing|walking|leaning|holding|bowed|profile)\b/i;
 
+/** Beat-contact geometry — must outrank generic standing/costume when compressing. */
+const BEAT_CONTACT_PATTERN =
+  /\b(throat|neck|gauntlets?|hilt|corpse|glowing|dead face)\b/i;
+
 const MAX_IDENTITY_VISUAL_PARTS = 4;
-const MAX_IDENTITY_VISUAL_LEN = 80;
+/** Match portrait appearance budget (AVATAR_APPEARANCE_MAX_CHARS). */
+const MAX_IDENTITY_VISUAL_LEN = 220;
 
 function shortRoleLabel(role: string): string {
   const parts = role.trim().split(/\s+/).filter(Boolean);
@@ -384,6 +389,7 @@ function isNamedIdentityWeapon(part: string): boolean {
  * Action phrases must not outrank P1 named weapons or body marks.
  */
 function scoreVisualPart(part: string): number {
+  if (BEAT_CONTACT_PATTERN.test(part)) return 110;
   if (
     TIER3_FILLER_PATTERN.test(part) &&
     !IDENTITY_BODY_PATTERN.test(part) &&
@@ -498,7 +504,11 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
       `${action} ${composition}`
     );
 
-    if (!verticalCamera) {
+    const overlayPlacement = /\b(leaning over|standing over|clamped|throat|over him|over her)\b/i.test(
+      action
+    );
+
+    if (!verticalCamera && !overlayPlacement) {
       if (action && !hasLateralPlacement) {
         action = `${action}, ${left} left, ${right} right`;
       } else if (!action) {
@@ -528,7 +538,7 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
     }
   }
 
-  action = hardCapAtBoundary(action, 110);
+  action = hardCapAtBoundary(action, 280);
 
   return sharpenExpressionAnchors({
     ...expression,

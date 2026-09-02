@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   clipWorkVisualConvention,
   flattenWorkVisualConventionForPrompt,
+  forbidsFromUnlabeledNegations,
   forbidsFromWorkVisualConvention,
+  stripPositiveNegations,
   workTitleAndConventionFromRow,
   workVisualConventionFromRow,
   workVisualConventionPromptBlock,
@@ -99,6 +101,18 @@ describe("flattenWorkVisualConventionForPrompt", () => {
     expect(flat).toMatch(/leather/);
     expect(flat).not.toMatch(/cloak/i);
   });
+
+  it("drops unlabeled no-X forbids from the positive block", () => {
+    const flat = flattenWorkVisualConventionForPrompt(
+      "painterly digital painting, medieval wool fur leather, no modern military, no olive drab, no camouflage"
+    );
+    expect(flat).toMatch(/painterly/);
+    expect(flat).toMatch(/wool/);
+    expect(flat).not.toMatch(/camouflage/i);
+    expect(flat).not.toMatch(/olive drab/i);
+    expect(flat).not.toMatch(/modern military/i);
+    expect(flat).not.toMatch(/\bno\b/i);
+  });
 });
 
 describe("forbidsFromWorkVisualConvention", () => {
@@ -108,5 +122,27 @@ describe("forbidsFromWorkVisualConvention", () => {
         "STYLE: painterly. FORBID: modern military, olive drab."
       )
     ).toEqual(["modern military", "olive drab"]);
+  });
+
+  it("extracts unlabeled no-X prose for negatives", () => {
+    expect(
+      forbidsFromWorkVisualConvention(
+        "painterly, no modern military, no olive drab, no camouflage"
+      )
+    ).toEqual(["modern military", "olive drab", "camouflage"]);
+  });
+});
+
+describe("stripPositiveNegations", () => {
+  it("removes no-X clauses and anachronism nouns from Local positives", () => {
+    expect(
+      stripPositiveNegations(
+        "dark mail, no camouflage, no olive drab, pale dead face"
+      )
+    ).toBe("dark mail, pale dead face");
+    expect(forbidsFromUnlabeledNegations("no camouflage, not a child")).toEqual([
+      "camouflage",
+      "child",
+    ]);
   });
 });

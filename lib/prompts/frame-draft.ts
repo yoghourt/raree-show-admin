@@ -4,7 +4,8 @@
  * Visual Intent MUST NOT be passed here.
  *
  * Expression path: Execution Projection by Deployment profile (A5).
- * Local caption fallback: short single-pass beat (Local blanks above ~600 chars).
+ * Local caption fallback: short single-pass beat.
+ * Expression execute body tracks portrait length (~800); see LOCAL_PROMPT_BODY_MAX.
  * Cloud caption path: denser wrapper for caption-only frames.
  *
  * Operator revision notes (`[操作员修改意见] …`) are promoted to the front —
@@ -22,7 +23,9 @@ import {
 } from "@/lib/discovery/visual-contract";
 import { isVerticalTreeCamera } from "@/lib/discovery/expression-capability-rules";
 import {
+  forbidsFromUnlabeledNegations,
   forbidsFromWorkVisualConvention,
+  stripPositiveNegations,
   workVisualConventionPromptBlock,
 } from "@/lib/prompts/work-visual-convention";
 
@@ -134,7 +137,12 @@ export function buildFrameNegativePrompt(
     "letterbox",
     "inset frame",
     "picture frame",
+    "camouflage",
+    "olive drab",
+    "modern military",
+    "woodland camo",
     ...forbids,
+    ...forbidsFromUnlabeledNegations(expressionForbidBlob(options?.rendererExpression)),
   ];
   if (
     options?.rendererExpression &&
@@ -180,6 +188,18 @@ export function buildFrameNegativePrompt(
   return extra.length
     ? `${FRAME_NEGATIVE_PROMPT}, ${extra.join(", ")}`
     : FRAME_NEGATIVE_PROMPT;
+}
+
+function expressionForbidBlob(
+  expression?: RendererExpression | null
+): string {
+  if (!expression) return "";
+  return [
+    expression.action,
+    expression.composition,
+    expression.visualEmphasis ?? "",
+    ...(expression.characters ?? []).map((c) => c.visual),
+  ].join(". ");
 }
 
 function conventionLead(convention?: string): string | null {
@@ -364,25 +384,28 @@ export function buildFrameDraftPrompt(input: {
 
   const executable = executableRendererExpression(input.rendererExpression);
   if (executable) {
-    return buildExpressionPrompt({
+    const prompt = buildExpressionPrompt({
       expression: executable,
       revisionNote,
       routeTitle,
       projectionProfile,
       workVisualConvention,
     });
+    return projectionProfile === "local" ? stripPositiveNegations(prompt) : prompt;
   }
 
   const scene = (base || input.caption.trim()).trim();
   if (!scene) return "";
 
   if (projectionProfile === "local") {
-    return buildLocalCaptionPrompt({
-      scene,
-      revisionNote,
-      routeTitle,
-      workVisualConvention,
-    });
+    return stripPositiveNegations(
+      buildLocalCaptionPrompt({
+        scene,
+        revisionNote,
+        routeTitle,
+        workVisualConvention,
+      })
+    );
   }
 
   return buildCaptionLegacyPrompt({

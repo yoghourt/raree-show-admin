@@ -8,6 +8,7 @@ import { foldCharacterArchivesIntoExpression } from "@/lib/discovery/character-a
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import {
   expressionToPrompt,
+  LOCAL_PROMPT_BODY_MAX,
   projectExpressionForDeployment,
 } from "@/lib/discovery/execution-projection";
 import { FRAMES } from "../../scripts/evg-001-cross-work-visual/fixtures";
@@ -324,7 +325,7 @@ describe("Rule 6 Face Safety", () => {
       },
       "local"
     );
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThanOrEqual(LOCAL_PROMPT_BODY_MAX);
     expect(prompt).not.toMatch(/exactly two figures/i);
     expect(prompt).toMatch(/medium-wide shot of two figures/i);
     expect(prompt).not.toMatch(/Atmosphere:/i);
@@ -646,8 +647,9 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     });
     expect(prompt).not.toMatch(/VISUAL LOCK/i);
     expect(prompt).toMatch(/elevated shot/i);
-    expect(prompt).toMatch(/living perch not a fallen log/i);
-    expect(prompt).toMatch(/not matching outfits/i);
+    expect(prompt).toMatch(/living perch/i);
+    expect(prompt).not.toMatch(/fallen log/i);
+    expect(prompt).toMatch(/different silhouettes/i);
     expect(prompt).not.toMatch(/both fully visible/i);
     expect(prompt).not.toMatch(/identity weapons in frame/i);
     expect(prompt).not.toContain("Haunting Beyond the Wall");
@@ -661,6 +663,78 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     });
     expect(neg).toMatch(/fallen log perch/i);
     expect(neg).toMatch(/matching hooded cloaks/i);
+  });
+
+  it("keeps camouflage out of the Local positive and in negatives", () => {
+    const expression = {
+      environment: "Haunted Forest at night",
+      action: "kneeling man, standing corpse, two figures only",
+      composition: "medium-wide, two figures only",
+      visualEmphasis: "gauntlets around the throat, no camouflage",
+      characters: [
+        { role: "Will", visual: "adult kneeling, black wool cloak" },
+        {
+          role: "Ser Waymar Royce",
+          visual: "dark steel plate, no olive drab, pale dead face",
+        },
+      ],
+    };
+    const prompt = buildFrameDraftPrompt({
+      caption: "Waymar rises.",
+      rendererExpression: expression,
+      projectionProfile: "local",
+      workVisualConvention:
+        "painterly digital painting, medieval wool, no modern military, no camouflage",
+    });
+    expect(prompt).toMatch(/black wool cloak/);
+    expect(prompt).toMatch(/pale dead face/);
+    expect(prompt).not.toMatch(/camouflage/i);
+    expect(prompt).not.toMatch(/olive drab/i);
+    expect(prompt).not.toMatch(/modern military/i);
+    const neg = buildFrameNegativePrompt("Waymar rises.", {
+      castCount: 2,
+      rendererExpression: expression,
+      workVisualConvention:
+        "painterly digital painting, no modern military, no camouflage",
+    });
+    expect(neg).toMatch(/camouflage/i);
+    expect(neg).toMatch(/olive drab/i);
+    expect(neg).toMatch(/modern military/i);
+  });
+
+  it("keeps overlay-beat action and corpse identity instead of cutting at 96 chars", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "Waymar rises to choke Will.",
+      rendererExpression: {
+        environment: "Haunted Forest at night, snow, black enclosing trees",
+        action:
+          "two adult figures only: kneeling cloaked man, standing armored corpse leaning over him with both gauntlets clamped around his throat; broken hilt unused on the snow",
+        composition: "medium-wide, two figures only, faces secondary",
+        visualEmphasis: "gauntlets around the throat, hilt on the snow",
+        characters: [
+          {
+            role: "Will",
+            visual:
+              "adult kneeling in snow, black wool cloak, empty hands, head pulled back",
+          },
+          {
+            role: "Ser Waymar Royce",
+            visual:
+              "taller standing corpse, dark steel plate and mail, solid black wool cloth, pale dead face, glowing blue eyes, both gauntlets on the kneeling man's throat",
+          },
+        ],
+      },
+      projectionProfile: "local",
+      workVisualConvention:
+        "painterly digital painting, medieval wool, fur, leather",
+    });
+    expect(prompt).not.toMatch(/…/);
+    expect(prompt).toMatch(/throat/i);
+    expect(prompt).toMatch(/broken hilt/i);
+    expect(prompt).toMatch(/standing corpse/i);
+    expect(prompt).toMatch(/glowing blue eyes/i);
+    expect(prompt).toMatch(/empty hands/i);
+    expect(prompt.length).toBeLessThan(LOCAL_PROMPT_BODY_MAX + 80);
   });
 
   it("keeps operator revision with Expression", () => {

@@ -35,6 +35,39 @@ const CONVENTION_SECTION_LABEL =
 const WORK_WIDE_GARMENT_PATTERN =
   /\b(?:all[- ](?:the\s+)?(?:black|white|dark|red|grey|gray)\s+)?(?:matching\s+)?(?:hooded\s+)?cloaks?\b/gi;
 
+/** Local paints the noun if it appears in the positive, even after "no". */
+const POSITIVE_NEGATION_CLAUSE =
+  /\b(?:no|not|without)\s+(?:a\s+|an\s+|any\s+|the\s+)?([^,.;，]+)/gi;
+
+const ANACHRONISM_IN_POSITIVE =
+  /\b(camouflage|olive drab|modern military|woodland camo)\b/gi;
+
+export function forbidsFromUnlabeledNegations(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const m of text.replace(/\s+/g, " ").matchAll(POSITIVE_NEGATION_CLAUSE)) {
+    const item = (m[1] ?? "").trim().replace(/\.+$/g, "");
+    const key = item.toLowerCase();
+    if (item.length > 1 && item.length < 48 && !seen.has(key)) {
+      seen.add(key);
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+/** Drop "no X" clauses and anachronism nouns from a Local positive prompt. */
+export function stripPositiveNegations(text: string): string {
+  return text
+    .replace(POSITIVE_NEGATION_CLAUSE, " ")
+    .replace(ANACHRONISM_IN_POSITIVE, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+,/g, ",")
+    .replace(/,(?:\s*,)+/g, ",")
+    .replace(/^[,;.\s]+|[,;.\s]+$/g, "")
+    .trim();
+}
+
 function forbidClause(convention: string): string {
   const m = convention.match(
     /\bFORBID\s*:\s*(.+?)(?=\b(?:STYLE|ERA|FORBID|COSTUME|FACE|PROP|SUMMARY)\s*:|$)/i
@@ -42,14 +75,24 @@ function forbidClause(convention: string): string {
   return m?.[1]?.trim() ?? "";
 }
 
-/** FORBID: values for negative_prompt. Empty when the operator used unlabeled prose. */
+/** FORBID: values plus unlabeled "no X" prose for negative_prompt. */
 export function forbidsFromWorkVisualConvention(convention: string): string[] {
-  const clause = forbidClause(clipWorkVisualConvention(convention));
-  if (!clause) return [];
-  return clause
+  const clipped = clipWorkVisualConvention(convention);
+  const labeled = forbidClause(clipped)
     .split(/[,;]/)
     .map((part) => part.replace(/\.+$/g, "").trim())
     .filter((part) => part.length > 1);
+  const unlabeled = forbidsFromUnlabeledNegations(clipped);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of [...labeled, ...unlabeled]) {
+    const key = item.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(item);
+    }
+  }
+  return out;
 }
 
 /**
@@ -68,6 +111,7 @@ export function flattenWorkVisualConventionForPrompt(
   );
   t = t.replace(CONVENTION_SECTION_LABEL, "");
   t = t.replace(WORK_WIDE_GARMENT_PATTERN, " ");
+  t = stripPositiveNegations(t);
   t = t.replace(/\s+/g, " ").trim().replace(/^[,;.\s]+|[,;.\s]+$/g, "");
   return clipWorkVisualConvention(t, maxChars);
 }
