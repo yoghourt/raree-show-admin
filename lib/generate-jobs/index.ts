@@ -131,6 +131,18 @@ export function parseSceneFrameJobInput(
   };
 }
 
+/** Replace Expression on a scene_frame enqueue snapshot (queued jobs only). */
+export function withSceneFrameRendererExpression(
+  inputJson: Record<string, unknown>,
+  expression: RendererExpression
+): SceneFrameJobInput {
+  const parsed = parseSceneFrameJobInput(inputJson);
+  return {
+    ...parsed,
+    renderer_expression: expression,
+  };
+}
+
 export function parseCharacterPortraitJobInput(
   inputJson: Record<string, unknown>
 ): CharacterPortraitJobInput {
@@ -193,6 +205,66 @@ export async function enqueueGenerateJob(
     throw new Error(`enqueue generate_jobs failed: ${error.message}`);
   }
   return mapRow(data as Record<string, unknown>);
+}
+
+/**
+ * Rewrite renderer_expression on a still-queued scene_frame job.
+ * If the Worker already claimed the row, the status filter misses and this
+ * throws so the operator can cancel/requeue instead.
+ */
+export async function patchQueuedSceneFrameRendererExpression(
+  id: string,
+  expression: RendererExpression,
+  client: SupabaseClient = defaultSupabase
+): Promise<GenerateJobRow> {
+  const { data: row, error: fetchError } = await client
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw new Error(
+      `load generate_jobs for Expression patch failed: ${fetchError.message}`
+    );
+  }
+  if (!row) {
+    throw new Error("任务不存在");
+  }
+  const current = mapRow(row as Record<string, unknown>);
+  if (current.status !== "queued") {
+    throw new Error(
+      `任务已是 ${current.status}，无法改排队 Expression 快照`
+    );
+  }
+
+  const nextInput = withSceneFrameRendererExpression(
+    current.input_json,
+    expression
+  );
+  const now = new Date().toISOString();
+  const { data: updated, error: updateError } = await client
+    .from(TABLE)
+    .update({
+      input_json: nextInput,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .eq("status", "queued")
+    .select("*")
+    .maybeSingle();
+
+  if (updateError) {
+    throw new Error(
+      `patch queued generate_jobs Expression failed: ${updateError.message}`
+    );
+  }
+  if (!updated) {
+    throw new Error(
+      "任务已开始生成，无法改 Expression。请等结束后重试，或取消后重新排队。"
+    );
+  }
+  return mapRow(updated as Record<string, unknown>);
 }
 
 export async function listGenerateJobsForWork(

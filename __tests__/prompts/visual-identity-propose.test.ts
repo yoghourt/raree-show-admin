@@ -6,6 +6,7 @@ import {
 } from "@/lib/prompts/avatar";
 import {
   buildVisualIdentityProposePrompt,
+  characterArchiveFromLabeledIdentity,
   parseVisualIdentityProposal,
 } from "@/lib/prompts/visual-identity-propose";
 
@@ -56,6 +57,24 @@ STYLE: semi-realistic digital painting.`;
   });
 });
 
+describe("characterArchiveFromLabeledIdentity", () => {
+  it("maps FACE/COSTUME/PROP lines into archive cues", () => {
+    const archive = characterArchiveFromLabeledIdentity(
+      "FACE: ruddy bronze complexion, long beard.\nCOSTUME: green battle robe.\nPROP: Green Dragon Crescent Blade.\nSTYLE: painterly digital painting."
+    );
+    expect(archive).not.toBeNull();
+    expect(archive?.identityCues).toEqual(
+      expect.arrayContaining(["ruddy bronze complexion", "long beard"])
+    );
+    expect(archive?.costumeCues).toEqual(
+      expect.arrayContaining(["green battle robe"])
+    );
+    expect(archive?.propCues).toEqual(
+      expect.arrayContaining(["Green Dragon Crescent Blade"])
+    );
+  });
+});
+
 describe("packVisualIdentityForPortrait", () => {
   it("does not left-clip PROP when FACE is verbose", () => {
     const packed = packVisualIdentityForPortrait(LONG_SUMMARY_FIRST);
@@ -66,7 +85,7 @@ describe("packVisualIdentityForPortrait", () => {
 });
 
 describe("buildVisualIdentityProposePrompt", () => {
-  it("includes operator note and forbids bare red-face instruction", () => {
+  it("includes operator note and keeps looks scoped to this work", () => {
     const p = buildVisualIdentityProposePrompt({
       name: "Guan Yu",
       operatorNote: "avoid nianhua",
@@ -74,9 +93,10 @@ describe("buildVisualIdentityProposePrompt", () => {
     });
     expect(p).toMatch(/Guan Yu/);
     expect(p).toMatch(/avoid nianhua/);
-    expect(p).toMatch(/NEVER bare "red face"/);
+    expect(p).toMatch(/THIS work/);
     expect(p).toMatch(/IGNORE age\/look/);
-    expect(p).toMatch(/generic youthful idol/);
+    expect(p).not.toMatch(/Green Dragon Crescent Blade/);
+    expect(p).not.toMatch(/nianhua, temple icon/);
   });
 
   it("requires output within the Local execute budget and omits SUMMARY", () => {
@@ -85,5 +105,18 @@ describe("buildVisualIdentityProposePrompt", () => {
     expect(p).not.toMatch(/~800/);
     expect(p).toMatch(/Omit SUMMARY/);
     expect(p).toMatch(/FACE: …/);
+  });
+
+  it("injects this work's visual convention when set", () => {
+    const p = buildVisualIdentityProposePrompt({
+      name: "Will",
+      workTitle: "A Game of Thrones",
+      visualConvention:
+        "ERA: medieval wool, fur, leather. FORBID: modern military, olive drab.",
+    });
+    expect(p).toMatch(/Work look/);
+    expect(p).toMatch(/medieval wool/);
+    expect(p).toMatch(/olive drab/);
+    expect(p).toMatch(/character looks and the caption beat still win/);
   });
 });

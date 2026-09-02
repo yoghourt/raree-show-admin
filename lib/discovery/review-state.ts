@@ -421,7 +421,7 @@ export function validateSceneAcceptFields(
   }
   if (!isValidSceneChapterNumber(scene.chapter_number)) {
     errors.push(
-      "chapter_number must be a numeric chapter index (integer ≥ 1); use chapter_title for POV labels like \"Bran I\""
+      "chapter_number must be a numeric chapter index (integer ≥ 0, 0 = prologue); use chapter_title for POV labels like \"Bran I\""
     );
   }
   if (!isNonEmptyString(scene.title)) {

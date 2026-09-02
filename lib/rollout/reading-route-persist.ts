@@ -10,6 +10,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AcceptedStoryUnitStaging } from "@/lib/discovery/review-types";
 import {
+  MIN_SCENE_CHAPTER_NUMBER,
+  parseSceneChapterNumber,
+} from "@/lib/discovery/scene-chapter-number";
+import {
   deleteSceneRow,
   getSceneRowByDiscoverySourceReviewId,
   getSceneRowByTsid,
@@ -112,9 +116,10 @@ export async function persistReadingRouteFromStoryStaging(
     return rowToApprovedStoryUnit(data as SceneRowWithProvenance);
   }
 
+  const parsedChapter = parseSceneChapterNumber(staging.chapter_number);
   const chapterNumber =
-    typeof staging.chapter_number === "number" && staging.chapter_number >= 1
-      ? staging.chapter_number
+    parsedChapter !== null && parsedChapter >= MIN_SCENE_CHAPTER_NUMBER
+      ? parsedChapter
       : await nextChapterNumber(supabase, workId);
   const row = await insertReadingRouteWithProvenance(supabase, workId, {
     title: staging.title.trim(),

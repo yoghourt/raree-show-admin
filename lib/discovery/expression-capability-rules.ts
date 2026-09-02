@@ -42,7 +42,7 @@ lighting = lighting intent (cold moonlight, ember key, etc.) — not model hyper
 atmosphere = mood of the air/place (bitter hush, dread, isolation).
 threatPerception = how threat should read visually (unseen fog pressure, inhuman scale).
 visualEmphasis = narrative focus (formation, prop, scale contrast).
-styleHints = stable style family only (e.g. "desaturated dark fantasy illustration").
+styleHints = stable style family matching THIS work only.
 FORBIDDEN in styleHints: masterpiece, 8k, best quality, ultra detailed.
 Intent narrow-fold (same propose call, no second AI): when visualIntent has emotion/purpose/
 relationship/threat-like meaning, encode into atmosphere / visualEmphasis / threatPerception
@@ -53,7 +53,8 @@ Prefer verbs/poses: standing, facing, holding, behind, near, fallen, pointing.
 FORBIDDEN as motion/physics cues: shattering, lifting, hoisting, throwing, exploding,
 mid-air collision/choke, flying debris, large anonymous crowds.
 Prefer mid/wide with all required bodies over close-ups that drop a character.
-Prefer 2 clear figures over crowds when the beat is a relationship.
+Prefer 2 clear figures over anonymous crowds when the beat is a two-person relationship.
+MUST NOT drop a caption-named hinge figure, victim, or third actor to force a two-shot.
 Prefer flat left/right or front/back placement — avoid upper/lower tree stacking when possible.
 
 Rule 4 — Abstract action expansion:
@@ -62,7 +63,8 @@ MUST NOT be the only renderer cue — convert to visible arrangement.
 Bad: action "protects the king" / "fight" / "talk" / "threat".
 Good: "knight standing in front of king, holding sword" + composition "knight foreground, king behind".
 Bad: "two warriors fighting".
-Good: "knight on left holding steel sword, enemy on right holding ice sword, both facing each other".
+Good (opponents only): "figure on left holding a weapon, opponent on right holding a weapon, both facing each other".
+Allies / same-side beats MUST NOT use facing-each-other or crossed blades.
 
 Rule 5 — Cast consistency (action/composition ↔ characters[]):
 Every explicit actor count or named role in action/composition MUST match characters[].
@@ -134,6 +136,42 @@ composition MUST include: medium-wide + both figures fully visible + profiles or
 FORBIDDEN: single centered hero portrait; one figure cropped out; facing-camera stare.
 FORBIDDEN: inventing a landmark or prop the Canonical Expression did not name
 (e.g. inserting a pool-and-sword layout into an unrelated interior).
+
+Rule 13 — Relationship geometry + hinge cast (anti duel / anti missing third):
+Caption relationship decides facing. Do not default two armed figures to a duel.
+Allies / same side / storming together: side by side, facing the SAME direction or the same victims.
+FORBIDDEN for allies: facing each other; blades crossed; swinging/lunging at one another.
+Prefer a stopped still of the same beat (blades down, kneeling/fallen victims) over mid-swing physics.
+
+When caption names a third person as the reason a blow stops (upon seeing X, adopted son, blocks, restrains):
+that person MUST be in characters[] with blocking placement (in front / between).
+FORBIDDEN: a two-person side-by-side debate that omits the hinge figure.
+Convert "halts / stops execution" to static geometry: sword lowered, not striking.
+
+Named extras the beat acts on (eunuchs struck down, officials cowering) MUST have characters[]
+entries with static poses (kneeling, fallen, cowering). Do not leave them only in action prose.
+
+A person named only as the source of a gift or order (on behalf of / sent by / by order of)
+is off-stage unless the caption places them in the scene. Do not stand them in the still.
+
+Named mounts and treasure (Red Hare, gold, jade) are props in action/visual — not extra people.
+
+Bad: two generals swinging/lunging at each other (caption: they storm the palace together).
+Good: two generals side by side, blades down at kneeling/fallen eunuchs, not at each other.
+Bad: Ding Yuan pointing + Dong Zhuo with a sword; Lü Bu omitted (caption: halt because of Lü Bu).
+Good: Ding Yuan left pointing, Lü Bu in front of him, Dong Zhuo right, execution sword lowered.
+
+Rule 14 — Life-stage is identity (anti adult default):
+Apparent age / life-stage is a Tier-1 identity cue, not mood or costume.
+Title (Emperor, King, Empress, Prince) MUST NOT default to a mature bearded adult.
+If Work archive or visual identity names child, boy, girl, youth, aged, or elder,
+those tokens MUST appear in characters[].visual immediately after pose — they outrank
+robes and "mournful features" and MUST survive Local compression.
+FORBIDDEN: inventing grey beard, lined middle-aged face, or an adult mournful emperor
+when looks mark that ruler as a child/youth, or when the beat elevates/installs a
+named emperor whose looks do not say adult.
+Bad: Emperor Xian as a grey-bearded adult on the throne (caption: Dong Zhuo elevates him).
+Good: boy emperor about eight or nine, no beard, small seated figure; Dong Zhuo towering.
 `.trim();
 
 /**
@@ -229,22 +267,22 @@ export const EXPRESSION_CAPABILITY_EXAMPLE: ExpressionLike & {
   threatPerception?: string;
   lighting?: string;
 } = {
-  environment: "Haunted Forest clearing under moonlight",
+  environment: "the place named in this caption",
   characters: [
     {
-      role: "Waymar Royce",
-      visual: "steel sword, closed helm armor",
+      role: "PersonA",
+      visual: "standing left, look cues from this work",
     },
     {
-      role: "White Walker",
-      visual: "ice sword, hooded pale figure",
+      role: "PersonB",
+      visual: "standing right, look cues from this work",
     },
   ],
-  action: "two warriors facing each other, swords crossed at middle distance",
-  composition: "wide shot, faces secondary, two silhouettes",
-  lighting: "cold moonlight, pale rim on ice blade",
-  atmosphere: "supernatural cold, wrong stillness",
-  threatPerception: "inhuman opponent; lethal scale",
+  action: "both figures visible in this caption's still",
+  composition: "medium-wide, faces secondary, two figures",
+  lighting: "lighting named in this beat if any",
+  atmosphere: "mood of this place",
+  threatPerception: "threat as this caption states it",
 };
 
 /** Mock / courtyard beat — minimal static greeting + face-safe dual cast. */
@@ -275,6 +313,23 @@ export const HAND_TRANSFER_ACTION_PATTERN =
 const CLOSE_DUAL_FRAMING_PATTERN =
   /\b(waist[\s-]?up|bust\s+shot|tight\s+two[\s-]?shot|two[\s-]?shot|head[\s-]and[\s-]shoulders|from\s+the\s+waist)\b/i;
 
+const DUAL_CAST_COMPOSITION_FALLBACK =
+  "medium-wide, both visible, identity weapons in frame, profiles";
+
+/** Elevated / high camera — do not flatten to a left/right ground standoff. */
+const VERTICAL_CAMERA_PATTERN =
+  /\b(elevat|high[- ]angle|over-?head|from above|dwarfed|from (?:a |the )?(?:branch|tree|wall|window|tower|rooftop))\b/i;
+
+const TREE_PERCH_PATTERN =
+  /\b(branch|bough|canopy|treetop|ironwood|(?:from|in|on) (?:a |the )?(?:\w+\s+)?tree)\b/i;
+
+export function isVerticalTreeCamera(
+  expression: Pick<ExpressionLike, "action" | "composition">
+): boolean {
+  const blob = `${expression.action ?? ""} ${expression.composition ?? ""}`;
+  return VERTICAL_CAMERA_PATTERN.test(blob) && TREE_PERCH_PATTERN.test(blob);
+}
+
 function hardCapAtBoundary(text: string, maxLen: number): string {
   const t = text.trim().replace(/\s+/g, " ");
   if (t.length <= maxLen) return t;
@@ -285,7 +340,7 @@ function hardCapAtBoundary(text: string, maxLen: number): string {
 
 /** Body / face marks that carry character identity (cross-work). */
 const IDENTITY_BODY_PATTERN =
-  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|auburn\s+hair|white\s+hair|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
+  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|\bgaunt\b|\bpale\b|auburn\s+hair|white\s+hair|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
 
 /** Costume class (Tier 2). */
 const COSTUME_CUE_PATTERN =
@@ -306,19 +361,17 @@ const DOCUMENT_CLASS_PATTERN =
 const ACTION_PHRASE_PATTERN =
   /\b(looking|standing|seated|sitting|reaching|turning|reading|facing|walking|leaning|holding|bowed|profile)\b/i;
 
+/** Beat-contact geometry — must outrank generic standing/costume when compressing. */
+const BEAT_CONTACT_PATTERN =
+  /\b(throat|neck|gauntlets?|hilt|corpse|glowing|dead face)\b/i;
+
 const MAX_IDENTITY_VISUAL_PARTS = 4;
-const MAX_IDENTITY_VISUAL_LEN = 80;
+/** Match portrait appearance budget (AVATAR_APPEARANCE_MAX_CHARS). */
+const MAX_IDENTITY_VISUAL_LEN = 220;
 
 function shortRoleLabel(role: string): string {
   const parts = role.trim().split(/\s+/).filter(Boolean);
   return parts[0] || role.trim();
-}
-
-function roleMentions(text: string, role: string): boolean {
-  const full = role.trim().toLowerCase();
-  const first = shortRoleLabel(role).toLowerCase();
-  const t = text.toLowerCase();
-  return (full.length > 2 && t.includes(full)) || (first.length > 2 && t.includes(first));
 }
 
 function wordCount(text: string): number {
@@ -336,6 +389,7 @@ function isNamedIdentityWeapon(part: string): boolean {
  * Action phrases must not outrank P1 named weapons or body marks.
  */
 function scoreVisualPart(part: string): number {
+  if (BEAT_CONTACT_PATTERN.test(part)) return 110;
   if (
     TIER3_FILLER_PATTERN.test(part) &&
     !IDENTITY_BODY_PATTERN.test(part) &&
@@ -419,7 +473,8 @@ export function sharpenExpressionAnchors<T extends ExpressionLike>(
  * Local Execution Projection adapt (ADR-011 A5).
  * Apply at execute time via projectExpressionForDeployment("local").
  * MUST NOT overwrite persisted Canonical Expression at propose/validate.
- * Applies Rules 8–12 for Local face-safety + landmark/prop blank avoidance.
+ * MAY wrap (placement / face-safety / length). MUST NOT replace story action
+ * with a placement-only stub — that invents a two-figure duel prior.
  */
 export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>(
   expression: T
@@ -443,27 +498,32 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
   if (castLen === 2) {
     const left = shortRoleLabel(chars[0]!.role);
     const right = shortRoleLabel(chars[1]!.role);
-    const namesBoth =
-      roleMentions(action, chars[0]!.role) &&
-      roleMentions(action, chars[1]!.role);
-    const hasPlacement = /\bleft\b/i.test(action) && /\bright\b/i.test(action);
-    const namedObject = namedNarrativeObject(
-      action,
-      expression.environment ?? ""
+    const hasLateralPlacement =
+      /\bleft\b/i.test(action) && /\bright\b/i.test(action);
+    const verticalCamera = VERTICAL_CAMERA_PATTERN.test(
+      `${action} ${composition}`
     );
 
-    if (!namesBoth || !hasPlacement) {
-      if (namedObject) {
-        action = `${namedObject} between figures, ${left} left, ${right} right, both looking toward ${namedObject}`;
-      } else {
-        action = `${left} left, ${right} right, both fully visible`;
+    const overlayPlacement = /\b(leaning over|standing over|clamped|throat|over him|over her)\b/i.test(
+      action
+    );
+
+    if (!verticalCamera && !overlayPlacement) {
+      if (action && !hasLateralPlacement) {
+        action = `${action}, ${left} left, ${right} right`;
+      } else if (!action) {
+        action = `${left} left, ${right} right`;
       }
-    } else if (!/\bboth\b/i.test(action)) {
-      action = `${action}, both fully visible`;
+      if (!/\bboth\b/i.test(action)) {
+        action = `${action}, both fully visible`;
+      }
     }
 
-    composition =
-      "medium-wide, both visible, identity weapons in frame, profiles";
+    // Keep authored camera (elevated / wide / dwarfed). Dual-profile fallback
+    // only when composition is empty or a close two-shot Local cannot hold.
+    if (!composition || CLOSE_DUAL_FRAMING_PATTERN.test(composition)) {
+      composition = DUAL_CAST_COMPOSITION_FALLBACK;
+    }
   } else if (castLen > 2) {
     composition = composition
       .replace(new RegExp(CLOSE_DUAL_FRAMING_PATTERN.source, "gi"), " ")
@@ -471,15 +531,14 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
       .replace(/\s{2,}/g, " ")
       .replace(/^[\s,]+|[\s,]+$/g, "")
       .trim();
-    if (
-      composition.length > 72 ||
-      !/\bmedium[\s-]?wide\b|\bwide\s+shot\b/i.test(composition)
-    ) {
+    if (!composition) {
       composition = "medium wide shot, faces secondary";
+    } else {
+      composition = hardCapAtBoundary(composition, 72);
     }
   }
 
-  action = hardCapAtBoundary(action, 110);
+  action = hardCapAtBoundary(action, 280);
 
   return sharpenExpressionAnchors({
     ...expression,

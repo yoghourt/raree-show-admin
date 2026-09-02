@@ -39,7 +39,8 @@ export const zhCN = {
     confirmDelete:      '确认删除',
     delete:             '删除',
     deleting:           '删除中…',
-    chapterN:           (n: number | string) => `第 ${n} 章`,
+    chapterN:           (n: number | string) =>
+      Number(n) === 0 ? "序章" : `第 ${n} 章`,
     businessId:         '编号',
     statusActive:       '活跃',
     statusArchived:     '已归档',
@@ -102,7 +103,8 @@ export const zhCN = {
     noCharacterDataHint:   '当前作品暂无角色数据，请用英文逗号分隔填写角色编号。',
     locationIdPlaceholder: '例如：loc_winterfell',
     characterIdsPlaceholder: '例如：char_arya, char_jon',
-    chapterTitlePlaceholder: '可选，如：布兰一世',
+    chapterTitlePlaceholder: '可选，如：布兰一世 / Prologue',
+    chapterNumberHint: '0 = 序章（Prologue），已录的第 1、2 章不必改号',
   },
   copilot: {
     brand:               '助手',
@@ -139,6 +141,11 @@ export const zhCN = {
       '确定要删除该故事吗？删除后无法恢复。',
     manageReadingRoutes: '管理当前作品下的故事',
     newReadingRoute:   '新增故事',
+    visualConvention: '视觉约定',
+    visualConventionHint:
+      '生图用，不进读者简介。写本作品的画风、时代/材料、禁止项。角色五官与单帧动作仍以角色视觉身份和画面说明为准。',
+    visualConventionPlaceholder:
+      '例如：STYLE: painterly digital painting. ERA: medieval wool, fur, leather. FORBID: modern military, olive drab, camouflage. 禁项用 FORBID，不要在正文里写 no camouflage（会画出来）。',
   },
   rollout: {
     pageTitle:          '写入作品',
@@ -174,6 +181,10 @@ export const zhCN = {
     persistCharacter: '写入角色',
     persistCharacterSkipExisting: '已有档案，移出队列',
     characterPortraitDeferredHint: '肖像不在此写入。写入后可在制作页派生「补齐角色肖像」任务。',
+    reproposeVisualIdentity: 'AI 提案视觉身份',
+    reproposingVisualIdentity: '提案视觉身份…',
+    reproposeVisualIdentityHint:
+      '按姓名与简介重写 FACE / COSTUME / PROP。提案后请核对再写入作品库。',
     locationStagingTitle: '待保存的地点',
     noLocationStaging: '暂时没有待保存的地点',
     writeLocationPreviewHint:
@@ -307,7 +318,7 @@ export const zhCN = {
     nextStepRollout: '下一步：写入作品 → 读者端验读',
     goRollout: '写入作品',
     editAfterAcceptSceneHint:
-      '章节序号须为 ≥1 的整数；视角名（如布兰一世）请写在章节标题。画面须挂在已确认的故事下。',
+      '章节序号须为 ≥0 的整数（0 = 序章 / Prologue）；视角名（如布兰一世）请写在章节标题。画面须挂在已确认的故事下。',
     editStagingHint: '修改后，正文提炼与写入作品的列表会同步更新。',
     confirmRevokeAccept:
       '确定取消确认？将回到上方待确认列表，并从写入作品列表移除。',
@@ -348,6 +359,9 @@ export const zhCN = {
       chapter_number: '章节序号',
       parentStoryCandidateId: '所属故事',
       parentStoryTitle: '所属故事',
+      rendererExpression: '画面 Expression',
+      visualIntent: '视觉意图',
+      visualIdentity: '视觉身份',
       characterArchive: '角色档案',
       visualSummary: '视觉摘要',
       identityCues: '身份线索',
@@ -414,6 +428,17 @@ export const zhCN = {
         '没有所属故事，无法确认。可编辑所属故事字段，或丢弃后重新提炼。',
       edit: '编辑',
       splitScene: '拆成多画面',
+      reproposeExpression: 'AI 提案 Expression',
+      reproposingExpression: '提案 Expression…',
+      reproposeExpressionHint:
+        '只重写画面 Expression，不改标题与说明。确认故事前可先核对。',
+      reproposeExpressionNeedSummary: '没有画面说明，无法提案 Expression。',
+      reproposeVisualIdentity: 'AI 提案视觉身份',
+      reproposingVisualIdentity: '提案视觉身份…',
+      reproposeVisualIdentityHint:
+        '重写 FACE / COSTUME / PROP，不改姓名与读者简介。卡片上会立刻写入待确认草稿；编辑框里提案后请再点保存。',
+      reproposeVisualIdentityFailed: '视觉身份提案失败，请重试。',
+      visualIdentityMissing: '缺视觉身份',
       splitSceneDialogTitle: '拆成多个单 beat 画面',
       splitSceneDialogDescription:
         '将一条多事件画面说明拆成多条。确认后会按各条 summary 补全 Expression；原条目丢弃。',
@@ -512,6 +537,36 @@ export const zhCN = {
       confirmLock: '确认',
       cancel: '取消',
     },
+  },
+  batchCompletion: {
+    splitFrame: '拆成多画面',
+    splitFrameTitle: '拆成多个单 beat 画面',
+    splitFrameDescription:
+      '这条说明含多个事件，一张图画不全。拆开后写入本故事，并为每条补全 Expression。原帧说明被替换；该帧及之后已排队的生成任务会取消。',
+    splitFrameConfirm: '确认拆分',
+    splitFrameConfirming: '拆分并补全 Expression…',
+    splitFrameAddBeat: '加一条',
+    splitFrameRemoveBeat: '删除',
+    splitFrameNeedTwo: '至少保留两条非空说明',
+    splitFrameFailed: '拆分失败，请重试',
+    splitFrameCaptionPlaceholder: '这一拍发生了什么？',
+    splitFrameCancel: '取消',
+    proposeExpression: 'AI 补 Expression',
+    proposingExpression: '补 Expression…',
+    proposeMissingExpressions: '为缺 Expression 的帧补全',
+    missingExpressionHint:
+      '缺 Expression：拆开后自动补全没落到这一帧。可在本行点「AI 补 Expression」，或到阅读帧打开该画面的 Frame Context（AI 提案 → 保存）。',
+    missingExpressionEnqueueConfirm:
+      '有帧缺少 Expression，将走 caption 兜底。请先在待补列表点「AI 补 Expression」，或到阅读帧 Frame Context 补写。仍要排队？',
+    splitExpressionPartial:
+      '画面已拆开，但部分 Expression 未写入。请在待补列表点「AI 补 Expression」。',
+    editQueuedExpression: '改 Expression',
+    collapseQueuedExpression: '收起 Expression',
+    reproposeQueuedExpression: 'AI 重新提案',
+    applyQueuedExpression: '保存到排队任务',
+    applyingQueuedExpression: '写入排队快照…',
+    queuedExpressionHint:
+      'Worker 用入队时的 Expression 快照。改完后须点「保存到排队任务」，否则仍用旧稿。生成中无法改。',
   },
 } as const;
 

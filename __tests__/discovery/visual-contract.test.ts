@@ -8,6 +8,7 @@ import { foldCharacterArchivesIntoExpression } from "@/lib/discovery/character-a
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import {
   expressionToPrompt,
+  LOCAL_PROMPT_BODY_MAX,
   projectExpressionForDeployment,
 } from "@/lib/discovery/execution-projection";
 import { FRAMES } from "../../scripts/evg-001-cross-work-visual/fixtures";
@@ -21,7 +22,7 @@ import {
   remapGenericRolesToRoleNames,
   sharpenExpressionAnchors,
 } from "@/lib/discovery/expression-capability-rules";
-import { buildFrameDraftPrompt } from "@/lib/prompts/frame-draft";
+import { buildFrameDraftPrompt, buildFrameNegativePrompt } from "@/lib/prompts/frame-draft";
 import { parseFrameProvenance } from "@/lib/rollout/scenes-server";
 import {
   MINIMAL_RENDERER_EXPRESSION,
@@ -324,10 +325,9 @@ describe("Rule 6 Face Safety", () => {
       },
       "local"
     );
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThanOrEqual(LOCAL_PROMPT_BODY_MAX);
     expect(prompt).not.toMatch(/exactly two figures/i);
-    expect(prompt).toMatch(/both visible/i);
-    expect(prompt).toMatch(/identity weapons in frame/i);
+    expect(prompt).toMatch(/medium-wide shot of two figures/i);
     expect(prompt).not.toMatch(/Atmosphere:/i);
   });
 
@@ -504,8 +504,36 @@ describe("Rule 6 Face Safety", () => {
     expect(adapted.action).toMatch(/left/i);
     expect(adapted.action).toMatch(/right/i);
     expect(adapted.action).toMatch(/letter/i);
-    expect(adapted.composition).toMatch(/both visible/i);
+    expect(adapted.composition).toMatch(/medium wide shot/i);
     expect(adapted.environment).toBe("Winterfell chamber");
+  });
+
+  it("does not replace a dual-cast story action with a placement-only stub", () => {
+    const adapted = adaptSceneExpressionForLocalCapability({
+      environment: "opulent imperial palace interior, ornate pillars and silk draperies",
+      characters: [
+        {
+          role: "Yuan Shao",
+          visual: "standing, swinging a heavy jian sword, decorated armor",
+        },
+        {
+          role: "Cao Cao",
+          visual: "standing, lunging forward with a drawn dao saber",
+        },
+      ],
+      action:
+        "Yuan Shao and Cao Cao storm the palace, both figures striking down fleeing eunuchs",
+      composition: "medium wide shot, faces secondary, dynamic dual-cast framing",
+    });
+    expect(adapted.action).toMatch(/storm the palace/i);
+    expect(adapted.action).toMatch(/eunuchs/i);
+    expect(adapted.action).not.toMatch(
+      /^(Yuan|Cao) left, (Yuan|Cao) right, both fully visible$/i
+    );
+    expect(adapted.action).toMatch(/left/i);
+    expect(adapted.action).toMatch(/right/i);
+    expect(adapted.composition).toMatch(/medium wide shot/i);
+    expect(adapted.composition).toMatch(/dynamic dual-cast framing/i);
   });
 });
 
@@ -527,14 +555,15 @@ describe("parseVisualIntent", () => {
 describe("rendererExpressionToPrompt", () => {
   it("joins expression fields without inventing meaning (local profile)", () => {
     const prompt = expressionToPrompt(SAMPLE_EXPRESSION, "local");
-    expect(prompt).toContain("Action: knight left kneeling");
-    expect(prompt).toContain("Environment: castle hall");
-    expect(prompt).toContain("both visible");
-    expect(prompt).toContain("identity weapons in frame");
-    expect(prompt).toContain("knight: armor, sword raised");
+    expect(prompt).toContain("knight left kneeling");
+    expect(prompt).toContain("castle hall");
+    expect(prompt).toContain("foreground knight, background king");
+    expect(prompt).toContain("armor, sword raised");
+    expect(prompt).not.toMatch(/knight:/i);
+    expect(prompt).not.toMatch(/\bAction:/);
+    expect(prompt).not.toMatch(/\bFigures:/);
+    expect(prompt).not.toMatch(/VISUAL LOCK/);
     expect(prompt).not.toContain("protects");
-    expect(prompt).toContain("Frozen still");
-    expect(prompt).toContain("No extra people");
   });
 
   it("legacy rendererExpressionToPrompt still returns a prompt", () => {
@@ -543,12 +572,23 @@ describe("rendererExpressionToPrompt", () => {
     );
   });
 
-  it("local projectExpressionForDeployment applies dual-cast rewrite", () => {
+  it("local projectExpressionForDeployment keeps authored dual-cast composition", () => {
     const projected = projectExpressionForDeployment(SAMPLE_EXPRESSION, "local");
-    expect(projected.composition).toMatch(/both visible/i);
-    expect(projected.composition).toMatch(/identity weapons in frame/i);
+    expect(projected.composition).toBe(SAMPLE_EXPRESSION.composition);
     const cloud = projectExpressionForDeployment(SAMPLE_EXPRESSION, "cloud");
     expect(cloud.composition).toBe(SAMPLE_EXPRESSION.composition);
+  });
+
+  it("local dual-cast still rewrites close two-shot framing", () => {
+    const projected = projectExpressionForDeployment(
+      {
+        ...SAMPLE_EXPRESSION,
+        composition: "tight two-shot, waist-up indoors",
+      },
+      "local"
+    );
+    expect(projected.composition).toMatch(/both visible/i);
+    expect(projected.composition).toMatch(/identity weapons in frame/i);
   });
 });
 
@@ -564,6 +604,137 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).not.toContain("Scene content (authoritative)");
     expect(prompt).not.toContain("Must match scene:");
     expect(prompt.split("knight left kneeling").length - 1).toBe(1);
+  });
+
+  it("injects work convention without replacing the Expression beat", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "legacy caption should not dominate",
+      rendererExpression: SAMPLE_EXPRESSION,
+      projectionProfile: "local",
+      workVisualConvention:
+        "ERA: medieval wool. FORBID: modern military camouflage.",
+    });
+    expect(prompt).toMatch(/medieval wool/);
+    expect(prompt).not.toMatch(/Work look/);
+    expect(prompt).not.toMatch(/VISUAL LOCK/);
+    expect(prompt).not.toMatch(/\bERA\s*:/);
+    expect(prompt).not.toMatch(/\bFORBID\s*:/);
+    expect(prompt).toContain("knight left kneeling");
+    expect(prompt.indexOf("knight left kneeling")).toBeLessThan(
+      prompt.indexOf("medieval wool")
+    );
+    expect(prompt).not.toContain("legacy caption should not dominate");
+  });
+
+  it("keeps elevated two-figure camera and omits route-title plaque text", () => {
+    const expression = {
+      environment: "dark forest at night",
+      action:
+        "high view from a thick branch, one small cloaked watcher above, one tall gaunt figure below",
+      composition: "elevated shot from the branch looking down",
+      characters: [
+        { role: "Will", visual: "tiny on high branch, black wool cloak" },
+        { role: "Other", visual: "tall gaunt pale among trunks below" },
+      ],
+    };
+    const prompt = buildFrameDraftPrompt({
+      caption: "Will spots a creature from a tree.",
+      routeTitle: "Haunting Beyond the Wall",
+      rendererExpression: expression,
+      projectionProfile: "local",
+      workVisualConvention:
+        "STYLE: painterly. ERA: wool, all-black cloaks. FORBID: modern military.",
+    });
+    expect(prompt).not.toMatch(/VISUAL LOCK/i);
+    expect(prompt).toMatch(/elevated shot/i);
+    expect(prompt).toMatch(/living perch/i);
+    expect(prompt).not.toMatch(/fallen log/i);
+    expect(prompt).toMatch(/different silhouettes/i);
+    expect(prompt).not.toMatch(/both fully visible/i);
+    expect(prompt).not.toMatch(/identity weapons in frame/i);
+    expect(prompt).not.toContain("Haunting Beyond the Wall");
+    expect(prompt).not.toMatch(/\bSTYLE\s*:/);
+    expect(prompt).not.toMatch(/\bWill:/);
+    expect(prompt).not.toMatch(/all-black cloaks/i);
+    expect(prompt).toMatch(/tiny on high branch/);
+    const neg = buildFrameNegativePrompt("Will spots a creature from a tree.", {
+      castCount: 2,
+      rendererExpression: expression,
+    });
+    expect(neg).toMatch(/fallen log perch/i);
+    expect(neg).toMatch(/matching hooded cloaks/i);
+  });
+
+  it("keeps camouflage out of the Local positive and in negatives", () => {
+    const expression = {
+      environment: "Haunted Forest at night",
+      action: "kneeling man, standing corpse, two figures only",
+      composition: "medium-wide, two figures only",
+      visualEmphasis: "gauntlets around the throat, no camouflage",
+      characters: [
+        { role: "Will", visual: "adult kneeling, black wool cloak" },
+        {
+          role: "Ser Waymar Royce",
+          visual: "dark steel plate, no olive drab, pale dead face",
+        },
+      ],
+    };
+    const prompt = buildFrameDraftPrompt({
+      caption: "Waymar rises.",
+      rendererExpression: expression,
+      projectionProfile: "local",
+      workVisualConvention:
+        "painterly digital painting, medieval wool, no modern military, no camouflage",
+    });
+    expect(prompt).toMatch(/black wool cloak/);
+    expect(prompt).toMatch(/pale dead face/);
+    expect(prompt).not.toMatch(/camouflage/i);
+    expect(prompt).not.toMatch(/olive drab/i);
+    expect(prompt).not.toMatch(/modern military/i);
+    const neg = buildFrameNegativePrompt("Waymar rises.", {
+      castCount: 2,
+      rendererExpression: expression,
+      workVisualConvention:
+        "painterly digital painting, no modern military, no camouflage",
+    });
+    expect(neg).toMatch(/camouflage/i);
+    expect(neg).toMatch(/olive drab/i);
+    expect(neg).toMatch(/modern military/i);
+  });
+
+  it("keeps overlay-beat action and corpse identity instead of cutting at 96 chars", () => {
+    const prompt = buildFrameDraftPrompt({
+      caption: "Waymar rises to choke Will.",
+      rendererExpression: {
+        environment: "Haunted Forest at night, snow, black enclosing trees",
+        action:
+          "two adult figures only: kneeling cloaked man, standing armored corpse leaning over him with both gauntlets clamped around his throat; broken hilt unused on the snow",
+        composition: "medium-wide, two figures only, faces secondary",
+        visualEmphasis: "gauntlets around the throat, hilt on the snow",
+        characters: [
+          {
+            role: "Will",
+            visual:
+              "adult kneeling in snow, black wool cloak, empty hands, head pulled back",
+          },
+          {
+            role: "Ser Waymar Royce",
+            visual:
+              "taller standing corpse, dark steel plate and mail, solid black wool cloth, pale dead face, glowing blue eyes, both gauntlets on the kneeling man's throat",
+          },
+        ],
+      },
+      projectionProfile: "local",
+      workVisualConvention:
+        "painterly digital painting, medieval wool, fur, leather",
+    });
+    expect(prompt).not.toMatch(/…/);
+    expect(prompt).toMatch(/throat/i);
+    expect(prompt).toMatch(/broken hilt/i);
+    expect(prompt).toMatch(/standing corpse/i);
+    expect(prompt).toMatch(/glowing blue eyes/i);
+    expect(prompt).toMatch(/empty hands/i);
+    expect(prompt.length).toBeLessThan(LOCAL_PROMPT_BODY_MAX + 80);
   });
 
   it("keeps operator revision with Expression", () => {
@@ -591,8 +762,8 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).toContain("街垒夜战");
     expect(prompt).toContain("Scene:");
     expect(prompt).not.toContain("Scene content (authoritative)");
-    expect(prompt).toMatch(/VISUAL LOCK|no Chinese text/i);
-    expect(prompt).toMatch(/faces sharp|readable/i);
+    expect(prompt).not.toMatch(/VISUAL LOCK/);
+    expect(prompt).toMatch(/cinematic|painterly/i);
     expect(prompt.length).toBeLessThan(600);
   });
 
@@ -610,7 +781,7 @@ describe("buildFrameDraftPrompt Expression-first", () => {
       },
       projectionProfile: "local",
     });
-    expect(prompt).toContain("blank wooden board");
+    expect(prompt).toContain("blank unmarked board");
     expect(prompt).not.toMatch(/recruitment notice/i);
     expect(prompt).toContain("Scene:");
     expect(prompt).not.toMatch(/empty scene/i);
@@ -766,7 +937,7 @@ describe("EVG-001-R3 identity slots on cross-work fixtures", () => {
     expect(`${projected.environment} ${projected.action}`).not.toMatch(
       /letter|parchment/i
     );
-    expect(projected.composition).toMatch(/identity weapons in frame/i);
+    expect(projected.composition).toMatch(/tent still|two profiles/i);
   });
 
   it("as-indoor-counsel uses the same ranking without work-specific rules", () => {
@@ -780,6 +951,6 @@ describe("EVG-001-R3 identity slots on cross-work fixtures", () => {
     expect(`${projected.environment} ${projected.action}`).toMatch(/letter/i);
     expect(projected.environment).toMatch(/winterfell|solar|granite/i);
     expect(projected.environment).not.toMatch(/\bhan\b|peach|felt tent/i);
-    expect(projected.composition).toMatch(/identity weapons in frame/i);
+    expect(projected.composition).toMatch(/indoor still|two profiles/i);
   });
 });

@@ -218,7 +218,7 @@ Editorial hierarchy (ADR-005): **Work → Story → Scene**. Scene Candidates ar
 | ----- | -------- | ----- |
 | `parentStoryCandidateId` | Yes | `candidateId` of a Story Candidate from the same propose batch |
 | `chapter_title` | No | Proposed scope; nullable per scene form |
-| `chapter_number` | Yes | Canonical ordering hint (integer ≥ 1) |
+| `chapter_number` | Yes | Canonical ordering hint (integer ≥ 0; 0 = prologue / front matter) |
 | `title` | Yes | Scene display title |
 | `summary` | No | Narrative prose |
 

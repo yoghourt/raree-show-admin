@@ -4,6 +4,8 @@
 
 import { z } from "zod";
 
+import { MIN_SCENE_CHAPTER_NUMBER } from "@/lib/discovery/scene-chapter-number";
+
 const stagingWorkId = z.string().min(1);
 
 export const acceptedStoryUnitStagingSchema = z.object({
@@ -14,7 +16,7 @@ export const acceptedStoryUnitStagingSchema = z.object({
   summary: z.string(),
   boundaryHint: z.string().optional(),
   acceptedAt: z.string().min(1),
-  chapter_number: z.number().int().min(1).optional(),
+  chapter_number: z.number().int().min(MIN_SCENE_CHAPTER_NUMBER).optional(),
   chapter_title: z.string().nullable().optional(),
   relatedCharacterRefs: z
     .array(

@@ -54,7 +54,20 @@ describe("buildPortraitPrepProposePrompt", () => {
     expect(p).toMatch(/Astute young military commander/);
     expect(p).toMatch(/rewrite it/);
     expect(p).toMatch(/FORBIDDEN: age/);
-    expect(p).toMatch(/Chancellor of Wei/);
+    expect(p).toMatch(/THIS work/);
+    expect(p).not.toMatch(/Chancellor of Wei/);
+    expect(p).not.toMatch(/Green Dragon Crescent Blade/);
     expect(p).not.toMatch(/~800/);
+  });
+
+  it("injects this work's visual convention when set", () => {
+    const p = buildPortraitPrepProposePrompt({
+      name: "Will",
+      workTitle: "A Game of Thrones",
+      visualConvention: "ERA: medieval wool. FORBID: modern military.",
+    });
+    expect(p).toMatch(/Work look/);
+    expect(p).toMatch(/medieval wool/);
+    expect(p).toMatch(/modern military/);
   });
 });

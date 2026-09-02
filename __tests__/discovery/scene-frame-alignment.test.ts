@@ -165,8 +165,11 @@ describe("authorExpressionsForSplitBeats (mock)", () => {
     expect(
       result.beats.every((b) => !isStubRendererExpression(b.rendererExpression))
     ).toBe(true);
-    expect(result.beats[0]!.rendererExpression.action).toMatch(
-      /Zhang Jue|yellow/i
+    expect(result.beats[0]!.rendererExpression.action).not.toEqual(
+      result.beats[0]!.summary
+    );
+    expect(result.beats[1]!.rendererExpression.action).not.toEqual(
+      result.beats[1]!.summary
     );
   });
 });

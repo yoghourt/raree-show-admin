@@ -1,7 +1,20 @@
 import { supabase } from "@/lib/supabase";
 import type { Work } from "@/lib/types";
+import {
+  clipWorkVisualConvention,
+  workVisualConventionFromRow,
+} from "@/lib/prompts/work-visual-convention";
 
 const TABLE = "works";
+
+function throwWorkWriteError(message: string): never {
+  if (/visual_convention/i.test(message)) {
+    throw new Error(
+      "作品表缺少 visual_convention 列。请在 Supabase SQL editor 执行 docs/supabase/migrations/20260901000000_work_visual_convention.sql"
+    );
+  }
+  throw new Error(message);
+}
 
 type WorkRow = {
   id: string;
@@ -10,6 +23,7 @@ type WorkRow = {
   description: string;
   cover_image: string;
   source_profile_id: string | null;
+  visual_convention?: string | null;
   created_at: string;
 };
 
@@ -21,6 +35,7 @@ function rowToWork(row: WorkRow): Work {
     description: row.description,
     coverImage: row.cover_image,
     sourceProfileId: row.source_profile_id ?? null,
+    visualConvention: workVisualConventionFromRow(row),
     createdAt: row.created_at,
   };
 }
@@ -74,6 +89,7 @@ export async function createWork(
   data: Pick<Work, "title" | "description" | "coverImage"> & {
     tsid?: string;
     sourceProfileId?: string | null;
+    visualConvention?: string;
   }
 ): Promise<Work> {
   try {
@@ -83,6 +99,7 @@ export async function createWork(
       title: data.title,
       description: data.description,
       cover_image: data.coverImage,
+      visual_convention: clipWorkVisualConvention(data.visualConvention ?? ""),
     };
     if (data.sourceProfileId !== undefined) {
       row.source_profile_id = data.sourceProfileId || null;
@@ -95,7 +112,7 @@ export async function createWork(
       .single();
 
     if (error) {
-      throw new Error(error.message);
+      throwWorkWriteError(error.message);
     }
 
     return rowToWork(inserted as WorkRow);
@@ -110,7 +127,15 @@ export async function createWork(
 export async function updateWork(
   id: string,
   data: Partial<
-    Pick<Work, "title" | "description" | "coverImage" | "tsid" | "sourceProfileId">
+    Pick<
+      Work,
+      | "title"
+      | "description"
+      | "coverImage"
+      | "tsid"
+      | "sourceProfileId"
+      | "visualConvention"
+    >
   >
 ): Promise<void> {
   try {
@@ -122,11 +147,14 @@ export async function updateWork(
     if (data.sourceProfileId !== undefined) {
       row.source_profile_id = data.sourceProfileId || null;
     }
+    if (data.visualConvention !== undefined) {
+      row.visual_convention = clipWorkVisualConvention(data.visualConvention);
+    }
 
     const { error } = await supabase.from(TABLE).update(row).eq("id", id);
 
     if (error) {
-      throw new Error(error.message);
+      throwWorkWriteError(error.message);
     }
   } catch (e) {
     if (e instanceof Error) {

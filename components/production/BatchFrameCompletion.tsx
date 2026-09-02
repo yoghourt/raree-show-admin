@@ -1,13 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import * as React from "react";
 
+import { applyQueuedFrameExpression } from "@/app/actions/applyQueuedFrameExpression";
 import { discardGenerateJob } from "@/app/actions/discardGenerateJob";
 import { proposeFrameExpression } from "@/app/actions/proposeFrameExpression";
 import { enqueueFrameDraftJobs } from "@/app/actions/enqueueFrameDraftJobs";
 import { generateFrameDraft } from "@/app/actions/generateFrameDraft";
+import { splitReadingFrame } from "@/app/actions/splitReadingFrame";
 import { FrameJobResultDialog } from "@/components/generate-jobs/FrameJobResultDialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatGenerateJobErrorForOperator } from "@/lib/ai/image/operatorErrorCopy";
@@ -25,6 +37,8 @@ import { isEmptyFrameUrl } from "@/lib/production/completion-profile";
 import { FRAME_REVISION_MARKER, splitFrameCaption } from "@/lib/prompts/frame-draft";
 import * as scenesApi from "@/lib/scenes";
 import { parseRendererExpression } from "@/lib/discovery/visual-contract";
+import { messages } from "@/lib/locale";
+import { draftProductionBeatsFromCaption } from "@/lib/production/split-reading-frame";
 import type { ReadingRoute } from "@/lib/types";
 
 type PendingFill = {
@@ -66,6 +80,27 @@ function mergeRevisionNote(
   if (!note) return base;
   if (!base) return `${FRAME_REVISION_MARKER} ${note}`;
   return `${base}\n\n${FRAME_REVISION_MARKER} ${note}`;
+}
+
+type SplitTarget = {
+  routeTsid: string;
+  frameIndex: number;
+  caption: string;
+};
+
+function captionForSplit(
+  routes: ReadingRoute[],
+  sceneTsid: string,
+  frameIndex: number,
+  job?: GenerateJobRow
+): string {
+  const live =
+    routes.find((r) => r.tsid === sceneTsid)?.story_images_v2?.[frameIndex]
+      ?.caption?.trim() ?? "";
+  if (live) return live;
+  const jobCaption =
+    typeof job?.input_json.caption === "string" ? job.input_json.caption : "";
+  return splitFrameCaption(jobCaption).base;
 }
 
 function frameEnqueueCaptionFromJob(
@@ -199,11 +234,11 @@ function ExpressionBadge({
 /** Structured failure → OPERATOR revision note (WS4). */
 const FAILURE_TYPE_NOTES = {
   missing_identity:
-    "OPERATOR: 主角须有稳定身份 cue（长须/专属兵器/甲色）；敌军标识只放敌军，勿戴在主角身上。Heroes need fixed identity cues (beard, iconic weapon, armor color); enemy markers (e.g. rebel colors) must stay on enemies only, never on heroes.",
+    "OPERATOR: 主角须有本作品视觉身份里的稳定 cue；敌军/敌对标识只放在敌军身上。Heroes need this work's standing identity cues; enemy markers must stay on enemies only, never on heroes.",
   wrong_beat:
     "OPERATOR: 须画本帧 caption 的瞬间，勿画无关对峙。Must depict this frame caption’s beat, not an unrelated standoff.",
   missing_prop:
-    "OPERATOR: 须有 blank unmarked wooden board centered。Must include blank unmarked wooden board centered.",
+    "OPERATOR: 须画出本帧 caption / Expression 点名的道具，居中可读。Must include the named prop from this frame, readable and centered.",
   cast_count:
     "OPERATOR: 人物数量/关系须匹配 Expression。Cast count/relations must match Expression.",
 } as const;
@@ -226,6 +261,16 @@ function isExprDraftDirty(
   baseline: string | undefined
 ): boolean {
   return (draft ?? "").trim() !== (baseline ?? "").trim();
+}
+
+function snapshotExpressionJson(job: GenerateJobRow): string {
+  const raw = job.input_json.renderer_expression;
+  if (raw == null) return "";
+  try {
+    return JSON.stringify(raw, null, 2);
+  } catch {
+    return "";
+  }
 }
 
 /** In-flight Execution jobs: block duplicate enqueue for the same frame. */
@@ -288,6 +333,11 @@ export function BatchFrameCompletion({
     currentRouteTitle?: string | null;
     draftRevisionNote?: string | null;
   } | null>(null);
+  const [splitRow, setSplitRow] = React.useState<SplitTarget | null>(null);
+  const [splitBeats, setSplitBeats] = React.useState<Array<{ summary: string }>>(
+    []
+  );
+  const [splitting, setSplitting] = React.useState(false);
 
   const refreshJobs = React.useCallback(async () => {
     try {
@@ -298,6 +348,64 @@ export function BatchFrameCompletion({
       setJobsError(e instanceof Error ? e.message : String(e));
     }
   }, [workId]);
+
+  const openSplit = (row: SplitTarget) => {
+    const drafts = draftProductionBeatsFromCaption(row.caption);
+    const beats =
+      drafts.length >= 2
+        ? drafts.map((d) => ({ summary: d.summary }))
+        : [{ summary: row.caption }, { summary: "" }];
+    setSplitBeats(beats);
+    setSplitRow(row);
+  };
+
+  const confirmSplit = async () => {
+    if (!splitRow) return;
+    const cleaned = splitBeats
+      .map((b) => ({ summary: b.summary.trim() }))
+      .filter((b) => b.summary.length > 0);
+    if (cleaned.length < 2) {
+      window.alert(messages.batchCompletion.splitFrameNeedTwo);
+      return;
+    }
+    setSplitting(true);
+    try {
+      const result = await splitReadingFrame({
+        workId,
+        sceneTsid: splitRow.routeTsid,
+        frameIndex: splitRow.frameIndex,
+        beats: cleaned,
+      });
+      if (!result.ok) {
+        window.alert(result.message || messages.batchCompletion.splitFrameFailed);
+        return;
+      }
+      if (result.expressionWarnings.length > 0) {
+        const detail = result.expressionWarnings.join("\n");
+        window.alert(
+          `${messages.batchCompletion.splitExpressionPartial}\n${detail}`
+        );
+        setWriteError(
+          `${messages.batchCompletion.splitExpressionPartial}\n${detail}`
+        );
+      } else {
+        setWriteError(null);
+        setAdmitHint(
+          `已拆成 ${result.inserted} 条画面，并写入 Expression。可再点缺画面排队。`
+        );
+      }
+      setSplitRow(null);
+      setSplitBeats([]);
+      onWrote();
+      await refreshJobs();
+    } catch (e) {
+      window.alert(
+        e instanceof Error ? e.message : messages.batchCompletion.splitFrameFailed
+      );
+    } finally {
+      setSplitting(false);
+    }
+  };
 
   React.useEffect(() => {
     const next: PendingFill[] = [];
@@ -337,6 +445,7 @@ export function BatchFrameCompletion({
   const enqueueableRows = rows.filter(
     (r) => !activeJobForFrame(jobs, r.routeTsid, r.frameIndex)
   );
+  const missingExprRows = rows.filter((r) => !r.hasRendererExpression);
 
   const patchRow = (key: string, patch: Partial<PendingFill>) => {
     setRows((prev) =>
@@ -389,7 +498,7 @@ export function BatchFrameCompletion({
     }
     if (fresh.some((r) => !r.hasRendererExpression)) {
       const ok = window.confirm(
-        "有帧缺少 Expression，将走 caption 兜底。建议先在读帧补 Expression。仍要排队？"
+        messages.batchCompletion.missingExpressionEnqueueConfirm
       );
       if (!ok) return;
     }
@@ -421,6 +530,67 @@ export function BatchFrameCompletion({
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
       setEnqueueBusy(false);
+    }
+  };
+
+  const proposeAndSaveExprForRow = async (
+    row: PendingFill
+  ): Promise<boolean> => {
+    const key = rowKey(row.routeTsid, row.frameIndex);
+    setProposingExprId(key);
+    setWriteError(null);
+    try {
+      const result = await proposeFrameExpression({
+        workId,
+        caption: row.caption,
+        routeTitle: row.routeTitle,
+      });
+      if (!result.ok) {
+        setWriteError(
+          `${row.routeTitle} · 帧 ${row.frameIndex + 1}：${result.message}`
+        );
+        return false;
+      }
+      await scenesApi.patchFrameProvenanceExpression(
+        workId,
+        row.routeTsid,
+        row.frameIndex,
+        result.rendererExpression
+      );
+      return true;
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+      return false;
+    } finally {
+      setProposingExprId(null);
+    }
+  };
+
+  const proposeMissingExpressions = async (targets: PendingFill[]) => {
+    const missing = targets.filter((r) => !r.hasRendererExpression);
+    if (missing.length === 0) {
+      setAdmitHint("所选帧都已有 Expression。");
+      return;
+    }
+    const failures: string[] = [];
+    let okCount = 0;
+    for (let i = 0; i < missing.length; i++) {
+      const row = missing[i]!;
+      setAdmitHint(
+        `正在补 Expression（${i + 1}/${missing.length}）· ${row.routeTitle} 帧 ${row.frameIndex + 1}`
+      );
+      const ok = await proposeAndSaveExprForRow(row);
+      if (ok) okCount += 1;
+      else failures.push(`${row.routeTitle} · 帧 ${row.frameIndex + 1}`);
+    }
+    onWrote();
+    if (failures.length > 0) {
+      setWriteError(
+        `已写入 ${okCount} 条 Expression；失败 ${failures.length}：${failures.join("；")}`
+      );
+    } else {
+      setWriteError(null);
+      setAdmitHint(`已为 ${okCount} 帧写入 Expression，可再点缺画面排队。`);
     }
   };
 
@@ -782,12 +952,15 @@ export function BatchFrameCompletion({
     }
   };
 
-  const proposeExprForJob = async (job: GenerateJobRow) => {
+  const proposeExprForJob = async (
+    job: GenerateJobRow,
+    options?: { currentExpression?: string }
+  ) => {
     if (job.subject_type !== "scene") return;
     const frameIndex = jobFrameIndex(job);
     if (frameIndex === null) {
       setWriteError("无法提案：job 无 frame_index");
-      return;
+      return false;
     }
     const route = routes.find((r) => r.tsid === job.subject_id);
     const liveCaption =
@@ -799,33 +972,137 @@ export function BatchFrameCompletion({
     const caption = splitFrameCaption(liveCaption || jobCaption).base;
     if (!caption) {
       setWriteError("无法提案：缺少画面说明");
-      return;
+      return false;
     }
+    const currentExpression =
+      options?.currentExpression ??
+      exprDraftByJob[job.id] ??
+      snapshotExpressionJson(job) ??
+      undefined;
     setProposingExprId(job.id);
     setWriteError(null);
     try {
       const result = await proposeFrameExpression({
         workId,
         caption,
-        currentExpression: exprDraftByJob[job.id],
+        currentExpression: currentExpression || undefined,
         operatorNote: revisionNotes[job.id],
         routeTitle: route?.title,
       });
       if (!result.ok) {
         setWriteError(result.message);
-        return;
+        return false;
       }
       setExprDraftByJob((prev) => ({
         ...prev,
         [job.id]: JSON.stringify(result.rendererExpression, null, 2),
       }));
       setAdmitHint(
-        "已填入 AI Expression（未写入 provenance；可再改后保存或重新排队）"
+        job.status === "queued"
+          ? "已填入 AI Expression（未写入排队快照；请核对后点「保存到排队任务」）"
+          : "已填入 AI Expression（未写入 provenance；可再改后保存或重新排队）"
       );
+      return true;
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : String(e));
+      return false;
+    } finally {
+      setProposingExprId(null);
+    }
+  };
+
+  const hydrateExprPanel = (job: GenerateJobRow) => {
+    const frameIndex = jobFrameIndex(job);
+    const snapshot = snapshotExpressionJson(job);
+    if (job.status === "queued" && snapshot) {
+      setExprDraftByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      setExprBaselineByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      return;
+    }
+    if (frameIndex === null) {
+      setExprDraftByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      setExprBaselineByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      return;
+    }
+    void scenesApi
+      .getFrameProvenance(workId, job.subject_id)
+      .then((entries) => {
+        const entry = entries.find((p) => p.frameIndex === frameIndex);
+        const json = entry?.rendererExpression
+          ? JSON.stringify(entry.rendererExpression, null, 2)
+          : snapshot;
+        setExprDraftByJob((prev) => ({ ...prev, [job.id]: json }));
+        setExprBaselineByJob((prev) => ({ ...prev, [job.id]: json }));
+      })
+      .catch(() => {
+        setExprDraftByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+        setExprBaselineByJob((prev) => ({ ...prev, [job.id]: snapshot }));
+      });
+  };
+
+  const openExprPanel = (job: GenerateJobRow) => {
+    const nextId = retryPanelJobId === job.id ? null : job.id;
+    setRetryPanelJobId(nextId);
+    if (nextId) hydrateExprPanel(job);
+  };
+
+  const saveExprDraftForJob = async (job: GenerateJobRow) => {
+    const frameIndex = jobFrameIndex(job);
+    if (frameIndex === null) {
+      setWriteError("无法保存：job 无 frame_index");
+      return;
+    }
+    const raw = (exprDraftByJob[job.id] ?? "").trim();
+    if (!raw) {
+      setWriteError("Expression JSON 为空");
+      return;
+    }
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(raw);
+    } catch {
+      setWriteError("Expression JSON 解析失败");
+      return;
+    }
+    const parsed = parseRendererExpression(parsedJson);
+    if (!parsed.ok) {
+      setWriteError(parsed.errors.join("; "));
+      return;
+    }
+    setExprBusyId(job.id);
+    setWriteError(null);
+    try {
+      await scenesApi.patchFrameProvenanceExpression(
+        workId,
+        job.subject_id,
+        frameIndex,
+        parsed.value
+      );
+      if (job.status === "queued") {
+        const applied = await applyQueuedFrameExpression({
+          workId,
+          jobId: job.id,
+          expression: parsed.value,
+        });
+        if (!applied.ok) {
+          setWriteError(
+            `Expression 已写入阅读帧，但排队快照未更新：${applied.message}`
+          );
+          onWrote();
+          return;
+        }
+        setExprBaselineByJob((prev) => ({ ...prev, [job.id]: raw }));
+        await refreshJobs();
+        onWrote();
+        setAdmitHint("已写入阅读帧与排队快照，Worker 将用新 Expression");
+        return;
+      }
+      setAdmitHint("Expression 已写入，出场人物已对齐");
+      onWrote();
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
     } finally {
-      setProposingExprId(null);
+      setExprBusyId(null);
     }
   };
 
@@ -900,11 +1177,32 @@ export function BatchFrameCompletion({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {missingExprRows.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={
+                writing ||
+                enqueueBusy ||
+                proposingExprId !== null ||
+                splitting
+              }
+              onClick={() => void proposeMissingExpressions(missingExprRows)}
+            >
+              {proposingExprId
+                ? messages.batchCompletion.proposingExpression
+                : `${messages.batchCompletion.proposeMissingExpressions}（${missingExprRows.length}）`}
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
             disabled={
-              writing || enqueueBusy || enqueueableRows.length === 0
+              writing ||
+              enqueueBusy ||
+              proposingExprId !== null ||
+              enqueueableRows.length === 0
             }
             onClick={() => void enqueueRows(rows)}
           >
@@ -998,8 +1296,13 @@ export function BatchFrameCompletion({
                     </div>
                     {!row.hasRendererExpression ? (
                       <p className="mt-1 text-[11px] text-amber-800">
-                        缺 Expression：建议先在读帧（Frame Context）补写，再排队；否则走
-                        caption 兜底。
+                        {messages.batchCompletion.missingExpressionHint}{" "}
+                        <Link
+                          href={`/works/${encodeURIComponent(workId)}/reading-routes/${encodeURIComponent(row.routeTsid)}/edit`}
+                          className="underline"
+                        >
+                          打开阅读帧
+                        </Link>
                       </p>
                     ) : null}
                     <p className="truncate text-xs text-zinc-500">{row.caption}</p>
@@ -1026,7 +1329,11 @@ export function BatchFrameCompletion({
                     type="button"
                     size="sm"
                     disabled={
-                      row.busy || writing || enqueueBusy || enqueueBlocked
+                      row.busy ||
+                      writing ||
+                      enqueueBusy ||
+                      enqueueBlocked ||
+                      proposingExprId !== null
                     }
                     onClick={() => void enqueueRows([row])}
                   >
@@ -1035,6 +1342,43 @@ export function BatchFrameCompletion({
                         ? "生成中…"
                         : "已排队"
                       : "排队生成"}
+                  </Button>
+                  {!row.hasRendererExpression ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={
+                        row.busy ||
+                        writing ||
+                        enqueueBusy ||
+                        proposingExprId !== null ||
+                        splitting
+                      }
+                      onClick={() => {
+                        void proposeAndSaveExprForRow(row).then((ok) => {
+                          if (!ok) return;
+                          onWrote();
+                          setAdmitHint(
+                            `${row.routeTitle} · 帧 ${row.frameIndex + 1}：已写入 Expression`
+                          );
+                        });
+                      }}
+                    >
+                      {proposingExprId === key
+                        ? messages.batchCompletion.proposingExpression
+                        : messages.batchCompletion.proposeExpression}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={row.busy || writing || enqueueBusy || splitting}
+                    onClick={() => openSplit(row)}
+                    title={messages.batchCompletion.splitFrameDescription}
+                  >
+                    {messages.batchCompletion.splitFrame}
                   </Button>
                   {row.candidateUrl ? (
                     <Button
@@ -1335,8 +1679,8 @@ export function BatchFrameCompletion({
                     </div>
                     {!jobHasRendererExpression(job) ? (
                       <p className="text-[11px] text-amber-800">
-                        无 Expression：下次可先在读帧 / Frame Context
-                        补写再重试，避免 caption 兜底。
+                        无 Expression：下次可先点待补列表的「AI 补 Expression」，或到阅读帧
+                        Frame Context 补写再重试，避免 caption 兜底。
                       </p>
                     ) : null}
                     {job.error ? (
@@ -1365,6 +1709,37 @@ export function BatchFrameCompletion({
                       </p>
                     ) : null}
                     <div className="flex flex-wrap gap-1.5">
+                      {job.subject_type === "scene" &&
+                      frameIndex !== null &&
+                      captionForSplit(
+                        routes,
+                        job.subject_id,
+                        frameIndex,
+                        job
+                      ) ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={writing || enqueueBusy || splitting}
+                          onClick={() =>
+                            openSplit({
+                              routeTsid: job.subject_id,
+                              frameIndex,
+                              caption: captionForSplit(
+                                routes,
+                                job.subject_id,
+                                frameIndex,
+                                job
+                              ),
+                            })
+                          }
+                          title={messages.batchCompletion.splitFrameDescription}
+                        >
+                          {messages.batchCompletion.splitFrame}
+                        </Button>
+                      ) : null}
                       {canAdmit ? (
                         <Button
                           type="button"
@@ -1452,45 +1827,7 @@ export function BatchFrameCompletion({
                                   )
                                 ))
                             }
-                            onClick={() => {
-                              const nextId =
-                                retryPanelJobId === job.id ? null : job.id;
-                              setRetryPanelJobId(nextId);
-                              if (nextId && frameIndex !== null) {
-                                void scenesApi
-                                  .getFrameProvenance(workId, job.subject_id)
-                                  .then((entries) => {
-                                    const entry = entries.find(
-                                      (p) => p.frameIndex === frameIndex
-                                    );
-                                    const json = entry?.rendererExpression
-                                      ? JSON.stringify(
-                                          entry.rendererExpression,
-                                          null,
-                                          2
-                                        )
-                                      : "";
-                                    setExprDraftByJob((prev) => ({
-                                      ...prev,
-                                      [job.id]: json,
-                                    }));
-                                    setExprBaselineByJob((prev) => ({
-                                      ...prev,
-                                      [job.id]: json,
-                                    }));
-                                  })
-                                  .catch(() => {
-                                    setExprDraftByJob((prev) => ({
-                                      ...prev,
-                                      [job.id]: "",
-                                    }));
-                                    setExprBaselineByJob((prev) => ({
-                                      ...prev,
-                                      [job.id]: "",
-                                    }));
-                                  });
-                              }
-                            }}
+                            onClick={() => openExprPanel(job)}
                           >
                             {retryPanelJobId === job.id
                               ? "收起修改意见"
@@ -1512,7 +1849,75 @@ export function BatchFrameCompletion({
                           </Button>
                         </>
                       ) : null}
-                      {(job.status === "queued" || job.status === "running") &&
+                      {job.status === "queued" &&
+                      job.subject_type === "scene" ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id ||
+                              proposingExprId === job.id
+                            }
+                            onClick={() => openExprPanel(job)}
+                          >
+                            {retryPanelJobId === job.id
+                              ? messages.batchCompletion.collapseQueuedExpression
+                              : messages.batchCompletion.editQueuedExpression}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id ||
+                              proposingExprId === job.id ||
+                              exprBusyId === job.id ||
+                              frameIndex === null
+                            }
+                            onClick={() => {
+                              const snapshot = snapshotExpressionJson(job);
+                              const current =
+                                retryPanelJobId === job.id
+                                  ? exprDraftByJob[job.id] || snapshot
+                                  : snapshot;
+                              if (retryPanelJobId !== job.id) {
+                                setRetryPanelJobId(job.id);
+                                hydrateExprPanel(job);
+                              }
+                              void proposeExprForJob(job, {
+                                currentExpression: current,
+                              });
+                            }}
+                          >
+                            {proposingExprId === job.id
+                              ? messages.batchCompletion.proposingExpression
+                              : messages.batchCompletion.reproposeQueuedExpression}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-zinc-500"
+                            disabled={
+                              writing ||
+                              enqueueBusy ||
+                              requeueingId === job.id
+                            }
+                            onClick={() => void discardFrameJob(job)}
+                          >
+                            {requeueingId === job.id ? "处理中…" : "取消"}
+                          </Button>
+                        </>
+                      ) : null}
+                      {job.status === "running" &&
                       job.subject_type === "scene" ? (
                         <Button
                           type="button"
@@ -1532,6 +1937,11 @@ export function BatchFrameCompletion({
                     </div>
                     {retryPanelJobId === job.id ? (
                       <div className="mt-1 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
+                        {job.status === "queued" ? (
+                          <p className="text-[11px] text-amber-800">
+                            {messages.batchCompletion.queuedExpressionHint}
+                          </p>
+                        ) : null}
                         <label
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-failure-type-${job.id}`}
@@ -1559,14 +1969,13 @@ export function BatchFrameCompletion({
                             选择结构化纠偏…
                           </option>
                           <option value="missing_identity">
-                            missing_identity · 主角身份 cue（兵器/胡须/甲色）；敌标勿贴主角
+                            missing_identity · 主角须有本作品身份 cue；敌标勿贴主角
                           </option>
                           <option value="wrong_beat">
                             wrong_beat · 须画本帧 caption 的瞬间，勿画无关对峙
                           </option>
                           <option value="missing_prop">
-                            missing_prop · 须有 blank unmarked wooden board
-                            centered
+                            missing_prop · 须画出本帧点名的道具
                           </option>
                           <option value="cast_count">
                             cast_count · 人物数量/关系须匹配 Expression
@@ -1576,8 +1985,9 @@ export function BatchFrameCompletion({
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-expr-${job.id}`}
                         >
-                          Expression（点下方重新排队时会写入 provenance
-                          再入队；也可先单独保存。修改意见可留空）
+                          {job.status === "queued"
+                            ? "Expression（点「保存到排队任务」后 Worker 用这份快照；不必取消重排）"
+                            : "Expression（点下方重新排队时会写入 provenance 再入队；也可先单独保存。修改意见可留空）"}
                         </label>
                         <Textarea
                           id={`frame-expr-${job.id}`}
@@ -1623,57 +2033,24 @@ export function BatchFrameCompletion({
                               writing ||
                               enqueueBusy
                             }
-                            onClick={() => {
-                            if (frameIndex === null) return;
-                            const raw = (exprDraftByJob[job.id] ?? "").trim();
-                            if (!raw) {
-                              setWriteError("Expression JSON 为空");
-                              return;
-                            }
-                            let parsedJson: unknown;
-                            try {
-                              parsedJson = JSON.parse(raw);
-                            } catch {
-                              setWriteError("Expression JSON 解析失败");
-                              return;
-                            }
-                            const parsed = parseRendererExpression(parsedJson);
-                            if (!parsed.ok) {
-                              setWriteError(parsed.errors.join("; "));
-                              return;
-                            }
-                            setExprBusyId(job.id);
-                            setWriteError(null);
-                            void scenesApi
-                              .patchFrameProvenanceExpression(
-                                workId,
-                                job.subject_id,
-                                frameIndex,
-                                parsed.value
-                              )
-                              .then(() =>
-                                setAdmitHint(
-                                  "Expression 已写入，出场人物已对齐"
-                                )
-                              )
-                              .catch((e) =>
-                                setWriteError(
-                                  e instanceof Error ? e.message : String(e)
-                                )
-                              )
-                              .finally(() => setExprBusyId(null));
-                          }}
-                        >
-                          {exprBusyId === job.id
-                            ? "保存 Expression…"
-                            : "保存 Expression"}
-                        </Button>
+                            onClick={() => void saveExprDraftForJob(job)}
+                          >
+                            {exprBusyId === job.id
+                              ? job.status === "queued"
+                                ? messages.batchCompletion.applyingQueuedExpression
+                                : "保存 Expression…"
+                              : job.status === "queued"
+                                ? messages.batchCompletion.applyQueuedExpression
+                                : "保存 Expression"}
+                          </Button>
                         </div>
                         <label
                           className="block text-[11px] text-zinc-600"
                           htmlFor={`frame-revision-${job.id}`}
                         >
-                          修改意见（可选；会并入下次生成 caption；不改库里的画面描述）
+                          {job.status === "queued"
+                            ? "修改意见（可选；给 AI 提案当纠偏。当前排队任务只改 Expression 快照，不改 caption）"
+                            : "修改意见（可选；会并入下次生成 caption；不改库里的画面描述）"}
                         </label>
                         <Textarea
                           id={`frame-revision-${job.id}`}
@@ -1688,35 +2065,37 @@ export function BatchFrameCompletion({
                           placeholder="例如：更暗的夜景；少一点人物；构图偏左；雨夜火光更强…"
                           className="min-h-[4.5rem] text-xs"
                         />
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-7 text-xs"
-                          title={
-                            canSubmitRetryPanel
-                              ? undefined
-                              : "请修改 Expression 或填写修改意见"
-                          }
-                          disabled={
-                            !canSubmitRetryPanel ||
-                            requeueingId === job.id ||
-                            writing ||
-                            enqueueBusy ||
-                            (frameIndex !== null &&
-                              Boolean(
-                                activeJobForFrame(
-                                  jobs,
-                                  job.subject_id,
-                                  frameIndex
-                                )
-                              ))
-                          }
-                          onClick={() => void requeueFromJob(job)}
-                        >
-                          {requeueingId === job.id
-                            ? "排队中…"
-                            : "按当前修改重新排队"}
-                        </Button>
+                        {job.status !== "queued" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 text-xs"
+                            title={
+                              canSubmitRetryPanel
+                                ? undefined
+                                : "请修改 Expression 或填写修改意见"
+                            }
+                            disabled={
+                              !canSubmitRetryPanel ||
+                              requeueingId === job.id ||
+                              writing ||
+                              enqueueBusy ||
+                              (frameIndex !== null &&
+                                Boolean(
+                                  activeJobForFrame(
+                                    jobs,
+                                    job.subject_id,
+                                    frameIndex
+                                  )
+                                ))
+                            }
+                            onClick={() => void requeueFromJob(job)}
+                          >
+                            {requeueingId === job.id
+                              ? "排队中…"
+                              : "按当前修改重新排队"}
+                          </Button>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -1753,6 +2132,102 @@ export function BatchFrameCompletion({
         draftRevisionNote={preview?.draftRevisionNote}
         title={preview?.label ? `${preview.label} · Job 预览` : "Job 画面预览"}
       />
+
+      <Dialog
+        open={splitRow !== null}
+        onOpenChange={(open) => {
+          if (!open && !splitting) {
+            setSplitRow(null);
+            setSplitBeats([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{messages.batchCompletion.splitFrameTitle}</DialogTitle>
+            <DialogDescription>
+              {messages.batchCompletion.splitFrameDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-3 overflow-y-auto">
+            {splitBeats.map((beat, index) => (
+              <div
+                key={`prod-split-${index}`}
+                className="space-y-1.5 rounded-lg border border-zinc-200 px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs">Beat {index + 1}</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    disabled={splitting || splitBeats.length <= 2}
+                    onClick={() =>
+                      setSplitBeats((prev) =>
+                        prev.filter((_, i) => i !== index)
+                      )
+                    }
+                  >
+                    {messages.batchCompletion.splitFrameRemoveBeat}
+                  </Button>
+                </div>
+                <Textarea
+                  value={beat.summary}
+                  rows={3}
+                  className="text-xs"
+                  placeholder={messages.batchCompletion.splitFrameCaptionPlaceholder}
+                  disabled={splitting}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSplitBeats((prev) =>
+                      prev.map((b, i) =>
+                        i === index ? { ...b, summary: value } : b
+                      )
+                    );
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              disabled={splitting}
+              onClick={() =>
+                setSplitBeats((prev) => [...prev, { summary: "" }])
+              }
+            >
+              {messages.batchCompletion.splitFrameAddBeat}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={splitting}
+              onClick={() => {
+                setSplitRow(null);
+                setSplitBeats([]);
+              }}
+            >
+              {messages.batchCompletion.splitFrameCancel}
+            </Button>
+            <Button
+              type="button"
+              disabled={splitting}
+              onClick={() => void confirmSplit()}
+            >
+              {splitting
+                ? messages.batchCompletion.splitFrameConfirming
+                : messages.batchCompletion.splitFrameConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

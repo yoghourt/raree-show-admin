@@ -9,6 +9,7 @@ import {
   parseVisualIdentityProposal,
 } from "@/lib/prompts/visual-identity-propose"
 import { createSupabaseServerClient } from "@/lib/supabase-server"
+import { workTitleAndConventionFromRow } from "@/lib/prompts/work-visual-convention"
 
 export type ProposeCharacterVisualIdentityResult =
   | { ok: true; visualIdentity: string }
@@ -80,21 +81,18 @@ export async function proposeCharacterVisualIdentity(input: {
     return { ok: false, message: "未登录，无法提案视觉身份。" }
   }
 
-  // Optional work title from DB when client omitted it.
-  let workTitle = parsed.data.workTitle
-  if (!workTitle) {
-    const { data: work } = await supabase
-      .from("works")
-      .select("title")
-      .eq("id", parsed.data.workId)
-      .maybeSingle()
-    if (work && typeof (work as { title?: string }).title === "string") {
-      workTitle = (work as { title: string }).title
-    }
-  }
+  // Title + visual convention from DB at propose time (not a client snapshot).
+  const { data: work } = await supabase
+    .from("works")
+    .select("title, visual_convention")
+    .eq("id", parsed.data.workId)
+    .maybeSingle()
+  const { title, visualConvention } = workTitleAndConventionFromRow(work)
+  const workTitle = parsed.data.workTitle ?? title
 
   const prompt = buildVisualIdentityProposePrompt({
     workTitle,
+    visualConvention,
     name: parsed.data.name,
     house: parsed.data.house,
     description: parsed.data.description,

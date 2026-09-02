@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { workVisualConventionFromRow } from "@/lib/prompts/work-visual-convention";
 
 export async function requireDiscoveryAuth(): Promise<
   | { ok: true; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>; userId: string }
@@ -31,12 +32,26 @@ export async function requireDiscoveryAuth(): Promise<
 export async function assertWorkAccessible(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   workId: string
-): Promise<{ ok: true; title: string } | { ok: false; response: NextResponse }> {
-  const { data } = await supabase
+): Promise<
+  | { ok: true; title: string; visualConvention: string }
+  | { ok: false; response: NextResponse }
+> {
+  const full = await supabase
     .from("works")
-    .select("id, title")
+    .select("id, title, visual_convention")
     .eq("id", workId)
     .maybeSingle();
+  const data =
+    full.data ??
+    (full.error
+      ? (
+          await supabase
+            .from("works")
+            .select("id, title")
+            .eq("id", workId)
+            .maybeSingle()
+        ).data
+      : null);
 
   if (!data) {
     return {
@@ -53,7 +68,11 @@ export async function assertWorkAccessible(
     };
   }
 
-  return { ok: true, title: (data.title as string) ?? "Untitled Work" };
+  return {
+    ok: true,
+    title: (data.title as string) ?? "Untitled Work",
+    visualConvention: workVisualConventionFromRow(data),
+  };
 }
 
 export async function parseJsonBody(

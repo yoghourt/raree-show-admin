@@ -354,7 +354,7 @@ ROL-002 **does** close the **semantic** Editorial Scene → Scene Context → Re
 | -- | ------------- |
 | OQ-ROL2-P01 | **Closed:** One Approved Scene unit → **at most one** Reading Route until Unproject. Second Projection Accept rejected (`ALREADY_PROJECTED`). |
 | OQ-ROL2-P02 | **Closed:** Multiple Approved Scene units **may** `link_existing` to the same Reading Route. |
-| OQ-ROL2-P03 | **Closed:** Minimum fields = staging-mapper (`title` non-empty, `chapter_number` ≥ 1) **plus** required `parentStorySourceReviewId` and matching **persisted active** `story_units` row. |
+| OQ-ROL2-P03 | **Closed:** Minimum fields = staging-mapper (`title` non-empty, `chapter_number` ≥ 0; 0 = prologue) **plus** required `parentStorySourceReviewId` and matching **persisted active** `story_units` row. |
 | OQ-ROL2-P04 | **Closed (deferred versioning):** No version column; Unproject + re-project is the edit path for projection metadata. |
 | OQ-ROL2-P05 | **Closed:** `StoryProjectionLink` and `SceneProjectionLink` remain distinct. Projection Accept auto-creates Story↔Route link to parent Story when missing; Unproject removes companion Story link only when recorded as projection-owned. |
 | OQ-ROL2-P06 | **Closed:** Remain distinct tables/models; do not collapse. |

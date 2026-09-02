@@ -4,7 +4,8 @@
  * Visual Intent MUST NOT be passed here.
  *
  * Expression path: Execution Projection by Deployment profile (A5).
- * Local caption fallback: short single-pass beat (Local blanks above ~600 chars).
+ * Local caption fallback: short single-pass beat.
+ * Expression execute body tracks portrait length (~800); see LOCAL_PROMPT_BODY_MAX.
  * Cloud caption path: denser wrapper for caption-only frames.
  *
  * Operator revision notes (`[操作员修改意见] …`) are promoted to the front —
@@ -20,6 +21,13 @@ import {
   executableRendererExpression,
   type RendererExpression,
 } from "@/lib/discovery/visual-contract";
+import { isVerticalTreeCamera } from "@/lib/discovery/expression-capability-rules";
+import {
+  forbidsFromUnlabeledNegations,
+  forbidsFromWorkVisualConvention,
+  stripPositiveNegations,
+  workVisualConventionPromptBlock,
+} from "@/lib/prompts/work-visual-convention";
 
 export const FRAME_REVISION_MARKER = "[操作员修改意见]";
 
@@ -109,13 +117,50 @@ export const FRAME_NEGATIVE_PROMPT = [
 
 export function buildFrameNegativePrompt(
   _caption?: string,
-  options?: { castCount?: number }
+  options?: {
+    castCount?: number;
+    workVisualConvention?: string;
+    rendererExpression?: RendererExpression | null;
+  }
 ): string {
   void _caption;
+  const forbids = forbidsFromWorkVisualConvention(
+    options?.workVisualConvention ?? ""
+  );
+  const extra = [
+    "floating text",
+    "diagram labels",
+    "title card",
+    "poster title",
+    "framed illustration",
+    "white border",
+    "letterbox",
+    "inset frame",
+    "picture frame",
+    "camouflage",
+    "olive drab",
+    "modern military",
+    "woodland camo",
+    ...forbids,
+    ...forbidsFromUnlabeledNegations(expressionForbidBlob(options?.rendererExpression)),
+  ];
+  if (
+    options?.rendererExpression &&
+    isVerticalTreeCamera(options.rendererExpression)
+  ) {
+    extra.push(
+      "fallen log perch",
+      "standing on a fallen trunk",
+      "matching hooded cloaks",
+      "identical outfits",
+      "two matching cloaks"
+    );
+  }
   const cast = options?.castCount;
   if (cast === 2) {
     return [
       FRAME_NEGATIVE_PROMPT,
+      ...extra,
       "three people",
       "three figures",
       "group of three",
@@ -133,13 +178,33 @@ export function buildFrameNegativePrompt(
   if (cast === 1) {
     return [
       FRAME_NEGATIVE_PROMPT,
+      ...extra,
       "two people",
       "couple",
       "extra person",
       "crowd",
     ].join(", ");
   }
-  return FRAME_NEGATIVE_PROMPT;
+  return extra.length
+    ? `${FRAME_NEGATIVE_PROMPT}, ${extra.join(", ")}`
+    : FRAME_NEGATIVE_PROMPT;
+}
+
+function expressionForbidBlob(
+  expression?: RendererExpression | null
+): string {
+  if (!expression) return "";
+  return [
+    expression.action,
+    expression.composition,
+    expression.visualEmphasis ?? "",
+    ...(expression.characters ?? []).map((c) => c.visual),
+  ].join(". ");
+}
+
+function conventionLead(convention?: string): string | null {
+  const block = workVisualConventionPromptBlock(convention);
+  return block || null;
 }
 
 /**
@@ -150,6 +215,7 @@ function buildExpressionPrompt(input: {
   revisionNote: string;
   routeTitle: string;
   projectionProfile: ProjectionProfile;
+  workVisualConvention?: string;
 }): string {
   const body = expressionToPrompt(
     input.expression,
@@ -159,13 +225,20 @@ function buildExpressionPrompt(input: {
 
   const parts: string[] = [];
   if (input.revisionNote) {
-    // Front only — Local often ignores trailing Chinese; do not duplicate the full note.
     parts.push(`OPERATOR OVERRIDE (must follow): ${input.revisionNote}.`);
   }
-  if (input.routeTitle) {
-    parts.push(`Setting: ${input.routeTitle}.`);
-  }
   parts.push(body);
+  const convention = conventionLead(input.workVisualConvention);
+  if (convention) {
+    parts.push(convention);
+  }
+  // Local: omit routeTitle — Setting strings render as plaque / title cards.
+  if (input.projectionProfile !== "local") {
+    const routeTitle = input.routeTitle.trim();
+    if (routeTitle) {
+      parts.push(`Setting: ${routeTitle}.`);
+    }
+  }
   return parts.join(" ");
 }
 
@@ -191,14 +264,14 @@ export function sanitizeLocalSceneCaptionForGlyphRisk(scene: string): string {
   s = s.replace(/[「『][^」』]{0,40}[」』]/g, "unmarked surface");
   s = s.replace(/["“”][^"“”]{0,40}["“”]/g, "unmarked surface");
   const rewrites: Array<[RegExp, string]> = [
-    [/recruitment\s+notice/gi, "blank wooden board with no writing"],
-    [/official\s+notice/gi, "blank wooden board with no writing"],
-    [/notice\s+board/gi, "unmarked wooden board without letters"],
+    [/recruitment\s+notice/gi, "blank unmarked board with no writing"],
+    [/official\s+notice/gi, "blank unmarked board with no writing"],
+    [/notice\s+board/gi, "unmarked board without letters"],
     [/notice\s+pinned/gi, "blank paper pinned without letters"],
-    [/\bproclamation\b/gi, "blank scroll without writing"],
+    [/\bproclamation\b/gi, "blank unmarked surface without writing"],
     [/\binscription\b/gi, "unmarked surface"],
     [/\bsignage\b/gi, "blank hanging board without letters"],
-    [/告示|榜文|檄文|诏书|招牌|牌匾|文书/g, "空白无字木板"],
+    [/告示|榜文|檄文|诏书|招牌|牌匾|文书/g, "空白无字板面"],
   ];
   for (const [re, rep] of rewrites) {
     s = s.replace(re, rep);
@@ -215,6 +288,7 @@ function buildLocalCaptionPrompt(input: {
   scene: string;
   revisionNote: string;
   routeTitle: string;
+  workVisualConvention?: string;
 }): string {
   void input.routeTitle;
   const scene = hardCapCaption(
@@ -226,20 +300,17 @@ function buildLocalCaptionPrompt(input: {
     : "";
 
   const parts: string[] = [];
-  // Lock before Scene: Chinese/English scene tokens otherwise win and paint glyphs.
-  parts.push(
-    "VISUAL LOCK: pure image only — no Chinese text, no English text, no letters,",
-    "no calligraphy, no plaque, no signboard writing, no caption overlay, no watermark;",
-    "any paper, scroll, or board must be blank unmarked surface;",
-    "when people appear, faces sharp and readable, not blurry."
-  );
   if (revision) {
     parts.push(`OPERATOR OVERRIDE (must follow): ${revision}.`);
   }
   parts.push(`Scene: ${scene}.`);
+  const convention = conventionLead(input.workVisualConvention);
+  if (convention) {
+    parts.push(convention);
+  }
   // Avoid "digital illustration" alone — Local turbo drifts to children's textbook look.
   parts.push(
-    "Cinematic historical narrative painting, adult epic tone,",
+    "Cinematic narrative painting, adult tone,",
     "painterly atmosphere, not a children's textbook, not a schoolbook illustration."
   );
   return parts.join(" ");
@@ -252,6 +323,7 @@ function buildCaptionLegacyPrompt(input: {
   scene: string;
   revisionNote: string;
   routeTitle: string;
+  workVisualConvention?: string;
 }): string {
   const parts: string[] = [];
 
@@ -260,6 +332,10 @@ function buildCaptionLegacyPrompt(input: {
       `OPERATOR OVERRIDE (must follow): ${input.revisionNote}.`,
       "Prefer this override over conflicting details in the scene description."
     );
+  }
+  const convention = conventionLead(input.workVisualConvention);
+  if (convention) {
+    parts.push(convention);
   }
 
   parts.push(
@@ -297,28 +373,45 @@ export function buildFrameDraftPrompt(input: {
   rendererExpression?: RendererExpression | null;
   /** A5 Deployment profile; defaults from IMAGE_CREATOR_ACCEPT_PROVIDER. */
   projectionProfile?: ProjectionProfile;
+  /** Creator-only work convention (era/style/forbids). Must not override the caption beat. */
+  workVisualConvention?: string;
 }): string {
   const { base, revisionNote } = splitFrameCaption(input.caption);
   const routeTitle = input.routeTitle?.trim() ?? "";
   const projectionProfile =
     input.projectionProfile ?? resolveProjectionProfileFromEnv();
+  const workVisualConvention = input.workVisualConvention;
 
   const executable = executableRendererExpression(input.rendererExpression);
   if (executable) {
-    return buildExpressionPrompt({
+    const prompt = buildExpressionPrompt({
       expression: executable,
       revisionNote,
       routeTitle,
       projectionProfile,
+      workVisualConvention,
     });
+    return projectionProfile === "local" ? stripPositiveNegations(prompt) : prompt;
   }
 
   const scene = (base || input.caption.trim()).trim();
   if (!scene) return "";
 
   if (projectionProfile === "local") {
-    return buildLocalCaptionPrompt({ scene, revisionNote, routeTitle });
+    return stripPositiveNegations(
+      buildLocalCaptionPrompt({
+        scene,
+        revisionNote,
+        routeTitle,
+        workVisualConvention,
+      })
+    );
   }
 
-  return buildCaptionLegacyPrompt({ scene, revisionNote, routeTitle });
+  return buildCaptionLegacyPrompt({
+    scene,
+    revisionNote,
+    routeTitle,
+    workVisualConvention,
+  });
 }

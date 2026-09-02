@@ -5,7 +5,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
-import { parseSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
+import {
+  MIN_SCENE_CHAPTER_NUMBER,
+  parseSceneChapterNumber,
+} from "@/lib/discovery/scene-chapter-number";
 import type { ApprovedSceneUnit } from "@/lib/rollout/types";
 import { isMissingRelationError, SCENE_PROJECTION_MIGRATION_HINT } from "@/lib/rollout/db-errors";
 
@@ -174,7 +177,7 @@ export async function upsertApprovedSceneUnitFromStaging(
   approvedBy: string
 ): Promise<ApprovedSceneUnit> {
   const chapterNumber = parseSceneChapterNumber(staging.chapter_number);
-  if (chapterNumber === null) {
+  if (chapterNumber === null || chapterNumber < MIN_SCENE_CHAPTER_NUMBER) {
     throw new Error("Invalid chapter_number for Approved Scene unit");
   }
 

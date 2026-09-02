@@ -64,6 +64,7 @@ export async function executeSceneFrameImageGenerate(input: {
    * Does not skip Human Accept — only records override on the safety assessment.
    */
   faceSafetyOverride?: boolean;
+  workVisualConvention?: string;
 }): Promise<ExecuteImageGenerateResult> {
   const started = Date.now();
   const caption = input.caption.trim();
@@ -119,6 +120,7 @@ export async function executeSceneFrameImageGenerate(input: {
     routeTitle,
     rendererExpression,
     projectionProfile,
+    workVisualConvention: input.workVisualConvention,
   });
   if (!prompt.trim()) {
     return {
@@ -143,6 +145,8 @@ export async function executeSceneFrameImageGenerate(input: {
       prompt,
       negativePrompt: buildFrameNegativePrompt(caption, {
         castCount: rendererExpression?.characters?.length,
+        workVisualConvention: input.workVisualConvention,
+        rendererExpression,
       }),
       // A5: Local profile 512² (blank mitigation); Cloud profile 1024².
       size: frameSize,
@@ -212,6 +216,7 @@ export async function executeSceneFrameImageGenerate(input: {
 export async function executePortraitImageGenerate(input: {
   name: string;
   description?: string;
+  workVisualConvention?: string;
 }): Promise<ExecuteImageGenerateResult> {
   const started = Date.now();
   const name = input.name.trim();
@@ -224,8 +229,15 @@ export async function executePortraitImageGenerate(input: {
   }
 
   const description = input.description?.trim() ?? "";
-  const prompt = buildAvatarPrompt(name, description);
-  const negativePrompt = buildAvatarNegativePrompt(description);
+  const prompt = buildAvatarPrompt(
+    name,
+    description,
+    input.workVisualConvention
+  );
+  const negativePrompt = buildAvatarNegativePrompt(
+    description,
+    input.workVisualConvention
+  );
 
   console.info("[executePortraitImageGenerate] prompt", {
     name,
@@ -295,6 +307,7 @@ export async function executeImageGenerateJob(input: {
   capabilityId: string;
   sceneFrame?: SceneFrameJobInput;
   portrait?: CharacterPortraitJobInput;
+  workVisualConvention?: string;
 }): Promise<ExecuteImageGenerateResult> {
   if (input.capabilityId !== "image.generate") {
     return {
@@ -307,6 +320,7 @@ export async function executeImageGenerateJob(input: {
     return executePortraitImageGenerate({
       name: input.portrait.name,
       description: input.portrait.description,
+      workVisualConvention: input.workVisualConvention,
     });
   }
   if (input.sceneFrame) {
@@ -315,6 +329,7 @@ export async function executeImageGenerateJob(input: {
       routeTitle: input.sceneFrame.route_title,
       rendererExpression: input.sceneFrame.renderer_expression,
       faceSafetyOverride: input.sceneFrame.face_safety_override === true,
+      workVisualConvention: input.workVisualConvention,
     });
   }
   return {

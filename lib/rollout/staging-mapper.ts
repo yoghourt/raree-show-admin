@@ -6,12 +6,18 @@
 import { z } from "zod";
 
 import type { AcceptedSceneCandidateStaging } from "@/lib/discovery/review-types";
-import { parseSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
+import {
+  MIN_SCENE_CHAPTER_NUMBER,
+  parseSceneChapterNumber,
+} from "@/lib/discovery/scene-chapter-number";
 import type { ReadingRoute } from "@/lib/types";
 
 const readingRouteCreateSchema = z.object({
   title: z.string().trim().min(1, "title is required"),
-  chapter_number: z.number().int().min(1, "chapter_number must be at least 1"),
+  chapter_number: z
+    .number()
+    .int()
+    .min(MIN_SCENE_CHAPTER_NUMBER, "chapter_number must be an integer ≥ 0"),
   chapter_title: z.string().nullable(),
   summary: z.string(),
   tags: z.array(z.string()),
@@ -31,10 +37,12 @@ export function mapSceneStagingToReadingRoutePayload(
   staging: AcceptedSceneCandidateStaging
 ): ReadingRouteMappingResult {
   const chapterNumber = parseSceneChapterNumber(staging.chapter_number);
-  if (chapterNumber === null) {
+  if (chapterNumber === null || chapterNumber < MIN_SCENE_CHAPTER_NUMBER) {
     return {
       ok: false,
-      fieldErrors: { chapter_number: ["chapter_number must be a valid number"] },
+      fieldErrors: {
+        chapter_number: ["chapter_number must be an integer ≥ 0"],
+      },
     };
   }
 

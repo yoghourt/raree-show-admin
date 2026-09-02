@@ -3,10 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   LOCAL_ACTION_MAX,
   LOCAL_VISUAL_MAX,
+  packActionNamingCast,
 } from "@/lib/discovery/execution-projection";
 import {
+  applyCharacterLifeStageLooks,
   buildFrameExpressionProposePrompt,
+  captionAgencyOnlyNames,
+  captionOnStageNames,
   captionProperNamePhrases,
+  findLifeStageContradictions,
+  lifeStageLookFromIdentity,
   parseFrameExpressionProposal,
 } from "@/lib/prompts/frame-expression-propose";
 
@@ -111,12 +117,40 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/NOT a cast menu/);
     expect(p).toMatch(/raven parchment/);
     expect(p).toMatch(/kingsroad/);
+    expect(p).toMatch(/Rule 13/);
+    expect(p).toMatch(/not at each other/);
+    expect(p).toMatch(/hinge/);
+    expect(p).toMatch(/storm the palace/);
+    expect(p).toMatch(/Lü Bu/);
+    expect(p).toMatch(/Caption-named groups/);
+    expect(p).toMatch(/MUST NOT stand in the still/);
+    expect(p).toMatch(/Red Hare/);
+    expect(p).toMatch(/off-stage/);
+    expect(p).toMatch(/ending on a bare name/);
     expect(p).toMatch(/Do NOT add other Work characters/);
     expect(p).toMatch(new RegExp(String(LOCAL_VISUAL_MAX)));
     expect(p).toMatch(/pose\/blocking/);
     expect(p).toMatch(/Creator production override/);
     expect(p).toMatch(/weathered northern lord face/);
     expect(p).not.toMatch(/Valyrian steel greatsword/);
+    expect(p).toMatch(/Rule 14/);
+    expect(p).toMatch(/boy emperor about nine/);
+    expect(p).toMatch(/grey goatee/);
+  });
+
+  it("lists life-stage from Work looks as a must-keep identity cue", () => {
+    const p = buildFrameExpressionProposePrompt({
+      workTitle: "Romance of the Three Kingdoms",
+      caption: "Dong Zhuo elevates Emperor Xian and seizes absolute power.",
+      characterCues: [
+        {
+          name: "Emperor Xian",
+          visualIdentity: "FACE: child emperor, boy about nine. COSTUME: imperial robes.",
+        },
+      ],
+    });
+    expect(p).toMatch(/Life-stage \/ apparent age/);
+    expect(p).toMatch(/Emperor Xian: child emperor, no beard/);
   });
 
   it("makes caption the beat authority and allows replacing a contradicting draft", () => {
@@ -138,6 +172,72 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/Prince Bian/);
     expect(p).toMatch(/灵帝已死/);
   });
+
+  it("injects this work's visual convention when set", () => {
+    const p = buildFrameExpressionProposePrompt({
+      workTitle: "A Game of Thrones",
+      caption: "Will sees the Others in the woods.",
+      visualConvention:
+        "ERA: medieval wool, fur. FORBID: modern military camouflage.",
+    });
+    expect(p).toMatch(/Work look/);
+    expect(p).toMatch(/medieval wool/);
+    expect(p).toMatch(/modern military/);
+    expect(p).toMatch(/caption beat still win/);
+  });
+});
+
+describe("life-stage identity", () => {
+  it("extracts a child look and folds it after pose", () => {
+    expect(
+      lifeStageLookFromIdentity("FACE: child emperor, boy about nine.")
+    ).toBe("child emperor, no beard");
+
+    const folded = applyCharacterLifeStageLooks(
+      {
+        environment: "imperial throne room",
+        characters: [
+          {
+            role: "Emperor Xian",
+            visual:
+              "seated on throne, mournful features, opulent imperial robes, grey goatee",
+          },
+        ],
+        action: "Dong Zhuo towers; Emperor Xian seated",
+        composition: "medium-wide",
+      },
+      [
+        {
+          name: "Emperor Xian",
+          visualIdentity: "FACE: child emperor about nine.",
+        },
+      ]
+    );
+    expect(folded.characters[0]?.visual).toMatch(/^seated on throne/i);
+    expect(folded.characters[0]?.visual).toMatch(/child emperor/i);
+    expect(folded.characters[0]?.visual).not.toMatch(/grey goatee/i);
+    expect(folded.characters[0]?.visual.length).toBeLessThanOrEqual(
+      LOCAL_VISUAL_MAX
+    );
+  });
+
+  it("flags an adult face against child looks", () => {
+    const errors = findLifeStageContradictions(
+      {
+        environment: "hall",
+        characters: [
+          {
+            role: "Emperor Xian",
+            visual: "seated, middle-aged, grey goatee, imperial robes",
+          },
+        ],
+        action: "seated",
+        composition: "wide",
+      },
+      [{ name: "Emperor Xian", visualIdentity: "FACE: child emperor." }]
+    );
+    expect(errors.join(" ")).toMatch(/adult face/i);
+  });
 });
 
 describe("captionProperNamePhrases", () => {
@@ -154,5 +254,79 @@ describe("captionProperNamePhrases", () => {
       ])
     );
     expect(names.join(" ")).not.toMatch(/\bHand\b/);
+  });
+
+  it("does not treat sentence-initial verbs or generic Emperor as cast", () => {
+    const names = captionProperNamePhrases(
+      "Backed by Lü Bu, Dong Zhuo demands the deposition of the Emperor at a second assembly."
+    );
+    expect(names).toEqual(expect.arrayContaining(["Lü Bu", "Dong Zhuo"]));
+    expect(names).not.toEqual(expect.arrayContaining(["Backed"]));
+    expect(names).not.toEqual(expect.arrayContaining(["Emperor"]));
+  });
+});
+
+describe("captionAgencyOnlyNames / captionOnStageNames", () => {
+  const caption =
+    "Enticed by Li Su bearing the legendary Red Hare horse, gold, pearls, and jade on behalf of Dong Zhuo, the mercenary Lü Bu agrees to switch sides.";
+
+  it("keeps the messenger and the tempted on stage, not the off-stage principal", () => {
+    expect(captionAgencyOnlyNames(caption)).toEqual(
+      expect.arrayContaining(["Dong Zhuo"])
+    );
+    const onStage = captionOnStageNames(caption);
+    expect(onStage).toEqual(expect.arrayContaining(["Li Su", "Lü Bu"]));
+    expect(onStage).not.toEqual(expect.arrayContaining(["Dong Zhuo"]));
+    expect(onStage).not.toEqual(expect.arrayContaining(["Enticed"]));
+  });
+});
+
+describe("packActionNamingCast", () => {
+  it("fills a trailing bare role with the first visual pose", () => {
+    const packed = packActionNamingCast(
+      "Li Su stands left presenting the Red Hare horse and treasure chests of gold and jade; Lü Bu",
+      [
+        {
+          role: "Li Su",
+          visual: "standing on left, holding reins of Red Hare horse",
+        },
+        {
+          role: "Lü Bu",
+          visual: "standing center, looking intently at the horse",
+        },
+      ],
+      LOCAL_ACTION_MAX
+    );
+    expect(packed).toMatch(/Lü Bu/i);
+    expect(packed).toMatch(/standing center/i);
+    expect(packed).not.toMatch(/;\s*Lü Bu\s*$/i);
+    expect(packed.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
+  });
+});
+
+describe("parseFrameExpressionProposal trailing action", () => {
+  it("does not leave action ending on a bare last name after Local pack", () => {
+    const out = parseFrameExpressionProposal(
+      JSON.stringify({
+        environment: "military camp courtyard at night, torch posts",
+        characters: [
+          {
+            role: "Li Su",
+            visual: "standing on left, holding reins of Red Hare horse",
+          },
+          {
+            role: "Lü Bu",
+            visual: "standing center, looking intently at the horse",
+          },
+        ],
+        action:
+          "Li Su stands left presenting the Red Hare horse and treasure chests of gold and jade; Lü Bu",
+        composition: "medium-wide shot, both fully visible, faces secondary",
+      })
+    );
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.action).toMatch(/standing center/i);
+    expect(out.value.action.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
   });
 });

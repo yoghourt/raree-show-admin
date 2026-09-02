@@ -82,6 +82,21 @@ STYLE: semi-realistic digital painting, textured painterly brushwork, cinematic 
     expect(prompt).not.toMatch(/ENDMARK/);
     expect(prompt).toMatch(/…/);
   });
+
+  it("injects work convention before visual identity", () => {
+    const prompt = buildAvatarPrompt(
+      "Will",
+      "[视觉身份]\nFACE: pale. COSTUME: black wool cloak.",
+      "ERA: medieval wool. FORBID: modern military, olive drab."
+    );
+    expect(prompt).toMatch(/medieval wool/);
+    expect(prompt).not.toMatch(/Work look/);
+    expect(prompt).not.toMatch(/olive drab/);
+    expect(prompt.indexOf("medieval wool")).toBeLessThan(
+      prompt.indexOf("CRITICAL visual identity")
+    );
+    expect(prompt).toMatch(/black wool cloak/);
+  });
 });
 
 describe("scrubConflictingGenderTokens", () => {

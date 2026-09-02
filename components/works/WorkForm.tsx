@@ -12,6 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { messages } from "@/lib/locale";
+import {
+  WORK_VISUAL_CONVENTION_MAX_CHARS,
+  WORK_VISUAL_CONVENTION_PROMPT_MAX_CHARS,
+} from "@/lib/prompts/work-visual-convention";
 import { createWork, updateWork } from "@/lib/works";
 
 const workFormSchema = z.object({
@@ -19,6 +24,7 @@ const workFormSchema = z.object({
   description: z.string(),
   coverImage: z.string().min(1, "封面链接不能为空"),
   sourceProfileId: z.string(),
+  visualConvention: z.string(),
 });
 
 export type WorkFormValues = z.infer<typeof workFormSchema>;
@@ -56,7 +62,13 @@ export function WorkForm(props: WorkFormProps) {
   const defaultValues: WorkFormValues =
     props.mode === "edit"
       ? props.defaultValues
-      : { title: "", description: "", coverImage: "", sourceProfileId: "" };
+      : {
+          title: "",
+          description: "",
+          coverImage: "",
+          sourceProfileId: "",
+          visualConvention: "",
+        };
 
   const form = useForm<WorkFormValues>({
     resolver: zodResolver(workFormSchema),
@@ -110,6 +122,7 @@ export function WorkForm(props: WorkFormProps) {
           description: values.description.trim(),
           coverImage: values.coverImage.trim(),
           sourceProfileId,
+          visualConvention: values.visualConvention,
         });
       } else {
         await updateWork(props.workId, {
@@ -117,6 +130,7 @@ export function WorkForm(props: WorkFormProps) {
           description: values.description.trim(),
           coverImage: values.coverImage.trim(),
           sourceProfileId,
+          visualConvention: values.visualConvention,
         });
       }
       router.push("/works");
@@ -190,6 +204,25 @@ export function WorkForm(props: WorkFormProps) {
           {...form.register("description")}
           aria-invalid={!!form.formState.errors.description}
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="work-visual-convention">
+          {messages.works.visualConvention}
+          <span className="ml-1 text-xs text-muted-foreground">
+            （保存最多 {WORK_VISUAL_CONVENTION_MAX_CHARS} 字，生图取前{" "}
+            {WORK_VISUAL_CONVENTION_PROMPT_MAX_CHARS}）
+          </span>
+        </Label>
+        <Textarea
+          id="work-visual-convention"
+          rows={4}
+          placeholder={messages.works.visualConventionPlaceholder}
+          {...form.register("visualConvention")}
+        />
+        <p className="text-muted-foreground text-xs">
+          {messages.works.visualConventionHint}
+        </p>
       </div>
 
       <Controller

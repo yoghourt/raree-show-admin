@@ -7,6 +7,11 @@
  * prompt — trailing Chinese notes lose to early English tokens like "Lady".
  */
 
+import {
+  forbidsFromWorkVisualConvention,
+  workVisualConventionPromptBlock,
+} from "@/lib/prompts/work-visual-convention";
+
 export const AVATAR_REVISION_MARKER = "[操作员修改意见]";
 /** Budgeted Character Archive visual cues folded into portrait description. */
 export const AVATAR_APPEARANCE_MARKER = "[视觉身份]";
@@ -186,7 +191,7 @@ type GenderCue = "male" | "female" | null;
 export function detectGenderCue(text: string): GenderCue {
   const t = text.toLowerCase();
   const male =
-    /\b(male|man|men|he|him|his|boy|gentleman|lord|ser|knight|ranger)\b/.test(
+    /\b(male|man|men|he|him|his|boy|gentleman|lord|ser|knight)\b/.test(
       t
     ) ||
     /他是个男|他是男|男性|男人|男的|帅哥/.test(text);
@@ -256,7 +261,11 @@ export function scrubConflictingGenderTokens(
   return out.replace(/\s{2,}/g, " ").replace(/\s([,.])/g, "$1").trim();
 }
 
-export function buildAvatarPrompt(name: string, description: string): string {
+export function buildAvatarPrompt(
+  name: string,
+  description: string,
+  workVisualConvention?: string
+): string {
   const n = name.trim();
   const { base, revisionNote, appearance } = splitAvatarDescription(description);
   const revisionCue = detectGenderCue(revisionNote);
@@ -289,6 +298,10 @@ export function buildAvatarPrompt(name: string, description: string): string {
     parts.push(
       `OPERATOR OVERRIDE (must follow): ${clipPromptChunk(revisionNote, 120)}.`
     );
+  }
+  const convention = workVisualConventionPromptBlock(workVisualConvention);
+  if (convention) {
+    parts.push(convention);
   }
   if (clippedAppearance) {
     parts.push(
@@ -364,7 +377,10 @@ function appearanceNegativeExtras(appearance: string): string[] {
 }
 
 /** Negatives for portrait slot, optionally extended from description cues. */
-export function buildAvatarNegativePrompt(description?: string): string {
+export function buildAvatarNegativePrompt(
+  description?: string,
+  workVisualConvention?: string
+): string {
   const { base, revisionNote, appearance } = splitAvatarDescription(
     description ?? ""
   );
@@ -374,7 +390,12 @@ export function buildAvatarNegativePrompt(description?: string): string {
     detectGenderCue(base);
   const { negativeExtra } = genderOverrideClauses(cue);
   const appearanceNeg = appearanceNegativeExtras(appearance);
-  const merged = [...new Set([...negativeExtra, ...appearanceNeg])];
+  const conventionNeg = forbidsFromWorkVisualConvention(
+    workVisualConvention ?? ""
+  );
+  const merged = [
+    ...new Set([...negativeExtra, ...appearanceNeg, ...conventionNeg]),
+  ];
   if (merged.length === 0) return AVATAR_NEGATIVE_PROMPT;
   return `${AVATAR_NEGATIVE_PROMPT}, ${merged.join(", ")}`;
 }

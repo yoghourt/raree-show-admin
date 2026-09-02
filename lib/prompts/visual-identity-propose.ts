@@ -8,9 +8,13 @@ import {
   AVATAR_APPEARANCE_MAX_CHARS,
   packVisualIdentityForPortrait,
 } from "@/lib/prompts/avatar";
+import { workVisualConventionProposeBlock } from "@/lib/prompts/work-visual-convention";
+import type { CharacterArchive } from "@/lib/discovery/character-archive";
+import { parseCharacterArchive } from "@/lib/discovery/character-archive";
 
 export type VisualIdentityProposeInput = {
   workTitle?: string;
+  visualConvention?: string;
   name: string;
   house?: string;
   description?: string;
@@ -65,6 +69,42 @@ export function parseVisualIdentityProposal(raw: string): string {
   return packVisualIdentityForPortrait(extracted);
 }
 
+function labeledLineValue(text: string, label: string): string {
+  const match = text.match(new RegExp(`^${label}\\s*:\\s*(.+)$`, "im"));
+  if (!match?.[1]) return "";
+  return match[1].replace(/\.+$/, "").trim();
+}
+
+function cuesFromLabeledLine(text: string, label: string): string[] {
+  const value = labeledLineValue(text, label);
+  if (!value) return [];
+  const parts = value
+    .split(/\s*[,;]\s*/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts : [value];
+}
+
+/** Map FACE/COSTUME/PROP proposal text back to Role Character Archive. */
+export function characterArchiveFromLabeledIdentity(
+  text: string
+): CharacterArchive | null {
+  const packed = parseVisualIdentityProposal(text);
+  if (!packed) return null;
+  const identityCues = cuesFromLabeledLine(packed, "FACE");
+  const costumeCues = cuesFromLabeledLine(packed, "COSTUME");
+  const propCues = cuesFromLabeledLine(packed, "PROP");
+  const visualSummary = labeledLineValue(packed, "SUMMARY");
+  const parsed = parseCharacterArchive({
+    ...(visualSummary ? { visualSummary } : {}),
+    ...(identityCues.length ? { identityCues } : {}),
+    costumeCues,
+    propCues,
+  });
+  if (!parsed.ok) return null;
+  return parsed.value;
+}
+
 export function buildVisualIdentityProposePrompt(
   input: VisualIdentityProposeInput
 ): string {
@@ -74,11 +114,13 @@ export function buildVisualIdentityProposePrompt(
   const description = input.description?.trim() || "(none)";
   const current = input.currentVisualIdentity?.trim() || "(empty)";
   const note = input.operatorNote?.trim() || "(none)";
+  const conventionBlock = workVisualConventionProposeBlock(input.visualConvention);
+  const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You propose Creator visual identity text for a character portrait (image model input).
 This is NOT Reader prose. Output short English cue lines only.
 
-Work: ${work}
+Work: ${work}${conventionLead}
 Character name: ${name}
 House/faction: ${house}
 Reader description (story role only — IGNORE age/look words like young, handsome, chiseled, beard, robes): ${description}
@@ -92,16 +134,15 @@ Rules:
   PROP: …
   STYLE: …
 - FACE, COSTUME, and PROP are required when the role has a stable look.
-- STYLE: one short clause (painterly digital painting). Omit SUMMARY — it wastes the Local budget.
+- STYLE: one short clause matching THIS work (title above). Omit SUMMARY — it wastes the Local budget.
 - Stable visual identity only: face/skin, hair/beard, clothing silhouette, iconic standing weapon.
 - FORBIDDEN: scene action, emotion, camera, InstantID, LoRA, reference image language.
 - Prefer short English phrases (Local image models). No long adjectives.
-- When source text omits iconic look but the work has a stable visual tradition, propose as editable tradition cues — do NOT claim they were extracted from the description.
-- STYLE must push semi-realistic digital painting / painterly skin texture; avoid Chinese New Year poster, nianhua, temple icon, flat opera face paint, glowing neon weapons.
-- If FACE needs a reddish complexion, write natural skin texture wording (e.g. ruddy bronze complexion with pores) — NEVER bare "red face" alone.
-- FACE comes from the work's stable visual tradition + name, not from Reader description adjectives.
-- If current draft FACE is a generic youthful idol that contradicts tradition, replace it; otherwise improve the draft.
+- When source text omits iconic look but THIS work has a stable visual tradition, propose as editable tradition cues for THIS work — do NOT copy another work's costumes, weapons, or poster style.
+- FACE is anatomy (skin, hair, beard, scars), not a job title. COSTUME names garments and materials of THIS work's era.
+- FACE comes from THIS work's visual tradition + name, not from Reader description adjectives.
+- If current draft FACE is a generic youthful idol that contradicts THIS work's tradition, replace it; otherwise improve the draft.
 - Honor operator note over conflicting draft bits.
 - Hard limit: total output MUST be ≤ ${AVATAR_APPEARANCE_MAX_CHARS} characters including newlines. This is the Local portrait execute budget; longer tails are dropped.
-- Example length: "FACE: ruddy bronze complexion with pores, long beard.\\nCOSTUME: green battle robe.\\nPROP: Green Dragon Crescent Blade.\\nSTYLE: painterly digital painting."`.trim();
+- Example format (fill from THIS work; do not copy sample looks): "FACE: …\\nCOSTUME: …\\nPROP: …\\nSTYLE: painterly digital painting."`.trim();
 }

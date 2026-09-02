@@ -162,10 +162,10 @@ export function DiscoveryComposer({
         className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden"
       >
         <TabsList className="h-8 w-fit shrink-0">
-          <TabsTrigger value="paste" className="h-7 px-3 text-xs">
+          <TabsTrigger value="paste" className="h-7 px-3 text-sm">
             {discoveryComposerUi.narrativeInputTitle}
           </TabsTrigger>
-          <TabsTrigger value="review" className="h-7 px-3 text-xs">
+          <TabsTrigger value="review" className="h-7 px-3 text-sm">
             {discoveryReviewUi.panelTitle}
             {activeReviewItems.length > 0 ? (
               <span className="bg-primary/10 text-primary ml-1.5 inline-flex min-w-4 justify-center rounded-full px-1 text-[10px] tabular-nums">
@@ -181,10 +181,10 @@ export function DiscoveryComposer({
         >
           <Card className="shadow-none">
             <CardHeader className="space-y-1 px-4 py-3">
-              <CardTitle className="text-sm">
+              <CardTitle className="text-base">
                 {discoveryComposerUi.narrativeInputTitle}
               </CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-sm">
                 {editable
                   ? discoveryComposerUi.draftDescription(
                       minProseRequired,
@@ -196,7 +196,7 @@ export function DiscoveryComposer({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 px-4 pb-3 pt-0">
-              <details className="rounded-md border border-zinc-200 bg-zinc-50/60 px-3 py-2 text-xs">
+              <details className="rounded-md border border-zinc-200 bg-zinc-50/60 px-3 py-2 text-sm">
                 <summary className="cursor-pointer font-medium text-zinc-800">
                   {discoveryComposerUi.helpToggle}
                 </summary>
@@ -216,7 +216,7 @@ export function DiscoveryComposer({
               </details>
 
               <div className="space-y-1.5">
-                <Label htmlFor="input-mode" className="text-xs">
+                <Label htmlFor="input-mode" className="text-sm">
                   {discoveryComposerUi.inputModeLabel}
                 </Label>
                 <Select
@@ -228,7 +228,7 @@ export function DiscoveryComposer({
                 >
                   <SelectTrigger
                     id="input-mode"
-                    className="h-8 w-full text-xs sm:w-72"
+                    className="h-8 w-full text-sm sm:w-72"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -255,7 +255,7 @@ export function DiscoveryComposer({
                       className="space-y-1.5 rounded-md border border-zinc-200 px-3 py-2"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <Label className="text-xs">
+                        <Label className="text-sm">
                           {discoveryComposerUi.excerptLabel(
                             excerpt.orderIndex + 1
                           )}
@@ -275,7 +275,7 @@ export function DiscoveryComposer({
                         </Button>
                       </div>
                       <Input
-                        className="h-8 text-xs"
+                        className="h-8 text-sm"
                         placeholder={
                           discoveryComposerUi.sourceLabelPlaceholder
                         }
@@ -292,7 +292,7 @@ export function DiscoveryComposer({
                         value={excerpt.text}
                         disabled={!editable}
                         rows={3}
-                        className="text-xs"
+                        className="text-sm leading-relaxed"
                         onChange={(e) =>
                           updateExcerpt(index, { text: e.target.value })
                         }
@@ -314,7 +314,7 @@ export function DiscoveryComposer({
               ) : null}
 
               <div className="space-y-1.5">
-                <Label htmlFor="operator-summary" className="text-xs">
+                <Label htmlFor="operator-summary" className="text-sm">
                   {narrative.inputMode === "approved_summary"
                     ? discoveryComposerUi.operatorSummaryRequired
                     : discoveryComposerUi.operatorSummaryOptional}
@@ -327,7 +327,7 @@ export function DiscoveryComposer({
                   value={narrative.operatorSummary ?? ""}
                   disabled={!editable}
                   rows={4}
-                  className="text-xs"
+                  className="text-sm leading-relaxed"
                   onChange={(e) =>
                     updateNarrative({
                       ...narrative,
@@ -352,7 +352,7 @@ export function DiscoveryComposer({
                   />
                   <Label
                     htmlFor="summary-attested"
-                    className="text-xs leading-snug"
+                    className="text-sm leading-snug"
                   >
                     {discoveryComposerUi.summaryAttested}
                   </Label>
@@ -436,7 +436,7 @@ export function DiscoveryComposer({
           className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
         >
           {!reviewReady ? (
-            <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-6 text-center text-xs text-zinc-500">
+            <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-6 text-center text-sm text-zinc-500">
               <p>{discoveryComposerUi.emptyReviewHint}</p>
               <Button
                 type="button"

@@ -9,6 +9,7 @@ import {
   parsePortraitPrepProposal,
 } from "@/lib/prompts/character-portrait-prep"
 import { createSupabaseServerClient } from "@/lib/supabase-server"
+import { workTitleAndConventionFromRow } from "@/lib/prompts/work-visual-convention"
 
 export type ProposeCharacterPortraitPrepResult =
   | { ok: true; description: string; visualIdentity: string }
@@ -81,20 +82,17 @@ export async function proposeCharacterPortraitPrep(input: {
     return { ok: false, message: "未登录，无法纠偏简介。" }
   }
 
-  let workTitle = parsed.data.workTitle
-  if (!workTitle) {
-    const { data: work } = await supabase
-      .from("works")
-      .select("title")
-      .eq("id", parsed.data.workId)
-      .maybeSingle()
-    if (work && typeof (work as { title?: string }).title === "string") {
-      workTitle = (work as { title: string }).title
-    }
-  }
+  const { data: work } = await supabase
+    .from("works")
+    .select("title, visual_convention")
+    .eq("id", parsed.data.workId)
+    .maybeSingle()
+  const { title, visualConvention } = workTitleAndConventionFromRow(work)
+  const workTitle = parsed.data.workTitle ?? title
 
   const prompt = buildPortraitPrepProposePrompt({
     workTitle,
+    visualConvention,
     name: parsed.data.name,
     house: parsed.data.house,
     description: parsed.data.description,

@@ -48,8 +48,7 @@ describe("frame draft prompt (derived Job input)", () => {
     });
     expect(prompt).toContain("街垒夜战");
     expect(prompt).toContain("Scene:");
-    expect(prompt).toMatch(/VISUAL LOCK/i);
-    expect(prompt.indexOf("VISUAL LOCK")).toBeLessThan(prompt.indexOf("Scene:"));
+    expect(prompt).not.toMatch(/VISUAL LOCK/i);
     expect(prompt).toMatch(/cinematic historical|painterly/i);
     expect(prompt).not.toMatch(/digital illustration/i);
     expect(prompt).not.toContain("巴黎起义");
@@ -65,8 +64,8 @@ describe("frame draft prompt (derived Job input)", () => {
       projectionProfile: "local",
     });
     expect(prompt).not.toMatch(/recruitment notice/i);
-    expect(prompt).toMatch(/blank wooden board|no writing/i);
-    expect(prompt).toMatch(/VISUAL LOCK/i);
+    expect(prompt).toMatch(/blank unmarked board|no writing/i);
+    expect(prompt).not.toMatch(/VISUAL LOCK/i);
   });
 
   it("requires caption meaning via non-empty caption string", () => {

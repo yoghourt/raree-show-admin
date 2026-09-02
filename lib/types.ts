@@ -7,6 +7,8 @@ export type Work = {
   description: string;
   coverImage: string;
   sourceProfileId: string | null;
+  /** Creator-only visual convention (style/era/forbids). Not Reader copy. */
+  visualConvention: string;
   createdAt: string;
 };
 

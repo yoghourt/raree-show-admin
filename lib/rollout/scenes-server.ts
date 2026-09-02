@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
 import type {
   RendererExpression,
   VisualIntent,
@@ -199,7 +200,9 @@ export async function nextChapterNumber(
 
   if (error) throw new Error(error.message);
   const max = (data as { chapter_number?: number } | null)?.chapter_number;
-  return typeof max === "number" && max >= 1 ? max + 1 : 1;
+  return typeof max === "number" && isValidSceneChapterNumber(max)
+    ? max + 1
+    : 1;
 }
 
 export async function nextOrderIndexInChapter(

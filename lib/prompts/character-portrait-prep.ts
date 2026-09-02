@@ -6,11 +6,13 @@
 
 import { AVATAR_APPEARANCE_MAX_CHARS } from "@/lib/prompts/avatar";
 import { parseVisualIdentityProposal } from "@/lib/prompts/visual-identity-propose";
+import { workVisualConventionProposeBlock } from "@/lib/prompts/work-visual-convention";
 
 export const READER_DESCRIPTION_MAX_CHARS = 280;
 
 export type PortraitPrepProposeInput = {
   workTitle?: string;
+  visualConvention?: string;
   name: string;
   house?: string;
   description?: string;
@@ -103,6 +105,8 @@ export function buildPortraitPrepProposePrompt(
   const description = input.description?.trim() || "(none)";
   const current = input.currentVisualIdentity?.trim() || "(empty)";
   const note = input.operatorNote?.trim() || "(none)";
+  const conventionBlock = workVisualConventionProposeBlock(input.visualConvention);
+  const conventionLead = conventionBlock ? `\n${conventionBlock}\n` : "";
 
   return `You prepare a character for Creator portrait generation.
 Return JSON only (no preamble):
@@ -111,7 +115,7 @@ Return JSON only (no preamble):
   "visualIdentity": "FACE: …\\nCOSTUME: …\\nPROP: …\\nSTYLE: …"
 }
 
-Work: ${work}
+Work: ${work}${conventionLead}
 Character name: ${name}
 House/faction: ${house}
 Current Reader description (may be polluted with look/age — rewrite it): ${description}
@@ -120,16 +124,16 @@ Operator revision note (must honor if present): ${note}
 
 description (Reader bio):
 - 1–2 short English sentences: story role, faction, relationships.
-- FORBIDDEN: age (young/old/middle-aged), looks (handsome, chiseled, beard, hair), costume, weapons, camera, "military commander" as a visual slogan.
-- Example: "Chancellor of Wei who seizes the Han court by cunning and force." not "Astute young military commander."
+- FORBIDDEN: age (young/old/middle-aged), looks (handsome, chiseled, beard, hair), costume, weapons, camera.
+- Rewrite look-stuffed bios into who they are in THIS work's plot (role, faction, relationships).
 - Max ${READER_DESCRIPTION_MAX_CHARS} characters.
 
 visualIdentity (Creator portrait cues — NOT Reader prose):
 - Labeled lines in order FACE, COSTUME, PROP, STYLE. Omit SUMMARY.
-- FACE from the work's stable visual tradition (historical novel / opera / illustration canon) + this name — NOT from Reader description adjectives.
-- Do NOT copy "young" / idol-handsome FACE from the current description or draft when tradition is a recognizable older or bearded figure.
-- If current draft FACE is a generic youthful commander that contradicts tradition, replace it.
-- STYLE: one short painterly clause.
+- FACE from THIS work's visual tradition + this name — NOT from Reader description adjectives.
+- Do NOT copy "young" / idol-handsome FACE from the current description or draft when THIS work's tradition is a recognizable older or bearded figure.
+- If current draft FACE is a generic youthful commander that contradicts THIS work, replace it.
+- STYLE: one short clause matching THIS work.
 - Hard limit: visualIdentity MUST be ≤ ${AVATAR_APPEARANCE_MAX_CHARS} characters.
-- Example: "FACE: ruddy bronze complexion with pores, long beard.\\nCOSTUME: green battle robe.\\nPROP: Green Dragon Crescent Blade.\\nSTYLE: painterly digital painting."`.trim();
+- Example format (fill from THIS work; do not copy sample looks): "FACE: …\\nCOSTUME: …\\nPROP: …\\nSTYLE: painterly digital painting."`.trim();
 }

@@ -10,6 +10,7 @@ const work = (overrides: Partial<Work> = {}): Work => ({
   description: "",
   coverImage: "https://example.com/cover.jpg",
   sourceProfileId: null,
+  visualConvention: "",
   createdAt: "",
   ...overrides,
 });
