@@ -25,6 +25,7 @@ import {
   FULL_FACE_SCENE_PATTERN,
   pinIdentityLocks,
   pinRelativeAgeContrast,
+  promoteDistinctiveGarments,
   remapGenericRolesToRoleNames,
   sharpenExpressionAnchors,
 } from "@/lib/discovery/expression-capability-rules";
@@ -712,6 +713,44 @@ describe("rendererExpressionToPrompt", () => {
     expect(drafted.length).toBeLessThanOrEqual(
       Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars + 200
     );
+  });
+
+  it("keeps distinctive silhouettes when three figures share a cloak", () => {
+    const expression = {
+      environment: "Haunted forest beyond the Wall at falling night, deep snow",
+      action:
+        "Will, Gared, and Ser Waymar Royce standing in a bare snowy forest clearing",
+      composition: "very wide shot, three small figures dwarfed by dark forest",
+      characters: [
+        {
+          role: "Will",
+          visual:
+            "standing left, cropped brown hair, all-black Night's Watch wool cloak, dark leather jerkin, fur collar",
+        },
+        {
+          role: "Gared",
+          visual:
+            "center, hooded black wool cloak, rough black wool tunic, boiled leather",
+        },
+        {
+          role: "Ser Waymar Royce",
+          visual:
+            "standing right, younger, nobleman armor, black cloak, grey mail, sheathed steel sword",
+        },
+      ],
+    };
+    const pinned = promoteDistinctiveGarments(expression);
+    const will = pinned.characters[0]?.visual ?? "";
+    expect(will.indexOf("fur collar")).toBeLessThan(will.indexOf("wool cloak"));
+    const waymar = pinned.characters[2]?.visual ?? "";
+    expect(waymar.indexOf("nobleman armor")).toBeLessThan(waymar.indexOf("black cloak"));
+
+    const prompt = expressionToPrompt(expression, "local");
+    expect(prompt).toMatch(/different silhouettes/i);
+    expect(prompt).toMatch(/not matching outfits/i);
+    expect(prompt).toMatch(/fur collar/i);
+    expect(prompt).toMatch(/nobleman armor/i);
+    expect(prompt).toMatch(/hooded black wool cloak/i);
   });
 });
 

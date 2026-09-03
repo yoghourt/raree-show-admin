@@ -11,6 +11,7 @@ import {
   captionAgencyOnlyNames,
   captionOnStageNames,
   captionProperNamePhrases,
+  costumeLookFromIdentity,
   findLifeStageContradictions,
   lifeStageLookFromIdentity,
   parseFrameExpressionProposal,
@@ -136,6 +137,9 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/Rule 15/);
     expect(p).toMatch(/Living vs undead/);
     expect(p).toMatch(/three living humans in black/);
+    expect(p).toMatch(/Rule 16/);
+    expect(p).toMatch(/Wardrobe is identity/);
+    expect(p).toMatch(/same distinctive silhouettes as looks/);
   });
 
   it("lists life-stage from Work looks as a must-keep identity cue", () => {
@@ -348,6 +352,73 @@ describe("life-stage identity", () => {
       []
     );
     expect(errors.join(" ")).toMatch(/white\/silver hair leaked/i);
+  });
+
+  it("strips a matching cloak from armor/mail looks that do not wear a cloak", () => {
+    expect(
+      costumeLookFromIdentity("FACE: young lord.\nCOSTUME: nobleman armor, grey mail.")
+    ).toMatch(/nobleman armor/i);
+
+    const folded = applyCharacterLifeStageLooks(
+      {
+        environment: "bare snowy clearing",
+        characters: [
+          {
+            role: "Will",
+            visual: "standing left, all-black Night's Watch wool cloak, fur collar",
+          },
+          {
+            role: "Ser Waymar Royce",
+            visual: "standing right, black cloak, nobleman armor",
+          },
+        ],
+        action: "standing in empty snow",
+        composition: "wide",
+      },
+      [
+        {
+          name: "Will",
+          visualIdentity: "COSTUME: all-black Night's Watch wool cloak, fur collar.",
+        },
+        {
+          name: "Ser Waymar Royce",
+          visualIdentity: "COSTUME: nobleman armor, grey mail.",
+        },
+      ]
+    );
+    expect(folded.characters[0]?.visual).toMatch(/wool cloak/i);
+    expect(folded.characters[1]?.visual).toMatch(/nobleman armor/i);
+    expect(folded.characters[1]?.visual).toMatch(/grey mail/i);
+    expect(folded.characters[1]?.visual).not.toMatch(/black cloak/i);
+  });
+
+  it("flags a matching cloak leaked onto armor/mail looks", () => {
+    const errors = findLifeStageContradictions(
+      {
+        environment: "snow",
+        characters: [
+          {
+            role: "Will",
+            visual: "standing left, all-black wool cloak",
+          },
+          {
+            role: "Ser Waymar Royce",
+            visual: "standing right, black cloak, plate",
+          },
+        ],
+        action: "standing",
+        composition: "wide",
+      },
+      [
+        { name: "Will", visualIdentity: "COSTUME: black wool cloak." },
+        {
+          name: "Ser Waymar Royce",
+          visualIdentity: "COSTUME: nobleman armor, grey mail.",
+        },
+      ]
+    );
+    expect(errors.join(" ")).toMatch(/matching cloak leaked/i);
+    expect(errors.join(" ")).toMatch(/Ser Waymar Royce/);
   });
 });
 

@@ -272,7 +272,7 @@ function isStubCastVisual(visual: string): boolean {
 }
 
 const GARMENT_TOKEN =
-  /\b(cloak|hood|robe|armor|armour|gown|tunic|mail|shroud)\b/gi;
+  /\b(cloak|hood|robe|armor|armour|gown|tunic|mail|shroud|fur|jerkin|collar)\b/gi;
 
 function garmentTokens(visual: string): Set<string> {
   return new Set(
@@ -280,15 +280,20 @@ function garmentTokens(visual: string): Set<string> {
   );
 }
 
-/** Dual-cast Local prior: copy the first figure's cloak onto everyone. */
-function dualCastNeedsCostumeContrast(visuals: string[]): boolean {
-  if (visuals.length !== 2) return false;
-  const a = garmentTokens(visuals[0]!);
-  const b = garmentTokens(visuals[1]!);
-  if (a.size === 0 && b.size === 0) return false;
-  if (a.size !== b.size) return true;
-  for (const token of a) {
-    if (!b.has(token)) return true;
+/** Dual/multi-cast Local prior: copy the first figure's cloak onto everyone. */
+function castNeedsCostumeContrast(visuals: string[]): boolean {
+  if (visuals.length < 2) return false;
+  const sets = visuals.map(garmentTokens);
+  if (sets.every((s) => s.size === 0)) return false;
+  const first = sets[0]!;
+  for (const other of sets.slice(1)) {
+    if (other.size !== first.size) return true;
+    for (const token of first) {
+      if (!other.has(token)) return true;
+    }
+    for (const token of other) {
+      if (!first.has(token)) return true;
+    }
   }
   return false;
 }
@@ -334,8 +339,8 @@ function joinLocalPrompt(
     ),
     cap.compositionMaxChars
   );
-  const contrast = dualCastNeedsCostumeContrast(visuals)
-    ? "different silhouettes"
+  const contrast = castNeedsCostumeContrast(visuals)
+    ? "different silhouettes, not matching outfits"
     : "";
   const perch = isVerticalTreeCamera(re) ? "living perch not a fallen log" : "";
   const environment = clipLocalBudgetText(

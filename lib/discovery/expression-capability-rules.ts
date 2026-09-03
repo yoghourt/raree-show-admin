@@ -191,6 +191,17 @@ the unmarked figure MUST stay a living human.
 Bad: three living rangers among frozen wildlings; leftmost ranger corpse-white with long
 silver hair (an Other inserted into the patrol).
 Good: three living humans in black; cropped brown hair stays brown; the dead stay on the snow.
+
+Rule 16 — Wardrobe is identity across beats:
+Costume class is standing identity, not a per-beat rewrite. A new caption changes pose,
+place, and whether bodies are on the snow — not who wears plate vs wool vs fur.
+FORBIDDEN: putting the same cloak on every figure when looks differ (plate / mail vs
+fur collar vs hood). Shared Watch-black is allowed only if each figure keeps a
+distinctive second garment. Do not copy a peer's cloak onto a figure whose looks
+are armor or mail without a cloak.
+Bad: previous still had fur-collar cloak, leather, and plate; next still puts black
+cloak on all three and the plate disappears.
+Good: same distinctive silhouettes as looks; empty clearing is the beat, not a costume change.
 `.trim();
 
 /**
@@ -641,10 +652,12 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
   );
 }
 
-/** Age, living/undead, and authored hair color — execute and propose persist. */
+/** Age, living/undead, hair, and distinctive costume order — execute and propose persist. */
 export function pinIdentityLocks<T extends ExpressionLike>(expression: T): T {
-  return pinAuthoredHairColor(
-    pinLivingCastAgainstUndeadPrior(pinRelativeAgeContrast(expression))
+  return promoteDistinctiveGarments(
+    pinAuthoredHairColor(
+      pinLivingCastAgainstUndeadPrior(pinRelativeAgeContrast(expression))
+    )
   );
 }
 
@@ -797,6 +810,87 @@ export function findUndeadIdentityLeaks<T extends ExpressionLike>(
     if (/\b(wight|undead|white walker|dead face|gaunt pale)\b/i.test(ch.visual)) {
       errors.push(
         `${ch.role}: undead marks leaked onto a figure that is not the authored undead`
+      );
+    }
+  }
+  return errors;
+}
+
+const DISTINCTIVE_GARMENT_PATTERN =
+  /\b(fur collar|hooded|plate|armor|armour|mail|chainmail|jerkin|boiled leather)\b/i;
+
+function isDistinctiveGarmentPart(part: string): boolean {
+  return DISTINCTIVE_GARMENT_PATTERN.test(part);
+}
+
+function isSharedCloakPart(part: string): boolean {
+  return /\bcloak\b/i.test(part) && !isDistinctiveGarmentPart(part);
+}
+
+function sharedCloakCount<T extends ExpressionLike>(expression: T): number {
+  return (expression.characters ?? []).filter((ch) =>
+    ch.visual
+      .split(",")
+      .map((s) => s.trim())
+      .some((p) => isSharedCloakPart(p) || /\bcloak\b/i.test(p))
+  ).length;
+}
+
+/**
+ * When two or more figures share a cloak, put distinctive silhouette tokens
+ * (fur collar, hood, plate, mail) before the shared cloak so Local does not
+ * paint matching Watch-black on everyone.
+ */
+export function promoteDistinctiveGarments<T extends ExpressionLike>(
+  expression: T
+): T {
+  const chars = expression.characters ?? [];
+  if (chars.length < 2) return expression;
+  if (sharedCloakCount(expression) < 2) return expression;
+  return {
+    ...expression,
+    characters: chars.map((ch) => {
+      const parts = ch.visual
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length < 2) return ch;
+      const pose = parts[0]!;
+      const rest = parts.slice(1);
+      const distinctive = rest.filter((p) => isDistinctiveGarmentPart(p));
+      const cloaks = rest.filter((p) => isSharedCloakPart(p));
+      const other = rest.filter(
+        (p) => !isDistinctiveGarmentPart(p) && !isSharedCloakPart(p)
+      );
+      if (distinctive.length === 0) return ch;
+      return {
+        ...ch,
+        visual: [pose, ...distinctive, ...cloaks, ...other].join(", "),
+      };
+    }),
+  };
+}
+
+export function findMatchingCloakLeaks<T extends ExpressionLike>(
+  expression: T,
+  characterCues: Array<{ name: string; visualIdentity?: string }>
+): string[] {
+  const chars = expression.characters ?? [];
+  if (sharedCloakCount(expression) < 2) return [];
+  const errors: string[] = [];
+  for (const ch of chars) {
+    const cue = characterCues.find((c) => {
+      const r = ch.role.trim().toLowerCase();
+      const n = c.name.trim().toLowerCase();
+      return r === n || r.includes(n) || n.includes(r);
+    });
+    const costume = cue?.visualIdentity?.match(/COSTUME:\s*([^\n]+)/i)?.[1] ?? "";
+    const looksArmor = /\b(armor|armour|mail|plate)\b/i.test(costume);
+    const looksCloak = /\bcloak\b/i.test(costume);
+    if (!looksArmor || looksCloak) continue;
+    if (ch.visual.split(",").some((p) => isSharedCloakPart(p))) {
+      errors.push(
+        `${ch.role}: matching cloak leaked onto a figure whose looks are armor/mail without a cloak`
       );
     }
   }

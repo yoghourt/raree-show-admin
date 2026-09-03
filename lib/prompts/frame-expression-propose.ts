@@ -10,6 +10,7 @@ import {
   ADULT_FACE_LEAK_PATTERN,
   WEATHERED_AGE_PATTERN,
   findUndeadIdentityLeaks,
+  findMatchingCloakLeaks,
 } from "@/lib/discovery/expression-capability-rules";
 import { clipLocalBudgetText } from "@/lib/discovery/execution-projection";
 import {
@@ -168,7 +169,69 @@ export function findLifeStageContradictions(
     }
   }
   errors.push(...findUndeadIdentityLeaks(expression));
+  errors.push(...findMatchingCloakLeaks(expression, characterCues));
   return errors;
+}
+
+export function costumeLookFromIdentity(
+  visualIdentity: string | undefined
+): string | null {
+  const raw = visualIdentity?.match(/COSTUME:\s*([^\n]+)/i)?.[1]?.trim() ?? "";
+  if (!raw) return null;
+  const compact = raw.replace(/\.$/, "").trim();
+  return compact ? compact : null;
+}
+
+function looksArmorWithoutCloak(costume: string): boolean {
+  return (
+    /\b(armor|armour|mail|plate)\b/i.test(costume) && !/\bcloak\b/i.test(costume)
+  );
+}
+
+function stripSharedCloakParts(visual: string): string {
+  return visual
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter(
+      (p) =>
+        !(/\bcloak\b/i.test(p) &&
+          !/\b(fur collar|hooded|plate|armor|armour|mail|chainmail|jerkin|boiled leather)\b/i.test(
+            p
+          ))
+    )
+    .join(", ");
+}
+
+function applyCostumeFromLooks(
+  expression: RendererExpression,
+  characterCues: Array<{ name: string; visualIdentity?: string }>
+): RendererExpression {
+  return {
+    ...expression,
+    characters: expression.characters.map((ch) => {
+      const cue = characterCues.find((c) => cueMatchesRole(ch.role, c.name));
+      const costume = costumeLookFromIdentity(cue?.visualIdentity);
+      if (!costume) return ch;
+      let visual = looksArmorWithoutCloak(costume)
+        ? stripSharedCloakParts(ch.visual)
+        : ch.visual;
+      const costumeParts = costume
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const missing = costumeParts.filter(
+        (part) => !new RegExp(escapeRegExp(part), "i").test(visual)
+      );
+      if (missing.length === 0) return { ...ch, visual };
+      const parts = visual
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const pose = parts[0] || "standing";
+      return { ...ch, visual: [pose, ...missing, ...parts.slice(1)].join(", ") };
+    }),
+  };
 }
 
 /** Put archive life-stage immediately after pose so Local clip keeps it. */
@@ -179,7 +242,7 @@ export function applyCharacterLifeStageLooks(
   if (!characterCues.length) {
     return pinIdentityLocks(expression);
   }
-  return pinIdentityLocks({
+  const withStage = {
     ...expression,
     characters: expression.characters.map((ch) => {
       const cue = characterCues.find((c) => cueMatchesRole(ch.role, c.name));
@@ -200,7 +263,8 @@ export function applyCharacterLifeStageLooks(
         visual: [pose, stage, ...rest].join(", "),
       };
     }),
-  });
+  };
+  return pinIdentityLocks(applyCostumeFromLooks(withStage, characterCues));
 }
 
 function extractJsonObject(raw: string): unknown {
@@ -345,6 +409,7 @@ Rules:
 - Apparent age / life-stage is identity. After pose, the next look cue MUST keep child/youth/elder tokens from Work looks. Title (Emperor, King) MUST NOT default to a mature bearded adult. FORBIDDEN: grey goatee / lined middle-aged face / "mournful features" as a substitute for a boy emperor.
 - Relative age across the still is identity. If one figure's visual has weathered / silver beard / grey hair and another's does not, the unmarked figure MUST stay younger (no grey hair, no silver beard). FORBIDDEN: moving those marks onto the figure whose visual lacks them.
 - Living vs undead is identity. If a figure's visual does not name corpse / dead face / glowing / gaunt pale, they are living. FORBIDDEN: corpse-white skin or long white/silver hair on a living ranger in a haunted / frozen-bodies still. "pale face" means a weathered living complexion. Hair color tokens MUST stay. Frozen bodies on the ground are the dead — not a named living figure.
+- Wardrobe is identity across beats. A new caption changes pose and place, not costume class. FORBIDDEN: putting the same cloak on every figure when looks differ (plate vs fur collar vs hood). Shared black is allowed only with a distinctive second garment. Do not copy a peer's cloak onto armor/mail looks.
 
 Structural counterexamples (geometry only — do not copy their era, costumes, or place names into this work):
 WRONG beat example (do not do this):
@@ -378,6 +443,11 @@ WRONG living/undead (do not do this):
 caption: three rangers discover frozen wildlings in a haunted forest.
 bad: leftmost ranger corpse-white, long silver hair, an Other inserted into the patrol.
 good: three living humans in black; cropped brown hair stays brown; frozen bodies stay on the snow.
+
+WRONG wardrobe rewrite (do not do this):
+caption: the rangers return to the camp; the bodies have vanished.
+bad: every figure in the same black cloak; plate/mail from looks dropped.
+good: same distinctive silhouettes as looks (fur collar vs hood vs plate); empty snow is the beat.
 
 ${EXPRESSION_CAPABILITY_RULES}
 
