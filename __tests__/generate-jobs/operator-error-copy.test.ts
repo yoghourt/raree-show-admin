@@ -34,6 +34,17 @@ describe("formatGenerateJobErrorForOperator", () => {
     );
   });
 
+  it("does not mislabel Cloudinary hosting timeout as LocalAI / MAX_EDGE", () => {
+    const stored =
+      "画面已生成，但托管失败：fetch failed (Connect Timeout Error (attempted address: api.cloudinary.com:443, timeout: 10000ms), UND_ERR_CONNECT_TIMEOUT) — 与 Google API 的 TCP 连接在超时时间内未建立";
+    const msg = formatGenerateJobErrorForOperator(stored);
+    expect(msg).toMatch(/Cloudinary/);
+    expect(msg).toMatch(/托管失败/);
+    expect(msg).not.toMatch(/可降低 IMAGE_CREATOR_LOCALAI_MAX_EDGE/);
+    expect(msg).not.toMatch(/LocalAI 仍在计算/);
+    expect(msg).not.toMatch(/本地出图超时/);
+  });
+
   it("passes through already-friendly Chinese", () => {
     const msg =
       "本地出图失败：生成出了空白白图（几乎没有画面内容），已自动拒绝。可「附修改意见重试」。";
@@ -56,6 +67,16 @@ describe("formatImageAttemptError", () => {
     const msg = formatImageAttemptError(timeout);
     expect(msg).toContain("单独重试");
     expect(msg).not.toContain("MAX_EDGE");
+  });
+
+  it("maps attempt-level Cloudinary errors the same way", () => {
+    const err = new Error(
+      "Cloudinary upload failed: Connect Timeout Error (attempted address: api.cloudinary.com:443)"
+    );
+    expect(formatImageAttemptError(err)).toMatch(/托管失败/);
+    expect(formatImageAttemptError(err)).not.toMatch(
+      /可降低 IMAGE_CREATOR_LOCALAI_MAX_EDGE/
+    );
   });
 
   it("still maps true missing-base errors", () => {

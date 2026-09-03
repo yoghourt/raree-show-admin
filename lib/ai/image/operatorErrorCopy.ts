@@ -44,7 +44,13 @@ function softSkipOperatorMessage(raw: string): string | null {
   return null;
 }
 
+function hostingOperatorMessage(raw: string): string | null {
+  if (!/托管失败|cloudinary|api\.cloudinary\.com/i.test(raw)) return null;
+  return "画面已生成，但图片托管失败（连不上 Cloudinary）。请检查到 api.cloudinary.com 的网络或 HTTPS_PROXY 后重试；不必降低 IMAGE_CREATOR_LOCALAI_MAX_EDGE。";
+}
+
 function timeoutOperatorMessage(raw: string): string | null {
+  if (hostingOperatorMessage(raw)) return null;
   if (!/timed out|timeout/i.test(raw)) return null;
   // Scene frames already request 512² — MAX_EDGE advice is usually a red herring.
   if (/size\s*512\s*x\s*512/i.test(raw)) {
@@ -62,6 +68,8 @@ export function formatImageAttemptError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
   const soft = softSkipOperatorMessage(raw);
   if (soft) return soft;
+  const hosting = hostingOperatorMessage(raw);
+  if (hosting) return hosting;
   const timeout = timeoutOperatorMessage(raw);
   if (timeout) return timeout;
   // Already operator-facing blank copy
@@ -114,6 +122,9 @@ export function formatGenerateJobErrorForOperator(
   if (error == null) return null;
   const raw = error.trim();
   if (!raw) return null;
+
+  const hosting = hostingOperatorMessage(raw);
+  if (hosting) return hosting;
 
   // Timeout must win over soft-skip substring false positives in stored English.
   const timeout = timeoutOperatorMessage(raw);
