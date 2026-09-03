@@ -131,6 +131,8 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/Rule 14/);
     expect(p).toMatch(/boy emperor about nine/);
     expect(p).toMatch(/grey goatee/);
+    expect(p).toMatch(/Relative age/);
+    expect(p).toMatch(/unmarked figure MUST stay younger/);
   });
 
   it("lists life-stage from Work looks as a must-keep identity cue", () => {
@@ -229,6 +231,68 @@ describe("life-stage identity", () => {
       [{ name: "Emperor Xian", visualIdentity: "FACE: child emperor." }]
     );
     expect(errors.join(" ")).toMatch(/adult face/i);
+  });
+
+  it("pins relative youth when a peer is weathered", () => {
+    const folded = applyCharacterLifeStageLooks(
+      {
+        environment: "snowy forest clearing",
+        characters: [
+          {
+            role: "Jon Snow",
+            visual:
+              "standing left, holding a small dark direwolf pup, black cloak",
+          },
+          {
+            role: "Lord Eddard",
+            visual:
+              "standing right, weathered northern face, dark beard with silver, thick fur cloak",
+          },
+        ],
+        action: "Jon holds a pup and urges Ned",
+        composition: "medium-wide",
+      },
+      [
+        {
+          name: "Jon Snow",
+          visualIdentity: "FACE: long face, dark hair. COSTUME: black cloak.",
+        },
+        {
+          name: "Lord Eddard",
+          visualIdentity:
+            "FACE: weathered northern lord, dark beard with silver.",
+        },
+      ]
+    );
+    expect(folded.characters[0]?.visual).toMatch(/^standing left/i);
+    expect(folded.characters[0]?.visual).toMatch(/younger/i);
+    expect(folded.characters[0]?.visual).toMatch(/no grey hair/i);
+    expect(folded.characters[0]?.visual).not.toMatch(/weathered/i);
+    expect(folded.characters[1]?.visual).toMatch(/weathered/i);
+    expect(folded.characters[1]?.visual).toMatch(/dark beard with silver/i);
+  });
+
+  it("flags grey/weathered leaking onto the unmarked figure", () => {
+    const errors = findLifeStageContradictions(
+      {
+        environment: "snow",
+        characters: [
+          {
+            role: "Jon Snow",
+            visual: "standing left, holding a pup, grey beard, black cloak",
+          },
+          {
+            role: "Lord Eddard",
+            visual: "standing right, weathered northern face, thick fur cloak",
+          },
+        ],
+        action: "Jon urges Ned",
+        composition: "medium-wide",
+      },
+      []
+    );
+    expect(errors.join(" ")).toMatch(/leaked/i);
+    expect(errors.join(" ")).toMatch(/Jon Snow/);
   });
 });
 

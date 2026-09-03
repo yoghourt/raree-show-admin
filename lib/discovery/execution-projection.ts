@@ -293,18 +293,34 @@ function dualCastNeedsCostumeContrast(visuals: string[]): boolean {
   return false;
 }
 
+function rolePrefixedVisual(
+  role: string,
+  visual: string,
+  cap: RendererCapability
+): string {
+  const name = clipLocalBudgetText(role.trim(), cap.roleMaxChars);
+  const body = clipLocalBudgetText(
+    stripExactlyFigureCues(capPart(visual, cap.visualMaxChars)),
+    cap.visualMaxChars
+  );
+  if (!body || isStubCastVisual(body)) return "";
+  if (!name) return body;
+  if (new RegExp(`^${escapeRegExp(name)}\\b`, "i").test(body)) {
+    return body;
+  }
+  return clipLocalBudgetText(
+    `${name} ${body}`,
+    cap.visualMaxChars + cap.roleMaxChars
+  );
+}
+
 function joinLocalPrompt(
   re: RendererExpression,
   cap: RendererCapability
 ): string {
   const visuals = (re.characters ?? [])
-    .map((c) =>
-      clipLocalBudgetText(
-        stripExactlyFigureCues(capPart(c.visual, cap.visualMaxChars)),
-        cap.visualMaxChars
-      )
-    )
-    .filter((visual) => !isStubCastVisual(visual));
+    .map((c) => rolePrefixedVisual(c.role, c.visual, cap))
+    .filter(Boolean);
 
   const action = packActionNamingCast(
     stripExactlyFigureCues(capPart(re.action ?? "", cap.actionMaxChars * 2)),
@@ -358,15 +374,29 @@ function assembleLocalPromptBody(parts: {
   contrast: string;
   emphasis: string;
 }): string {
-  const joined = [
-    parts.visuals.join("; "),
-    parts.action,
-    parts.environment,
-    parts.composition,
-    parts.perch,
-    parts.contrast,
-    parts.emphasis,
-  ].filter(Boolean);
+  const cast = parts.visuals.join("; ");
+  const dual = parts.visuals.length >= 2;
+  const joined = (
+    dual
+      ? [
+          parts.action,
+          cast,
+          parts.environment,
+          parts.composition,
+          parts.perch,
+          parts.contrast,
+          parts.emphasis,
+        ]
+      : [
+          cast,
+          parts.action,
+          parts.environment,
+          parts.composition,
+          parts.perch,
+          parts.contrast,
+          parts.emphasis,
+        ]
+  ).filter(Boolean);
   if (!joined.length) return "";
   return `${joined.join(". ")}.`;
 }

@@ -163,10 +163,15 @@ Good: Ding Yuan left pointing, Lü Bu in front of him, Dong Zhuo right, executio
 
 Rule 14 — Life-stage is identity (anti adult default):
 Apparent age / life-stage is a Tier-1 identity cue, not mood or costume.
-Title (Emperor, King, Empress, Prince) MUST NOT default to a mature bearded adult.
+Title (Emperor, King, Empress, Prince, Lord) MUST NOT default to a mature bearded adult.
 If Work archive or visual identity names child, boy, girl, youth, aged, or elder,
 those tokens MUST appear in characters[].visual immediately after pose — they outrank
 robes and "mournful features" and MUST survive Local compression.
+Relative age across the still is identity. If one figure's visual has weathered /
+silver beard / grey hair and another's does not, the unmarked figure MUST stay
+younger. FORBIDDEN: moving grey hair or a weathered face onto the figure whose
+visual lacks those tokens (son painted older than father; youth holding a prop
+given the lord's silver beard).
 FORBIDDEN: inventing grey beard, lined middle-aged face, or an adult mournful emperor
 when looks mark that ruler as a child/youth, or when the beat elevates/installs a
 named emperor whose looks do not say adult.
@@ -340,7 +345,16 @@ function hardCapAtBoundary(text: string, maxLen: number): string {
 
 /** Body / face marks that carry character identity (cross-work). */
 const IDENTITY_BODY_PATTERN =
-  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|\bgaunt\b|\bpale\b|auburn\s+hair|white\s+hair|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
+  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|\bgaunt\b|\bpale\b|auburn\s+hair|white\s+hair|grey hair|gray hair|no grey hair|no gray hair|silver beard|younger|youthful|beardless|weathered|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
+
+/** Authored elder/weathered marks — must not drift onto the other figure. */
+export const WEATHERED_AGE_PATTERN =
+  /\b(weathered|grey-streaked|gray-streaked|(?:dark\s+)?beard with silver|(?<!\bno\s)silver(?:ed)?\s+(?:in\s+(?:the\s+)?beard|beard)|white-haired|elderly|lined (?:face|complexion)|(?<!\bno\s)(?:grey|gray) hair)\b/i;
+
+export const RELATIVE_YOUTH_PIN = "younger, no grey hair, no silver beard";
+
+export const ADULT_FACE_LEAK_PATTERN =
+  /\b(middle-?aged|lined (?:face|complexion)|old man|(?<!\bno\s)(?:(?:grey|gray)(?:-streaked)?\s+(?:goatee|beard|hair)|white beard|silver beard))\b/i;
 
 /** Costume class (Tier 2). */
 const COSTUME_CUE_PATTERN =
@@ -564,14 +578,56 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
 
   action = hardCapAtBoundary(action, budgets.actionMaxChars);
 
-  return sharpenExpressionAnchors(
-    {
-      ...expression,
-      action: action || expression.action,
-      composition: composition || expression.composition,
-    },
-    budgets
+  return pinRelativeAgeContrast(
+    sharpenExpressionAnchors(
+      {
+        ...expression,
+        action: action || expression.action,
+        composition: composition || expression.composition,
+      },
+      budgets
+    )
   );
+}
+
+/**
+ * When one figure is authored weathered/silver and another is not, pin youth
+ * on the unmarked figure so execute cannot swap the father's face onto the son.
+ * Does not invent age when nobody in the still has weathered marks.
+ */
+export function pinRelativeAgeContrast<T extends ExpressionLike>(
+  expression: T
+): T {
+  const chars = expression.characters ?? [];
+  if (chars.length < 2) return expression;
+  const weathered = chars.map((ch) => WEATHERED_AGE_PATTERN.test(ch.visual));
+  const weatheredCount = weathered.filter(Boolean).length;
+  if (weatheredCount === 0 || weatheredCount === chars.length) {
+    return expression;
+  }
+  return {
+    ...expression,
+    characters: chars.map((ch, i) => {
+      if (weathered[i]) return ch;
+      if (
+        /\byounger\b/i.test(ch.visual) &&
+        /\bno grey hair\b|\bno gray hair\b/i.test(ch.visual)
+      ) {
+        return ch;
+      }
+      const parts = ch.visual
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter(
+          (p) =>
+            !ADULT_FACE_LEAK_PATTERN.test(p) && !WEATHERED_AGE_PATTERN.test(p)
+        );
+      const pose = parts[0] || "standing";
+      const rest = parts.slice(1);
+      return { ...ch, visual: [pose, RELATIVE_YOUTH_PIN, ...rest].join(", ") };
+    }),
+  };
 }
 
 /**

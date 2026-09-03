@@ -6,6 +6,9 @@
 import {
   EXPRESSION_CAPABILITY_EXAMPLE,
   EXPRESSION_CAPABILITY_RULES,
+  pinRelativeAgeContrast,
+  ADULT_FACE_LEAK_PATTERN,
+  WEATHERED_AGE_PATTERN,
 } from "@/lib/discovery/expression-capability-rules";
 import { clipLocalBudgetText } from "@/lib/discovery/execution-projection";
 import {
@@ -111,7 +114,7 @@ const CHILD_LIFE_STAGE =
 const ELDER_LIFE_STAGE =
   /\b(elderly|elder(?:ly)?|aged man|aged woman|white-haired)\b/i;
 const ADULT_FACE_INVENTED =
-  /\b((?:grey|gray)(?:-streaked)?\s+(?:goatee|beard)|white beard|long beard|goatee|middle-?aged|lined (?:face|complexion)|old man)\b/i;
+  /\b((?:grey|gray)(?:-streaked)?\s+(?:goatee|beard|hair)|white beard|silver beard|long beard|goatee|middle-?aged|lined (?:face|complexion)|weathered|old man)\b/i;
 
 function cueMatchesRole(role: string, cueName: string): boolean {
   const r = role.trim().toLowerCase();
@@ -147,6 +150,22 @@ export function findLifeStageContradictions(
       );
     }
   }
+  const weathered = (expression.characters ?? []).filter((ch) =>
+    WEATHERED_AGE_PATTERN.test(ch.visual)
+  );
+  if (
+    weathered.length > 0 &&
+    weathered.length < (expression.characters?.length ?? 0)
+  ) {
+    for (const ch of expression.characters ?? []) {
+      if (WEATHERED_AGE_PATTERN.test(ch.visual)) continue;
+      if (ADULT_FACE_LEAK_PATTERN.test(ch.visual)) {
+        errors.push(
+          `${ch.role}: grey/weathered face leaked onto a figure that is not the authored elder`
+        );
+      }
+    }
+  }
   return errors;
 }
 
@@ -155,8 +174,10 @@ export function applyCharacterLifeStageLooks(
   expression: RendererExpression,
   characterCues: Array<{ name: string; visualIdentity?: string }>
 ): RendererExpression {
-  if (!characterCues.length) return expression;
-  return {
+  if (!characterCues.length) {
+    return pinRelativeAgeContrast(expression);
+  }
+  return pinRelativeAgeContrast({
     ...expression,
     characters: expression.characters.map((ch) => {
       const cue = characterCues.find((c) => cueMatchesRole(ch.role, c.name));
@@ -177,7 +198,7 @@ export function applyCharacterLifeStageLooks(
         visual: [pose, stage, ...rest].join(", "),
       };
     }),
-  };
+  });
 }
 
 function extractJsonObject(raw: string): unknown {
@@ -320,6 +341,7 @@ Rules:
 - Named mounts and treasure in the caption are props between the figures — not extra people in characters[].
 - Current Expression is a draft to replace, not a location lock.
 - Apparent age / life-stage is identity. After pose, the next look cue MUST keep child/youth/elder tokens from Work looks. Title (Emperor, King) MUST NOT default to a mature bearded adult. FORBIDDEN: grey goatee / lined middle-aged face / "mournful features" as a substitute for a boy emperor.
+- Relative age across the still is identity. If one figure's visual has weathered / silver beard / grey hair and another's does not, the unmarked figure MUST stay younger (no grey hair, no silver beard). FORBIDDEN: moving those marks onto the figure whose visual lacks them.
 
 Structural counterexamples (geometry only — do not copy their era, costumes, or place names into this work):
 WRONG beat example (do not do this):
@@ -343,6 +365,11 @@ good: camp courtyard; Li Su left with Red Hare reins and chests; Lü Bu right lo
 caption: Dong Zhuo elevates Emperor Xian and seizes absolute power.
 bad: Emperor Xian as a middle-aged man with grey goatee, mournful adult face, opulent robes only.
 good: Dong Zhuo towering left; Emperor Xian a boy emperor about nine, no beard, small on the throne.
+
+WRONG relative age (do not do this):
+caption: a youth urges a weathered father to keep foundlings.
+bad: the figure holding the foundling has grey-streaked hair and a lined face; the unmarked father looks younger.
+good: weathered / silver-beard marks stay on the father; the youth holding the foundling stays younger, no grey hair.
 
 ${EXPRESSION_CAPABILITY_RULES}
 

@@ -23,6 +23,7 @@ import {
   findRestrictedFullFaceSceneCues,
   FORBIDDEN_PHYSICS_PATTERN,
   FULL_FACE_SCENE_PATTERN,
+  pinRelativeAgeContrast,
   remapGenericRolesToRoleNames,
   sharpenExpressionAnchors,
 } from "@/lib/discovery/expression-capability-rules";
@@ -568,6 +569,7 @@ describe("rendererExpressionToPrompt", () => {
     expect(prompt).not.toMatch(/\bFigures:/);
     expect(prompt).not.toMatch(/VISUAL LOCK/);
     expect(prompt).not.toContain("protects");
+    expect(prompt).not.toMatch(/\byounger\b/i);
   });
 
   it("legacy rendererExpressionToPrompt still returns a prompt", () => {
@@ -593,6 +595,45 @@ describe("rendererExpressionToPrompt", () => {
     );
     expect(projected.composition).toMatch(/both visible/i);
     expect(projected.composition).toMatch(/identity weapons in frame/i);
+  });
+
+  it("pins relative youth and prefixes role names without a colon", () => {
+    const expression = {
+      environment: "snowy forest clearing",
+      characters: [
+        {
+          role: "Jon Snow",
+          visual:
+            "standing left, holding a small dark direwolf pup, black cloak",
+        },
+        {
+          role: "Lord Eddard",
+          visual:
+            "standing right, weathered northern face, dark beard with silver, thick fur cloak",
+        },
+      ],
+      action:
+        "Jon left holding a pup, Lord Eddard right listening, both fully visible",
+      composition: "medium-wide, faces secondary",
+    };
+    const pinned = pinRelativeAgeContrast(expression);
+    expect(pinned.characters[0]?.visual).toMatch(/younger/i);
+    expect(pinned.characters[0]?.visual).toMatch(/no grey hair/i);
+    expect(pinned.characters[1]?.visual).toMatch(/weathered/i);
+    expect(pinned.characters[0]?.visual).not.toMatch(/weathered/i);
+
+    const prompt = expressionToPrompt(expression, "local");
+    expect(prompt).toMatch(/Jon Snow standing left/);
+    expect(prompt).toMatch(/Lord Eddard standing right/);
+    expect(prompt).toMatch(/Jon Snow standing left[^.;]*younger/i);
+    expect(prompt).toMatch(/Lord Eddard standing right[^.;]*weathered/i);
+    expect(prompt).not.toMatch(/Jon Snow:/);
+    expect(prompt).not.toMatch(/Lord Eddard:/);
+    expect(prompt).not.toMatch(/VISUAL LOCK/);
+    expect(prompt).not.toMatch(/\bWill:/);
+    expect(prompt.indexOf("Jon left holding a pup")).toBeLessThan(
+      prompt.indexOf("Jon Snow standing left")
+    );
   });
 });
 
@@ -661,6 +702,7 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).not.toMatch(/\bWill:/);
     expect(prompt).not.toMatch(/all-black cloaks/i);
     expect(prompt).toMatch(/tiny on high branch/);
+    expect(prompt).toMatch(/\bWill tiny on high branch/);
     const neg = buildFrameNegativePrompt("Will spots a creature from a tree.", {
       castCount: 2,
       rendererExpression: expression,
