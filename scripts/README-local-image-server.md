@@ -103,7 +103,11 @@ Pull-based：本机拉任务，**不**暴露 LocalAI 给 Vercel。
 
    # 常驻轮询（默认 5s）
    WORKER_POLL_MS=5000 npx tsx scripts/local-generate-worker.ts --loop
+
+   # macOS：跑完响一声 + 通知中心（drain 结束时一次；--loop/--once 每条 job）
+   WORKER_NOTIFY=1 npx tsx scripts/local-generate-worker.ts
    ```
+   也可写入 `.env.local`：`WORKER_NOTIFY=1`（改完须重开 Worker）。首次 `osascript` 可能要在系统设置里允许「终端 / osascript」通知。
 5. Admin Job 列表点 **刷新**：期望 `succeeded` + `result_reference`（可预览图）。  
    **未** Accept 前 `story_images_v2` 不应变化。
 6. 日志关键字：`[local-generate-worker] claim` → `complete`；失败则为 `fail` + DB `status=failed`。

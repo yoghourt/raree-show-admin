@@ -10,9 +10,14 @@
  * Loop:
  *   WORKER_POLL_MS=5000 npx tsx scripts/local-generate-worker.ts --loop
  *
+ * macOS chime + Notification Center when a run finishes (opt-in):
+ *   WORKER_NOTIFY=1
+ *
  * Requires `.env.local`: SUPABASE_SERVICE_ROLE_KEY, LocalAI / image Deployment,
  * Cloudinary unsigned preset (same as Admin). Does NOT write Assets.
  */
+
+import { spawn } from "node:child_process";
 
 import { loadEnvLocal } from "./load-env-local";
 
@@ -33,6 +38,84 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function workerNotifyEnabled(): boolean {
+  const raw = (process.env.WORKER_NOTIFY ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+}
+
+function runDetached(
+  command: string,
+  args: string[],
+  timeoutMs: number
+): Promise<void> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { stdio: "ignore" });
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve();
+    }, timeoutMs);
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    child.once("close", done);
+    child.once("error", done);
+  });
+}
+
+/**
+ * macOS only. afplay still sounds if Notification Center is muted;
+ * osascript banner has no extra sound name (avoid a double chime).
+ */
+async function notifyWorker(input: {
+  title: string;
+  body: string;
+  sound: "Glass" | "Basso";
+}): Promise<void> {
+  if (!workerNotifyEnabled()) return;
+  if (process.platform !== "darwin") {
+    console.info("[local-generate-worker] notify skipped (not macOS)");
+    return;
+  }
+  await Promise.all([
+    runDetached(
+      "afplay",
+      [`/System/Library/Sounds/${input.sound}.aiff`],
+      4000
+    ),
+    runDetached(
+      "osascript",
+      [
+        "-e",
+        "on run argv",
+        "-e",
+        "display notification (item 2 of argv) with title (item 1 of argv)",
+        "-e",
+        "end run",
+        input.title,
+        input.body,
+      ],
+      4000
+    ),
+  ]);
+}
+
+async function notifyJobOutcome(outcome: "ok" | "fail"): Promise<void> {
+  await notifyWorker(
+    outcome === "ok"
+      ? {
+          title: "Raree Generate",
+          body: "本地出图完成",
+          sound: "Glass",
+        }
+      : {
+          title: "Raree Generate",
+          body: "本地出图失败",
+          sound: "Basso",
+        }
+  );
+}
+
 async function loadWorkVisualConvention(
   client: ReturnType<typeof createSupabaseServiceClient>,
   workId: string
@@ -49,7 +132,7 @@ async function loadWorkVisualConvention(
 
 async function processOne(
   client: ReturnType<typeof createSupabaseServiceClient>
-): Promise<"processed" | "empty"> {
+): Promise<"empty" | "ok" | "fail"> {
   const job = await claimNextQueuedJob(client);
   if (!job) return "empty";
 
@@ -96,7 +179,7 @@ async function processOne(
         durationMs: result.durationMs,
       });
       await failGenerateJob(job.id, result.message, client);
-      return "processed";
+      return "fail";
     }
 
     await completeGenerateJob(job.id, result.resultReference, client);
@@ -106,7 +189,7 @@ async function processOne(
       usedFallback: result.usedFallback,
       url: result.url.slice(0, 80),
     });
-    return "processed";
+    return "ok";
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.warn("[local-generate-worker] fail", { id: job.id, message });
@@ -119,7 +202,7 @@ async function processOne(
         original: message,
       });
     }
-    return "processed";
+    return "fail";
   }
 }
 
@@ -135,6 +218,7 @@ async function main(): Promise<void> {
   console.info("[local-generate-worker] start", {
     mode: loop ? "loop" : once ? "once" : "drain",
     pollMs: loop ? pollMs : null,
+    notify: workerNotifyEnabled(),
   });
 
   if (loop) {
@@ -142,7 +226,9 @@ async function main(): Promise<void> {
       const outcome = await processOne(client);
       if (outcome === "empty") {
         await sleep(pollMs);
+        continue;
       }
+      await notifyJobOutcome(outcome);
     }
   }
 
@@ -150,18 +236,35 @@ async function main(): Promise<void> {
     const outcome = await processOne(client);
     if (outcome === "empty") {
       console.info("[local-generate-worker] queue empty");
+      return;
     }
+    await notifyJobOutcome(outcome);
     return;
   }
 
-  // drain
-  let processed = 0;
+  // drain — one chime when the queue is empty (not per job)
+  let ok = 0;
+  let fail = 0;
   for (;;) {
     const outcome = await processOne(client);
     if (outcome === "empty") break;
-    processed += 1;
+    if (outcome === "ok") ok += 1;
+    else fail += 1;
   }
-  console.info("[local-generate-worker] drain done", { processed });
+  const processed = ok + fail;
+  console.info("[local-generate-worker] drain done", { processed, ok, fail });
+  if (processed === 0) return;
+  const body =
+    fail === 0
+      ? `本地出图完成（${ok} 条）`
+      : ok === 0
+        ? `本地出图失败（${fail} 条）`
+        : `本地出图结束：成功 ${ok}，失败 ${fail}`;
+  await notifyWorker({
+    title: "Raree Generate",
+    body,
+    sound: fail > 0 && ok === 0 ? "Basso" : "Glass",
+  });
 }
 
 main().catch((err) => {
