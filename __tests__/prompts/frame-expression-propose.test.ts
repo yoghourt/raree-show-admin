@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   LOCAL_ACTION_MAX,
-  LOCAL_VISUAL_MAX,
   packActionNamingCast,
 } from "@/lib/discovery/execution-projection";
+import { SD35_CAPABILITY } from "@/lib/ai/image/rendererCapability";
 import {
   applyCharacterLifeStageLooks,
   buildFrameExpressionProposePrompt,
@@ -59,13 +59,13 @@ describe("parseFrameExpressionProposal", () => {
     expect(out.ok).toBe(false);
   });
 
-  it("packs overlong visual and action to Local execute budgets, keeping the start", () => {
+  it("persists the full authored visual and action (no Local pack at propose)", () => {
     const longVisual =
       "kneeling in snow, stubble beard, pale eyes, rough black wool tunic, boiled leather doublet, heavy fur-lined black cloak, weathered young Night's Watch deserter";
     const longAction =
       "Lord Eddard Stark standing over kneeling Gared with raised sword; Bran Stark mounted on horse in background watching in profile from the far courtyard edge";
-    expect(longVisual.length).toBeGreaterThan(LOCAL_VISUAL_MAX);
-    expect(longAction.length).toBeGreaterThan(LOCAL_ACTION_MAX);
+    expect(longVisual.length).toBeGreaterThan(SD35_CAPABILITY.visualMaxChars);
+    expect(longAction.length).toBeGreaterThan(SD35_CAPABILITY.actionMaxChars);
 
     const out = parseFrameExpressionProposal(
       JSON.stringify({
@@ -85,13 +85,9 @@ describe("parseFrameExpressionProposal", () => {
     );
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.value.characters[0]?.visual.length).toBeLessThanOrEqual(
-      LOCAL_VISUAL_MAX
-    );
-    expect(out.value.characters[0]?.visual).toMatch(/^kneeling in snow/);
+    expect(out.value.characters[0]?.visual).toBe(longVisual);
     expect(out.value.characters[1]?.visual).toMatch(/^mounted on horse/);
-    expect(out.value.action.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
-    expect(out.value.action).toMatch(/kneeling Gared/);
+    expect(out.value.action).toBe(longAction);
   });
 });
 
@@ -128,11 +124,10 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/off-stage/);
     expect(p).toMatch(/ending on a bare name/);
     expect(p).toMatch(/Do NOT add other Work characters/);
-    expect(p).toMatch(new RegExp(String(LOCAL_VISUAL_MAX)));
     expect(p).toMatch(/pose\/blocking/);
-    expect(p).toMatch(/Creator production override/);
+    expect(p).not.toMatch(/Local execute budget/);
+    expect(p).not.toMatch(/visual ≤ 80/);
     expect(p).toMatch(/weathered northern lord face/);
-    expect(p).not.toMatch(/Valyrian steel greatsword/);
     expect(p).toMatch(/Rule 14/);
     expect(p).toMatch(/boy emperor about nine/);
     expect(p).toMatch(/grey goatee/);
@@ -216,9 +211,6 @@ describe("life-stage identity", () => {
     expect(folded.characters[0]?.visual).toMatch(/^seated on throne/i);
     expect(folded.characters[0]?.visual).toMatch(/child emperor/i);
     expect(folded.characters[0]?.visual).not.toMatch(/grey goatee/i);
-    expect(folded.characters[0]?.visual.length).toBeLessThanOrEqual(
-      LOCAL_VISUAL_MAX
-    );
   });
 
   it("flags an adult face against child looks", () => {
@@ -305,7 +297,9 @@ describe("packActionNamingCast", () => {
 });
 
 describe("parseFrameExpressionProposal trailing action", () => {
-  it("does not leave action ending on a bare last name after Local pack", () => {
+  it("persists the authored trailing bare name (execute repairs, not persist)", () => {
+    const action =
+      "Li Su stands left presenting the Red Hare horse and treasure chests of gold and jade; Lü Bu";
     const out = parseFrameExpressionProposal(
       JSON.stringify({
         environment: "military camp courtyard at night, torch posts",
@@ -319,14 +313,12 @@ describe("parseFrameExpressionProposal trailing action", () => {
             visual: "standing center, looking intently at the horse",
           },
         ],
-        action:
-          "Li Su stands left presenting the Red Hare horse and treasure chests of gold and jade; Lü Bu",
+        action,
         composition: "medium-wide shot, both fully visible, faces secondary",
       })
     );
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.value.action).toMatch(/standing center/i);
-    expect(out.value.action.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
+    expect(out.value.action).toBe(action);
   });
 });

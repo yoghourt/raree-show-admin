@@ -7,16 +7,7 @@ import {
   EXPRESSION_CAPABILITY_EXAMPLE,
   EXPRESSION_CAPABILITY_RULES,
 } from "@/lib/discovery/expression-capability-rules";
-import {
-  clipLocalBudgetText,
-  LOCAL_ACTION_MAX,
-  LOCAL_COMPOSITION_MAX,
-  LOCAL_EMPHASIS_MAX,
-  LOCAL_ENV_MAX,
-  LOCAL_ROLE_MAX,
-  LOCAL_VISUAL_MAX,
-  packExpressionForLocalTransport,
-} from "@/lib/discovery/execution-projection";
+import { clipLocalBudgetText } from "@/lib/discovery/execution-projection";
 import {
   parseRendererExpression,
   type RendererExpression,
@@ -183,7 +174,7 @@ export function applyCharacterLifeStageLooks(
       const rest = parts.slice(1);
       return {
         ...ch,
-        visual: clipLocalBudgetText([pose, stage, ...rest].join(", "), LOCAL_VISUAL_MAX),
+        visual: [pose, stage, ...rest].join(", "),
       };
     }),
   };
@@ -233,7 +224,7 @@ export function parseFrameExpressionProposal(
   }
   const parsed = parseRendererExpression(obj);
   if (!parsed.ok) return parsed;
-  return { ok: true, value: packExpressionForLocalTransport(parsed.value) };
+  return parsed;
 }
 
 export function buildFrameExpressionProposePrompt(
@@ -251,7 +242,7 @@ export function buildFrameExpressionProposePrompt(
           .map((c) => {
             const vis = c.visualIdentity?.trim();
             if (!vis) return `- ${c.name}`;
-            return `- ${c.name}: ${clipLocalBudgetText(vis, LOCAL_VISUAL_MAX)}`;
+            return `- ${c.name}: ${clipLocalBudgetText(vis, 220)}`;
           })
           .join("\n");
 
@@ -311,13 +302,9 @@ Rules:
 - OUTPUT LANGUAGE: English (Latin script only).
 - Return ONLY valid JSON for rendererExpression (no preamble).
 - Shape: ${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}
-- Local execute budget (Creator Default = Local). Longer tails are DROPPED at generate — write WITHIN budget so pose is not cut:
-  - characters[].visual ≤ ${LOCAL_VISUAL_MAX} chars. FIRST tokens MUST be pose/blocking (kneeling, mounted, standing, holding X), THEN 1–2 look cues. Do not paste full visual identity.
-  - characters[].role ≤ ${LOCAL_ROLE_MAX} chars.
-  - action ≤ ${LOCAL_ACTION_MAX} chars — COMPLETE clause for EVERY characters[] role (pose + left/right). FORBIDDEN: ending on a bare name with no verb ("…; Lü Bu"). Write the compact still first; drop adjectives if needed.
-  - environment ≤ ${LOCAL_ENV_MAX} chars. From THIS caption only. FORBIDDEN: copying an interior from Current Expression when the caption does not name that place.
-  - composition ≤ ${LOCAL_COMPOSITION_MAX} chars.
-  - visualEmphasis / lighting / atmosphere / threatPerception ≤ ${LOCAL_EMPHASIS_MAX} chars each.
+- Write a complete static still. FIRST tokens of characters[].visual MUST be pose/blocking (kneeling, mounted, standing, holding X), THEN look cues. Do not paste the full visual identity dump.
+- action MUST be a COMPLETE clause for EVERY characters[] role (pose). FORBIDDEN: ending on a bare name with no verb ("…; Lü Bu").
+- environment from THIS caption only. FORBIDDEN: copying an interior from Current Expression when the caption does not name that place.
 - FORBIDDEN: long costume paragraphs; repeating every archive cue; putting kneeling/mounted/holding at the END of visual.
 - Caption is beat authority. Do not invent a different moment or a more famous adjacent still.
 - Cast MUST come from caption-named agents. FORBIDDEN: swapping in other Work characters because they have visual cues.
@@ -351,7 +338,7 @@ good: Ding Yuan left pointing; Lü Bu center in front of him; Dong Zhuo right, s
 
 caption: Li Su bears Red Hare, gold and jade on behalf of Dong Zhuo; Lü Bu agrees to switch sides.
 bad: Dong Zhuo standing in the hall watching; action truncated as "…; Lü Bu"; imperial palace copied from the previous frame.
-good: camp courtyard; Li Su left with Red Hare reins and chests; Lü Bu right looking at the horse; Dong Zhuo off-stage. Action names both poses within the Local action budget.
+good: camp courtyard; Li Su left with Red Hare reins and chests; Lü Bu right looking at the horse; Dong Zhuo off-stage. Action names both poses.
 
 caption: Dong Zhuo elevates Emperor Xian and seizes absolute power.
 bad: Emperor Xian as a middle-aged man with grey goatee, mournful adult face, opulent robes only.
@@ -359,5 +346,5 @@ good: Dong Zhuo towering left; Emperor Xian a boy emperor about nine, no beard, 
 
 ${EXPRESSION_CAPABILITY_RULES}
 
-Creator production override: field lengths MUST fit the Local execute budgets above. Pose/blocking first in every visual. Ignore Discovery "do not shrink to Local prompt budget" for this re-propose.`.trim();
+Pose/blocking first in every visual. Do not shrink Canonical Expression to a renderer field ceiling — Execution Projection clips at generate if needed.`.trim();
 }

@@ -3,8 +3,16 @@
  *
  * Deterministic adaptation of Canonical Visual Expression to a Deployment
  * renderer profile. MUST NOT invent story meaning. MUST NOT run at persist.
+ * Length / pixel budgets come from the model-keyed capability table.
  */
 
+import {
+  CLOUD_CAPABILITY,
+  SD35_CAPABILITY,
+  Z_IMAGE_TURBO_CAPABILITY,
+  resolveRendererCapabilityFromEnv,
+  type RendererCapability,
+} from "@/lib/ai/image/rendererCapability";
 import {
   adaptSceneExpressionForLocalCapability,
   isVerticalTreeCamera,
@@ -13,26 +21,41 @@ import type { RendererExpression } from "@/lib/discovery/visual-contract";
 
 export type ProjectionProfile = "local" | "cloud";
 
-const MAX_PROMPT_PART_LEN = 400;
-/** Propose-time field caps (LLM persist). Execute join uses LOCAL_PROMPT_BODY_MAX. */
-export const LOCAL_VISUAL_MAX = 80;
-export const LOCAL_ACTION_MAX = 96;
-export const LOCAL_ENV_MAX = 80;
-export const LOCAL_COMPOSITION_MAX = 72;
-export const LOCAL_ROLE_MAX = 28;
-export const LOCAL_EMPHASIS_MAX = 72;
 /**
- * Local Z-Image portraits succeed near ~800 chars. Scene execute body tracks
- * that observed ceiling, not the older ~600 sd-3.5 blank folklore.
+ * sd-3.5 rollback field caps (packActionNamingCast tests / explicit short pack).
+ * Creator Default execute uses the Z-Image table, not these.
  */
-export const LOCAL_PROMPT_BODY_MAX = 740;
-/** Same identity budget as portrait appearance (AVATAR_APPEARANCE_MAX_CHARS). */
-const LOCAL_EXECUTE_VISUAL_MAX = 220;
-const LOCAL_EXECUTE_ACTION_MAX = 280;
+export const LOCAL_VISUAL_MAX = SD35_CAPABILITY.visualMaxChars;
+export const LOCAL_ACTION_MAX = SD35_CAPABILITY.actionMaxChars;
+export const LOCAL_ENV_MAX = SD35_CAPABILITY.envMaxChars;
+export const LOCAL_COMPOSITION_MAX = SD35_CAPABILITY.compositionMaxChars;
+export const LOCAL_ROLE_MAX = SD35_CAPABILITY.roleMaxChars;
+export const LOCAL_EMPHASIS_MAX = SD35_CAPABILITY.emphasisMaxChars;
 
-function capPart(value: string): string {
-  if (value.length <= MAX_PROMPT_PART_LEN) return value;
-  return value.slice(0, MAX_PROMPT_PART_LEN).trim();
+/** Creator Default (Z-Image) execute body ceiling. */
+export const LOCAL_PROMPT_BODY_MAX = Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars;
+
+export function capabilityForProfile(
+  profile: ProjectionProfile,
+  capability?: RendererCapability
+): RendererCapability {
+  if (capability) return capability;
+  if (profile === "cloud") return CLOUD_CAPABILITY;
+  return resolveRendererCapabilityFromEnv();
+}
+
+/**
+ * Word-boundary clip for execute transport. Keeps the start (pose first).
+ * No ellipsis — execute strings should look complete within budget.
+ */
+export function clipLocalBudgetText(text: string, maxChars: number): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length <= maxChars) return t;
+  const slice = t.slice(0, maxChars);
+  const cut = Math.max(slice.lastIndexOf(","), slice.lastIndexOf(" "), 0);
+  return (cut > maxChars * 0.5 ? slice.slice(0, cut) : slice)
+    .trim()
+    .replace(/[,:;]+$/, "");
 }
 
 function stripExactlyFigureCues(text: string): string {
@@ -43,18 +66,9 @@ function stripExactlyFigureCues(text: string): string {
     .trim();
 }
 
-/**
- * Word-boundary clip for Local transport. Keeps the start (pose must be authored first).
- * No ellipsis — stored Expression should look complete within budget.
- */
-export function clipLocalBudgetText(text: string, maxChars: number): string {
-  const t = text.trim().replace(/\s+/g, " ");
-  if (t.length <= maxChars) return t;
-  const slice = t.slice(0, maxChars);
-  const cut = Math.max(slice.lastIndexOf(","), slice.lastIndexOf(" "), 0);
-  return (cut > maxChars * 0.5 ? slice.slice(0, cut) : slice)
-    .trim()
-    .replace(/[,:;]+$/, "");
+function capPart(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return value.slice(0, max).trim();
 }
 
 function escapeRegExp(value: string): string {
@@ -69,9 +83,9 @@ function shortRole(role: string): string {
   return role.trim().split(/\s+/).filter(Boolean)[0] || role.trim();
 }
 
-function actionRoleLabel(role: string): string {
+function actionRoleLabel(role: string, roleMax: number): string {
   const t = role.trim().replace(/\s+/g, " ");
-  if (t.length <= LOCAL_ROLE_MAX) return t;
+  if (t.length <= roleMax) return t;
   return shortRole(t);
 }
 
@@ -83,7 +97,8 @@ function actionRoleLabel(role: string): string {
 export function packActionNamingCast(
   action: string,
   characters: Array<{ role: string; visual: string }>,
-  maxChars: number
+  maxChars: number,
+  roleMax: number = LOCAL_ROLE_MAX
 ): string {
   const original = action.trim().replace(/\s+/g, " ");
   let next = original;
@@ -91,7 +106,7 @@ export function packActionNamingCast(
 
   for (const ch of characters) {
     const full = ch.role.trim();
-    const label = actionRoleLabel(full);
+    const label = actionRoleLabel(full, roleMax);
     if (label.length < 2) continue;
     const trailing = new RegExp(
       `([;,]\\s*)(${escapeRegExp(full)}|${escapeRegExp(shortRole(full))})\\s*$`,
@@ -104,7 +119,7 @@ export function packActionNamingCast(
   }
 
   for (const ch of characters) {
-    const label = actionRoleLabel(ch.role);
+    const label = actionRoleLabel(ch.role, roleMax);
     if (label.length < 2) continue;
     if (new RegExp(`\\b${escapeRegExp(shortRole(ch.role))}\\b`, "i").test(next)) {
       continue;
@@ -118,7 +133,7 @@ export function packActionNamingCast(
   if (next.length <= maxChars) return next;
   if (repaired) {
     const compact = characters
-      .map((ch) => `${actionRoleLabel(ch.role)} ${firstPoseClause(ch.visual)}`)
+      .map((ch) => `${actionRoleLabel(ch.role, roleMax)} ${firstPoseClause(ch.visual)}`)
       .filter((part) => part.trim().length > 2)
       .join(", ");
     if (compact.length > 0 && compact.length <= maxChars) return compact;
@@ -128,59 +143,72 @@ export function packActionNamingCast(
 }
 
 /**
- * Fit Canonical Expression into Local execute field budgets.
- * Used by Creator Expression propose so pose/blocking is not left-clipped at generate.
+ * Execute-only fit of Canonical Expression into a renderer capability row.
+ * MUST NOT run at propose persist.
  */
-export function packExpressionForLocalTransport(
-  expression: RendererExpression
+export function packExpressionForTransport(
+  expression: RendererExpression,
+  capability: RendererCapability
 ): RendererExpression {
   const packed: RendererExpression = {
-    environment: clipLocalBudgetText(expression.environment, LOCAL_ENV_MAX),
+    environment: clipLocalBudgetText(
+      expression.environment,
+      capability.envMaxChars
+    ),
     action: packActionNamingCast(
       expression.action,
       expression.characters,
-      LOCAL_ACTION_MAX
+      capability.actionMaxChars,
+      capability.roleMaxChars
     ),
     composition: clipLocalBudgetText(
       expression.composition,
-      LOCAL_COMPOSITION_MAX
+      capability.compositionMaxChars
     ),
     characters: expression.characters.map((c) => ({
-      role: clipLocalBudgetText(c.role, LOCAL_ROLE_MAX),
-      visual: clipLocalBudgetText(c.visual, LOCAL_VISUAL_MAX),
+      role: clipLocalBudgetText(c.role, capability.roleMaxChars),
+      visual: clipLocalBudgetText(c.visual, capability.visualMaxChars),
     })),
   };
   if (expression.lighting?.trim()) {
     packed.lighting = clipLocalBudgetText(
       expression.lighting,
-      LOCAL_EMPHASIS_MAX
+      capability.emphasisMaxChars
     );
   }
   if (expression.atmosphere?.trim()) {
     packed.atmosphere = clipLocalBudgetText(
       expression.atmosphere,
-      LOCAL_EMPHASIS_MAX
+      capability.emphasisMaxChars
     );
   }
   if (expression.threatPerception?.trim()) {
     packed.threatPerception = clipLocalBudgetText(
       expression.threatPerception,
-      LOCAL_EMPHASIS_MAX
+      capability.emphasisMaxChars
     );
   }
   if (expression.visualEmphasis?.trim()) {
     packed.visualEmphasis = clipLocalBudgetText(
       expression.visualEmphasis,
-      LOCAL_EMPHASIS_MAX
+      capability.emphasisMaxChars
     );
   }
   if (expression.styleHints?.trim()) {
     packed.styleHints = clipLocalBudgetText(
       expression.styleHints,
-      LOCAL_EMPHASIS_MAX
+      capability.emphasisMaxChars
     );
   }
   return packed;
+}
+
+/** @deprecated execute-only; prefer packExpressionForTransport(capability). */
+export function packExpressionForLocalTransport(
+  expression: RendererExpression,
+  capability: RendererCapability = resolveRendererCapabilityFromEnv()
+): RendererExpression {
+  return packExpressionForTransport(expression, capability);
 }
 
 /** Map IMAGE_CREATOR_ACCEPT_PROVIDER id → projection profile. */
@@ -194,9 +222,7 @@ export function resolveProjectionProfile(providerId: string): ProjectionProfile 
 export function resolveProjectionProfileFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): ProjectionProfile {
-  const provider = (
-    env.IMAGE_CREATOR_ACCEPT_PROVIDER ?? "local"
-  ).trim();
+  const provider = (env.IMAGE_CREATOR_ACCEPT_PROVIDER ?? "local").trim();
   return resolveProjectionProfile(provider);
 }
 
@@ -207,10 +233,17 @@ export function resolveProjectionProfileFromEnv(
  */
 export function projectExpressionForDeployment(
   expression: RendererExpression,
-  profile: ProjectionProfile
+  profile: ProjectionProfile,
+  capability?: RendererCapability
 ): RendererExpression {
   if (profile === "local") {
-    return adaptSceneExpressionForLocalCapability(expression);
+    const cap = capabilityForProfile(profile, capability);
+    return adaptSceneExpressionForLocalCapability(expression, {
+      visualMaxChars: cap.visualMaxChars,
+      actionMaxChars: cap.actionMaxChars,
+      envMaxChars: cap.envMaxChars,
+      compositionMaxChars: cap.compositionMaxChars,
+    });
   }
   return expression;
 }
@@ -221,11 +254,13 @@ export function projectExpressionForDeployment(
  */
 export function expressionToPrompt(
   expression: RendererExpression,
-  profile: ProjectionProfile
+  profile: ProjectionProfile,
+  capability?: RendererCapability
 ): string {
-  const projected = projectExpressionForDeployment(expression, profile);
+  const cap = capabilityForProfile(profile, capability);
+  const projected = projectExpressionForDeployment(expression, profile, cap);
   if (profile === "local") {
-    return joinLocalPrompt(projected);
+    return joinLocalPrompt(projected, cap);
   }
   return joinCloudPrompt(projected);
 }
@@ -258,48 +293,60 @@ function dualCastNeedsCostumeContrast(visuals: string[]): boolean {
   return false;
 }
 
-function joinLocalPrompt(re: RendererExpression): string {
+function joinLocalPrompt(
+  re: RendererExpression,
+  cap: RendererCapability
+): string {
   const visuals = (re.characters ?? [])
     .map((c) =>
       clipLocalBudgetText(
-        stripExactlyFigureCues(capPart(c.visual)),
-        LOCAL_EXECUTE_VISUAL_MAX
+        stripExactlyFigureCues(capPart(c.visual, cap.visualMaxChars)),
+        cap.visualMaxChars
       )
     )
     .filter((visual) => !isStubCastVisual(visual));
 
-  const action = clipLocalBudgetText(
-    stripExactlyFigureCues(capPart(re.action ?? "")),
-    LOCAL_EXECUTE_ACTION_MAX
+  const action = packActionNamingCast(
+    stripExactlyFigureCues(capPart(re.action ?? "", cap.actionMaxChars * 2)),
+    re.characters ?? [],
+    cap.actionMaxChars,
+    cap.roleMaxChars
   );
   const composition = clipLocalBudgetText(
-    stripExactlyFigureCues(capPart(re.composition ?? "")),
-    LOCAL_COMPOSITION_MAX
+    stripExactlyFigureCues(
+      capPart(re.composition ?? "", cap.compositionMaxChars)
+    ),
+    cap.compositionMaxChars
   );
   const contrast = dualCastNeedsCostumeContrast(visuals)
     ? "different silhouettes"
     : "";
   const perch = isVerticalTreeCamera(re) ? "living perch not a fallen log" : "";
   const environment = clipLocalBudgetText(
-    stripExactlyFigureCues(capPart(re.environment ?? "")),
-    LOCAL_ENV_MAX
+    stripExactlyFigureCues(capPart(re.environment ?? "", cap.envMaxChars)),
+    cap.envMaxChars
   );
   const emphasis = re.visualEmphasis?.trim()
     ? clipLocalBudgetText(
-        stripExactlyFigureCues(capPart(re.visualEmphasis.trim())),
-        LOCAL_EMPHASIS_MAX
+        stripExactlyFigureCues(
+          capPart(re.visualEmphasis.trim(), cap.emphasisMaxChars)
+        ),
+        cap.emphasisMaxChars
       )
     : "";
 
-  return packLocalPromptBody({
-    visuals,
-    action,
-    environment,
-    composition,
-    perch,
-    contrast,
-    emphasis,
-  });
+  return packLocalPromptBody(
+    {
+      visuals,
+      action,
+      environment,
+      composition,
+      perch,
+      contrast,
+      emphasis,
+    },
+    cap
+  );
 }
 
 function assembleLocalPromptBody(parts: {
@@ -324,67 +371,86 @@ function assembleLocalPromptBody(parts: {
   return `${joined.join(". ")}.`;
 }
 
-function packLocalPromptBody(parts: {
-  visuals: string[];
-  action: string;
-  environment: string;
-  composition: string;
-  perch: string;
-  contrast: string;
-  emphasis: string;
-}): string {
+function packLocalPromptBody(
+  parts: {
+    visuals: string[];
+    action: string;
+    environment: string;
+    composition: string;
+    perch: string;
+    contrast: string;
+    emphasis: string;
+  },
+  cap: RendererCapability
+): string {
+  const bodyMax = cap.promptBodyMaxChars;
   let next = { ...parts, visuals: [...parts.visuals] };
   let body = assembleLocalPromptBody(next);
-  if (body.length <= LOCAL_PROMPT_BODY_MAX) return body;
+  if (body.length <= bodyMax) return body;
 
   next.emphasis = "";
   body = assembleLocalPromptBody(next);
-  if (body.length <= LOCAL_PROMPT_BODY_MAX) return body;
+  if (body.length <= bodyMax) return body;
 
-  next.environment = clipLocalBudgetText(next.environment, 48);
-  body = assembleLocalPromptBody(next);
-  if (body.length <= LOCAL_PROMPT_BODY_MAX) return body;
-
-  next.visuals = next.visuals.map((visual) =>
-    clipLocalBudgetText(visual, 120)
+  next.environment = clipLocalBudgetText(
+    next.environment,
+    Math.max(32, Math.floor(cap.envMaxChars * 0.6))
   );
   body = assembleLocalPromptBody(next);
-  if (body.length <= LOCAL_PROMPT_BODY_MAX) return body;
+  if (body.length <= bodyMax) return body;
+
+  next.visuals = next.visuals.map((visual) =>
+    clipLocalBudgetText(visual, Math.max(48, Math.floor(cap.visualMaxChars * 0.5)))
+  );
+  body = assembleLocalPromptBody(next);
+  if (body.length <= bodyMax) return body;
 
   const withoutAction = assembleLocalPromptBody({ ...next, action: "" });
-  const actionBudget = LOCAL_PROMPT_BODY_MAX - withoutAction.length;
+  const actionBudget = bodyMax - withoutAction.length;
   next.action = clipLocalBudgetText(
     next.action,
-    Math.max(96, actionBudget)
+    Math.max(Math.floor(cap.actionMaxChars * 0.25), actionBudget)
   );
   return assembleLocalPromptBody(next);
 }
 
 function joinCloudPrompt(re: RendererExpression): string {
+  const cloudCap = CLOUD_CAPABILITY;
   const cast = (re.characters ?? [])
     .map((c) => {
-      const role = capPart(c.role.trim());
-      const visual = stripExactlyFigureCues(capPart(c.visual));
+      const role = capPart(c.role.trim(), cloudCap.roleMaxChars);
+      const visual = stripExactlyFigureCues(
+        capPart(c.visual, cloudCap.visualMaxChars)
+      );
       return `${role}: ${visual}`;
     })
     .join("; ");
 
-  const action = stripExactlyFigureCues(capPart(re.action ?? ""));
-  const composition = stripExactlyFigureCues(capPart(re.composition ?? ""));
-  const environment = stripExactlyFigureCues(capPart(re.environment ?? ""));
+  const action = stripExactlyFigureCues(
+    capPart(re.action ?? "", cloudCap.actionMaxChars)
+  );
+  const composition = stripExactlyFigureCues(
+    capPart(re.composition ?? "", cloudCap.compositionMaxChars)
+  );
+  const environment = stripExactlyFigureCues(
+    capPart(re.environment ?? "", cloudCap.envMaxChars)
+  );
 
   const parts = [
     cast && `Characters: ${cast}.`,
     action && `Action: ${action}.`,
     environment && `Environment: ${environment}.`,
     composition && `Composition: ${composition}.`,
-    re.lighting?.trim() && `Lighting: ${capPart(re.lighting.trim())}.`,
-    re.styleHints?.trim() && `Style: ${capPart(re.styleHints.trim())}.`,
-    re.atmosphere?.trim() && `Atmosphere: ${capPart(re.atmosphere.trim())}.`,
+    re.lighting?.trim() &&
+      `Lighting: ${capPart(re.lighting.trim(), cloudCap.emphasisMaxChars)}.`,
+    re.styleHints?.trim() &&
+      `Style: ${capPart(re.styleHints.trim(), cloudCap.emphasisMaxChars)}.`,
+    re.atmosphere?.trim() &&
+      `Atmosphere: ${capPart(re.atmosphere.trim(), cloudCap.emphasisMaxChars)}.`,
     re.threatPerception?.trim() &&
-      `Threat: ${capPart(re.threatPerception.trim())}.`,
+      `Threat: ${capPart(re.threatPerception.trim(), cloudCap.emphasisMaxChars)}.`,
     re.visualEmphasis?.trim() &&
-      `Visual emphasis: ${capPart(re.visualEmphasis.trim())}.`,
+      `Visual emphasis: ${capPart(re.visualEmphasis.trim(), cloudCap.emphasisMaxChars)}.`,
   ].filter(Boolean);
 
   const body = parts.join(" ").trim();
@@ -393,10 +459,13 @@ function joinCloudPrompt(re: RendererExpression): string {
 }
 
 /** Scene frame pixel size for Deployment profile (A5). */
-export function sceneFrameSizeForProfile(profile: ProjectionProfile): {
+export function sceneFrameSizeForProfile(
+  profile: ProjectionProfile,
+  capability?: RendererCapability
+): {
   width: number;
   height: number;
 } {
-  if (profile === "cloud") return { width: 1024, height: 1024 };
-  return { width: 512, height: 512 };
+  const cap = capabilityForProfile(profile, capability);
+  return { width: cap.width, height: cap.height };
 }

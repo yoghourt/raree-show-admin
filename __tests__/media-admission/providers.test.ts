@@ -5,6 +5,7 @@ import {
   assertHttpUrl,
   pasteUrlProvider,
 } from "@/lib/media-admission/providers/pasteUrl";
+import { Z_IMAGE_TURBO_CAPABILITY } from "@/lib/ai/image/rendererCapability";
 import { buildFrameDraftPrompt, buildFrameNegativePrompt } from "@/lib/prompts/frame-draft";
 
 describe("pasteUrl provider", () => {
@@ -54,7 +55,9 @@ describe("frame draft prompt (derived Job input)", () => {
     expect(prompt).not.toContain("巴黎起义");
     expect(prompt).not.toContain("Scene content (authoritative):");
     expect(prompt).not.toContain("Must match scene:");
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars
+    );
   });
 
   it("rewrites recruitment-notice cues that paint glyphs on Local", () => {
@@ -125,7 +128,9 @@ describe("frame draft prompt (derived Job input)", () => {
     expect(prompt).toContain("couple parting on bridge");
     expect(prompt).not.toContain("legacy caption");
     expect(prompt).not.toContain("Scene content (authoritative)");
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars
+    );
   });
 
   it("frame negatives allow groups unlike avatar", () => {

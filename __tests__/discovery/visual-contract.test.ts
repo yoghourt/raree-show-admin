@@ -7,6 +7,10 @@ import { describe, expect, it } from "vitest";
 import { foldCharacterArchivesIntoExpression } from "@/lib/discovery/character-archive";
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import {
+  SD35_CAPABILITY,
+  Z_IMAGE_TURBO_CAPABILITY,
+} from "@/lib/ai/image/rendererCapability";
+import {
   expressionToPrompt,
   LOCAL_PROMPT_BODY_MAX,
   projectExpressionForDeployment,
@@ -734,7 +738,44 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).toMatch(/standing corpse/i);
     expect(prompt).toMatch(/glowing blue eyes/i);
     expect(prompt).toMatch(/empty hands/i);
-    expect(prompt.length).toBeLessThan(LOCAL_PROMPT_BODY_MAX + 80);
+    expect(prompt.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars + 80
+    );
+  });
+
+  it("Z-Image table keeps overlay action; sd-3.5 table still short-clips", () => {
+    const expression = {
+      environment: "Haunted Forest at night, snow, black enclosing trees",
+      action:
+        "two adult figures only: kneeling cloaked man, standing armored corpse leaning over him with both gauntlets clamped around his throat; broken hilt unused on the snow",
+      composition: "medium-wide, two figures only, faces secondary",
+      visualEmphasis: "gauntlets around the throat, hilt on the snow",
+      characters: [
+        {
+          role: "Will",
+          visual:
+            "adult kneeling in snow, black wool cloak, empty hands, head pulled back",
+        },
+        {
+          role: "Ser Waymar Royce",
+          visual:
+            "taller standing corpse, dark steel plate and mail, solid black wool cloth, pale dead face, glowing blue eyes, both gauntlets on the kneeling man's throat",
+        },
+      ],
+    };
+    const zImage = expressionToPrompt(
+      expression,
+      "local",
+      Z_IMAGE_TURBO_CAPABILITY
+    );
+    const sd35 = expressionToPrompt(expression, "local", SD35_CAPABILITY);
+    expect(zImage).toMatch(/throat/i);
+    expect(zImage).toMatch(/broken hilt/i);
+    expect(zImage.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars
+    );
+    expect(sd35.length).toBeLessThanOrEqual(SD35_CAPABILITY.promptBodyMaxChars);
+    expect(sd35.length).toBeLessThan(zImage.length);
   });
 
   it("keeps operator revision with Expression", () => {
@@ -764,7 +805,9 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).not.toContain("Scene content (authoritative)");
     expect(prompt).not.toMatch(/VISUAL LOCK/);
     expect(prompt).toMatch(/cinematic|painterly/i);
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars
+    );
   });
 
   it("falls back to caption when Expression is an empty-scene stub", () => {
@@ -786,7 +829,9 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).toContain("Scene:");
     expect(prompt).not.toMatch(/empty scene/i);
     expect(prompt).not.toContain("character present");
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars
+    );
   });
 
   it("keeps dense caption wrapper on cloud profile", () => {

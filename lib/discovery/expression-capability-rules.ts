@@ -366,8 +366,24 @@ const BEAT_CONTACT_PATTERN =
   /\b(throat|neck|gauntlets?|hilt|corpse|glowing|dead face)\b/i;
 
 const MAX_IDENTITY_VISUAL_PARTS = 4;
-/** Match portrait appearance budget (AVATAR_APPEARANCE_MAX_CHARS). */
-const MAX_IDENTITY_VISUAL_LEN = 220;
+
+/**
+ * Execute-time length knobs for Local adapt (Deployment table).
+ * Defaults match the Z-Image row so adapt does not pre-cut to sd-3.5.
+ */
+export type LocalAdaptBudgets = {
+  visualMaxChars: number;
+  actionMaxChars: number;
+  envMaxChars: number;
+  compositionMaxChars: number;
+};
+
+const DEFAULT_LOCAL_ADAPT_BUDGETS: LocalAdaptBudgets = {
+  visualMaxChars: 400,
+  actionMaxChars: 480,
+  envMaxChars: 160,
+  compositionMaxChars: 120,
+};
 
 function shortRoleLabel(role: string): string {
   const parts = role.trim().split(/\s+/).filter(Boolean);
@@ -409,13 +425,13 @@ function scoreVisualPart(part: string): number {
   return 30;
 }
 
-function pickSalientVisualParts(visual: string): string {
+function pickSalientVisualParts(visual: string, maxLen: number): string {
   const parts = visual
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
   if (parts.length <= MAX_IDENTITY_VISUAL_PARTS) {
-    return hardCapAtBoundary(parts.join(", "), MAX_IDENTITY_VISUAL_LEN);
+    return hardCapAtBoundary(parts.join(", "), maxLen);
   }
   const ranked = parts
     .map((part, index) => ({ part, index, score: scoreVisualPart(part) }))
@@ -423,7 +439,7 @@ function pickSalientVisualParts(visual: string): string {
     .slice(0, MAX_IDENTITY_VISUAL_PARTS)
     .sort((a, b) => a.index - b.index)
     .map((x) => x.part);
-  return hardCapAtBoundary(ranked.join(", "), MAX_IDENTITY_VISUAL_LEN);
+  return hardCapAtBoundary(ranked.join(", "), maxLen);
 }
 
 /** Longest narrative object already named in action/environment — never invented. */
@@ -459,12 +475,16 @@ function rewriteHandTransferPreservingObject(action: string): string {
  * MUST NOT substitute a different place or architecture class.
  */
 export function sharpenExpressionAnchors<T extends ExpressionLike>(
-  expression: T
+  expression: T,
+  budgets: LocalAdaptBudgets = DEFAULT_LOCAL_ADAPT_BUDGETS
 ): T {
-  const environment = hardCapAtBoundary(expression.environment ?? "", 80);
+  const environment = hardCapAtBoundary(
+    expression.environment ?? "",
+    budgets.envMaxChars
+  );
   const characters = (expression.characters ?? []).map((ch) => ({
     ...ch,
-    visual: pickSalientVisualParts(ch.visual.trim()),
+    visual: pickSalientVisualParts(ch.visual.trim(), budgets.visualMaxChars),
   }));
   return { ...expression, environment, characters };
 }
@@ -477,7 +497,8 @@ export function sharpenExpressionAnchors<T extends ExpressionLike>(
  * with a placement-only stub — that invents a two-figure duel prior.
  */
 export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>(
-  expression: T
+  expression: T,
+  budgets: LocalAdaptBudgets = DEFAULT_LOCAL_ADAPT_BUDGETS
 ): T {
   const castLen = expression.characters?.length ?? 0;
   const chars = expression.characters ?? [];
@@ -534,17 +555,23 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
     if (!composition) {
       composition = "medium wide shot, faces secondary";
     } else {
-      composition = hardCapAtBoundary(composition, 72);
+      composition = hardCapAtBoundary(
+        composition,
+        budgets.compositionMaxChars
+      );
     }
   }
 
-  action = hardCapAtBoundary(action, 280);
+  action = hardCapAtBoundary(action, budgets.actionMaxChars);
 
-  return sharpenExpressionAnchors({
-    ...expression,
-    action: action || expression.action,
-    composition: composition || expression.composition,
-  });
+  return sharpenExpressionAnchors(
+    {
+      ...expression,
+      action: action || expression.action,
+      composition: composition || expression.composition,
+    },
+    budgets
+  );
 }
 
 /**

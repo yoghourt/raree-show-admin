@@ -1,7 +1,7 @@
 # Deployment Defaults — Image Runtime & Content Showcase
 
 **Status:** Current recommendations (replaceable)  
-**Last Updated:** 2026-08-24  
+**Last Updated:** 2026-09-03  
 **Path:** `config/infra/deployment-defaults.md`  
 **Layer:** **Deployment only**  
 **Authority:** MUST remain compatible with ADR-010 (incl. **A3**) · SPEC-IMG-001 · `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC`
@@ -36,6 +36,7 @@ Deployment Adapter
 | `creator_accept_fallback` | **Opt-in Cloud** (SiliconFlow when set) | env `IMAGE_CREATOR_ACCEPT_FALLBACK` — **unset / none = no fallback** (do not silently hit Cloud). Set `siliconflow` to enable. |
 | `accept_model` | **LocalAI Creator Default:** `Z-Image-Turbo` (RSD-002). Rollback: `sd-3.5-medium-ggml`. Cloud T2I unchanged. | `IMAGE_CREATOR_ACCEPT_MODEL` / `IMAGE_CREATOR_FALLBACK_MODEL` (default Cloud T2I: `FLUX.1-dev`; Kontext only when reference image is present). Provider unchanged. |
 | Local endpoint | Operator HTTP portrait server | `IMAGE_CREATOR_LOCAL_BASE` (e.g. `http://127.0.0.1:8191`) |
+| Renderer capability (prompt / size) | **Model-keyed table** — see [`renderer-capability-defaults.md`](./renderer-capability-defaults.md) | Execute reads `lib/ai/image/rendererCapability.ts`. **800 chars / 512² are not Z-Image ceilings.** Official Turbo window is 512 tokens (~1800 conservative Latin chars); 512² is a CPU/draft knob. Host YAML (`Z-Image-Turbo`) does not set `context_size` → treat as 512 tokens. |
 
 **A3 Constraint F:** Creator Production Default = Local via Deployment Adapter; Cloud remains Fallback / Accept Baseline. MUST NOT freeze Local vendor/model. MUST remain replaceable without amending ADR-010 Contract / SPEC-IMG-001 Port shape. Reader Runtime is unaffected.
 
