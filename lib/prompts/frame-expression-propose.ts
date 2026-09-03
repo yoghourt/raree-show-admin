@@ -6,9 +6,10 @@
 import {
   EXPRESSION_CAPABILITY_EXAMPLE,
   EXPRESSION_CAPABILITY_RULES,
-  pinRelativeAgeContrast,
+  pinIdentityLocks,
   ADULT_FACE_LEAK_PATTERN,
   WEATHERED_AGE_PATTERN,
+  findUndeadIdentityLeaks,
 } from "@/lib/discovery/expression-capability-rules";
 import { clipLocalBudgetText } from "@/lib/discovery/execution-projection";
 import {
@@ -166,6 +167,7 @@ export function findLifeStageContradictions(
       }
     }
   }
+  errors.push(...findUndeadIdentityLeaks(expression));
   return errors;
 }
 
@@ -175,9 +177,9 @@ export function applyCharacterLifeStageLooks(
   characterCues: Array<{ name: string; visualIdentity?: string }>
 ): RendererExpression {
   if (!characterCues.length) {
-    return pinRelativeAgeContrast(expression);
+    return pinIdentityLocks(expression);
   }
-  return pinRelativeAgeContrast({
+  return pinIdentityLocks({
     ...expression,
     characters: expression.characters.map((ch) => {
       const cue = characterCues.find((c) => cueMatchesRole(ch.role, c.name));
@@ -342,6 +344,7 @@ Rules:
 - Current Expression is a draft to replace, not a location lock.
 - Apparent age / life-stage is identity. After pose, the next look cue MUST keep child/youth/elder tokens from Work looks. Title (Emperor, King) MUST NOT default to a mature bearded adult. FORBIDDEN: grey goatee / lined middle-aged face / "mournful features" as a substitute for a boy emperor.
 - Relative age across the still is identity. If one figure's visual has weathered / silver beard / grey hair and another's does not, the unmarked figure MUST stay younger (no grey hair, no silver beard). FORBIDDEN: moving those marks onto the figure whose visual lacks them.
+- Living vs undead is identity. If a figure's visual does not name corpse / dead face / glowing / gaunt pale, they are living. FORBIDDEN: corpse-white skin or long white/silver hair on a living ranger in a haunted / frozen-bodies still. "pale face" means a weathered living complexion. Hair color tokens MUST stay. Frozen bodies on the ground are the dead — not a named living figure.
 
 Structural counterexamples (geometry only — do not copy their era, costumes, or place names into this work):
 WRONG beat example (do not do this):
@@ -370,6 +373,11 @@ WRONG relative age (do not do this):
 caption: a youth urges a weathered father to keep foundlings.
 bad: the figure holding the foundling has grey-streaked hair and a lined face; the unmarked father looks younger.
 good: weathered / silver-beard marks stay on the father; the youth holding the foundling stays younger, no grey hair.
+
+WRONG living/undead (do not do this):
+caption: three rangers discover frozen wildlings in a haunted forest.
+bad: leftmost ranger corpse-white, long silver hair, an Other inserted into the patrol.
+good: three living humans in black; cropped brown hair stays brown; frozen bodies stay on the snow.
 
 ${EXPRESSION_CAPABILITY_RULES}
 

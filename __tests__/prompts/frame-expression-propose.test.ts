@@ -133,6 +133,9 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/grey goatee/);
     expect(p).toMatch(/Relative age/);
     expect(p).toMatch(/unmarked figure MUST stay younger/);
+    expect(p).toMatch(/Rule 15/);
+    expect(p).toMatch(/Living vs undead/);
+    expect(p).toMatch(/three living humans in black/);
   });
 
   it("lists life-stage from Work looks as a must-keep identity cue", () => {
@@ -266,7 +269,6 @@ describe("life-stage identity", () => {
     );
     expect(folded.characters[0]?.visual).toMatch(/^standing left/i);
     expect(folded.characters[0]?.visual).toMatch(/younger/i);
-    expect(folded.characters[0]?.visual).toMatch(/no grey hair/i);
     expect(folded.characters[0]?.visual).not.toMatch(/weathered/i);
     expect(folded.characters[1]?.visual).toMatch(/weathered/i);
     expect(folded.characters[1]?.visual).toMatch(/dark beard with silver/i);
@@ -293,6 +295,59 @@ describe("life-stage identity", () => {
     );
     expect(errors.join(" ")).toMatch(/leaked/i);
     expect(errors.join(" ")).toMatch(/Jon Snow/);
+  });
+
+  it("pins living rangers and keeps cropped brown hair in a haunted still", () => {
+    const folded = applyCharacterLifeStageLooks(
+      {
+        environment: "haunted forest north of the Wall",
+        characters: [
+          {
+            role: "Will",
+            visual:
+              "standing left, weathered pale face, cropped brown hair, all-black cloak",
+          },
+          {
+            role: "Gared",
+            visual: "standing center, weathered young man, pale eyes, black wool",
+          },
+          {
+            role: "Ser Waymar Royce",
+            visual: "standing right, younger, no grey hair, nobleman armor",
+          },
+        ],
+        action: "three rangers standing among frozen wildling bodies",
+        composition: "medium-wide",
+      },
+      []
+    );
+    expect(folded.characters[0]?.visual).toMatch(/living human/i);
+    expect(folded.characters[0]?.visual).toMatch(/cropped brown hair/i);
+    expect(folded.characters[0]?.visual).toMatch(/weathered living face/i);
+    expect(folded.characters[0]?.visual).not.toMatch(/pale face/i);
+  });
+
+  it("flags white hair leaking onto a living ranger with authored brown hair", () => {
+    const errors = findLifeStageContradictions(
+      {
+        environment: "haunted forest north of the Wall",
+        characters: [
+          {
+            role: "Will",
+            visual:
+              "standing left, cropped brown hair, long white hair, black cloak",
+          },
+          {
+            role: "Gared",
+            visual: "standing center, black wool",
+          },
+        ],
+        action: "standing among frozen wildling bodies",
+        composition: "medium-wide",
+      },
+      []
+    );
+    expect(errors.join(" ")).toMatch(/white\/silver hair leaked/i);
   });
 });
 

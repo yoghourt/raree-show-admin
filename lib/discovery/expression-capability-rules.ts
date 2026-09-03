@@ -177,6 +177,20 @@ when looks mark that ruler as a child/youth, or when the beat elevates/installs 
 named emperor whose looks do not say adult.
 Bad: Emperor Xian as a grey-bearded adult on the throne (caption: Dong Zhuo elevates him).
 Good: boy emperor about eight or nine, no beard, small seated figure; Dong Zhuo towering.
+
+Rule 15 — Living vs undead is identity:
+If a figure's visual does not name corpse / dead face / glowing / gaunt pale / wight,
+that figure is living. Hair color (cropped brown hair, dark hair) is identity and MUST
+survive Local compression — it outranks cloak filler.
+"pale face" on a living figure means a fair weathered complexion, not an Other.
+FORBIDDEN: painting a living figure as corpse-white, long white/silver hair, or undead
+when the still is a haunted / frozen-bodies beat, or when another figure is the authored
+undead. Frozen bodies on the ground are the dead — not a named living ranger.
+If one figure is authored undead (gaunt pale, glowing, dead face) and another is not,
+the unmarked figure MUST stay a living human.
+Bad: three living rangers among frozen wildlings; leftmost ranger corpse-white with long
+silver hair (an Other inserted into the patrol).
+Good: three living humans in black; cropped brown hair stays brown; the dead stay on the snow.
 `.trim();
 
 /**
@@ -345,16 +359,32 @@ function hardCapAtBoundary(text: string, maxLen: number): string {
 
 /** Body / face marks that carry character identity (cross-work). */
 const IDENTITY_BODY_PATTERN =
-  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|\bgaunt\b|\bpale\b|auburn\s+hair|white\s+hair|grey hair|gray hair|no grey hair|no gray hair|silver beard|younger|youthful|beardless|weathered|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
+  /\b((?:red|black|pale|blue|green|painted)\s+face|long\s+beard|bristling\s+beard|\bbeard\b|\bgaunt\b|\bpale\b|auburn\s+hair|white\s+hair|grey hair|gray hair|no grey hair|no gray hair|silver beard|younger|youthful|beardless|weathered|living (?:human|man|woman|face)|(?:cropped|short|long)\s+(?:dark\s+)?(?:brown|black|red|auburn|blond|blonde|golden)\s+hair|(?:dark\s+)?(?:brown|black|red|blond|blonde|golden)\s+hair|\bstubble\b|topknot|closed\s+helm|\bscar(?:red)?\b)\b/i;
 
 /** Authored elder/weathered marks — must not drift onto the other figure. */
 export const WEATHERED_AGE_PATTERN =
   /\b(weathered|grey-streaked|gray-streaked|(?:dark\s+)?beard with silver|(?<!\bno\s)silver(?:ed)?\s+(?:in\s+(?:the\s+)?beard|beard)|white-haired|elderly|lined (?:face|complexion)|(?<!\bno\s)(?:grey|gray) hair)\b/i;
 
-export const RELATIVE_YOUTH_PIN = "younger, no grey hair, no silver beard";
+export const RELATIVE_YOUTH_PIN = "younger";
 
 export const ADULT_FACE_LEAK_PATTERN =
   /\b(middle-?aged|lined (?:face|complexion)|old man|(?<!\bno\s)(?:(?:grey|gray)(?:-streaked)?\s+(?:goatee|beard|hair)|white beard|silver beard))\b/i;
+
+/** Authored undead / Other marks — must not drift onto living figures. */
+export const UNDEAD_VISUAL_PATTERN =
+  /\b(glowing(?:\s+blue)?\s+eyes|dead face|pale dead|standing corpse|\bwight\b|white walker|undead|ice-blue|gaunt pale)\b/i;
+
+/** Scene priors that paint a living extra as the undead beat. */
+export const UNDEAD_SCENE_PATTERN =
+  /\b(haunted|undead|\bwight\b|white walker|frozen (?:\w+\s+){0,3}bodies|among frozen|frozen to death)\b/i;
+
+export const LIVING_PIN = "living human";
+
+export const AUTHORED_HAIR_COLOR_PATTERN =
+  /\b((?:cropped|short|long)\s+)?(?:dark\s+)?(?:brown|black|red|auburn|blond|blonde|golden)\s+hair\b/i;
+
+const WHITE_HAIR_LEAK_PATTERN =
+  /\b((?:long\s+)?(?:white|silver|platinum)\s+hair|white-haired)\b/i;
 
 /** Costume class (Tier 2). */
 const COSTUME_CUE_PATTERN =
@@ -378,8 +408,6 @@ const ACTION_PHRASE_PATTERN =
 /** Beat-contact geometry — must outrank generic standing/costume when compressing. */
 const BEAT_CONTACT_PATTERN =
   /\b(throat|neck|gauntlets?|hilt|corpse|glowing|dead face)\b/i;
-
-const MAX_IDENTITY_VISUAL_PARTS = 4;
 
 /**
  * Execute-time length knobs for Local adapt (Deployment table).
@@ -439,21 +467,44 @@ function scoreVisualPart(part: string): number {
   return 30;
 }
 
+function isDroppableVisualFiller(part: string): boolean {
+  if (BEAT_CONTACT_PATTERN.test(part)) return false;
+  if (IDENTITY_BODY_PATTERN.test(part)) return false;
+  if (isNamedIdentityWeapon(part)) return false;
+  if (TIER3_FILLER_PATTERN.test(part)) return true;
+  if (ACTION_PHRASE_PATTERN.test(part)) return true;
+  return false;
+}
+
 function pickSalientVisualParts(visual: string, maxLen: number): string {
   const parts = visual
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
-  if (parts.length <= MAX_IDENTITY_VISUAL_PARTS) {
-    return hardCapAtBoundary(parts.join(", "), maxLen);
-  }
-  const ranked = parts
+  if (!parts.length) return "";
+  const pose = parts[0]!;
+  const rest = parts.slice(1).filter((p) => !isDroppableVisualFiller(p));
+  const useful = [pose, ...rest];
+  const joined = useful.join(", ");
+  if (joined.length <= maxLen) return joined;
+
+  const ranked = rest
     .map((part, index) => ({ part, index, score: scoreVisualPart(part) }))
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .slice(0, MAX_IDENTITY_VISUAL_PARTS)
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+  const selected: Array<{ part: string; index: number; score: number }> = [];
+  for (const item of ranked) {
+    const trial = [
+      pose,
+      ...[...selected, item]
+        .sort((a, b) => a.index - b.index)
+        .map((x) => x.part),
+    ].join(", ");
+    if (trial.length <= maxLen) selected.push(item);
+  }
+  const ordered = selected
     .sort((a, b) => a.index - b.index)
     .map((x) => x.part);
-  return hardCapAtBoundary(ranked.join(", "), maxLen);
+  return hardCapAtBoundary([pose, ...ordered].join(", "), maxLen);
 }
 
 /** Longest narrative object already named in action/environment — never invented. */
@@ -578,7 +629,7 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
 
   action = hardCapAtBoundary(action, budgets.actionMaxChars);
 
-  return pinRelativeAgeContrast(
+  return pinIdentityLocks(
     sharpenExpressionAnchors(
       {
         ...expression,
@@ -587,6 +638,13 @@ export function adaptSceneExpressionForLocalCapability<T extends ExpressionLike>
       },
       budgets
     )
+  );
+}
+
+/** Age, living/undead, and authored hair color — execute and propose persist. */
+export function pinIdentityLocks<T extends ExpressionLike>(expression: T): T {
+  return pinAuthoredHairColor(
+    pinLivingCastAgainstUndeadPrior(pinRelativeAgeContrast(expression))
   );
 }
 
@@ -609,10 +667,7 @@ export function pinRelativeAgeContrast<T extends ExpressionLike>(
     ...expression,
     characters: chars.map((ch, i) => {
       if (weathered[i]) return ch;
-      if (
-        /\byounger\b/i.test(ch.visual) &&
-        /\bno grey hair\b|\bno gray hair\b/i.test(ch.visual)
-      ) {
+      if (/\byounger\b/i.test(ch.visual)) {
         return ch;
       }
       const parts = ch.visual
@@ -628,6 +683,124 @@ export function pinRelativeAgeContrast<T extends ExpressionLike>(
       return { ...ch, visual: [pose, RELATIVE_YOUTH_PIN, ...rest].join(", ") };
     }),
   };
+}
+
+function isUndeadVisual(visual: string): boolean {
+  return UNDEAD_VISUAL_PATTERN.test(visual);
+}
+
+function sceneInvitesUndeadPrior<T extends ExpressionLike>(expression: T): boolean {
+  return UNDEAD_SCENE_PATTERN.test(
+    `${expression.environment ?? ""} ${expression.action ?? ""} ${expression.composition ?? ""}`
+  );
+}
+
+function rewritePaleFaceOnLiving(visual: string): string {
+  return visual
+    .replace(/\bweathered pale face\b/gi, "weathered living face")
+    .replace(/\bpale face\b/gi, "living human face");
+}
+
+function insertAfterPose(visual: string, token: string): string {
+  if (new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(visual)) {
+    return visual;
+  }
+  const parts = visual
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const pose = parts[0] || "standing";
+  return [pose, token, ...parts.slice(1)].join(", ");
+}
+
+function stripWhiteHairLeak(visual: string): string {
+  return visual
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((p) => !WHITE_HAIR_LEAK_PATTERN.test(p))
+    .join(", ");
+}
+
+/**
+ * Keep living figures human when the still has an undead prior (haunted /
+ * frozen bodies, or a peer authored as gaunt pale / dead).
+ * Does not invent an undead extra, and does not rewrite authored undead visuals.
+ */
+export function pinLivingCastAgainstUndeadPrior<T extends ExpressionLike>(
+  expression: T
+): T {
+  const chars = expression.characters ?? [];
+  if (!chars.length) return expression;
+  const undead = chars.map((ch) => isUndeadVisual(ch.visual));
+  const undeadCount = undead.filter(Boolean).length;
+  const haunted = sceneInvitesUndeadPrior(expression);
+  if (undeadCount === chars.length) return expression;
+  if (!haunted && undeadCount === 0) return expression;
+  return {
+    ...expression,
+    characters: chars.map((ch, i) => {
+      if (undead[i]) return ch;
+      let visual = rewritePaleFaceOnLiving(ch.visual);
+      visual = stripWhiteHairLeak(visual);
+      if (!/\bliving human\b|\bliving man\b|\bliving woman\b/i.test(visual)) {
+        visual = insertAfterPose(visual, LIVING_PIN);
+      }
+      return { ...ch, visual };
+    }),
+  };
+}
+
+/**
+ * Authored hair color is identity. Keep it after pose and drop white/silver
+ * hair that drifted onto a figure whose visual already names brown/dark/red hair.
+ */
+export function pinAuthoredHairColor<T extends ExpressionLike>(
+  expression: T
+): T {
+  const chars = expression.characters ?? [];
+  if (!chars.length) return expression;
+  return {
+    ...expression,
+    characters: chars.map((ch) => {
+      if (isUndeadVisual(ch.visual)) return ch;
+      const hair = ch.visual.match(AUTHORED_HAIR_COLOR_PATTERN)?.[0];
+      if (!hair) return ch;
+      let visual = stripWhiteHairLeak(ch.visual);
+      const withoutHair = visual
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((p) => !AUTHORED_HAIR_COLOR_PATTERN.test(p));
+      const pose = withoutHair[0] || "standing";
+      const rest = withoutHair.slice(1);
+      visual = [pose, hair, ...rest].join(", ");
+      return { ...ch, visual };
+    }),
+  };
+}
+
+export function findUndeadIdentityLeaks<T extends ExpressionLike>(
+  expression: T
+): string[] {
+  const chars = expression.characters ?? [];
+  const undeadCount = chars.filter((ch) => isUndeadVisual(ch.visual)).length;
+  if (!sceneInvitesUndeadPrior(expression) && undeadCount === 0) return [];
+  const errors: string[] = [];
+  for (const ch of chars) {
+    if (isUndeadVisual(ch.visual)) continue;
+    if (WHITE_HAIR_LEAK_PATTERN.test(ch.visual)) {
+      errors.push(
+        `${ch.role}: white/silver hair leaked onto a living figure`
+      );
+    }
+    if (/\b(wight|undead|white walker|dead face|gaunt pale)\b/i.test(ch.visual)) {
+      errors.push(
+        `${ch.role}: undead marks leaked onto a figure that is not the authored undead`
+      );
+    }
+  }
+  return errors;
 }
 
 /**

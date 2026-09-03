@@ -23,6 +23,7 @@ import {
   findRestrictedFullFaceSceneCues,
   FORBIDDEN_PHYSICS_PATTERN,
   FULL_FACE_SCENE_PATTERN,
+  pinIdentityLocks,
   pinRelativeAgeContrast,
   remapGenericRolesToRoleNames,
   sharpenExpressionAnchors,
@@ -570,6 +571,7 @@ describe("rendererExpressionToPrompt", () => {
     expect(prompt).not.toMatch(/VISUAL LOCK/);
     expect(prompt).not.toContain("protects");
     expect(prompt).not.toMatch(/\byounger\b/i);
+    expect(prompt).not.toMatch(/living human/i);
   });
 
   it("legacy rendererExpressionToPrompt still returns a prompt", () => {
@@ -618,7 +620,6 @@ describe("rendererExpressionToPrompt", () => {
     };
     const pinned = pinRelativeAgeContrast(expression);
     expect(pinned.characters[0]?.visual).toMatch(/younger/i);
-    expect(pinned.characters[0]?.visual).toMatch(/no grey hair/i);
     expect(pinned.characters[1]?.visual).toMatch(/weathered/i);
     expect(pinned.characters[0]?.visual).not.toMatch(/weathered/i);
 
@@ -633,6 +634,83 @@ describe("rendererExpressionToPrompt", () => {
     expect(prompt).not.toMatch(/\bWill:/);
     expect(prompt.indexOf("Jon left holding a pup")).toBeLessThan(
       prompt.indexOf("Jon Snow standing left")
+    );
+  });
+
+  it("keeps living rangers human in a haunted frozen-bodies still", () => {
+    const expression = {
+      environment:
+        "haunted forest north of the Wall, dense dark trees, pale snow-covered ground",
+      action:
+        "three rangers of the Night's Watch standing among frozen wildling bodies in a forest clearing",
+      composition:
+        "medium-wide shot, three figures grouped near dark trees, faces secondary",
+      characters: [
+        {
+          role: "Will",
+          visual:
+            "standing left, weathered pale face, cropped brown hair, light stubble, all-black Night's Watch wool cloak, dark leather jerkin, fur collar, holding broken longsword hilt",
+        },
+        {
+          role: "Gared",
+          visual:
+            "standing center, weathered young man, pale eyes, sharp jawline, stubble beard, rough black wool tunic, boiled leather",
+        },
+        {
+          role: "Ser Waymar Royce",
+          visual:
+            "standing right, younger, no grey hair, no silver beard, young lord, nobleman armor, steel sword at side",
+        },
+      ],
+    };
+    const pinned = pinIdentityLocks(expression);
+    const will = pinned.characters[0]?.visual ?? "";
+    expect(will).toMatch(/living human/i);
+    expect(will).toMatch(/cropped brown hair/i);
+    expect(will).toMatch(/weathered living face/i);
+    expect(will).not.toMatch(/pale face/i);
+    expect(will).not.toMatch(/white hair|silver hair/i);
+    expect(pinned.characters[1]?.visual).toMatch(/living human/i);
+    expect(pinned.characters[2]?.visual).toMatch(/living human/i);
+    expect(pinned.characters[2]?.visual).not.toMatch(/gaunt pale|dead face/i);
+
+    const otherStill = pinIdentityLocks({
+      environment: "dark forest at night",
+      action:
+        "high view from a thick branch, one small cloaked watcher above, one tall gaunt figure below",
+      composition: "elevated shot from the branch looking down",
+      characters: [
+        { role: "Will", visual: "tiny on high branch, black wool cloak" },
+        { role: "Other", visual: "tall gaunt pale among trunks below" },
+      ],
+    });
+    expect(otherStill.characters[0]?.visual).toMatch(/living human/i);
+    expect(otherStill.characters[1]?.visual).toMatch(/gaunt pale/i);
+    expect(otherStill.characters[1]?.visual).not.toMatch(/living human/i);
+
+    const prompt = expressionToPrompt(expression, "local");
+    expect(prompt).toMatch(/Will standing left[^.;]*living human/i);
+    expect(prompt).toMatch(/Will standing left[^.;]*cropped brown hair/i);
+    expect(prompt).toMatch(/Night's Watch wool cloak/i);
+    expect(prompt).toMatch(/nobleman armor/i);
+    expect(prompt).toMatch(/boiled leather/i);
+    expect(prompt).not.toMatch(/\bWill:/);
+    expect(prompt).not.toMatch(/VISUAL LOCK/);
+
+    const drafted = buildFrameDraftPrompt({
+      caption:
+        "Three rangers of the Night's Watch scout deep in the haunted forest.",
+      rendererExpression: expression,
+      projectionProfile: "local",
+      workVisualConvention:
+        "STYLE: painterly digital painting. ERA: medieval wool, fur, leather.",
+    });
+    expect(drafted).toMatch(/Night's Watch wool cloak/i);
+    expect(drafted).toMatch(/nobleman armor/i);
+    expect(drafted).not.toMatch(/younger,\s*\./);
+    expect(drafted.length).toBeGreaterThan(700);
+    expect(drafted.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars + 200
     );
   });
 });
