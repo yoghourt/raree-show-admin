@@ -8,6 +8,7 @@ values here MUST NOT require amending ADR/SPEC Port shape.
 | Document | Purpose |
 | -------- | ------- |
 | [`deployment-defaults.md`](./deployment-defaults.md) | Image Runtime provider defaults, budget examples, showcase pointers, env knobs |
+| [`renderer-capability-defaults.md`](./renderer-capability-defaults.md) | Model-keyed execute prompt/size budgets (Z-Image official tokens vs this-host YAML) |
 | [`pd-showcase-recommendation-v1.md`](./pd-showcase-recommendation-v1.md) | Public-domain showcase selection & canon subset counts |
 | [`media-admission-defaults.md`](./media-admission-defaults.md) | Media Admission Phase 1 providers (upload · paste URL) |
 | [`discovery-text-defaults.md`](./discovery-text-defaults.md) | Discovery propose text provider/model (gemini-3.5-flash-lite primary) |

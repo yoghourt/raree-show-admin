@@ -103,7 +103,11 @@ Pull-based：本机拉任务，**不**暴露 LocalAI 给 Vercel。
 
    # 常驻轮询（默认 5s）
    WORKER_POLL_MS=5000 npx tsx scripts/local-generate-worker.ts --loop
+
+   # macOS：跑完响一声 + 通知中心（drain 结束时一次；--loop/--once 每条 job）
+   WORKER_NOTIFY=1 npx tsx scripts/local-generate-worker.ts
    ```
+   也可写入 `.env.local`：`WORKER_NOTIFY=1`（改完须重开 Worker）。首次 `osascript` 可能要在系统设置里允许「终端 / osascript」通知。
 5. Admin Job 列表点 **刷新**：期望 `succeeded` + `result_reference`（可预览图）。  
    **未** Accept 前 `story_images_v2` 不应变化。
 6. 日志关键字：`[local-generate-worker] claim` → `complete`；失败则为 `fail` + DB `status=failed`。
@@ -123,6 +127,7 @@ Job succeeded 之后，在制作页同一 Job 列表：
 | 缺 `SUPABASE_SERVICE_ROLE_KEY` | 写入 `.env.local` 后重跑脚本（不必重启 Next） |
 | 一直 `queued` | Worker 未跑；或 LocalAI/Cloudinary 失败看终端 |
 | `failed` + LocalAI timeout | 见下方 LocalAI 排查；可降 `IMAGE_CREATOR_LOCALAI_MAX_EDGE` |
+| `failed` + Cloudinary /「托管失败」 | 图已生成，上传 `api.cloudinary.com` 失败。查网络/`HTTPS_PROXY`；不必降 `MAX_EDGE` |
 | 纳入候选后列表仍显示空帧 | 尚未点「写入作品」；Candidate ≠ Asset |
 
 ### 操作者步骤（按序）
@@ -176,6 +181,7 @@ npx tsx scripts/verify-execution-localai.ts
 | 现象 | 处理 |
 |------|------|
 | `localai timed out` | 多为分辨率过大或首次加载；看 LocalAI 日志；降 `MAX_EDGE`（如 512）或加 `TIMEOUT_MS` |
+| `画面已生成，但托管失败` / Cloudinary connect timeout | 推理已完成；失败在上传。检查到 `api.cloudinary.com` 的网络或 `HTTPS_PROXY`，Worker 会自动重试 3 次 |
 | 电脑很卡但最终失败 | LocalAI 仍在本机推理；超时只断客户端等待，后台可能还在跑——必要时重启 LocalAI |
 | 仍像走云 / `usedFallback: true` + siliconflow | 未配 `IMAGE_CREATOR_ACCEPT_FALLBACK` 时不应走云；若仍出现，检查是否显式设了 `siliconflow`，并重启 `npm run dev` / worker |
 | connection refused | LocalAI 未听 8080；检查 `IMAGE_CREATOR_LOCALAI_BASE` |

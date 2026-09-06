@@ -2,15 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   LOCAL_ACTION_MAX,
-  LOCAL_VISUAL_MAX,
   packActionNamingCast,
 } from "@/lib/discovery/execution-projection";
+import { SD35_CAPABILITY } from "@/lib/ai/image/rendererCapability";
 import {
   applyCharacterLifeStageLooks,
   buildFrameExpressionProposePrompt,
   captionAgencyOnlyNames,
   captionOnStageNames,
   captionProperNamePhrases,
+  costumeLookFromIdentity,
   findLifeStageContradictions,
   lifeStageLookFromIdentity,
   parseFrameExpressionProposal,
@@ -59,13 +60,13 @@ describe("parseFrameExpressionProposal", () => {
     expect(out.ok).toBe(false);
   });
 
-  it("packs overlong visual and action to Local execute budgets, keeping the start", () => {
+  it("persists the full authored visual and action (no Local pack at propose)", () => {
     const longVisual =
       "kneeling in snow, stubble beard, pale eyes, rough black wool tunic, boiled leather doublet, heavy fur-lined black cloak, weathered young Night's Watch deserter";
     const longAction =
       "Lord Eddard Stark standing over kneeling Gared with raised sword; Bran Stark mounted on horse in background watching in profile from the far courtyard edge";
-    expect(longVisual.length).toBeGreaterThan(LOCAL_VISUAL_MAX);
-    expect(longAction.length).toBeGreaterThan(LOCAL_ACTION_MAX);
+    expect(longVisual.length).toBeGreaterThan(SD35_CAPABILITY.visualMaxChars);
+    expect(longAction.length).toBeGreaterThan(SD35_CAPABILITY.actionMaxChars);
 
     const out = parseFrameExpressionProposal(
       JSON.stringify({
@@ -85,13 +86,9 @@ describe("parseFrameExpressionProposal", () => {
     );
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.value.characters[0]?.visual.length).toBeLessThanOrEqual(
-      LOCAL_VISUAL_MAX
-    );
-    expect(out.value.characters[0]?.visual).toMatch(/^kneeling in snow/);
+    expect(out.value.characters[0]?.visual).toBe(longVisual);
     expect(out.value.characters[1]?.visual).toMatch(/^mounted on horse/);
-    expect(out.value.action.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
-    expect(out.value.action).toMatch(/kneeling Gared/);
+    expect(out.value.action).toBe(longAction);
   });
 });
 
@@ -128,14 +125,21 @@ describe("buildFrameExpressionProposePrompt", () => {
     expect(p).toMatch(/off-stage/);
     expect(p).toMatch(/ending on a bare name/);
     expect(p).toMatch(/Do NOT add other Work characters/);
-    expect(p).toMatch(new RegExp(String(LOCAL_VISUAL_MAX)));
     expect(p).toMatch(/pose\/blocking/);
-    expect(p).toMatch(/Creator production override/);
+    expect(p).not.toMatch(/Local execute budget/);
+    expect(p).not.toMatch(/visual ≤ 80/);
     expect(p).toMatch(/weathered northern lord face/);
-    expect(p).not.toMatch(/Valyrian steel greatsword/);
     expect(p).toMatch(/Rule 14/);
     expect(p).toMatch(/boy emperor about nine/);
     expect(p).toMatch(/grey goatee/);
+    expect(p).toMatch(/Relative age/);
+    expect(p).toMatch(/unmarked figure MUST stay younger/);
+    expect(p).toMatch(/Rule 15/);
+    expect(p).toMatch(/Living vs undead/);
+    expect(p).toMatch(/three living humans in black/);
+    expect(p).toMatch(/Rule 16/);
+    expect(p).toMatch(/Wardrobe is identity/);
+    expect(p).toMatch(/same distinctive silhouettes as looks/);
   });
 
   it("lists life-stage from Work looks as a must-keep identity cue", () => {
@@ -216,9 +220,6 @@ describe("life-stage identity", () => {
     expect(folded.characters[0]?.visual).toMatch(/^seated on throne/i);
     expect(folded.characters[0]?.visual).toMatch(/child emperor/i);
     expect(folded.characters[0]?.visual).not.toMatch(/grey goatee/i);
-    expect(folded.characters[0]?.visual.length).toBeLessThanOrEqual(
-      LOCAL_VISUAL_MAX
-    );
   });
 
   it("flags an adult face against child looks", () => {
@@ -237,6 +238,187 @@ describe("life-stage identity", () => {
       [{ name: "Emperor Xian", visualIdentity: "FACE: child emperor." }]
     );
     expect(errors.join(" ")).toMatch(/adult face/i);
+  });
+
+  it("pins relative youth when a peer is weathered", () => {
+    const folded = applyCharacterLifeStageLooks(
+      {
+        environment: "snowy forest clearing",
+        characters: [
+          {
+            role: "Jon Snow",
+            visual:
+              "standing left, holding a small dark direwolf pup, black cloak",
+          },
+          {
+            role: "Lord Eddard",
+            visual:
+              "standing right, weathered northern face, dark beard with silver, thick fur cloak",
+          },
+        ],
+        action: "Jon holds a pup and urges Ned",
+        composition: "medium-wide",
+      },
+      [
+        {
+          name: "Jon Snow",
+          visualIdentity: "FACE: long face, dark hair. COSTUME: black cloak.",
+        },
+        {
+          name: "Lord Eddard",
+          visualIdentity:
+            "FACE: weathered northern lord, dark beard with silver.",
+        },
+      ]
+    );
+    expect(folded.characters[0]?.visual).toMatch(/^standing left/i);
+    expect(folded.characters[0]?.visual).toMatch(/younger/i);
+    expect(folded.characters[0]?.visual).not.toMatch(/weathered/i);
+    expect(folded.characters[1]?.visual).toMatch(/weathered/i);
+    expect(folded.characters[1]?.visual).toMatch(/dark beard with silver/i);
+  });
+
+  it("flags grey/weathered leaking onto the unmarked figure", () => {
+    const errors = findLifeStageContradictions(
+      {
+        environment: "snow",
+        characters: [
+          {
+            role: "Jon Snow",
+            visual: "standing left, holding a pup, grey beard, black cloak",
+          },
+          {
+            role: "Lord Eddard",
+            visual: "standing right, weathered northern face, thick fur cloak",
+          },
+        ],
+        action: "Jon urges Ned",
+        composition: "medium-wide",
+      },
+      []
+    );
+    expect(errors.join(" ")).toMatch(/leaked/i);
+    expect(errors.join(" ")).toMatch(/Jon Snow/);
+  });
+
+  it("pins living rangers and keeps cropped brown hair in a haunted still", () => {
+    const folded = applyCharacterLifeStageLooks(
+      {
+        environment: "haunted forest north of the Wall",
+        characters: [
+          {
+            role: "Will",
+            visual:
+              "standing left, weathered pale face, cropped brown hair, all-black cloak",
+          },
+          {
+            role: "Gared",
+            visual: "standing center, weathered young man, pale eyes, black wool",
+          },
+          {
+            role: "Ser Waymar Royce",
+            visual: "standing right, younger, no grey hair, nobleman armor",
+          },
+        ],
+        action: "three rangers standing among frozen wildling bodies",
+        composition: "medium-wide",
+      },
+      []
+    );
+    expect(folded.characters[0]?.visual).toMatch(/living human/i);
+    expect(folded.characters[0]?.visual).toMatch(/cropped brown hair/i);
+    expect(folded.characters[0]?.visual).toMatch(/weathered living face/i);
+    expect(folded.characters[0]?.visual).not.toMatch(/pale face/i);
+  });
+
+  it("flags white hair leaking onto a living ranger with authored brown hair", () => {
+    const errors = findLifeStageContradictions(
+      {
+        environment: "haunted forest north of the Wall",
+        characters: [
+          {
+            role: "Will",
+            visual:
+              "standing left, cropped brown hair, long white hair, black cloak",
+          },
+          {
+            role: "Gared",
+            visual: "standing center, black wool",
+          },
+        ],
+        action: "standing among frozen wildling bodies",
+        composition: "medium-wide",
+      },
+      []
+    );
+    expect(errors.join(" ")).toMatch(/white\/silver hair leaked/i);
+  });
+
+  it("strips a matching cloak from armor/mail looks that do not wear a cloak", () => {
+    expect(
+      costumeLookFromIdentity("FACE: young lord.\nCOSTUME: nobleman armor, grey mail.")
+    ).toMatch(/nobleman armor/i);
+
+    const folded = applyCharacterLifeStageLooks(
+      {
+        environment: "bare snowy clearing",
+        characters: [
+          {
+            role: "Will",
+            visual: "standing left, all-black Night's Watch wool cloak, fur collar",
+          },
+          {
+            role: "Ser Waymar Royce",
+            visual: "standing right, black cloak, nobleman armor",
+          },
+        ],
+        action: "standing in empty snow",
+        composition: "wide",
+      },
+      [
+        {
+          name: "Will",
+          visualIdentity: "COSTUME: all-black Night's Watch wool cloak, fur collar.",
+        },
+        {
+          name: "Ser Waymar Royce",
+          visualIdentity: "COSTUME: nobleman armor, grey mail.",
+        },
+      ]
+    );
+    expect(folded.characters[0]?.visual).toMatch(/wool cloak/i);
+    expect(folded.characters[1]?.visual).toMatch(/nobleman armor/i);
+    expect(folded.characters[1]?.visual).toMatch(/grey mail/i);
+    expect(folded.characters[1]?.visual).not.toMatch(/black cloak/i);
+  });
+
+  it("flags a matching cloak leaked onto armor/mail looks", () => {
+    const errors = findLifeStageContradictions(
+      {
+        environment: "snow",
+        characters: [
+          {
+            role: "Will",
+            visual: "standing left, all-black wool cloak",
+          },
+          {
+            role: "Ser Waymar Royce",
+            visual: "standing right, black cloak, plate",
+          },
+        ],
+        action: "standing",
+        composition: "wide",
+      },
+      [
+        { name: "Will", visualIdentity: "COSTUME: black wool cloak." },
+        {
+          name: "Ser Waymar Royce",
+          visualIdentity: "COSTUME: nobleman armor, grey mail.",
+        },
+      ]
+    );
+    expect(errors.join(" ")).toMatch(/matching cloak leaked/i);
+    expect(errors.join(" ")).toMatch(/Ser Waymar Royce/);
   });
 });
 
@@ -305,7 +487,9 @@ describe("packActionNamingCast", () => {
 });
 
 describe("parseFrameExpressionProposal trailing action", () => {
-  it("does not leave action ending on a bare last name after Local pack", () => {
+  it("persists the authored trailing bare name (execute repairs, not persist)", () => {
+    const action =
+      "Li Su stands left presenting the Red Hare horse and treasure chests of gold and jade; Lü Bu";
     const out = parseFrameExpressionProposal(
       JSON.stringify({
         environment: "military camp courtyard at night, torch posts",
@@ -319,14 +503,12 @@ describe("parseFrameExpressionProposal trailing action", () => {
             visual: "standing center, looking intently at the horse",
           },
         ],
-        action:
-          "Li Su stands left presenting the Red Hare horse and treasure chests of gold and jade; Lü Bu",
+        action,
         composition: "medium-wide shot, both fully visible, faces secondary",
       })
     );
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.value.action).toMatch(/standing center/i);
-    expect(out.value.action.length).toBeLessThanOrEqual(LOCAL_ACTION_MAX);
+    expect(out.value.action).toBe(action);
   });
 });

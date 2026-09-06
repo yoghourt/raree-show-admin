@@ -134,6 +134,6 @@ visualIdentity (Creator portrait cues — NOT Reader prose):
 - Do NOT copy "young" / idol-handsome FACE from the current description or draft when THIS work's tradition is a recognizable older or bearded figure.
 - If current draft FACE is a generic youthful commander that contradicts THIS work, replace it.
 - STYLE: one short clause matching THIS work.
-- Hard limit: visualIdentity MUST be ≤ ${AVATAR_APPEARANCE_MAX_CHARS} characters.
+- Keep visualIdentity compact. Execute clips to ${AVATAR_APPEARANCE_MAX_CHARS} characters (current model table).
 - Example format (fill from THIS work; do not copy sample looks): "FACE: …\\nCOSTUME: …\\nPROP: …\\nSTYLE: painterly digital painting."`.trim();
 }

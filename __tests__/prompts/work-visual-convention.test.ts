@@ -140,6 +140,13 @@ describe("stripPositiveNegations", () => {
         "dark mail, no camouflage, no olive drab, pale dead face"
       )
     ).toBe("dark mail, pale dead face");
+    expect(
+      stripPositiveNegations(
+        "Ser Waymar Royce standing right, living human, younger, no grey hair, no silver beard. haunted forest"
+      )
+    ).toBe(
+      "Ser Waymar Royce standing right, living human, younger. haunted forest"
+    );
     expect(forbidsFromUnlabeledNegations("no camouflage, not a child")).toEqual([
       "camouflage",
       "child",

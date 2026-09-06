@@ -1,5 +1,6 @@
 import { imageGenerate } from "@/lib/ai/capability";
 import { loadCreatorImageDeploymentConfig } from "@/lib/ai/image/deploymentConfig";
+import { resolveRendererCapability } from "@/lib/ai/image/rendererCapability";
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload";
 import {
   resolveProjectionProfile,
@@ -22,7 +23,6 @@ import { buildHostedImageResultReference } from "@/lib/generate-jobs/resultRefer
 import {
   buildAvatarPrompt,
   buildAvatarNegativePrompt,
-  PORTRAIT_IMAGE_SIZE,
 } from "@/lib/prompts/avatar";
 import {
   buildFrameDraftPrompt,
@@ -114,12 +114,17 @@ export async function executeSceneFrameImageGenerate(input: {
   const projectionProfile = resolveProjectionProfile(
     deployment.acceptProviderId
   );
-  const frameSize = sceneFrameSizeForProfile(projectionProfile);
+  const capability = resolveRendererCapability({
+    providerId: deployment.acceptProviderId,
+    modelId: deployment.acceptModelId,
+  });
+  const frameSize = sceneFrameSizeForProfile(projectionProfile, capability);
   const prompt = buildFrameDraftPrompt({
     caption: caption || " ",
     routeTitle,
     rendererExpression,
     projectionProfile,
+    capability,
     workVisualConvention: input.workVisualConvention,
   });
   if (!prompt.trim()) {
@@ -135,6 +140,9 @@ export async function executeSceneFrameImageGenerate(input: {
     promptLen: prompt.length,
     routeTitle: routeTitle ?? null,
     projectionProfile,
+    capabilityId: capability.id,
+    promptBodyMaxChars: capability.promptBodyMaxChars,
+    negativePromptEffective: capability.negativePromptEffective,
     size: `${frameSize.width}x${frameSize.height}`,
   });
 
@@ -148,7 +156,7 @@ export async function executeSceneFrameImageGenerate(input: {
         workVisualConvention: input.workVisualConvention,
         rendererExpression,
       }),
-      // A5: Local profile 512² (blank mitigation); Cloud profile 1024².
+      // Size from the model capability table (CPU/draft knob for Local Z-Image).
       size: frameSize,
     });
     let url: string;
@@ -229,10 +237,17 @@ export async function executePortraitImageGenerate(input: {
   }
 
   const description = input.description?.trim() ?? "";
+  const deployment = loadCreatorImageDeploymentConfig();
+  const capability = resolveRendererCapability({
+    providerId: deployment.acceptProviderId,
+    modelId: deployment.acceptModelId,
+  });
+  const portraitSize = { width: capability.width, height: capability.height };
   const prompt = buildAvatarPrompt(
     name,
     description,
-    input.workVisualConvention
+    input.workVisualConvention,
+    capability
   );
   const negativePrompt = buildAvatarNegativePrompt(
     description,
@@ -243,7 +258,8 @@ export async function executePortraitImageGenerate(input: {
     name,
     promptLen: prompt.length,
     negativeLen: negativePrompt.length,
-    size: PORTRAIT_IMAGE_SIZE,
+    capabilityId: capability.id,
+    size: portraitSize,
   });
 
   try {
@@ -252,7 +268,7 @@ export async function executePortraitImageGenerate(input: {
       assetSlot: "portrait",
       prompt,
       negativePrompt,
-      size: { ...PORTRAIT_IMAGE_SIZE },
+      size: portraitSize,
     });
     let url: string;
     try {

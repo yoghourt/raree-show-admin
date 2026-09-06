@@ -5,13 +5,14 @@
  *
  * Expression path: Execution Projection by Deployment profile (A5).
  * Local caption fallback: short single-pass beat.
- * Expression execute body tracks portrait length (~800); see LOCAL_PROMPT_BODY_MAX.
+ * Expression execute body is clipped to the model capability table.
  * Cloud caption path: denser wrapper for caption-only frames.
  *
  * Operator revision notes (`[操作员修改意见] …`) are promoted to the front —
  * trailing Chinese notes lose to early English style tokens.
  */
 
+import type { RendererCapability } from "@/lib/ai/image/rendererCapability";
 import {
   expressionToPrompt,
   resolveProjectionProfileFromEnv,
@@ -216,10 +217,12 @@ function buildExpressionPrompt(input: {
   routeTitle: string;
   projectionProfile: ProjectionProfile;
   workVisualConvention?: string;
+  capability?: RendererCapability;
 }): string {
   const body = expressionToPrompt(
     input.expression,
-    input.projectionProfile
+    input.projectionProfile,
+    input.capability
   ).trim();
   if (!body) return "";
 
@@ -373,6 +376,8 @@ export function buildFrameDraftPrompt(input: {
   rendererExpression?: RendererExpression | null;
   /** A5 Deployment profile; defaults from IMAGE_CREATOR_ACCEPT_PROVIDER. */
   projectionProfile?: ProjectionProfile;
+  /** Model-keyed execute budgets; defaults from Deployment env. */
+  capability?: RendererCapability;
   /** Creator-only work convention (era/style/forbids). Must not override the caption beat. */
   workVisualConvention?: string;
 }): string {
@@ -390,6 +395,7 @@ export function buildFrameDraftPrompt(input: {
       routeTitle,
       projectionProfile,
       workVisualConvention,
+      capability: input.capability,
     });
     return projectionProfile === "local" ? stripPositiveNegations(prompt) : prompt;
   }

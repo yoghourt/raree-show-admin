@@ -9,12 +9,13 @@
 import { z } from "zod"
 
 import { imageGenerate } from "@/lib/ai/capability"
+import { loadCreatorImageDeploymentConfig } from "@/lib/ai/image/deploymentConfig"
+import { resolveRendererCapability } from "@/lib/ai/image/rendererCapability"
 import { uploadImageBufferToCloudinary } from "@/lib/cloudinary/serverUpload"
 import { formatRequestError } from "@/lib/format-request-error"
 import {
   buildAvatarPrompt,
   buildAvatarNegativePrompt,
-  PORTRAIT_IMAGE_SIZE,
 } from "@/lib/prompts/avatar"
 
 export type GenerateCharacterAvatarState =
@@ -56,7 +57,12 @@ export async function generateCharacterAvatar(
   }
 
   const { name, description, characterTsid } = raw.data
-  const prompt = buildAvatarPrompt(name, description)
+  const deployment = loadCreatorImageDeploymentConfig()
+  const capability = resolveRendererCapability({
+    providerId: deployment.acceptProviderId,
+    modelId: deployment.acceptModelId,
+  })
+  const prompt = buildAvatarPrompt(name, description, undefined, capability)
 
   try {
     const candidate = await imageGenerate({
@@ -64,7 +70,7 @@ export async function generateCharacterAvatar(
       assetSlot: "portrait",
       prompt,
       negativePrompt: buildAvatarNegativePrompt(description),
-      size: { ...PORTRAIT_IMAGE_SIZE },
+      size: { width: capability.width, height: capability.height },
     })
     let url: string
     try {

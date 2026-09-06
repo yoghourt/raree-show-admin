@@ -7,6 +7,10 @@ import { describe, expect, it } from "vitest";
 import { foldCharacterArchivesIntoExpression } from "@/lib/discovery/character-archive";
 import { normalizeRawCandidate } from "@/lib/discovery/candidate-validate";
 import {
+  SD35_CAPABILITY,
+  Z_IMAGE_TURBO_CAPABILITY,
+} from "@/lib/ai/image/rendererCapability";
+import {
   expressionToPrompt,
   LOCAL_PROMPT_BODY_MAX,
   projectExpressionForDeployment,
@@ -19,6 +23,9 @@ import {
   findRestrictedFullFaceSceneCues,
   FORBIDDEN_PHYSICS_PATTERN,
   FULL_FACE_SCENE_PATTERN,
+  pinIdentityLocks,
+  pinRelativeAgeContrast,
+  promoteDistinctiveGarments,
   remapGenericRolesToRoleNames,
   sharpenExpressionAnchors,
 } from "@/lib/discovery/expression-capability-rules";
@@ -564,6 +571,8 @@ describe("rendererExpressionToPrompt", () => {
     expect(prompt).not.toMatch(/\bFigures:/);
     expect(prompt).not.toMatch(/VISUAL LOCK/);
     expect(prompt).not.toContain("protects");
+    expect(prompt).not.toMatch(/\byounger\b/i);
+    expect(prompt).not.toMatch(/living human/i);
   });
 
   it("legacy rendererExpressionToPrompt still returns a prompt", () => {
@@ -589,6 +598,159 @@ describe("rendererExpressionToPrompt", () => {
     );
     expect(projected.composition).toMatch(/both visible/i);
     expect(projected.composition).toMatch(/identity weapons in frame/i);
+  });
+
+  it("pins relative youth and prefixes role names without a colon", () => {
+    const expression = {
+      environment: "snowy forest clearing",
+      characters: [
+        {
+          role: "Jon Snow",
+          visual:
+            "standing left, holding a small dark direwolf pup, black cloak",
+        },
+        {
+          role: "Lord Eddard",
+          visual:
+            "standing right, weathered northern face, dark beard with silver, thick fur cloak",
+        },
+      ],
+      action:
+        "Jon left holding a pup, Lord Eddard right listening, both fully visible",
+      composition: "medium-wide, faces secondary",
+    };
+    const pinned = pinRelativeAgeContrast(expression);
+    expect(pinned.characters[0]?.visual).toMatch(/younger/i);
+    expect(pinned.characters[1]?.visual).toMatch(/weathered/i);
+    expect(pinned.characters[0]?.visual).not.toMatch(/weathered/i);
+
+    const prompt = expressionToPrompt(expression, "local");
+    expect(prompt).toMatch(/Jon Snow standing left/);
+    expect(prompt).toMatch(/Lord Eddard standing right/);
+    expect(prompt).toMatch(/Jon Snow standing left[^.;]*younger/i);
+    expect(prompt).toMatch(/Lord Eddard standing right[^.;]*weathered/i);
+    expect(prompt).not.toMatch(/Jon Snow:/);
+    expect(prompt).not.toMatch(/Lord Eddard:/);
+    expect(prompt).not.toMatch(/VISUAL LOCK/);
+    expect(prompt).not.toMatch(/\bWill:/);
+    expect(prompt.indexOf("Jon left holding a pup")).toBeLessThan(
+      prompt.indexOf("Jon Snow standing left")
+    );
+  });
+
+  it("keeps living rangers human in a haunted frozen-bodies still", () => {
+    const expression = {
+      environment:
+        "haunted forest north of the Wall, dense dark trees, pale snow-covered ground",
+      action:
+        "three rangers of the Night's Watch standing among frozen wildling bodies in a forest clearing",
+      composition:
+        "medium-wide shot, three figures grouped near dark trees, faces secondary",
+      characters: [
+        {
+          role: "Will",
+          visual:
+            "standing left, weathered pale face, cropped brown hair, light stubble, all-black Night's Watch wool cloak, dark leather jerkin, fur collar, holding broken longsword hilt",
+        },
+        {
+          role: "Gared",
+          visual:
+            "standing center, weathered young man, pale eyes, sharp jawline, stubble beard, rough black wool tunic, boiled leather",
+        },
+        {
+          role: "Ser Waymar Royce",
+          visual:
+            "standing right, younger, no grey hair, no silver beard, young lord, nobleman armor, steel sword at side",
+        },
+      ],
+    };
+    const pinned = pinIdentityLocks(expression);
+    const will = pinned.characters[0]?.visual ?? "";
+    expect(will).toMatch(/living human/i);
+    expect(will).toMatch(/cropped brown hair/i);
+    expect(will).toMatch(/weathered living face/i);
+    expect(will).not.toMatch(/pale face/i);
+    expect(will).not.toMatch(/white hair|silver hair/i);
+    expect(pinned.characters[1]?.visual).toMatch(/living human/i);
+    expect(pinned.characters[2]?.visual).toMatch(/living human/i);
+    expect(pinned.characters[2]?.visual).not.toMatch(/gaunt pale|dead face/i);
+
+    const otherStill = pinIdentityLocks({
+      environment: "dark forest at night",
+      action:
+        "high view from a thick branch, one small cloaked watcher above, one tall gaunt figure below",
+      composition: "elevated shot from the branch looking down",
+      characters: [
+        { role: "Will", visual: "tiny on high branch, black wool cloak" },
+        { role: "Other", visual: "tall gaunt pale among trunks below" },
+      ],
+    });
+    expect(otherStill.characters[0]?.visual).toMatch(/living human/i);
+    expect(otherStill.characters[1]?.visual).toMatch(/gaunt pale/i);
+    expect(otherStill.characters[1]?.visual).not.toMatch(/living human/i);
+
+    const prompt = expressionToPrompt(expression, "local");
+    expect(prompt).toMatch(/Will standing left[^.;]*living human/i);
+    expect(prompt).toMatch(/Will standing left[^.;]*cropped brown hair/i);
+    expect(prompt).toMatch(/Night's Watch wool cloak/i);
+    expect(prompt).toMatch(/nobleman armor/i);
+    expect(prompt).toMatch(/boiled leather/i);
+    expect(prompt).not.toMatch(/\bWill:/);
+    expect(prompt).not.toMatch(/VISUAL LOCK/);
+
+    const drafted = buildFrameDraftPrompt({
+      caption:
+        "Three rangers of the Night's Watch scout deep in the haunted forest.",
+      rendererExpression: expression,
+      projectionProfile: "local",
+      workVisualConvention:
+        "STYLE: painterly digital painting. ERA: medieval wool, fur, leather.",
+    });
+    expect(drafted).toMatch(/Night's Watch wool cloak/i);
+    expect(drafted).toMatch(/nobleman armor/i);
+    expect(drafted).not.toMatch(/younger,\s*\./);
+    expect(drafted.length).toBeGreaterThan(700);
+    expect(drafted.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars + 200
+    );
+  });
+
+  it("keeps distinctive silhouettes when three figures share a cloak", () => {
+    const expression = {
+      environment: "Haunted forest beyond the Wall at falling night, deep snow",
+      action:
+        "Will, Gared, and Ser Waymar Royce standing in a bare snowy forest clearing",
+      composition: "very wide shot, three small figures dwarfed by dark forest",
+      characters: [
+        {
+          role: "Will",
+          visual:
+            "standing left, cropped brown hair, all-black Night's Watch wool cloak, dark leather jerkin, fur collar",
+        },
+        {
+          role: "Gared",
+          visual:
+            "center, hooded black wool cloak, rough black wool tunic, boiled leather",
+        },
+        {
+          role: "Ser Waymar Royce",
+          visual:
+            "standing right, younger, nobleman armor, black cloak, grey mail, sheathed steel sword",
+        },
+      ],
+    };
+    const pinned = promoteDistinctiveGarments(expression);
+    const will = pinned.characters[0]?.visual ?? "";
+    expect(will.indexOf("fur collar")).toBeLessThan(will.indexOf("wool cloak"));
+    const waymar = pinned.characters[2]?.visual ?? "";
+    expect(waymar.indexOf("nobleman armor")).toBeLessThan(waymar.indexOf("black cloak"));
+
+    const prompt = expressionToPrompt(expression, "local");
+    expect(prompt).toMatch(/different silhouettes/i);
+    expect(prompt).toMatch(/not matching outfits/i);
+    expect(prompt).toMatch(/fur collar/i);
+    expect(prompt).toMatch(/nobleman armor/i);
+    expect(prompt).toMatch(/hooded black wool cloak/i);
   });
 });
 
@@ -657,6 +819,7 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).not.toMatch(/\bWill:/);
     expect(prompt).not.toMatch(/all-black cloaks/i);
     expect(prompt).toMatch(/tiny on high branch/);
+    expect(prompt).toMatch(/\bWill tiny on high branch/);
     const neg = buildFrameNegativePrompt("Will spots a creature from a tree.", {
       castCount: 2,
       rendererExpression: expression,
@@ -734,7 +897,44 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).toMatch(/standing corpse/i);
     expect(prompt).toMatch(/glowing blue eyes/i);
     expect(prompt).toMatch(/empty hands/i);
-    expect(prompt.length).toBeLessThan(LOCAL_PROMPT_BODY_MAX + 80);
+    expect(prompt.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars + 80
+    );
+  });
+
+  it("Z-Image table keeps overlay action; sd-3.5 table still short-clips", () => {
+    const expression = {
+      environment: "Haunted Forest at night, snow, black enclosing trees",
+      action:
+        "two adult figures only: kneeling cloaked man, standing armored corpse leaning over him with both gauntlets clamped around his throat; broken hilt unused on the snow",
+      composition: "medium-wide, two figures only, faces secondary",
+      visualEmphasis: "gauntlets around the throat, hilt on the snow",
+      characters: [
+        {
+          role: "Will",
+          visual:
+            "adult kneeling in snow, black wool cloak, empty hands, head pulled back",
+        },
+        {
+          role: "Ser Waymar Royce",
+          visual:
+            "taller standing corpse, dark steel plate and mail, solid black wool cloth, pale dead face, glowing blue eyes, both gauntlets on the kneeling man's throat",
+        },
+      ],
+    };
+    const zImage = expressionToPrompt(
+      expression,
+      "local",
+      Z_IMAGE_TURBO_CAPABILITY
+    );
+    const sd35 = expressionToPrompt(expression, "local", SD35_CAPABILITY);
+    expect(zImage).toMatch(/throat/i);
+    expect(zImage).toMatch(/broken hilt/i);
+    expect(zImage.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars
+    );
+    expect(sd35.length).toBeLessThanOrEqual(SD35_CAPABILITY.promptBodyMaxChars);
+    expect(sd35.length).toBeLessThan(zImage.length);
   });
 
   it("keeps operator revision with Expression", () => {
@@ -764,7 +964,9 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).not.toContain("Scene content (authoritative)");
     expect(prompt).not.toMatch(/VISUAL LOCK/);
     expect(prompt).toMatch(/cinematic|painterly/i);
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars
+    );
   });
 
   it("falls back to caption when Expression is an empty-scene stub", () => {
@@ -786,7 +988,9 @@ describe("buildFrameDraftPrompt Expression-first", () => {
     expect(prompt).toContain("Scene:");
     expect(prompt).not.toMatch(/empty scene/i);
     expect(prompt).not.toContain("character present");
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.promptBodyMaxChars
+    );
   });
 
   it("keeps dense caption wrapper on cloud profile", () => {

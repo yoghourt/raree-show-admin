@@ -6,17 +6,13 @@
 import {
   EXPRESSION_CAPABILITY_EXAMPLE,
   EXPRESSION_CAPABILITY_RULES,
+  pinIdentityLocks,
+  ADULT_FACE_LEAK_PATTERN,
+  WEATHERED_AGE_PATTERN,
+  findUndeadIdentityLeaks,
+  findMatchingCloakLeaks,
 } from "@/lib/discovery/expression-capability-rules";
-import {
-  clipLocalBudgetText,
-  LOCAL_ACTION_MAX,
-  LOCAL_COMPOSITION_MAX,
-  LOCAL_EMPHASIS_MAX,
-  LOCAL_ENV_MAX,
-  LOCAL_ROLE_MAX,
-  LOCAL_VISUAL_MAX,
-  packExpressionForLocalTransport,
-} from "@/lib/discovery/execution-projection";
+import { clipLocalBudgetText } from "@/lib/discovery/execution-projection";
 import {
   parseRendererExpression,
   type RendererExpression,
@@ -120,7 +116,7 @@ const CHILD_LIFE_STAGE =
 const ELDER_LIFE_STAGE =
   /\b(elderly|elder(?:ly)?|aged man|aged woman|white-haired)\b/i;
 const ADULT_FACE_INVENTED =
-  /\b((?:grey|gray)(?:-streaked)?\s+(?:goatee|beard)|white beard|long beard|goatee|middle-?aged|lined (?:face|complexion)|old man)\b/i;
+  /\b((?:grey|gray)(?:-streaked)?\s+(?:goatee|beard|hair)|white beard|silver beard|long beard|goatee|middle-?aged|lined (?:face|complexion)|weathered|old man)\b/i;
 
 function cueMatchesRole(role: string, cueName: string): boolean {
   const r = role.trim().toLowerCase();
@@ -156,7 +152,86 @@ export function findLifeStageContradictions(
       );
     }
   }
+  const weathered = (expression.characters ?? []).filter((ch) =>
+    WEATHERED_AGE_PATTERN.test(ch.visual)
+  );
+  if (
+    weathered.length > 0 &&
+    weathered.length < (expression.characters?.length ?? 0)
+  ) {
+    for (const ch of expression.characters ?? []) {
+      if (WEATHERED_AGE_PATTERN.test(ch.visual)) continue;
+      if (ADULT_FACE_LEAK_PATTERN.test(ch.visual)) {
+        errors.push(
+          `${ch.role}: grey/weathered face leaked onto a figure that is not the authored elder`
+        );
+      }
+    }
+  }
+  errors.push(...findUndeadIdentityLeaks(expression));
+  errors.push(...findMatchingCloakLeaks(expression, characterCues));
   return errors;
+}
+
+export function costumeLookFromIdentity(
+  visualIdentity: string | undefined
+): string | null {
+  const raw = visualIdentity?.match(/COSTUME:\s*([^\n]+)/i)?.[1]?.trim() ?? "";
+  if (!raw) return null;
+  const compact = raw.replace(/\.$/, "").trim();
+  return compact ? compact : null;
+}
+
+function looksArmorWithoutCloak(costume: string): boolean {
+  return (
+    /\b(armor|armour|mail|plate)\b/i.test(costume) && !/\bcloak\b/i.test(costume)
+  );
+}
+
+function stripSharedCloakParts(visual: string): string {
+  return visual
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter(
+      (p) =>
+        !(/\bcloak\b/i.test(p) &&
+          !/\b(fur collar|hooded|plate|armor|armour|mail|chainmail|jerkin|boiled leather)\b/i.test(
+            p
+          ))
+    )
+    .join(", ");
+}
+
+function applyCostumeFromLooks(
+  expression: RendererExpression,
+  characterCues: Array<{ name: string; visualIdentity?: string }>
+): RendererExpression {
+  return {
+    ...expression,
+    characters: expression.characters.map((ch) => {
+      const cue = characterCues.find((c) => cueMatchesRole(ch.role, c.name));
+      const costume = costumeLookFromIdentity(cue?.visualIdentity);
+      if (!costume) return ch;
+      let visual = looksArmorWithoutCloak(costume)
+        ? stripSharedCloakParts(ch.visual)
+        : ch.visual;
+      const costumeParts = costume
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const missing = costumeParts.filter(
+        (part) => !new RegExp(escapeRegExp(part), "i").test(visual)
+      );
+      if (missing.length === 0) return { ...ch, visual };
+      const parts = visual
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const pose = parts[0] || "standing";
+      return { ...ch, visual: [pose, ...missing, ...parts.slice(1)].join(", ") };
+    }),
+  };
 }
 
 /** Put archive life-stage immediately after pose so Local clip keeps it. */
@@ -164,8 +239,10 @@ export function applyCharacterLifeStageLooks(
   expression: RendererExpression,
   characterCues: Array<{ name: string; visualIdentity?: string }>
 ): RendererExpression {
-  if (!characterCues.length) return expression;
-  return {
+  if (!characterCues.length) {
+    return pinIdentityLocks(expression);
+  }
+  const withStage = {
     ...expression,
     characters: expression.characters.map((ch) => {
       const cue = characterCues.find((c) => cueMatchesRole(ch.role, c.name));
@@ -183,10 +260,11 @@ export function applyCharacterLifeStageLooks(
       const rest = parts.slice(1);
       return {
         ...ch,
-        visual: clipLocalBudgetText([pose, stage, ...rest].join(", "), LOCAL_VISUAL_MAX),
+        visual: [pose, stage, ...rest].join(", "),
       };
     }),
   };
+  return pinIdentityLocks(applyCostumeFromLooks(withStage, characterCues));
 }
 
 function extractJsonObject(raw: string): unknown {
@@ -233,7 +311,7 @@ export function parseFrameExpressionProposal(
   }
   const parsed = parseRendererExpression(obj);
   if (!parsed.ok) return parsed;
-  return { ok: true, value: packExpressionForLocalTransport(parsed.value) };
+  return parsed;
 }
 
 export function buildFrameExpressionProposePrompt(
@@ -251,7 +329,7 @@ export function buildFrameExpressionProposePrompt(
           .map((c) => {
             const vis = c.visualIdentity?.trim();
             if (!vis) return `- ${c.name}`;
-            return `- ${c.name}: ${clipLocalBudgetText(vis, LOCAL_VISUAL_MAX)}`;
+            return `- ${c.name}: ${clipLocalBudgetText(vis, 220)}`;
           })
           .join("\n");
 
@@ -311,13 +389,9 @@ Rules:
 - OUTPUT LANGUAGE: English (Latin script only).
 - Return ONLY valid JSON for rendererExpression (no preamble).
 - Shape: ${JSON.stringify(EXPRESSION_CAPABILITY_EXAMPLE)}
-- Local execute budget (Creator Default = Local). Longer tails are DROPPED at generate — write WITHIN budget so pose is not cut:
-  - characters[].visual ≤ ${LOCAL_VISUAL_MAX} chars. FIRST tokens MUST be pose/blocking (kneeling, mounted, standing, holding X), THEN 1–2 look cues. Do not paste full visual identity.
-  - characters[].role ≤ ${LOCAL_ROLE_MAX} chars.
-  - action ≤ ${LOCAL_ACTION_MAX} chars — COMPLETE clause for EVERY characters[] role (pose + left/right). FORBIDDEN: ending on a bare name with no verb ("…; Lü Bu"). Write the compact still first; drop adjectives if needed.
-  - environment ≤ ${LOCAL_ENV_MAX} chars. From THIS caption only. FORBIDDEN: copying an interior from Current Expression when the caption does not name that place.
-  - composition ≤ ${LOCAL_COMPOSITION_MAX} chars.
-  - visualEmphasis / lighting / atmosphere / threatPerception ≤ ${LOCAL_EMPHASIS_MAX} chars each.
+- Write a complete static still. FIRST tokens of characters[].visual MUST be pose/blocking (kneeling, mounted, standing, holding X), THEN look cues. Do not paste the full visual identity dump.
+- action MUST be a COMPLETE clause for EVERY characters[] role (pose). FORBIDDEN: ending on a bare name with no verb ("…; Lü Bu").
+- environment from THIS caption only. FORBIDDEN: copying an interior from Current Expression when the caption does not name that place.
 - FORBIDDEN: long costume paragraphs; repeating every archive cue; putting kneeling/mounted/holding at the END of visual.
 - Caption is beat authority. Do not invent a different moment or a more famous adjacent still.
 - Cast MUST come from caption-named agents. FORBIDDEN: swapping in other Work characters because they have visual cues.
@@ -333,6 +407,9 @@ Rules:
 - Named mounts and treasure in the caption are props between the figures — not extra people in characters[].
 - Current Expression is a draft to replace, not a location lock.
 - Apparent age / life-stage is identity. After pose, the next look cue MUST keep child/youth/elder tokens from Work looks. Title (Emperor, King) MUST NOT default to a mature bearded adult. FORBIDDEN: grey goatee / lined middle-aged face / "mournful features" as a substitute for a boy emperor.
+- Relative age across the still is identity. If one figure's visual has weathered / silver beard / grey hair and another's does not, the unmarked figure MUST stay younger (no grey hair, no silver beard). FORBIDDEN: moving those marks onto the figure whose visual lacks them.
+- Living vs undead is identity. If a figure's visual does not name corpse / dead face / glowing / gaunt pale, they are living. FORBIDDEN: corpse-white skin or long white/silver hair on a living ranger in a haunted / frozen-bodies still. "pale face" means a weathered living complexion. Hair color tokens MUST stay. Frozen bodies on the ground are the dead — not a named living figure.
+- Wardrobe is identity across beats. A new caption changes pose and place, not costume class. FORBIDDEN: putting the same cloak on every figure when looks differ (plate vs fur collar vs hood). Shared black is allowed only with a distinctive second garment. Do not copy a peer's cloak onto armor/mail looks.
 
 Structural counterexamples (geometry only — do not copy their era, costumes, or place names into this work):
 WRONG beat example (do not do this):
@@ -351,13 +428,28 @@ good: Ding Yuan left pointing; Lü Bu center in front of him; Dong Zhuo right, s
 
 caption: Li Su bears Red Hare, gold and jade on behalf of Dong Zhuo; Lü Bu agrees to switch sides.
 bad: Dong Zhuo standing in the hall watching; action truncated as "…; Lü Bu"; imperial palace copied from the previous frame.
-good: camp courtyard; Li Su left with Red Hare reins and chests; Lü Bu right looking at the horse; Dong Zhuo off-stage. Action names both poses within the Local action budget.
+good: camp courtyard; Li Su left with Red Hare reins and chests; Lü Bu right looking at the horse; Dong Zhuo off-stage. Action names both poses.
 
 caption: Dong Zhuo elevates Emperor Xian and seizes absolute power.
 bad: Emperor Xian as a middle-aged man with grey goatee, mournful adult face, opulent robes only.
 good: Dong Zhuo towering left; Emperor Xian a boy emperor about nine, no beard, small on the throne.
 
+WRONG relative age (do not do this):
+caption: a youth urges a weathered father to keep foundlings.
+bad: the figure holding the foundling has grey-streaked hair and a lined face; the unmarked father looks younger.
+good: weathered / silver-beard marks stay on the father; the youth holding the foundling stays younger, no grey hair.
+
+WRONG living/undead (do not do this):
+caption: three rangers discover frozen wildlings in a haunted forest.
+bad: leftmost ranger corpse-white, long silver hair, an Other inserted into the patrol.
+good: three living humans in black; cropped brown hair stays brown; frozen bodies stay on the snow.
+
+WRONG wardrobe rewrite (do not do this):
+caption: the rangers return to the camp; the bodies have vanished.
+bad: every figure in the same black cloak; plate/mail from looks dropped.
+good: same distinctive silhouettes as looks (fur collar vs hood vs plate); empty snow is the beat.
+
 ${EXPRESSION_CAPABILITY_RULES}
 
-Creator production override: field lengths MUST fit the Local execute budgets above. Pose/blocking first in every visual. Ignore Discovery "do not shrink to Local prompt budget" for this re-propose.`.trim();
+Pose/blocking first in every visual. Do not shrink Canonical Expression to a renderer field ceiling — Execution Projection clips at generate if needed.`.trim();
 }

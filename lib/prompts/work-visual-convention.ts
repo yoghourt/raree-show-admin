@@ -64,6 +64,7 @@ export function stripPositiveNegations(text: string): string {
     .replace(/\s+/g, " ")
     .replace(/\s+,/g, ",")
     .replace(/,(?:\s*,)+/g, ",")
+    .replace(/,\s*([.;])/g, "$1")
     .replace(/^[,;.\s]+|[,;.\s]+$/g, "")
     .trim();
 }

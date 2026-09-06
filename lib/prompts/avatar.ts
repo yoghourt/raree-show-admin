@@ -8,6 +8,11 @@
  */
 
 import {
+  resolveRendererCapabilityFromEnv,
+  Z_IMAGE_TURBO_CAPABILITY,
+  type RendererCapability,
+} from "@/lib/ai/image/rendererCapability";
+import {
   forbidsFromWorkVisualConvention,
   workVisualConventionPromptBlock,
 } from "@/lib/prompts/work-visual-convention";
@@ -17,15 +22,18 @@ export const AVATAR_REVISION_MARKER = "[操作员修改意见]";
 export const AVATAR_APPEARANCE_MARKER = "[视觉身份]";
 
 /**
- * Local Z-Image throughput size (square matches LocalAI UI defaults).
- * Waist-up framing is prompt-driven; revisit 3:4 after Local is stable.
+ * Creator Default portrait size from the Z-Image capability row.
+ * 512² is a CPU/draft knob, not the Z-Image native ceiling (1024²).
  */
-export const PORTRAIT_IMAGE_SIZE = { width: 512, height: 512 } as const;
+export const PORTRAIT_IMAGE_SIZE = {
+  width: Z_IMAGE_TURBO_CAPABILITY.width,
+  height: Z_IMAGE_TURBO_CAPABILITY.height,
+} as const;
 
-/** Cap bio / archive text so Local turbo stays reliable. */
-export const AVATAR_BIO_MAX_CHARS = 160;
-/** Execute-time identity budget (Local blank / ignore). Pack FACE→PROP first. */
-export const AVATAR_APPEARANCE_MAX_CHARS = 220;
+/** Creator Default (Z-Image) execute identity / bio clip. */
+export const AVATAR_BIO_MAX_CHARS = Z_IMAGE_TURBO_CAPABILITY.bioMaxChars;
+export const AVATAR_APPEARANCE_MAX_CHARS =
+  Z_IMAGE_TURBO_CAPABILITY.appearanceMaxChars;
 
 export const VISUAL_IDENTITY_FIELD_ORDER = [
   "FACE",
@@ -87,15 +95,16 @@ export function extractVisualIdentityFields(
   return out;
 }
 
-/**
- * Per-line caps so a verbose FACE cannot eat COSTUME/PROP (sum < 220).
- * STYLE / SUMMARY only take leftover.
- */
-const PRIMARY_LINE_CAP: Record<"FACE" | "COSTUME" | "PROP", number> = {
-  FACE: 90,
-  COSTUME: 70,
-  PROP: 40,
-};
+/** Per-line caps so a verbose FACE cannot eat COSTUME/PROP. */
+function primaryLineCaps(
+  maxChars: number
+): Record<"FACE" | "COSTUME" | "PROP", number> {
+  return {
+    FACE: Math.max(90, Math.floor(maxChars * 0.4)),
+    COSTUME: Math.max(70, Math.floor(maxChars * 0.32)),
+    PROP: Math.max(40, Math.floor(maxChars * 0.18)),
+  };
+}
 
 /**
  * Fit visual identity into the Local portrait execute budget.
@@ -113,6 +122,7 @@ export function packVisualIdentityForPortrait(
 
   const lines: string[] = [];
   let used = 0;
+  const lineCaps = primaryLineCaps(maxChars);
   for (const key of VISUAL_IDENTITY_FIELD_ORDER) {
     const val = fields[key];
     if (!val) continue;
@@ -121,7 +131,7 @@ export function packVisualIdentityForPortrait(
     const remaining = maxChars - used - sep;
     const primaryCap =
       key === "FACE" || key === "COSTUME" || key === "PROP"
-        ? PRIMARY_LINE_CAP[key]
+        ? lineCaps[key]
         : remaining;
     const fitted = fitIdentityLine(line, Math.min(remaining, primaryCap));
     if (!fitted) break;
@@ -264,8 +274,10 @@ export function scrubConflictingGenderTokens(
 export function buildAvatarPrompt(
   name: string,
   description: string,
-  workVisualConvention?: string
+  workVisualConvention?: string,
+  capability?: RendererCapability
 ): string {
+  const cap = capability ?? resolveRendererCapabilityFromEnv();
   const n = name.trim();
   const { base, revisionNote, appearance } = splitAvatarDescription(description);
   const revisionCue = detectGenderCue(revisionNote);
@@ -283,10 +295,15 @@ export function buildAvatarPrompt(
     revisionCue != null ? scrubConflictingGenderTokens(base, revisionCue) : base;
 
   const clippedAppearance = scrubbedAppearance
-    ? packVisualIdentityForPortrait(scrubbedAppearance).replace(/\s+/g, " ").trim()
+    ? packVisualIdentityForPortrait(
+        scrubbedAppearance,
+        cap.appearanceMaxChars
+      )
+        .replace(/\s+/g, " ")
+        .trim()
     : "";
   const clippedBio = scrubbedBase
-    ? clipPromptChunk(scrubbedBase, AVATAR_BIO_MAX_CHARS)
+    ? clipPromptChunk(scrubbedBase, cap.bioMaxChars)
     : "";
 
   const subjectParts = [n];

@@ -1,7 +1,7 @@
 /**
  * Creator-only: propose a portrait visual_identity draft (not Reader description).
  * Output is operator-editable FACE/COSTUME/PROP/STYLE text — not Archive objects.
- * Length must fit Local portrait execute budget (AVATAR_APPEARANCE_MAX_CHARS).
+ * Length is packed to the current model appearance budget (capability table).
  */
 
 import {
@@ -143,6 +143,6 @@ Rules:
 - FACE comes from THIS work's visual tradition + name, not from Reader description adjectives.
 - If current draft FACE is a generic youthful idol that contradicts THIS work's tradition, replace it; otherwise improve the draft.
 - Honor operator note over conflicting draft bits.
-- Hard limit: total output MUST be ≤ ${AVATAR_APPEARANCE_MAX_CHARS} characters including newlines. This is the Local portrait execute budget; longer tails are dropped.
+- Keep FACE / COSTUME / PROP compact. Execute clips identity to ${AVATAR_APPEARANCE_MAX_CHARS} characters (current model table, not an Architecture ceiling).
 - Example format (fill from THIS work; do not copy sample looks): "FACE: …\\nCOSTUME: …\\nPROP: …\\nSTYLE: painterly digital painting."`.trim();
 }

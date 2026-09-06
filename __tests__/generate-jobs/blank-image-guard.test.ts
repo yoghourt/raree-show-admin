@@ -4,6 +4,7 @@ import {
   assessBlankFromLumaSamples,
   assessBlankImageBuffer,
 } from "@/lib/ai/image/blankImageGuard";
+import { Z_IMAGE_TURBO_CAPABILITY } from "@/lib/ai/image/rendererCapability";
 import {
   buildAvatarNegativePrompt,
   buildAvatarPrompt,
@@ -73,7 +74,9 @@ STYLE: semi-realistic digital painting, textured painterly brushwork, cinematic 
       prompt.indexOf("CRITICAL visual identity"),
       prompt.indexOf("Character portrait")
     );
-    expect(critical.length).toBeLessThan(320);
+    expect(critical.length).toBeLessThanOrEqual(
+      Z_IMAGE_TURBO_CAPABILITY.appearanceMaxChars + 80
+    );
   });
 
   it("truncates long biographical description", () => {
