@@ -10,6 +10,8 @@
 import {
   Agent,
   EnvHttpProxyAgent,
+  File,
+  FormData,
   fetch as undiciFetch,
   type Dispatcher,
 } from "undici"
@@ -124,8 +126,7 @@ export async function uploadImageBufferToCloudinary(
     const formData = new FormData()
     formData.append(
       "file",
-      new Blob([new Uint8Array(buffer)], { type: mimeType }),
-      `portrait.${ext}`
+      new File([new Uint8Array(buffer)], `portrait.${ext}`, { type: mimeType })
     )
     formData.append("upload_preset", "raree-show-admin")
 
