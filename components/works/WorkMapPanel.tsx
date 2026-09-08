@@ -16,6 +16,7 @@ import {
   type WorkMapResolution,
 } from "@/lib/work-maps";
 import type { MapCapability } from "@/lib/work-maps/resolve";
+import { cloudinaryDisplayUrl } from "@/lib/cloudinary-display";
 
 type WorkMapPanelProps = {
   workId: string;
@@ -226,10 +227,12 @@ export function WorkMapPanel({ workId, initialCapability }: WorkMapPanelProps) {
 
       {resolution?.status === "ready" ? (
         <div className="space-y-2">
-          <Label>已发布地图预览（resolved URL）</Label>
+          <Label>已发布地图预览（resolved display URL）</Label>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={resolution.published_asset_url}
+            src={cloudinaryDisplayUrl(resolution.published_asset_url, {
+              maxEdge: 1600,
+            })}
             alt="已发布作品地图"
             className="max-h-64 max-w-full rounded border object-contain"
           />
