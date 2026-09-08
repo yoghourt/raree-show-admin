@@ -5,7 +5,7 @@
 - **Decision Type:** Architecture
 - **Scope:** Work Map Authority / Location `map_focus` / Published Map Asset / Reader / Creator
 - **Supersedes:** None
-- **Related:** ADR-004, ADR-010, ADR-012
+- **Related:** ADR-004, ADR-010, ADR-012, SPEC-WMA-001
 - **Explicitly Unchanged:** ADR-002
 
 ## What
@@ -64,7 +64,7 @@ Reader
 
 Creator and Reader must consume the same Published Work Map Asset.
 
-This ADR does not freeze the concrete storage representation of Work Map Authority. Whether the implementation uses `work.map_asset_id`, a dedicated map table, or another representation remains a subsequent specification decision.
+Concrete storage representation is owned by SPEC-WMA-001 (dedicated `work_maps` record; not `works.map_asset_id` alone). This ADR freezes authority and reference-frame meaning only.
 
 ## Why
 
@@ -347,6 +347,8 @@ Invariant checks:
   - `ADR-012`
 - ADR:
   - `ADR-002` — explicitly unchanged
+- SPEC:
+  - `docs/specs/spec-wma-001-work-map-authority.md` — persistence and consumption contract
 
 ---
 
@@ -388,7 +390,7 @@ The primary architectural rule is:
 
 v1 uses one canonical coordinate space per Work.
 
-Concrete schema representation is intentionally deferred.
+Concrete persistence is specified in SPEC-WMA-001.
 
 ---
 
