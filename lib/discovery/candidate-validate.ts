@@ -33,6 +33,7 @@ const ASSET_FIELD_NAMES = new Set([
   "portraitUrl",
   "map_focus_x",
   "map_focus_y",
+  "map_focus_geometry_id",
   "story_images_v2",
   "tags",
   "locationId",

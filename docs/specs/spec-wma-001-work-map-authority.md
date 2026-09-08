@@ -11,13 +11,15 @@
 | Last Updated | 2026-09-08 |
 | Derived From | ADR-014 (Work Map Authority and Location Map Focus Reference Frame — Accepted) |
 | Related | ADR-004 · ADR-010 · ADR-012 · SPEC-CORE-001 · SPEC-SCC-001 · SPEC-RDX-001 · SPEC-IMG-001 |
-| Authorization | **Contract Accepted** — no Spike / Production / Implementation grant |
+| Authorization | **Contract Accepted** · **Implementation Granted (scoped)** — `docs/spikes/implement-wma-001-work-map-authority.md` |
 | Supersedes | SPEC-WMA-001 v0.1 Draft (Contract Freeze Ready A1–A3) |
 | Amendment | **A1–A3** (included at Accept) — `published_asset_id` is Asset identity; URL is resolved runtime representation; current Reader consumption set is the map-ready gate; `geometry_id` means the same canonical spatial reference frame, not visual resemblance |
 
-> **Authority boundary:** This SPEC is the downstream Runtime Contract for ADR-014. It freezes Work Map Authority meaning, coordinate reference-frame semantics, persistence ownership, publication gates, and Creator / Reader consumption rules. It does **not** authorize migrations, Admin UI, Reader UI, or production wiring.
+> **Authority boundary:** This SPEC is the downstream Runtime Contract for ADR-014. It freezes Work Map Authority meaning, coordinate reference-frame semantics, persistence ownership, publication gates, and Creator / Reader consumption rules. Implementation wiring is authorized only inside the IMPLEMENT-WMA-001 allowlist.
 
-> **v0.1 (Contract Accepted — 2026-09-08):** Architect Accept after A1–A3. Freezes Work Map Authority contract only. Spike / Production / Implementation remain **not granted**.
+> **v0.1 (Contract Accepted — 2026-09-08):** Architect Accept after A1–A3. Freezes Work Map Authority contract only.
+
+> **IMPLEMENT-WMA-001 (2026-09-08):** Scoped Implementation Authorization granted for Admin Creator path + `raree-show-web` Reader consumption. Spike remains **not granted**. Denylist in the grant still applies.
 
 > On any conflict with ADR-014, ADR-014 prevails until amended. On conflict with ADR-004 / ADR-010 / ADR-012, those ADRs prevail. Named showcase works, providers, and map image hosts are **Deployment**, not this contract.
 
@@ -31,9 +33,9 @@ Per `POLICY_RUNTIME_DEPLOYMENT_LAYER_SPEC` §6:
 | ----- | ------------ |
 | Contract Freeze | **Yes** (Accepted) |
 | Spike Implementation Authorization | **Not granted** |
-| Production Authorization | **Not granted** |
+| Production Authorization | **Granted (scoped)** — IMPLEMENT-WMA-001 allowlist |
 
-Contract Freeze does **not** authorize code, schema migration execution, or removal of the current repository-local Westeros MapPicker URL.
+Wiring outside the IMPLEMENT-WMA-001 allowlist remains unauthorized. Contract semantics (A1–A3) are unchanged.
 
 ---
 

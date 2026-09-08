@@ -168,6 +168,7 @@ This registry supersedes SPEC-D2-002 Appendix A as the authoritative source. The
 | `description` | `description` | `narrative`    | `narrative`   | Yes      | No        | Location description prose                 |
 | `map_focus_x` | `map_focus_x` | `asset`        | `excluded`    | No       | No        | Map coordinate (0–1 float)                 |
 | `map_focus_y` | `map_focus_y` | `asset`        | `excluded`    | No       | No        | Map coordinate (0–1 float)                 |
+| `map_focus_geometry_id` | `map_focus_geometry_id` | `asset` | `excluded` | No | No | IMPLEMENT-WMA-001: geometry_id binding for map_focus |
 
 **System fields excluded from Copilot:** `id`, `tsid`, `workId`, `createdAt`
 

@@ -26,6 +26,11 @@ import { useCopilotSession } from "@/hooks/useCopilotSession";
 import { messages } from "@/lib/locale";
 import * as locationsApi from "@/lib/locations";
 import type { Location } from "@/lib/types";
+import {
+  normalizeLocationPinForPersist,
+  resolveWorkMapForWork,
+  type WorkMapResolution,
+} from "@/lib/work-maps";
 
 // ---------------------------------------------------------------------------
 // Location Copilot field labels
@@ -45,6 +50,7 @@ const locationFormSchema = z.object({
   region: z.string(),
   map_focus_x: z.number().min(0).max(1).nullable().optional(),
   map_focus_y: z.number().min(0).max(1).nullable().optional(),
+  map_focus_geometry_id: z.string().nullable().optional(),
   description: z.string(),
 });
 
@@ -56,18 +62,52 @@ function locationToFormValues(loc: Location): LocationFormValues {
     region: loc.region,
     map_focus_x: loc.map_focus_x ?? null,
     map_focus_y: loc.map_focus_y ?? null,
+    map_focus_geometry_id: loc.map_focus_geometry_id ?? null,
     description: loc.description,
   };
 }
 
 function toPayload(
-  values: LocationFormValues
+  values: LocationFormValues,
+  currentGeometryId: string | null
 ): Omit<Location, "id" | "tsid" | "workId" | "createdAt"> {
+  const x = values.map_focus_x ?? null;
+  const y = values.map_focus_y ?? null;
+  const bind = values.map_focus_geometry_id?.trim() || null;
+
+  if ((x == null && y == null) || (Number.isNaN(Number(x)) && Number.isNaN(Number(y)))) {
+    return {
+      name: values.name.trim(),
+      region: values.region.trim(),
+      map_focus_x: null,
+      map_focus_y: null,
+      map_focus_geometry_id: null,
+      description: values.description.trim(),
+    };
+  }
+
+  // SPEC-WMA-001: never silently rebind Westeros-era / foreign-geometry pins.
+  if (!currentGeometryId || !bind || bind !== currentGeometryId) {
+    throw new Error(
+      "地点钉点未绑定当前作品几何。请清除后在已发布地图上重新标记，或清除钉点后再保存。"
+    );
+  }
+
+  const pin = normalizeLocationPinForPersist(
+    {
+      map_focus_x: x,
+      map_focus_y: y,
+      map_focus_geometry_id: bind,
+    },
+    currentGeometryId
+  );
+
   return {
     name: values.name.trim(),
     region: values.region.trim(),
-    map_focus_x: values.map_focus_x ?? null,
-    map_focus_y: values.map_focus_y ?? null,
+    map_focus_x: pin.map_focus_x,
+    map_focus_y: pin.map_focus_y,
+    map_focus_geometry_id: pin.map_focus_geometry_id,
     description: values.description.trim(),
   };
 }
@@ -86,8 +126,36 @@ type LocationFormProps =
 export function LocationForm(props: LocationFormProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [resolution, setResolution] = React.useState<WorkMapResolution | null>(
+    null
+  );
+  const [resolutionLoading, setResolutionLoading] = React.useState(true);
   const listHref = `/works/${encodeURIComponent(props.workId)}/locations`;
   const successHref = props.successRedirectHref ?? listHref;
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setResolutionLoading(true);
+    (async () => {
+      try {
+        const r = await resolveWorkMapForWork(props.workId);
+        if (!cancelled) setResolution(r);
+      } catch (e) {
+        if (!cancelled) {
+          setSubmitError(toSubmitError(e));
+          setResolution({ status: "not_applicable" });
+        }
+      } finally {
+        if (!cancelled) setResolutionLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [props.workId]);
+
+  const geometryId =
+    resolution?.status === "ready" ? resolution.geometry_id : null;
 
   const defaultValues: LocationFormValues =
     props.mode === "edit"
@@ -97,6 +165,7 @@ export function LocationForm(props: LocationFormProps) {
           region: props.initialValues?.region ?? "",
           map_focus_x: props.initialValues?.map_focus_x ?? null,
           map_focus_y: props.initialValues?.map_focus_y ?? null,
+          map_focus_geometry_id: null,
           description: props.initialValues?.description ?? "",
         };
 
@@ -114,6 +183,7 @@ export function LocationForm(props: LocationFormProps) {
       region: props.initialValues.region ?? "",
       map_focus_x: props.initialValues.map_focus_x ?? null,
       map_focus_y: props.initialValues.map_focus_y ?? null,
+      map_focus_geometry_id: null,
       description: props.initialValues.description ?? "",
     });
   }, [form, props]);
@@ -149,13 +219,14 @@ export function LocationForm(props: LocationFormProps) {
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitError(null);
     try {
+      const payload = toPayload(values, geometryId);
       if (props.mode === "create") {
-        await locationsApi.create(props.workId, toPayload(values));
+        await locationsApi.create(props.workId, payload);
       } else {
         await locationsApi.update(
           props.workId,
           props.defaultValues.tsid,
-          toPayload(values)
+          payload
         );
       }
       router.push(successHref);
@@ -250,11 +321,40 @@ export function LocationForm(props: LocationFormProps) {
         <Label>地图坐标</Label>
         <MapPicker
           value={{ x: mapFocusX ?? null, y: mapFocusY ?? null }}
+          resolution={resolution}
+          resolutionLoading={resolutionLoading}
           onChange={({ x, y }) => {
+            if (resolution?.status !== "ready") return;
             form.setValue("map_focus_x", x, { shouldDirty: true });
             form.setValue("map_focus_y", y, { shouldDirty: true });
+            form.setValue("map_focus_geometry_id", resolution.geometry_id, {
+              shouldDirty: true,
+            });
           }}
         />
+        {(mapFocusX != null || mapFocusY != null) && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="px-0"
+            onClick={() => {
+              form.setValue("map_focus_x", null, { shouldDirty: true });
+              form.setValue("map_focus_y", null, { shouldDirty: true });
+              form.setValue("map_focus_geometry_id", null, { shouldDirty: true });
+            }}
+          >
+            清除钉点
+          </Button>
+        )}
+        {mapFocusX != null &&
+        mapFocusY != null &&
+        resolution?.status === "ready" &&
+        form.watch("map_focus_geometry_id") !== resolution.geometry_id ? (
+          <p className="text-destructive text-xs">
+            当前钉点未绑定本作品几何（可能是旧维斯特洛坐标）。请清除后重新标记。
+          </p>
+        ) : null}
       </div>
 
       {/* ── Description (narrative) ── */}

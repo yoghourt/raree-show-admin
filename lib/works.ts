@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Work } from "@/lib/types";
+import type { MapCapability, Work } from "@/lib/types";
 import {
   clipWorkVisualConvention,
   workVisualConventionFromRow,
@@ -13,6 +13,11 @@ function throwWorkWriteError(message: string): never {
       "作品表缺少 visual_convention 列。请在 Supabase SQL editor 执行 docs/supabase/migrations/20260901000000_work_visual_convention.sql"
     );
   }
+  if (/map_capability/i.test(message)) {
+    throw new Error(
+      "作品表缺少 map_capability 列。请在 Supabase SQL editor 执行 docs/supabase/migrations/20260908000000_work_map_authority.sql"
+    );
+  }
   throw new Error(message);
 }
 
@@ -24,8 +29,13 @@ type WorkRow = {
   cover_image: string;
   source_profile_id: string | null;
   visual_convention?: string | null;
+  map_capability?: string | null;
   created_at: string;
 };
+
+function mapCapabilityFromRow(row: WorkRow): MapCapability {
+  return row.map_capability === "required" ? "required" : "off";
+}
 
 function rowToWork(row: WorkRow): Work {
   return {
@@ -36,6 +46,7 @@ function rowToWork(row: WorkRow): Work {
     coverImage: row.cover_image,
     sourceProfileId: row.source_profile_id ?? null,
     visualConvention: workVisualConventionFromRow(row),
+    mapCapability: mapCapabilityFromRow(row),
     createdAt: row.created_at,
   };
 }
@@ -90,6 +101,7 @@ export async function createWork(
     tsid?: string;
     sourceProfileId?: string | null;
     visualConvention?: string;
+    mapCapability?: MapCapability;
   }
 ): Promise<Work> {
   try {
@@ -100,6 +112,7 @@ export async function createWork(
       description: data.description,
       cover_image: data.coverImage,
       visual_convention: clipWorkVisualConvention(data.visualConvention ?? ""),
+      map_capability: data.mapCapability === "required" ? "required" : "off",
     };
     if (data.sourceProfileId !== undefined) {
       row.source_profile_id = data.sourceProfileId || null;
@@ -135,6 +148,7 @@ export async function updateWork(
       | "tsid"
       | "sourceProfileId"
       | "visualConvention"
+      | "mapCapability"
     >
   >
 ): Promise<void> {
@@ -149,6 +163,10 @@ export async function updateWork(
     }
     if (data.visualConvention !== undefined) {
       row.visual_convention = clipWorkVisualConvention(data.visualConvention);
+    }
+    if (data.mapCapability !== undefined) {
+      row.map_capability =
+        data.mapCapability === "required" ? "required" : "off";
     }
 
     const { error } = await supabase.from(TABLE).update(row).eq("id", id);

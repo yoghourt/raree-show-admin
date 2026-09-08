@@ -43,6 +43,7 @@ const LOCATION_REGISTRY: Record<string, FieldMetadata> = {
   description: { classification: "narrative",  copilot_route: "narrative" },
   map_focus_x: { classification: "asset",      copilot_route: "excluded"  },
   map_focus_y: { classification: "asset",      copilot_route: "excluded"  },
+  map_focus_geometry_id: { classification: "asset", copilot_route: "excluded" },
 };
 
 // ---------------------------------------------------------------------------

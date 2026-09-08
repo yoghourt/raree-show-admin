@@ -1,5 +1,7 @@
 import type { SceneContextRecord } from "@/lib/scene-context/types";
 
+export type MapCapability = "off" | "required";
+
 export type Work = {
   id: string;
   tsid: string;
@@ -9,6 +11,8 @@ export type Work = {
   sourceProfileId: string | null;
   /** Creator-only visual convention (style/era/forbids). Not Reader copy. */
   visualConvention: string;
+  /** IMPLEMENT-WMA-001: off = no map; required = Work Map Authority must be ready. */
+  mapCapability: MapCapability;
   createdAt: string;
 };
 
@@ -75,4 +79,6 @@ export type Location = {
   createdAt: string;
   map_focus_x?: number | null;
   map_focus_y?: number | null;
+  /** IMPLEMENT-WMA-001: geometry_id this pin was authored against. */
+  map_focus_geometry_id?: string | null;
 };
