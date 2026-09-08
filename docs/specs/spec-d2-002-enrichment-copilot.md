@@ -1093,6 +1093,7 @@ System fields (`id`, `tsid`, `workId`, `createdAt`) are excluded from all Copilo
 | `description` | `description` | `narrative`    | `narrative`   | Yes | Location description prose |
 | `map_focus_x` | `map_focus_x` | `asset`        | `excluded`    | No  | Map coordinate (0–1 float); Asset |
 | `map_focus_y` | `map_focus_y` | `asset`        | `excluded`    | No  | Map coordinate (0–1 float); Asset |
+| `map_focus_geometry_id` | `map_focus_geometry_id` | `asset` | `excluded` | No | IMPLEMENT-WMA-001 geometry bind |
 
 System fields (`id`, `tsid`, `workId`, `createdAt`) are excluded from all Copilot operations.
 

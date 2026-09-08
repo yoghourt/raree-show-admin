@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import * as React from "react";
 
 import { WorkForm } from "@/components/works/WorkForm";
+import { WorkMapPanel } from "@/components/works/WorkMapPanel";
 import { Button } from "@/components/ui/button";
 import { getWork } from "@/lib/works";
 import type { Work } from "@/lib/types";
@@ -134,6 +135,10 @@ export default function EditWorkPage() {
           sourceProfileId: work.sourceProfileId ?? "",
           visualConvention: work.visualConvention ?? "",
         }}
+      />
+      <WorkMapPanel
+        workId={work.id}
+        initialCapability={work.mapCapability ?? "off"}
       />
     </div>
   );

@@ -13,6 +13,7 @@ type LocationRow = {
   created_at: string;
   map_focus_x: number | null;
   map_focus_y: number | null;
+  map_focus_geometry_id?: string | null;
 };
 
 function rowToLocation(row: LocationRow): Location {
@@ -26,6 +27,7 @@ function rowToLocation(row: LocationRow): Location {
     createdAt: row.created_at,
     map_focus_x: row.map_focus_x ?? null,
     map_focus_y: row.map_focus_y ?? null,
+    map_focus_geometry_id: row.map_focus_geometry_id ?? null,
   };
 }
 
@@ -43,6 +45,7 @@ function toInsertRow(
     description: data.description,
     map_focus_x: data.map_focus_x ?? null,
     map_focus_y: data.map_focus_y ?? null,
+    map_focus_geometry_id: data.map_focus_geometry_id ?? null,
   };
 }
 
@@ -55,6 +58,7 @@ function toUpdateRow(
     description: data.description,
     map_focus_x: data.map_focus_x ?? null,
     map_focus_y: data.map_focus_y ?? null,
+    map_focus_geometry_id: data.map_focus_geometry_id ?? null,
   };
 }
 

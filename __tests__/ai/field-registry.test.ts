@@ -50,6 +50,7 @@ describe("FIELD_REGISTRY — SPEC-CORE-001 §4.3 completeness", () => {
     expect(locReg["description"].classification).toBe("narrative");
     expect(locReg["map_focus_x"].classification).toBe("asset");
     expect(locReg["map_focus_y"].classification).toBe("asset");
+    expect(locReg["map_focus_geometry_id"].classification).toBe("asset");
   });
 
   it("scene registry contains required fields with correct classification", () => {
@@ -77,6 +78,9 @@ describe("getEffectiveRoute — FC-03 asset permanent exclusion", () => {
     expect(getEffectiveRoute("character", "portraitUrl")).toBe("excluded");
     expect(getEffectiveRoute("location", "map_focus_x")).toBe("excluded");
     expect(getEffectiveRoute("location", "map_focus_y")).toBe("excluded");
+    expect(getEffectiveRoute("location", "map_focus_geometry_id")).toBe(
+      "excluded"
+    );
     expect(getEffectiveRoute("scene", "story_images_v2")).toBe("excluded");
   });
 
