@@ -8,8 +8,20 @@ const CLOUDINARY_UPLOAD =
   /^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload)\/(.*)$/i;
 
 export type CloudinaryDisplayOptions = {
-  /** Long-edge max pixels (c_limit). Default 2400 — enough for pin UI, far smaller than atlas originals. */
+  /** Long-edge max pixels (c_limit). Default 2400. */
   maxEdge?: number;
+  /** Cloudinary `q_` value, e.g. `auto`, `auto:good`, `auto:best`, `80`. */
+  quality?: string;
+};
+
+/**
+ * Work-map pin / Reader-grade delivery. 2400 + `q_auto` is too soft once the
+ * picker zooms past fit; original atlas PNGs are multi-MB.
+ * 4200 + `q_auto:best` matches raree-show-web work-map display.
+ */
+export const WORK_MAP_DISPLAY_OPTIONS: CloudinaryDisplayOptions = {
+  maxEdge: 4200,
+  quality: "auto:best",
 };
 
 /**
@@ -35,7 +47,8 @@ export function cloudinaryDisplayUrl(
   rest = stripManagedDisplayTransforms(rest);
 
   const maxEdge = options?.maxEdge ?? 2400;
-  const transforms = `w_${maxEdge},c_limit,f_auto,q_auto`;
+  const quality = options?.quality?.trim() || "auto";
+  const transforms = `w_${maxEdge},c_limit,f_auto,q_${quality}`;
   return `${base}/${transforms}/${rest}`;
 }
 
