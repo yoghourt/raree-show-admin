@@ -13,7 +13,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { WorkMapResolution } from "@/lib/work-maps/resolve";
-import { cloudinaryDisplayUrl } from "@/lib/cloudinary-display";
+import {
+  cloudinaryDisplayUrl,
+  WORK_MAP_DISPLAY_OPTIONS,
+} from "@/lib/cloudinary-display";
 
 export type MapPickerValue = { x: number | null; y: number | null };
 
@@ -29,7 +32,9 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 1.25;
 /** 1 = fit entire map in the viewport (contain), centered. */
-const DEFAULT_ZOOM = 1;
+const FIT_ZOOM = 1;
+/** Close-up for pinning labels; reset still returns to FIT_ZOOM. */
+const INITIAL_ZOOM = 3.5;
 const DRAG_THRESHOLD_PX = 5;
 
 function formatCoord(n: number | null | undefined) {
@@ -87,10 +92,12 @@ export function MapPicker({
   const [marker, setMarker] = React.useState<{ x: number; y: number } | null>(
     null
   );
-  const [zoom, setZoom] = React.useState(DEFAULT_ZOOM);
+  const [zoom, setZoom] = React.useState(INITIAL_ZOOM);
   const [pan, setPan] = React.useState({ x: 0, y: 0 });
   const [natural, setNatural] = React.useState({ w: 0, h: 0 });
   const [viewport, setViewport] = React.useState({ w: 0, h: 0 });
+  const [panning, setPanning] = React.useState(false);
+  const openRef = React.useRef(false);
 
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const imgRef = React.useRef<HTMLImageElement>(null);
@@ -108,7 +115,10 @@ export function MapPicker({
 
   const ready = resolution?.status === "ready";
   const mapUrl = ready
-    ? cloudinaryDisplayUrl(resolution.published_asset_url, { maxEdge: 2400 })
+    ? cloudinaryDisplayUrl(
+        resolution.published_asset_url,
+        WORK_MAP_DISPLAY_OPTIONS
+      )
     : null;
 
   const fitScale =
@@ -133,13 +143,20 @@ export function MapPicker({
   );
 
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      openRef.current = false;
+      setPanning(false);
+      return;
+    }
     const nextMarker =
       value.x != null && value.y != null
         ? { x: value.x, y: value.y }
         : null;
     setMarker(nextMarker);
-    setZoom(DEFAULT_ZOOM);
+    const justOpened = !openRef.current;
+    openRef.current = true;
+    if (!justOpened) return;
+    setZoom(INITIAL_ZOOM);
     centerPinRef.current = nextMarker;
     needsCenterRef.current = true;
   }, [open, value.x, value.y]);
@@ -170,7 +187,7 @@ export function MapPicker({
     if (natural.w <= 0 || natural.h <= 0 || viewport.w <= 0 || viewport.h <= 0) {
       return;
     }
-    applyCenter(DEFAULT_ZOOM, centerPinRef.current);
+    applyCenter(INITIAL_ZOOM, centerPinRef.current);
     needsCenterRef.current = false;
   }, [open, natural, viewport, applyCenter]);
 
@@ -212,7 +229,6 @@ export function MapPicker({
     const ny = clamp((clientY - rect.top) / h, 0, 1);
     setMarker({ x: nx, y: ny });
     onChange({ x: nx, y: ny });
-    setOpen(false);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -240,6 +256,7 @@ export function MapPicker({
       drag.moved = true;
     }
     if (drag.moved) {
+      setPanning(true);
       setPan({
         x: drag.originPanX + dx,
         y: drag.originPanY + dy,
@@ -251,6 +268,7 @@ export function MapPicker({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
     dragRef.current = null;
+    setPanning(false);
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {
@@ -262,8 +280,8 @@ export function MapPicker({
   };
 
   const resetView = () => {
-    setZoom(DEFAULT_ZOOM);
-    applyCenter(DEFAULT_ZOOM, marker ?? centerPinRef.current);
+    setZoom(FIT_ZOOM);
+    applyCenter(FIT_ZOOM, marker ?? centerPinRef.current);
   };
 
   const hasCoords =
@@ -304,7 +322,7 @@ export function MapPicker({
         <DialogHeader className="shrink-0 space-y-1 pr-8">
           <DialogTitle>标记地图位置</DialogTitle>
           <DialogDescription>
-            默认整图居中。滚轮缩放，拖拽平移，单击落点。坐标相对整张规范几何（0–1）。
+            默认放大到标记附近（无标记则放大中心）。单击落点后红点会留在图上，弹窗保持打开；拖拽平移，滚轮缩放。复位看整图。
           </DialogDescription>
         </DialogHeader>
 
@@ -364,7 +382,8 @@ export function MapPicker({
 
             <div
               ref={viewportRef}
-              className="bg-muted/40 relative min-h-0 flex-1 cursor-grab touch-none overflow-hidden rounded-md ring-1 ring-border active:cursor-grabbing"
+              className="bg-muted/40 relative min-h-0 flex-1 touch-none overflow-hidden rounded-md ring-1 ring-border"
+              style={{ cursor: panning ? "grabbing" : "crosshair" }}
               onWheel={handleWheel}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
@@ -399,7 +418,7 @@ export function MapPicker({
                       setViewport(vp);
                       setPan(
                         centeredPan(
-                          DEFAULT_ZOOM,
+                          INITIAL_ZOOM,
                           centerPinRef.current,
                           nat,
                           vp
