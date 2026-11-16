@@ -69,13 +69,24 @@ function titleCandidates(
   const baseTitles = wikiTitleCandidates(searchTerm).map((t) =>
     t.replace(/_/g, " ")
   );
-  const candidates = [...baseTitles];
+  const contextual: string[] = [];
   if (context) {
     for (const t of baseTitles) {
-      candidates.push(`${t} ${context}`);
+      contextual.push(`${t} ${context}`);
     }
   }
-  return [...new Set(candidates)];
+  return [...new Set([...contextual, ...baseTitles])];
+}
+
+/** Context must appear in the resolved title or lead; otherwise the page is a same-name miss. */
+export function wikipediaPageMatchesSearchContext(
+  page: { title?: string; extract?: string },
+  context: string
+): boolean {
+  const needle = context.trim().toLowerCase();
+  if (!needle) return true;
+  const haystack = `${page.title ?? ""}\n${page.extract ?? ""}`.toLowerCase();
+  return haystack.includes(needle);
 }
 
 export async function liveWikipediaRetrieve(
@@ -92,6 +103,8 @@ export async function liveWikipediaRetrieve(
 
   try {
     let resolved: WikiPage | null = null;
+    let rejectedForContext = false;
+    let sawDisambiguation = false;
 
     for (const titles of titleCandidates(searchTerm, context)) {
       const { page, error } = await fetchWikiPage(titles, controller.signal);
@@ -103,26 +116,31 @@ export async function liveWikipediaRetrieve(
         });
         return { items: [], diagnostics };
       }
-      if (page) {
-        resolved = page;
-        break;
+      if (!page) continue;
+
+      if (page.title?.toLowerCase().includes("disambiguation")) {
+        sawDisambiguation = true;
+        continue;
       }
+
+      if (context && !wikipediaPageMatchesSearchContext(page, context)) {
+        rejectedForContext = true;
+        continue;
+      }
+
+      resolved = page;
+      break;
     }
 
     if (!resolved?.extract?.trim()) {
       diagnostics.push({
         connectorId: CONNECTOR_ID,
         code: "NO_MATCH",
-        message: "No Wikipedia page resolved",
-      });
-      return { items: [], diagnostics };
-    }
-
-    if (resolved.title?.toLowerCase().includes("disambiguation")) {
-      diagnostics.push({
-        connectorId: CONNECTOR_ID,
-        code: "NO_MATCH",
-        message: "Disambiguation page rejected",
+        message: rejectedForContext
+          ? "Wikipedia page did not match search context"
+          : sawDisambiguation
+            ? "Disambiguation page rejected"
+            : "No Wikipedia page resolved",
       });
       return { items: [], diagnostics };
     }
