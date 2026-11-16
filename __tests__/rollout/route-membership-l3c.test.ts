@@ -23,16 +23,11 @@ describe("L3-C Route membership schema sunset", () => {
 
     expect(patch).not.toHaveProperty("character_ids");
     expect(patch).not.toHaveProperty("location_id");
+    expect(patch).not.toHaveProperty("story_images_v2");
+    expect(patch).not.toHaveProperty("scene_contexts_v1");
+    expect(patch).not.toHaveProperty("frame_provenance_v1");
     expect(Object.keys(patch).sort()).toEqual(
-      [
-        "chapter_number",
-        "chapter_title",
-        "scene_contexts_v1",
-        "story_images_v2",
-        "summary",
-        "tags",
-        "title",
-      ].sort()
+      ["chapter_number", "chapter_title", "summary", "tags", "title"].sort()
     );
   });
 

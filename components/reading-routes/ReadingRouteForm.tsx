@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { type Resolver, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -287,6 +287,11 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
 
   const readingRouteTsid =
     props.mode === "edit" ? props.defaultValues.tsid : "new";
+  const [frameIdentity, setFrameIdentity] = useState<Array<string | null>>(
+    () => (props.mode === "edit" ? props.defaultValues.frameIdentity ?? [] : [])
+  );
+  const expectedFrameProvenance =
+    props.mode === "edit" ? props.defaultValues.frameProvenanceExpected ?? [] : [];
 
   const setFramesAndContexts = (next: {
     frames: ReadingFrame[];
@@ -312,7 +317,10 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
             ),
           });
         } else {
-          await updateScene(workId, props.defaultValues.tsid, payload);
+          await updateScene(workId, props.defaultValues.tsid, payload, {
+            frameIdentity,
+            expectedFrameProvenance,
+          });
         }
         router.push(listHref);
       } catch (e) {
@@ -528,18 +536,33 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
           onMoveUp={(i) => {
             const next = swapFramesWithContexts(frames, sceneContexts, i, i - 1);
             setFramesAndContexts(next);
+            setFrameIdentity((current) => {
+              const copy = [...current];
+              const left = copy[i - 1] ?? null;
+              copy[i - 1] = copy[i] ?? null;
+              copy[i] = left;
+              return copy;
+            });
             if (drawerIndex === i) setDrawerIndex(i - 1);
             else if (drawerIndex === i - 1) setDrawerIndex(i);
           }}
           onMoveDown={(i) => {
             const next = swapFramesWithContexts(frames, sceneContexts, i, i + 1);
             setFramesAndContexts(next);
+            setFrameIdentity((current) => {
+              const copy = [...current];
+              const right = copy[i + 1] ?? null;
+              copy[i + 1] = copy[i] ?? null;
+              copy[i] = right;
+              return copy;
+            });
             if (drawerIndex === i) setDrawerIndex(i + 1);
             else if (drawerIndex === i + 1) setDrawerIndex(i);
           }}
           onRemove={(i) => {
             const next = removeFrameWithContexts(frames, sceneContexts, i);
             setFramesAndContexts(next);
+            setFrameIdentity((current) => current.filter((_, index) => index !== i));
             if (drawerIndex == null) return;
             if (drawerIndex === i) setDrawerIndex(null);
             else if (drawerIndex > i) setDrawerIndex(drawerIndex - 1);
@@ -549,6 +572,7 @@ export function ReadingRouteForm(props: ReadingRouteFormProps) {
               frames: [...frames, { url: "", caption: "" }],
               contexts: sceneContexts,
             });
+            setFrameIdentity((current) => [...current, null]);
             setDrawerIndex(frames.length);
           }}
           onOpen={(i) => setDrawerIndex(i)}

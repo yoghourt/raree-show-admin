@@ -53,6 +53,14 @@ export type ReadingRoute = {
    * (lighting / atmosphere / threatPerception / visualEmphasis). A5 smoke aid.
    */
   frameExpressionHasNarrativeCues?: boolean[];
+  /**
+   * Ids aligned with story_images_v2. Null slots are new frames.
+   * Server assigns the UUID. Not a reader field.
+   */
+  frameIdentity?: Array<string | null>;
+  /** Raw frame_provenance_v1 from the load that filled this form. */
+  frameProvenanceExpected?: unknown;
+  frameStructureBijection?: boolean;
 };
 
 export type Character = {

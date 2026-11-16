@@ -1,7 +1,9 @@
 /**
  * IMPLEMENT-SCC-001-L3-B — Work-scoped Scene Context backfill CLI.
  *
- * Default: dry-run (plan only). Pass --apply to write scene_contexts_v1.
+ * Default: dry-run (plan only). Pass --apply to write scene_contexts_v1
+ * through apply_scene_frame_structure. A direct context update is rejected
+ * once the frame-identity trigger is installed.
  *
  * Usage:
  *   npx tsx scripts/scene-context-backfill/run.ts --workId=<uuid>

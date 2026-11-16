@@ -12,6 +12,8 @@ import {
   parseFrameProvenance,
   parseStoryImagesV2,
 } from "@/lib/rollout/scenes-server"
+import { applySceneFrameStructure } from "@/lib/scene-context/apply-frame-structure"
+import { isPositionalBijection } from "@/lib/scene-context/frame-identity"
 import { syncFrameContextAppearanceFromExpression } from "@/lib/scene-context/frame-context-edit"
 import { parseSceneContextsV1 } from "@/lib/scene-context/parse"
 import {
@@ -21,8 +23,8 @@ import {
   parseFrameExpressionProposal,
 } from "@/lib/prompts/frame-expression-propose"
 import {
+  provenanceWithNewSplitSlots,
   reindexContextsAfterSplit,
-  reindexProvenanceAfterSplit,
   spliceFramesAtIndex,
   type ProductionBeatDraft,
 } from "@/lib/production/split-reading-frame"
@@ -112,8 +114,13 @@ export async function splitReadingFrame(input: {
   }
 
   const inserted = beats.length
-  let provenance = reindexProvenanceAfterSplit(
-    parseFrameProvenance(row.frame_provenance_v1),
+  const currentProvenance = parseFrameProvenance(row.frame_provenance_v1)
+  const currentFrames = parseStoryImagesV2(row.story_images_v2)
+  if (!isPositionalBijection(currentFrames.length, currentProvenance)) {
+    return { ok: false, message: "画面身份不成立，已拒绝保存。" }
+  }
+  let provenance = provenanceWithNewSplitSlots(
+    currentProvenance,
     frameIndex,
     inserted
   )
@@ -123,19 +130,20 @@ export async function splitReadingFrame(input: {
     inserted
   )
 
-  const { error: persistError } = await supabase
-    .from("scenes")
-    .update({
-      story_images_v2: nextFrames,
-      frame_provenance_v1: provenance,
-      scene_contexts_v1: contexts,
+  let persisted
+  try {
+    persisted = await applySceneFrameStructure(supabase, {
+      workId,
+      sceneTsid,
+      expected: row.frame_provenance_v1 ?? [],
+      storyImages: nextFrames,
+      sceneContexts: contexts,
+      provenance,
     })
-    .eq("work_id", workId)
-    .eq("tsid", sceneTsid)
-
-  if (persistError) {
-    return { ok: false, message: persistError.message }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
+  provenance = persisted.frameProvenance
 
   const { data: work } = await supabase
     .from("works")
@@ -228,14 +236,11 @@ export async function splitReadingFrame(input: {
 
   if (newExpressions.length > 0) {
     for (const item of newExpressions) {
-      provenance = [
-        ...provenance.filter((p) => p.frameIndex !== item.frameIndex),
-        {
-          sourceReviewId: `split_${frameIndex}_${item.frameIndex}`,
-          frameIndex: item.frameIndex,
-          rendererExpression: item.expression,
-        },
-      ]
+      provenance = provenance.map((entry) =>
+        entry.frameIndex === item.frameIndex
+          ? { ...entry, rendererExpression: item.expression }
+          : entry
+      )
       const frame = nextFrames[item.frameIndex]
       if (frame) {
         contexts = syncFrameContextAppearanceFromExpression({
@@ -252,16 +257,18 @@ export async function splitReadingFrame(input: {
         })
       }
     }
-    const { error: exprError } = await supabase
-      .from("scenes")
-      .update({
-        frame_provenance_v1: provenance,
-        scene_contexts_v1: contexts,
+    try {
+      const expressed = await applySceneFrameStructure(supabase, {
+        workId,
+        sceneTsid,
+        expected: persisted.frameProvenance,
+        storyImages: nextFrames,
+        sceneContexts: contexts,
+        provenance,
       })
-      .eq("work_id", workId)
-      .eq("tsid", sceneTsid)
-    if (exprError) {
-      expressionWarnings.push(exprError.message)
+      provenance = expressed.frameProvenance
+    } catch (e) {
+      expressionWarnings.push(e instanceof Error ? e.message : String(e))
     }
   }
 

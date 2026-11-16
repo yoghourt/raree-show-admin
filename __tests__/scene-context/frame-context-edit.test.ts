@@ -13,6 +13,11 @@ import {
   swapFramesWithContexts,
   syncFrameContextAppearanceFromExpression,
 } from "@/lib/scene-context/frame-context-edit";
+import {
+  remapProvenance,
+  removeIndexMap,
+  swapIndexMap,
+} from "@/lib/scene-context/frame-identity";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
 
 const ctx = (
@@ -67,6 +72,23 @@ describe("swapFramesWithContexts", () => {
       next.contexts.find((c) => c.contextId === "ctx_a")
         ?.characterAppearanceContext[0]?.archiveTsid
     ).toBe("char_0");
+  });
+
+  it("remaps provenance with the same index map as the frame swap", () => {
+    const entries = [
+      { sourceReviewId: "a", frameIndex: 0, visualIntent: null },
+      { sourceReviewId: "b", frameIndex: 1 },
+      { sourceReviewId: "c", frameIndex: 2 },
+    ];
+    const swapped = remapProvenance(entries, swapIndexMap(0, 1));
+    expect(swapped.map((entry) => entry.sourceReviewId)).toEqual(["b", "a", "c"]);
+    expect(swapped.map((entry) => entry.frameIndex)).toEqual([0, 1, 2]);
+    expect(swapped[1]?.visualIntent).toBeNull();
+    const removed = remapProvenance(entries, removeIndexMap(0));
+    expect(removed.map((entry) => [entry.sourceReviewId, entry.frameIndex])).toEqual([
+      ["b", 0],
+      ["c", 1],
+    ]);
   });
 });
 
