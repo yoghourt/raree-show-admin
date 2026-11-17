@@ -113,7 +113,7 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
       workId: "work-1",
       entityType: "character",
       entityId: "new",
-      scopeField: "Arya Stark",
+      scopeField: "Gared",
       sourceContext: asoiafContext,
       emptyFields: [{ field: "house", copilot_route: "fact" }],
     });
@@ -170,6 +170,60 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
     );
   });
 
+  it("empty narrative value is an error, not a completed field", async () => {
+    mockFetch.mockResolvedValue(makeFakeGeminiResponse(""));
+
+    const { items, errors } = await generateSuggestions({
+      workId: "work-1",
+      entityType: "location",
+      entityId: "loc_1",
+      scopeField: "The Wall",
+      workTitle: "A Song of Ice and Fire",
+      sourceContext: asoiafContext,
+      emptyFields: [{ field: "description", copilot_route: "narrative" }],
+    });
+
+    expect(items).toHaveLength(0);
+    expect(errors).toEqual([
+      {
+        field: "description",
+        code: "EMPTY_RESULT",
+        message: "模型未返回有效建议，请补充反馈后重试",
+      },
+    ]);
+  });
+
+  it("batch narrative keeps filled fields and errors on blank ones", async () => {
+    mockFetch.mockResolvedValue(
+      makeFakeBatchResponse({
+        description: "",
+        signatureQuote: "Winter is coming",
+      })
+    );
+
+    const { items, errors } = await generateSuggestions({
+      workId: "work-1",
+      entityType: "character",
+      entityId: "new",
+      scopeField: "Arya Stark",
+      workTitle: "A Song of Ice and Fire",
+      sourceContext: asoiafContext,
+      emptyFields: [
+        { field: "description", copilot_route: "narrative" },
+        { field: "signatureQuote", copilot_route: "narrative" },
+      ],
+    });
+
+    expect(items.map((item) => item.field)).toEqual(["signatureQuote"]);
+    expect(errors).toEqual([
+      {
+        field: "description",
+        code: "EMPTY_RESULT",
+        message: "模型未返回有效建议，请补充反馈后重试",
+      },
+    ]);
+  });
+
   it("public franchise without evidence refuses ungrounded narrative (no LLM invent)", async () => {
     process.env.MOCK_AWOIAF_TIER = "none";
     process.env.MOCK_WIKIPEDIA_EN_TIER = "none";
@@ -212,7 +266,7 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
       workId: "work-1",
       entityType: "character",
       entityId: "new",
-      scopeField: "叶文洁",
+      scopeField: "Gared",
       workTitle: "三体",
       sourceContext: asoiafContext,
       emptyFields: [
@@ -237,7 +291,7 @@ describe("generateSuggestions — SC-03 fallback invariants", () => {
       workId: "work-1",
       entityType: "character",
       entityId: "new",
-      scopeField: "Arya Stark",
+      scopeField: "Gared",
       sourceContext: asoiafContext,
       emptyFields: [
         { field: "house", copilot_route: "fact" },
@@ -272,7 +326,7 @@ describe("generateRetrySuggestions — Option B retry", () => {
       ],
       {
         entityType: "character",
-        scopeFieldValue: "Arya Stark",
+        scopeFieldValue: "Gared",
         workId: "work-1",
         sourceContext: asoiafContext,
       }

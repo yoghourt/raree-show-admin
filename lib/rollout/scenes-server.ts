@@ -6,6 +6,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { applySceneFrameStructure } from "@/lib/scene-context/apply-frame-structure";
+
 import { isValidSceneChapterNumber } from "@/lib/discovery/scene-chapter-number";
 import type {
   RendererExpression,
@@ -273,21 +275,38 @@ export async function updateSceneFramesAndProvenance(
   provenance: FrameProvenanceEntry[],
   options?: { sceneContexts?: SceneContextRecord[] }
 ): Promise<SceneRowWithProvenance> {
-  const patch: Record<string, unknown> = {
-    story_images_v2: frames,
-    frame_provenance_v1: provenance,
-  };
   const withContexts = options?.sceneContexts !== undefined;
-  if (withContexts) {
-    patch.scene_contexts_v1 = options.sceneContexts;
+  const { data: current, error: currentError } = await supabase
+    .from("scenes")
+    .select("frame_provenance_v1, scene_contexts_v1")
+    .eq("work_id", workId)
+    .eq("tsid", tsid)
+    .maybeSingle();
+  if (currentError) throw new Error(currentError.message);
+  if (!current) {
+    throw new Error("无法写入画面结构。");
   }
+  const currentRow = current as {
+    frame_provenance_v1?: unknown;
+    scene_contexts_v1?: unknown;
+  };
+
+  await applySceneFrameStructure(supabase, {
+    workId,
+    sceneTsid: tsid,
+    expected: currentRow.frame_provenance_v1 ?? [],
+    storyImages: frames,
+    sceneContexts: withContexts
+      ? options?.sceneContexts ?? []
+      : currentRow.scene_contexts_v1 ?? [],
+    provenance,
+  });
 
   const { data, error } = await supabase
     .from("scenes")
-    .update(patch)
+    .select(withContexts ? SELECT_COLS_WITH_CONTEXTS : SELECT_COLS)
     .eq("work_id", workId)
     .eq("tsid", tsid)
-    .select(withContexts ? SELECT_COLS_WITH_CONTEXTS : SELECT_COLS)
     .single();
 
   if (error) {
@@ -359,12 +378,41 @@ export async function replaceSceneContextsOnly(
   tsid: string,
   sceneContexts: SceneContextRecord[]
 ): Promise<SceneRowWithProvenance> {
-  const { data, error } = await supabase
+  const { data: current, error: currentError } = await supabase
     .from("scenes")
-    .update({ scene_contexts_v1: sceneContexts })
+    .select("story_images_v2, frame_provenance_v1")
     .eq("work_id", workId)
     .eq("tsid", tsid)
+    .maybeSingle();
+  if (currentError) {
+    if (/scene_contexts_v1/i.test(currentError.message)) {
+      throw new Error(
+        "scene_contexts_v1 missing — apply docs/supabase/migrations/20260808000000_scene_contexts_v1.sql before L3-B backfill"
+      );
+    }
+    throw new Error(currentError.message);
+  }
+  if (!current) {
+    throw new Error("无法写入画面结构。");
+  }
+  const currentRow = current as {
+    story_images_v2?: unknown;
+    frame_provenance_v1?: unknown;
+  };
+  await applySceneFrameStructure(supabase, {
+    workId,
+    sceneTsid: tsid,
+    expected: currentRow.frame_provenance_v1 ?? [],
+    storyImages: currentRow.story_images_v2 ?? [],
+    sceneContexts,
+    provenance: currentRow.frame_provenance_v1 ?? [],
+  });
+
+  const { data, error } = await supabase
+    .from("scenes")
     .select(SELECT_COLS_WITH_CONTEXTS)
+    .eq("work_id", workId)
+    .eq("tsid", tsid)
     .single();
 
   if (error) {

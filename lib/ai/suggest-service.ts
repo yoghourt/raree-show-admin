@@ -351,21 +351,26 @@ ${narrativeGroundingRules(hasEvidence)}
 仅输出 JSON 对象，不要有其他内容。`;
 }
 
+function emptyFieldResultError(field: string): {
+  field: string;
+  code: string;
+  message: string;
+} {
+  return {
+    field,
+    code: "EMPTY_RESULT",
+    message: "模型未返回有效建议，请补充反馈后重试",
+  };
+}
+
 function collectEmptyFieldErrors(
   fieldKeys: string[],
-  values: Record<string, string>,
-  treatEmptyAsError: boolean
+  values: Record<string, string>
 ): Array<{ field: string; code: string; message: string }> {
-  if (!treatEmptyAsError) return [];
-
   const errors: Array<{ field: string; code: string; message: string }> = [];
   for (const field of fieldKeys) {
     if (!(values[field] ?? "").trim()) {
-      errors.push({
-        field,
-        code: "EMPTY_RESULT",
-        message: "模型未返回有效建议，请补充反馈后重试",
-      });
+      errors.push(emptyFieldResultError(field));
     }
   }
   return errors;
@@ -558,7 +563,10 @@ async function generateOptionBSuggestions(
         sourceContext: req.sourceContext,
         acceptedFacts,
       });
-      if (!item.value.trim()) continue;
+      if (!item.value.trim()) {
+        errors.push(emptyFieldResultError(fr.field));
+        continue;
+      }
       items.push(item);
     } catch (e) {
       errors.push(toSuggestFieldError(fr.field, e));
@@ -618,8 +626,7 @@ async function generateOptionBSuggestions(
         errors.push(
           ...collectEmptyFieldErrors(
             narrativeFields.map((f) => f.field),
-            values,
-            false
+            values
           )
         );
       }
@@ -675,7 +682,10 @@ async function generateSequentialSuggestions(
               acceptedFacts,
             });
 
-      if (!item.value.trim()) continue;
+      if (!item.value.trim()) {
+        errors.push(emptyFieldResultError(fr.field));
+        continue;
+      }
       items.push(item);
     } catch (e) {
       errors.push(toSuggestFieldError(fr.field, e));

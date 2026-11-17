@@ -11,7 +11,15 @@ import {
   aggregateStoryRelatedRefs,
   formatStoryRelatedAggregateLine,
 } from "@/lib/scene-context/aggregate-story-refs";
+import {
+  applySceneFrameStructure,
+  FrameStructureWriteError,
+} from "@/lib/scene-context/apply-frame-structure";
 import { syncFrameContextAppearanceFromExpression } from "@/lib/scene-context/frame-context-edit";
+import {
+  isPositionalBijection,
+  provenanceFromIdentity,
+} from "@/lib/scene-context/frame-identity";
 import { parseSceneContextsV1 } from "@/lib/scene-context/parse";
 import type { SceneContextRecord } from "@/lib/scene-context/types";
 import type { ReadingFrame, ReadingRoute } from "@/lib/types";
@@ -114,6 +122,15 @@ function rowToReadingRoute(row: ReadingRouteRow): ReadingRoute {
     relatedFromContextsLine: relatedLineFromRouteRow(row),
     frameHasRendererExpression,
     frameExpressionHasNarrativeCues,
+    frameIdentity: (frames ?? []).map((_, frameIndex) => {
+      const entry = provenance.find((item) => item.frameIndex === frameIndex);
+      return entry?.sourceReviewId ?? null;
+    }),
+    frameProvenanceExpected: row.frame_provenance_v1 ?? [],
+    frameStructureBijection: isPositionalBijection(
+      frames?.length ?? 0,
+      provenance
+    ),
   };
 }
 
@@ -139,7 +156,7 @@ function toInsertRow(
   };
 }
 
-/** Update patch for Reading Route delivery fields + hosted Contexts (no membership columns). */
+/** Narrative fields only. Frame columns go through apply_scene_frame_structure. */
 export function toUpdateRowWithoutMembership(
   data: ReadingRouteWriteInput
 ): Record<string, unknown> {
@@ -149,8 +166,6 @@ export function toUpdateRowWithoutMembership(
     chapter_title: data.chapter_title ?? null,
     summary: data.summary,
     tags: data.tags,
-    story_images_v2: data.story_images_v2 ?? [],
-    scene_contexts_v1: data.sceneContexts ?? [],
   };
 }
 
@@ -322,8 +337,12 @@ export async function createScene(
         sceneContexts: rest.sceneContexts ?? [],
       };
 
-    const insertRow = toInsertRow(workId, full);
-    console.log("[scenes] createScene Supabase insert payload", insertRow);
+    const insertRow = {
+      ...toInsertRow(workId, full),
+      story_images_v2: [],
+      scene_contexts_v1: [],
+      frame_provenance_v1: [],
+    };
 
     const { data: inserted, error } = await supabase
       .from(TABLE)
@@ -335,7 +354,33 @@ export async function createScene(
       throw new Error(error.message);
     }
 
-    return rowToReadingRoute(inserted as ReadingRouteRow);
+    const created = inserted as ReadingRouteRow;
+    const frames = full.story_images_v2 ?? [];
+    const contexts = full.sceneContexts ?? [];
+    if (frames.length > 0 || contexts.length > 0) {
+      try {
+        await applySceneFrameStructure(supabase, {
+          workId,
+          sceneTsid: created.tsid,
+          expected: [],
+          storyImages: frames,
+          sceneContexts: contexts,
+          provenance: frames.map((_, frameIndex) => ({
+            sourceReviewId: "",
+            frameIndex,
+          })),
+        });
+      } catch (frameError) {
+        await supabase.from(TABLE).delete().eq("work_id", workId).eq("tsid", created.tsid);
+        throw frameError;
+      }
+    }
+
+    const reloaded = await getScene(workId, created.tsid);
+    if (!reloaded) {
+      throw new FrameStructureWriteError("frame_write_rejected");
+    }
+    return reloaded;
   } catch (e) {
     if (e instanceof Error) {
       throw e;
@@ -344,28 +389,136 @@ export async function createScene(
   }
 }
 
-export async function updateScene(
+export type SceneFrameWrite = {
+  frameIdentity: Array<string | null>;
+  expectedFrameProvenance: unknown;
+};
+
+function framesMatch(
+  current: ReadingFrame[],
+  next: ReadingFrame[]
+): boolean {
+  if (current.length !== next.length) return false;
+  return current.every(
+    (frame, index) =>
+      frame.url === next[index]?.url && frame.caption === next[index]?.caption
+  );
+}
+
+function classifyLegacyFrames(
+  current: ReadingFrame[],
+  next: ReadingFrame[]
+): "unchanged" | "urls_only" | "rejected" {
+  if (current.length !== next.length) return "rejected";
+  let urlChanged = false;
+  for (let index = 0; index < current.length; index += 1) {
+    if ((current[index]?.caption ?? "") !== (next[index]?.caption ?? "")) {
+      return "rejected";
+    }
+    if ((current[index]?.url ?? "") !== (next[index]?.url ?? "")) {
+      urlChanged = true;
+    }
+  }
+  return urlChanged ? "urls_only" : "unchanged";
+}
+
+async function loadSceneFrameRow(workId: string, tsid: string) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("story_images_v2, frame_provenance_v1, scene_contexts_v1")
+    .eq("work_id", workId)
+    .eq("tsid", tsid)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new FrameStructureWriteError("frame_write_rejected");
+  const row = data as {
+    story_images_v2?: unknown;
+    frame_provenance_v1?: unknown;
+    scene_contexts_v1?: unknown;
+  };
+  const frames = parseStoryImagesV2(row.story_images_v2) ?? [];
+  const provenance = parseFrameProvenance(row.frame_provenance_v1);
+  const contexts = parseSceneContextsV1(row.scene_contexts_v1);
+  return { row, frames, provenance, contexts };
+}
+
+async function writeNarrative(
   workId: string,
   tsid: string,
   data: ReadingRouteWriteInput
 ): Promise<void> {
+  const { error } = await supabase
+    .from(TABLE)
+    .update(toUpdateRow(data))
+    .eq("work_id", workId)
+    .eq("tsid", tsid);
+  if (error) throw new Error(error.message);
+}
+
+export async function updateScene(
+  workId: string,
+  tsid: string,
+  data: ReadingRouteWriteInput,
+  frameWrite?: SceneFrameWrite
+): Promise<void> {
   try {
-    const updateRow = toUpdateRow(data);
-    console.log("[scenes] updateScene Supabase update payload", updateRow);
+    const loaded = await loadSceneFrameRow(workId, tsid);
+    const nextFrames = data.story_images_v2 ?? [];
+    const nextContexts = data.sceneContexts ?? [];
+    const contextsUnchanged =
+      JSON.stringify(loaded.contexts) === JSON.stringify(nextContexts);
+    const structureUnchanged =
+      framesMatch(loaded.frames, nextFrames) && contextsUnchanged;
 
-    const { error } = await supabase
-      .from(TABLE)
-      .update(updateRow)
-      .eq("work_id", workId)
-      .eq("tsid", tsid);
-
-    if (error) {
-      throw new Error(error.message);
+    if (!structureUnchanged) {
+      if (!isPositionalBijection(loaded.frames.length, loaded.provenance)) {
+        throw new FrameStructureWriteError("frame_structure_invariant");
+      }
+      if (frameWrite) {
+        const identity =
+          frameWrite.frameIdentity.length === nextFrames.length
+            ? frameWrite.frameIdentity
+            : null;
+        if (!identity) {
+          throw new FrameStructureWriteError("frame_structure_invariant");
+        }
+        let provenance;
+        try {
+          provenance = provenanceFromIdentity(
+            identity,
+            parseFrameProvenance(frameWrite.expectedFrameProvenance)
+          );
+        } catch {
+          throw new FrameStructureWriteError("frame_structure_invariant");
+        }
+        await applySceneFrameStructure(supabase, {
+          workId,
+          sceneTsid: tsid,
+          expected: frameWrite.expectedFrameProvenance ?? [],
+          storyImages: nextFrames,
+          sceneContexts: nextContexts,
+          provenance,
+        });
+      } else {
+        const kind = classifyLegacyFrames(loaded.frames, nextFrames);
+        if (kind === "urls_only" && contextsUnchanged) {
+          await applySceneFrameStructure(supabase, {
+            workId,
+            sceneTsid: tsid,
+            expected: loaded.row.frame_provenance_v1 ?? [],
+            storyImages: nextFrames,
+            sceneContexts: loaded.contexts,
+            provenance: loaded.provenance,
+          });
+        } else if (kind !== "unchanged" || !contextsUnchanged) {
+          throw new FrameStructureWriteError("frame_structure_invariant");
+        }
+      }
     }
+
+    await writeNarrative(workId, tsid, data);
   } catch (e) {
-    if (e instanceof Error) {
-      throw e;
-    }
+    if (e instanceof Error) throw e;
     throw new Error(String(e));
   }
 }
@@ -395,12 +548,10 @@ export async function getFrameProvenance(
 
 /**
  * Upsert or clear rendererExpression on frame_provenance_v1 at frameIndex.
- * Keeps existing sourceReviewId when present; otherwise uses `manual_${frameIndex}`.
- * When expression is null: strips Expression from the entry, or drops the entry
- * if nothing else (Intent / sourceContextId) remains.
+ * Keeps the existing sourceReviewId. A frame with no id is rejected.
+ * When expression is null: strips Expression from the entry.
  * When expression is saved: replaces that frame's Scene Context 出场人物 from
- * Expression.characters (Archive name match) so operators need not edit cast
- * on the story page.
+ * Expression.characters (Archive name match).
  */
 export async function patchFrameProvenanceExpression(
   workId: string,
@@ -464,16 +615,14 @@ export async function patchFrameProvenanceExpression(
     };
     if (existing.visualIntent) kept.visualIntent = existing.visualIntent;
     if (existing.sourceContextId) kept.sourceContextId = existing.sourceContextId;
-    const hasExtras = Boolean(kept.visualIntent || kept.sourceContextId);
-    if (hasExtras) {
-      next = [...provenance];
-      next[existingIdx] = kept;
-    } else {
-      next = provenance.filter((_, i) => i !== existingIdx);
-    }
+    next = [...provenance];
+    next[existingIdx] = kept;
   } else {
+    if (!existing?.sourceReviewId?.trim()) {
+      throw new FrameStructureWriteError("frame_structure_invariant");
+    }
     const entry: FrameProvenanceEntry = {
-      sourceReviewId: existing?.sourceReviewId ?? `manual_${frameIndex}`,
+      sourceReviewId: existing.sourceReviewId,
       frameIndex,
       rendererExpression: parsedExpr.value,
     };
@@ -489,7 +638,7 @@ export async function patchFrameProvenanceExpression(
     }
   }
 
-  const patch: Record<string, unknown> = { frame_provenance_v1: next };
+  let nextContexts = parseSceneContextsV1(row.scene_contexts_v1);
 
   if (parsedExpr !== null) {
     const frame = frames[frameIndex];
@@ -515,7 +664,7 @@ export async function patchFrameProvenanceExpression(
       const chapterTitle =
         typeof row.chapter_title === "string" ? row.chapter_title : null;
       const routeTitle = typeof row.title === "string" ? row.title : "";
-      patch.scene_contexts_v1 = syncFrameContextAppearanceFromExpression({
+      nextContexts = syncFrameContextAppearanceFromExpression({
         workId,
         readingRouteTsid: tsid,
         frameIndex,
@@ -530,15 +679,21 @@ export async function patchFrameProvenanceExpression(
     }
   }
 
-  const { error: updateError } = await supabase
-    .from(TABLE)
-    .update(patch)
-    .eq("work_id", workId)
-    .eq("tsid", tsid);
-
-  if (updateError) {
-    throw new Error(updateError.message);
+  if (!isPositionalBijection(frames.length, provenance)) {
+    throw new FrameStructureWriteError("frame_structure_invariant");
   }
+  if (!isPositionalBijection(frames.length, next)) {
+    throw new FrameStructureWriteError("frame_structure_invariant");
+  }
+
+  await applySceneFrameStructure(supabase, {
+    workId,
+    sceneTsid: tsid,
+    expected: row.frame_provenance_v1 ?? [],
+    storyImages: frames,
+    sceneContexts: nextContexts,
+    provenance: next,
+  });
 }
 
 /**
@@ -551,11 +706,11 @@ export async function patchSceneFrameUrls(
   tsid: string,
   patches: Array<{ frameIndex: number; url: string }>
 ): Promise<void> {
-  const scene = await getScene(workId, tsid);
-  if (!scene) {
-    throw new Error(`故事不存在：${tsid}`);
+  const loaded = await loadSceneFrameRow(workId, tsid);
+  if (!isPositionalBijection(loaded.frames.length, loaded.provenance)) {
+    throw new FrameStructureWriteError("frame_structure_invariant");
   }
-  const frames = [...(scene.story_images_v2 ?? [])];
+  const frames = [...loaded.frames];
   for (const patch of patches) {
     const url = patch.url.trim();
     if (!url) {
@@ -566,19 +721,24 @@ export async function patchSceneFrameUrls(
         `帧索引越界：${tsid}[${patch.frameIndex}]（共 ${frames.length} 帧）`
       );
     }
+    const current = frames[patch.frameIndex];
+    if (!current) {
+      throw new Error(
+        `帧索引越界：${tsid}[${patch.frameIndex}]（共 ${frames.length} 帧）`
+      );
+    }
     frames[patch.frameIndex] = {
-      ...frames[patch.frameIndex],
+      ...current,
       url,
     };
   }
-  await updateScene(workId, tsid, {
-    title: scene.title,
-    chapter_number: scene.chapter_number,
-    chapter_title: scene.chapter_title,
-    summary: scene.summary,
-    tags: scene.tags,
-    story_images_v2: frames,
-    sceneContexts: scene.sceneContexts,
+  await applySceneFrameStructure(supabase, {
+    workId,
+    sceneTsid: tsid,
+    expected: loaded.row.frame_provenance_v1 ?? [],
+    storyImages: frames,
+    sceneContexts: loaded.contexts,
+    provenance: loaded.provenance,
   });
 }
 

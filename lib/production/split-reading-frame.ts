@@ -85,6 +85,31 @@ export function reindexProvenanceAfterSplit(
   return out;
 }
 
+/**
+ * Drop the split frame's id, shift the rest, and leave blank ids in the new
+ * slots. The frame RPC mints those ids. The old id is not reused.
+ */
+export function provenanceWithNewSplitSlots(
+  entries: FrameProvenanceEntry[],
+  splitAt: number,
+  insertedCount: number
+): FrameProvenanceEntry[] {
+  const kept = reindexProvenanceAfterSplit(entries, splitAt, insertedCount);
+  const byIndex = new Map(kept.map((entry) => [entry.frameIndex, entry]));
+  const lastIndex = Math.max(
+    splitAt + insertedCount - 1,
+    ...kept.map((entry) => entry.frameIndex),
+    -1
+  );
+  const out: FrameProvenanceEntry[] = [];
+  for (let index = 0; index <= lastIndex; index += 1) {
+    out.push(
+      byIndex.get(index) ?? { sourceReviewId: "", frameIndex: index }
+    );
+  }
+  return out;
+}
+
 export function reindexContextsAfterSplit(
   contexts: SceneContextRecord[],
   splitAt: number,

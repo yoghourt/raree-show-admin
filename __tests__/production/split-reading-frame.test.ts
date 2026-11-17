@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   draftProductionBeatsFromCaption,
+  provenanceWithNewSplitSlots,
   reindexContextsAfterSplit,
   reindexProvenanceAfterSplit,
   shiftIndexAfterSplit,
@@ -67,5 +68,21 @@ describe("reindex after split", () => {
     ] as SceneContextRecord[];
     const nextC = reindexContextsAfterSplit(contexts, 1, 3);
     expect(nextC.map((c) => c.projectsToFrameIndex)).toEqual([4]);
+  });
+
+  it("gives the new slots blank ids and keeps the other ids", () => {
+    const provenance: FrameProvenanceEntry[] = [
+      { sourceReviewId: "a", frameIndex: 0, visualIntent: null },
+      { sourceReviewId: "b", frameIndex: 1 },
+      { sourceReviewId: "c", frameIndex: 2 },
+    ];
+    const next = provenanceWithNewSplitSlots(provenance, 1, 2);
+    expect(next.map((entry) => entry.frameIndex)).toEqual([0, 1, 2, 3]);
+    expect(next.map((entry) => entry.sourceReviewId)).toEqual(["a", "", "", "c"]);
+    expect(next[0]?.visualIntent).toBeNull();
+    expect(next.some((entry) => entry.sourceReviewId === "b")).toBe(false);
+    expect(next.some((entry) => entry.sourceReviewId.startsWith("split_"))).toBe(
+      false
+    );
   });
 });
